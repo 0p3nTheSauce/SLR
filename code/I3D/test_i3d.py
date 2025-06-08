@@ -65,6 +65,16 @@ def run(init_lr=0.1,
     # setup dataset
     test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
 
+    #check the file paths
+    print(f"\nInside run function:")
+    print(f"Training split file: {train_split}")
+    if not os.path.exists(root):
+        print(f"Root directory does not exist: {root}")
+        return
+    print(f"Root directory exists: {os.path.exists(root)}")
+    print()
+    
+    
     val_dataset = Dataset(train_split, 'test', root, mode, test_transforms)
     val_dataloader = torch.utils.data.DataLoader(val_dataset, batch_size=1,
                                                  shuffle=False, num_workers=2,
@@ -90,15 +100,21 @@ def run(init_lr=0.1,
     correct_5 = 0
     correct_10 = 0
 
-    top1_fp = np.zeros(num_classes, dtype=np.int)
-    top1_tp = np.zeros(num_classes, dtype=np.int)
+    top1_fp = np.zeros(num_classes, dtype=np.int64)
+    top1_tp = np.zeros(num_classes, dtype=np.int64)
 
-    top5_fp = np.zeros(num_classes, dtype=np.int)
-    top5_tp = np.zeros(num_classes, dtype=np.int)
+    top5_fp = np.zeros(num_classes, dtype=np.int64)
+    top5_tp = np.zeros(num_classes, dtype=np.int64)
 
-    top10_fp = np.zeros(num_classes, dtype=np.int)
-    top10_tp = np.zeros(num_classes, dtype=np.int)
-
+    top10_fp = np.zeros(num_classes, dtype=np.int64)
+    top10_tp = np.zeros(num_classes, dtype=np.int64)
+    
+    ####### Error handling for missing video files #######
+    if len(dataloaders["test"]) == 0:
+        print("No videos found in the dataset. Please check the dataset path and ensure it contains valid video files.")
+        return
+    
+    
     for data in dataloaders["test"]:
         inputs, labels, video_id = data  # inputs: b, c, t, h, w
 
@@ -162,16 +178,16 @@ def ensemble(mode, root, train_split, weights, num_classes):
     correct = 0
     correct_5 = 0
     correct_10 = 0
-    # confusion_matrix = np.zeros((num_classes,num_classes), dtype=np.int)
+    # confusion_matrix = np.zeros((num_classes,num_classes), dtype=np.int64)
 
-    top1_fp = np.zeros(num_classes, dtype=np.int)
-    top1_tp = np.zeros(num_classes, dtype=np.int)
+    top1_fp = np.zeros(num_classes, dtype=np.int64)
+    top1_tp = np.zeros(num_classes, dtype=np.int64)
 
-    top5_fp = np.zeros(num_classes, dtype=np.int)
-    top5_tp = np.zeros(num_classes, dtype=np.int)
+    top5_fp = np.zeros(num_classes, dtype=np.int64)
+    top5_tp = np.zeros(num_classes, dtype=np.int64)
 
-    top10_fp = np.zeros(num_classes, dtype=np.int)
-    top10_tp = np.zeros(num_classes, dtype=np.int)
+    top10_fp = np.zeros(num_classes, dtype=np.int64)
+    top10_tp = np.zeros(num_classes, dtype=np.int64)
 
     for data in dataloaders["test"]:
         inputs, labels, video_id = data  # inputs: b, c, t, h, w
