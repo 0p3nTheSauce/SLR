@@ -24,6 +24,11 @@ def video_to_tensor(pic):
 def load_rgb_frames_from_video(vid_root, vid, start, num):
     video_path = os.path.join(vid_root, vid + '.mp4')
 
+    # Check if the video file exists
+    if not os.path.exists(video_path):
+        print(f"Video file {video_path} does not exist.")
+        raise FileNotFoundError(f"Video file {video_path} not found.")
+    
     vidcap = cv2.VideoCapture(video_path)
     # vidcap = cv2.VideoCapture('/home/dxli/Desktop/dm_256.mp4')
 
