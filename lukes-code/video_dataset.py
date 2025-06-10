@@ -35,16 +35,17 @@ def get_split(root, lst_gloss_dicts, split):
   return mod_instances, class_names
 
 class VideoDataset(Dataset):
-  def __init__(self, root, split, json_path, transform=None, preprocess="on"):
+  def __init__(self, root, split, json_path, transform=None, preprocess_strat="off"):
     self.root = root
     self.split = split
     self.transform = transform
-    self.preprocess = preprocess
     with open(json_path, 'r') as f:
       asl_num = json.load(f)
       instances, classes = get_split(root,asl_num, split)
       self.data = instances
       self.classes = classes
+    if preprocess_strat == "off":
+      self.load_func = 
     
   
   def __preprocess__(self, storage='data_cache'):
@@ -56,7 +57,7 @@ class VideoDataset(Dataset):
       label_num, video_id = item['label_num'], item['video_id']
       frame_start, frame_end = item['frame_start'], item['frame_end']
       bbox = item['bbox']
-      base_name = f"{video_id}_{label_num}.pt"
+      base_name = f"{video_id}.pt"
       fname = os.path.join(cache_path, base_name)
       if os.path.exists(fname):
         continue
@@ -66,12 +67,25 @@ class VideoDataset(Dataset):
       if self.transform:
         frames = self.transform(frames)
       torch.save({"frames": frames, "label_num": label_num}, fname)  
-      
-  
-  
-  def __len__(self):
-    return len(self.data)
+    self.preprocessed = True
 
+  def __calc_path__(self,v_id,storage):
+    cache_path = os.path.join(self.root, storage)
+    base_name = f"{v_id}.pt"
+    return os.path.join(cache_path, base_name)
+
+  def __load_preprocessed__(self,video_id,storage='data_cache'):
+    return torch.load(__calc_path__(self,video_id,storage))
+
+  def __manual_load__(self,item):
+    frames = crop_frames(
+      load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
+                                 item['frame_end'])
+      , item['bbox']) 
+    if self.transform:
+      frames = self.transform(frames)
+    return {"frames" : frames, "label_num" : item['label_num']}
+  
   def __getitem__(self, idx):
     item = self.data[idx]
     frames = crop_frames(
@@ -80,8 +94,10 @@ class VideoDataset(Dataset):
       , item['bbox']) 
     if self.transform:
       frames = self.transform(frames)
-    return frames, item['label_num']
+    return {"frames" : frames, "label_num" : item['label_num']}
   
+  def __len__(self):
+    return len(self.data)
   #TODO: Make a ca
 ###################################################################################################################################################################  
 
