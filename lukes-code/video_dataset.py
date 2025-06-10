@@ -35,18 +35,40 @@ def get_split(root, lst_gloss_dicts, split):
   return mod_instances, class_names
 
 class VideoDataset(Dataset):
-  def __init__(self, root, split, json_path, transform=None):
+  def __init__(self, root, split, json_path, transform=None, preprocess="on"):
     self.root = root
     self.split = split
     self.transform = transform
+    self.preprocess = preprocess
     with open(json_path, 'r') as f:
       asl_num = json.load(f)
       instances, classes = get_split(root,asl_num, split)
       self.data = instances
       self.classes = classes
-       
+    
+  
+  def __preprocess__(self, storage='data_cache'):
+    # This method can be used to preprocess the data if needed
+    cache_path = os.path.join(self.root, storage)
+    if not os.path.exists(cache_path):
+      os.makedirs(cache_path)
+    for item in self.data:
+      label_num, video_id = item['label_num'], item['video_id']
+      frame_start, frame_end = item['frame_start'], item['frame_end']
+      bbox = item['bbox']
+      base_name = f"{video_id}_{label_num}.pt"
+      fname = os.path.join(cache_path, base_name)
+      if os.path.exists(fname):
+        continue
+      frames = crop_frames(
+        load_rgb_frames_from_video(self.root, video_id, frame_start,
+                                   frame_end), bbox)
+      if self.transform:
+        frames = self.transform(frames)
+      torch.save({"frames": frames, "label_num": label_num}, fname)  
       
-
+  
+  
   def __len__(self):
     return len(self.data)
 
@@ -58,7 +80,9 @@ class VideoDataset(Dataset):
       , item['bbox']) 
     if self.transform:
       frames = self.transform(frames)
-    return { 'frames': frames, 'label': te}
+    return frames, item['label_num']
+  
+  #TODO: Make a ca
 ###################################################################################################################################################################  
 
 
