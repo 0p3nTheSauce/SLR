@@ -8,6 +8,7 @@ start_kit/videos/
 code/I3D/archived/
 *.pt
 
+*.pyc
 *.zip
 data/
 .venv

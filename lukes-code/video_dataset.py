@@ -1,0 +1,120 @@
+import torch
+from torch.utils.data import Dataset
+import os
+from torchcodec.decoders import VideoDecoder
+import json
+from torch.utils.data import Dataset
+import cv2
+
+def load_rgb_frames_from_video(root, vid, start, end):
+  video_path = os.path.join(root,vid+'.mp4')
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+  decoder = VideoDecoder(video_path, device=device)
+  return decoder.get_frames_in_range(start, end).data
+
+def crop_frames(frames, bbox):
+  return frames[:, :, bbox[1]:bbox[3], bbox[0]:bbox[2]]
+   
+
+def get_split(root, lst_gloss_dicts, split):
+  mod_instances = []
+  class_names = []
+  for i, gloss_dict in enumerate(lst_gloss_dicts):
+    label_text = gloss_dict['gloss']
+    instances = gloss_dict['instances']
+    for inst in instances:
+      if inst['split'] == split:
+        mod_instances.append({
+          'label_num': i,
+          'bbox': inst['bbox'],
+          'frame_end': inst['frame_end'],
+          'frame_start': inst['frame_start'],
+          'video_id': inst['video_id'],
+        }) 
+        class_names.append(label_text) 
+  return mod_instances, class_names
+
+class VideoDataset(Dataset):
+  def __init__(self, root, split, json_path, transform=None):
+    self.root = root
+    self.split = split
+    self.transform = transform
+    with open(json_path, 'r') as f:
+      asl_num = json.load(f)
+      instances, classes = get_split(root,asl_num, split)
+      self.data = instances
+      self.classes = classes
+       
+      
+
+  def __len__(self):
+    return len(self.data)
+
+  def __getitem__(self, idx):
+    item = self.data[idx]
+    frames = crop_frames(
+      load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
+                                 item['frame_end'])
+      , item['bbox']) 
+    if self.transform:
+      frames = self.transform(frames)
+    return { 'frames': frames, 'label': te}
+###################################################################################################################################################################  
+
+
+
+def test_video():
+  video_path = 'video'
+  start = 0
+  num = 10
+  out = 'output'
+  if not os.path.exists(out):
+    os.makedirs(out)
+  data = load_rgb_frames_from_video('.', video_path, start, num)
+  #type 
+  
+  print()
+  print(data.shape)
+  print()
+  lent = data.shape[0]
+  print("Number of frames:", lent)
+  # for i in range(lent):
+  #   img = data[i]
+  #   cv2.imshow('Frame', img.permute(1, 2, 0).cpu().numpy())
+  #   cv2.waitKey(100)  # Display each frame for 100 ms
+  # cv2.destroyAllWindows()
+  # img = data[0]
+  # disp_image(img)
+  for i in range(lent-1, -1, -1):
+    img = data[i].permute(1, 2, 0).cpu().numpy()
+    cv2.imwrite(f"{out}/frame_{i:04d}.jpg", img)
+  print("Image displayed successfully.")  
+  
+def test_crop():
+  video_path = 'video'
+  start = 0
+  num = 10
+  out = 'output'
+  if not os.path.exists(out):
+    os.makedirs(out)
+  data = load_rgb_frames_from_video('.', video_path, start, num)
+  #type 
+  
+  print()
+  print(data.shape)
+  print()
+  lent = data.shape[0]
+  print("Number of frames:", lent)
+  # for i in range(lent):
+  #   img = data[i]
+  #   cv2.imshow('Frame', img.permute(1, 2, 0).cpu().numpy())
+  #   cv2.waitKey(100)  # Display each frame for 100 ms
+  # cv2.destroyAllWindows()
+  # img = data[0]
+  # disp_image(img)
+  bbox = [137,16,492,480]
+  cropped_data = crop_frames(data, bbox)
+  for i, cropped_frame in enumerate(cropped_data):
+    img = cropped_frame.permute(1, 2, 0).cpu().numpy()
+    cv2.imwrite(f"{out}/cropped_frame_{i:04d}.jpg", img)
+    
