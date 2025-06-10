@@ -35,8 +35,9 @@ def get_split(root, lst_gloss_dicts, split):
   return mod_instances, class_names
 
 class VideoDataset(Dataset):
-  def __init__(self, root, split, json_path, transform=None, preprocess_strat="off"):
+  def __init__(self, root, split, json_path, transform=None, preprocess_strat="off", cache_name='data_cache'):
     self.root = root
+    self.cache = os.path.join(self.root,cache_name)
     self.split = split
     self.transform = transform
     with open(json_path, 'r') as f:
@@ -44,38 +45,27 @@ class VideoDataset(Dataset):
       instances, classes = get_split(root,asl_num, split)
       self.data = instances
       self.classes = classes
-    if preprocess_strat == "off":
-      self.load_func = 
+    if preprocess_strat == "on":
+      self.load_func = self.__load_preprocessed__
+    elif preprocess_strat == "off":
+      self.load_func = self.__manual_load__
     
   
-  def __preprocess__(self, storage='data_cache'):
+  def __preprocess__(self):
     # This method can be used to preprocess the data if needed
-    cache_path = os.path.join(self.root, storage)
-    if not os.path.exists(cache_path):
-      os.makedirs(cache_path)
+    if not os.path.exists(self.cache):
+      os.makedirs(self.cache)
     for item in self.data:
       label_num, video_id = item['label_num'], item['video_id']
       frame_start, frame_end = item['frame_start'], item['frame_end']
       bbox = item['bbox']
-      base_name = f"{video_id}.pt"
-      fname = os.path.join(cache_path, base_name)
+      fname = os.path.join(self.cache, f"{video_id}.pt")
       if os.path.exists(fname):
         continue
-      frames = crop_frames(
-        load_rgb_frames_from_video(self.root, video_id, frame_start,
-                                   frame_end), bbox)
-      if self.transform:
-        frames = self.transform(frames)
-      torch.save({"frames": frames, "label_num": label_num}, fname)  
-    self.preprocessed = True
-
-  def __calc_path__(self,v_id,storage):
-    cache_path = os.path.join(self.root, storage)
-    base_name = f"{v_id}.pt"
-    return os.path.join(cache_path, base_name)
-
-  def __load_preprocessed__(self,video_id,storage='data_cache'):
-    return torch.load(__calc_path__(self,video_id,storage))
+      torch.save(self.__manual_load__(item), fname)  
+    
+  def __load_preprocessed__(self,item):
+    return torch.load(os.path.join(self.cache, f"{item['video_id']}.pt"))
 
   def __manual_load__(self,item):
     frames = crop_frames(
@@ -88,13 +78,7 @@ class VideoDataset(Dataset):
   
   def __getitem__(self, idx):
     item = self.data[idx]
-    frames = crop_frames(
-      load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
-                                 item['frame_end'])
-      , item['bbox']) 
-    if self.transform:
-      frames = self.transform(frames)
-    return {"frames" : frames, "label_num" : item['label_num']}
+    return self.load_func(item)
   
   def __len__(self):
     return len(self.data)
