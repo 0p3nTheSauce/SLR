@@ -16,7 +16,7 @@ def crop_frames(frames, bbox):
   return frames[:, :, bbox[1]:bbox[3], bbox[0]:bbox[2]]
    
 
-def get_split(root, lst_gloss_dicts, split):
+def get_split(lst_gloss_dicts, split):
   mod_instances = []
   class_names = []
   for i, gloss_dict in enumerate(lst_gloss_dicts):
@@ -34,6 +34,20 @@ def get_split(root, lst_gloss_dicts, split):
         class_names.append(label_text) 
   return mod_instances, class_names
 
+def preprocess_info(json_path, split, output_path):
+  with open(json_path, 'r') as f:
+    asl_num = json.load(f)
+    instances, classes = get_split(asl_num, split)
+  base_name = os.path.basename(json_path).replace('.json', '')
+  output_path = os.path.join(output_path, base_name.replace('.json', ''))
+  if not os.path.exists(output_path):
+    os.makedirs(output_path)
+  with open(os.path.join(output_path, f'{split}_instances.json'), 'w') as f:
+    json.dump(instances, f, indent=4)
+  with open(os.path.join(output_path, f'{split}_classes.json'), 'w') as f:
+    json.dump(classes, f, indent=4)
+    
+
 class VideoDataset(Dataset):
   def __init__(self, root, split, json_path, transform=None, preprocess_strat="off", cache_name='data_cache'):
     self.root = root
@@ -41,8 +55,9 @@ class VideoDataset(Dataset):
     self.split = split
     self.transform = transform
     with open(json_path, 'r') as f:
+      #expects preprocessed json file (preprocess_info)
       asl_num = json.load(f)
-      instances, classes = get_split(root,asl_num, split)
+      instances, classes = get_split(asl_num, split)
       self.data = instances
       self.classes = classes
     if preprocess_strat == "on":
@@ -50,7 +65,6 @@ class VideoDataset(Dataset):
     elif preprocess_strat == "off":
       self.load_func = self.__manual_load__
     
-  
   def __preprocess__(self):
     # This method can be used to preprocess the data if needed
     if not os.path.exists(self.cache):
@@ -63,7 +77,7 @@ class VideoDataset(Dataset):
       if os.path.exists(fname):
         continue
       torch.save(self.__manual_load__(item), fname)  
-    
+  
   def __load_preprocessed__(self,item):
     return torch.load(os.path.join(self.cache, f"{item['video_id']}.pt"))
 
@@ -84,8 +98,6 @@ class VideoDataset(Dataset):
     return len(self.data)
   #TODO: Make a ca
 ###################################################################################################################################################################  
-
-
 
 def test_video():
   video_path = 'video'
@@ -142,3 +154,31 @@ def test_crop():
     img = cropped_frame.permute(1, 2, 0).cpu().numpy()
     cv2.imwrite(f"{out}/cropped_frame_{i:04d}.jpg", img)
     
+def prep_train():
+  json_path = '../data/splits/asl100.json'
+  split = 'train'
+  output_root = './preprocessed_labels/'
+  if not os.path.exists(output_root):
+    os.makedirs(output_root)
+  preprocess_info(json_path, split, output_root)
+  
+def prep_test():
+  json_path = '../data/splits/asl100.json'
+  split = 'test'
+  output_root = './preprocessed_labels/'
+  if not os.path.exists(output_root):
+    os.makedirs(output_root)
+  preprocess_info(json_path, split, output_root)
+  
+def prep_val():
+  json_path = '../data/splits/asl100.json'
+  split = 'val'
+  output_root = './preprocessed_labels/'
+  if not os.path.exists(output_root):
+    os.makedirs(output_root)
+  preprocess_info(json_path, split, output_root)
+  
+if __name__ == "__main__":
+  # prep_train()
+  prep_test()
+  prep_val()
