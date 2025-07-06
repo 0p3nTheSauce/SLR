@@ -49,17 +49,15 @@ def preprocess_info(json_path, split, output_path):
     
 
 class VideoDataset(Dataset):
-  def __init__(self, root, split, json_path, transform=None, preprocess_strat="off", cache_name='data_cache'):
+  def __init__(self, root, split, instances_path, classes_path, transform=None, preprocess_strat="off", cache_name='data_cache'):
     self.root = root
     self.cache = os.path.join(self.root,cache_name)
     self.split = split
     self.transform = transform
-    with open(json_path, 'r') as f:
-      #expects preprocessed json file (preprocess_info)
-      asl_num = json.load(f)
-      instances, classes = get_split(asl_num, split)
-      self.data = instances
-      self.classes = classes
+    with open(instances_path, 'r') as f:
+      self.data = json.load(f) #created by preprocess_info
+    with open(classes_path, 'r') as f:
+      self.classes = json.load(f)
     if preprocess_strat == "on":
       self.load_func = self.__load_preprocessed__
     elif preprocess_strat == "off":
@@ -179,6 +177,8 @@ def prep_val():
   preprocess_info(json_path, split, output_root)
   
 if __name__ == "__main__":
-  # prep_train()
+  # test_video()
+  # test_crop()
+  prep_train()
   prep_test()
   prep_val()
