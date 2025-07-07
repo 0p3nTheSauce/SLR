@@ -231,7 +231,7 @@ def prep_val():
   
 if __name__ == "__main__":
   # test_video()
-  test_crop()
-  # prep_train()
-  # prep_test()
-  # prep_val()
+  # test_crop()
+  prep_train()
+  prep_test()
+  prep_val()
