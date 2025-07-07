@@ -12,7 +12,13 @@ def load_rgb_frames_from_video(root, vid, start, end):
   video_path = os.path.join(root,vid+'.mp4')
   device = "cuda" if torch.cuda.is_available() else "cpu"
   decoder = VideoDecoder(video_path, device=device)
-  #TODO: check if start and end are within the video length
+  num_frames = decoder._num_frames
+  if start < 0 or end > num_frames or end <= start:
+    # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
+    print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
+    print(f"Using start=0 and end={num_frames}")
+    start = 0
+    end = num_frames
   return decoder.get_frames_in_range(start, end).data
 
 def crop_frames(frames, bbox):
