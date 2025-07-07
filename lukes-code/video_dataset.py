@@ -9,6 +9,15 @@ import cv2
 import random
 
 def load_rgb_frames_from_video(root, vid, start, end):
+  '''Loads RGB frames from a video file.
+  Args:
+    root (str): The root directory where the video file is located.
+    vid (str): The video file name (without extension).
+    start (int): The starting frame index (inclusive).
+    end (int): The ending frame index (exclusive).
+  Returns:
+    torch.Tensor: A tensor containing the RGB frames in the shape (num_frames, channels,
+  '''
   video_path = os.path.join(root,vid+'.mp4')
   device = "cuda" if torch.cuda.is_available() else "cpu"
   decoder = VideoDecoder(video_path, device=device)
@@ -26,6 +35,18 @@ def crop_frames(frames, bbox):
   #bbox is a list of [x1, y1, x2, y2]
   x1, y1, x2, y2 = bbox
   return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
+
+def pad_frames(frames, target_length):
+  num_frames = frames.shape[0]
+  if num_frames == target_length:
+    return frames
+  elif num_frames < target_length:
+    # Pad with zeros if the number of frames is less than the target length
+    padding = torch.zeros(target_length - num_frames, frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
+    return torch.cat((frames, padding), dim=0)
+  else:
+    # Trim the frames if the number of frames is greater than the target length
+    return frames[:target_length, :, :, :]    
 
 def get_split(lst_gloss_dicts, split):
   mod_instances = []
@@ -205,6 +226,8 @@ def display(frames,output=None):
       cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
     print(f"Cropped frames saved to {output}.")
   
+
+
 def prep_train():
   json_path = '../data/splits/asl100.json'
   split = 'train'
@@ -232,6 +255,7 @@ def prep_val():
 if __name__ == "__main__":
   # test_video()
   # test_crop()
-  prep_train()
-  prep_test()
-  prep_val()
+  # prep_train()
+  # prep_test()
+  # prep_val()
+  pass
