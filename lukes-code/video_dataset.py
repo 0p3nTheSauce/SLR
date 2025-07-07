@@ -37,7 +37,7 @@ def get_split(lst_gloss_dicts, split):
       if inst['split'] == split:
         mod_instances.append({
           'label_num': i,
-          'bbox': inst['bbox'],
+          # 'bbox': inst['bbox'],             bad data, do not use
           'frame_end': inst['frame_end'],
           'frame_start': inst['frame_start'],
           'video_id': inst['video_id'],
@@ -79,9 +79,10 @@ class VideoDataset(Dataset):
     if not os.path.exists(self.cache):
       os.makedirs(self.cache)
     for item in self.data:
-      label_num, video_id = item['label_num'], item['video_id']
-      frame_start, frame_end = item['frame_start'], item['frame_end']
-      bbox = item['bbox']
+      video_id = item['video_id']
+      # label_num, video_id = item['label_num'], item['video_id']
+      # frame_start, frame_end = item['frame_start'], item['frame_end']
+      # bbox = item['bbox']
       fname = os.path.join(self.cache, f"{video_id}.pt")
       if os.path.exists(fname):
         continue
@@ -91,10 +92,12 @@ class VideoDataset(Dataset):
     return torch.load(os.path.join(self.cache, f"{item['video_id']}.pt"))
 
   def __manual_load__(self,item):
-    frames = crop_frames(
-      load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
-                                 item['frame_end'])
-      , item['bbox']) 
+    # frames = crop_frames(
+    #   load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
+    #                              item['frame_end'])
+    #   , item['bbox'])
+    frames = load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
+                                        item['frame_end']) 
     if self.transform:
       frames = self.transform(frames)
     return {"frames" : frames, "label_num" : item['label_num']}
