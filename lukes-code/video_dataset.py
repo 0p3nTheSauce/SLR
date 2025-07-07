@@ -6,15 +6,20 @@ import json
 from torch.utils.data import Dataset
 import cv2
 
+import random
+
 def load_rgb_frames_from_video(root, vid, start, end):
   video_path = os.path.join(root,vid+'.mp4')
   device = "cuda" if torch.cuda.is_available() else "cpu"
   decoder = VideoDecoder(video_path, device=device)
+  #TODO: check if start and end are within the video length
   return decoder.get_frames_in_range(start, end).data
 
 def crop_frames(frames, bbox):
-  return frames[:, :, bbox[1]:bbox[3], bbox[0]:bbox[2]]
-   
+  #frames hase shape (num_frames, channels, height, width)
+  #bbox is a list of [x1, y1, x2, y2]
+  x1, y1, x2, y2 = bbox
+  return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
 def get_split(lst_gloss_dicts, split):
   mod_instances = []
@@ -125,33 +130,72 @@ def test_video():
   print("Image displayed successfully.")  
   
 def test_crop():
-  video_path = 'video'
-  start = 0
-  num = 10
-  out = 'output'
-  if not os.path.exists(out):
-    os.makedirs(out)
-  data = load_rgb_frames_from_video('.', video_path, start, num)
-  #type 
+  output='./output/'
   
-  print()
-  print(data.shape)
-  print()
-  lent = data.shape[0]
-  print("Number of frames:", lent)
-  # for i in range(lent):
-  #   img = data[i]
-  #   cv2.imshow('Frame', img.permute(1, 2, 0).cpu().numpy())
-  #   cv2.waitKey(100)  # Display each frame for 100 ms
-  # cv2.destroyAllWindows()
-  # img = data[0]
-  # disp_image(img)
-  bbox = [137,16,492,480]
-  cropped_data = crop_frames(data, bbox)
-  for i, cropped_frame in enumerate(cropped_data):
-    img = cropped_frame.permute(1, 2, 0).cpu().numpy()
-    cv2.imwrite(f"{out}/cropped_frame_{i:04d}.jpg", img)
-    
+  root = '../data/WLASL2000/'
+  info = './preprocessed_labels/asl100/train_instances.json'
+  with open(info, 'r') as f:
+    items = json.load(f)
+  rand_idx = random.randint(0, len(items) - 1)
+  item = items[rand_idx]  # Get the first item for testing
+  
+  frames = load_rgb_frames_from_video(root, item['video_id'], item['frame_start'],
+                               item['frame_end'])
+  
+  
+  show_bbox(frames, item['bbox'])
+  
+  corrected_bbox = correct_bbox(item['bbox'], frames.shape)
+  print("Corrected bounding box coordinates:", corrected_bbox)
+  show_bbox(frames, corrected_bbox)
+  
+  cropped_frames = crop_frames(frames, corrected_bbox)
+  frames = cropped_frames
+  
+  print("Original frames shape:", frames.shape)
+  print("Cropped frames shape:", cropped_frames.shape)
+  
+  
+  frames = frames.permute(0, 2, 3, 1).cpu().numpy()  # Change to (num_frames, height, width, channels)
+  # display(frames, output)  # Display or save the cropped frames
+  display(frames)
+
+def show_bbox(frames, bbox):
+  #frames has shape (num_frames, channels, height, width)
+  #bbox is a list of [x1, y1, x2, y2]
+  x1, y1, x2, y2 = bbox
+  print("Bounding box coordinates:", bbox)
+  for i in range(frames.shape[0]):
+    frame = frames[i].permute(1, 2, 0).cpu().numpy()  # Change to (height, width, channels)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)  # Draw the bounding box
+    cv2.imshow('Frame with Bounding Box', frame)
+    cv2.waitKey(0)  # Display each frame for 100 ms
+  cv2.destroyAllWindows()
+  
+def correct_bbox(bbox, frame_shape):
+  # bbox is a list of [x1, y1, x2, y2]
+  # on a hunch, the boundign box seems shifted by:
+  # 0.5 * width (of bbox) to the right
+  x1, y1, x2, y2 = bbox
+  width_bbox = x2 - x1
+  width_frame = frame_shape[2]  # Assuming frame_shape is (num_frames, channels, height, width)
+  x1 = int(max(0, x1 - 0.5 * width_bbox))
+  x2 = int(min(width_frame, x2 - 0.5 * width_bbox))
+  return [x1, y1, x2, y2]
+  
+def display(frames,output=None):
+  if output is None:
+    for i, frame in enumerate(frames):
+      cv2.imshow('Cropped Frames', frame)  # Display the first frame
+      cv2.waitKey(100)  # Wait for a key press to close the window
+    cv2.destroyAllWindows()
+  else:
+    if not os.path.exists(output):
+      os.makedirs(output)
+    for i, img in enumerate(frames):
+      cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
+    print(f"Cropped frames saved to {output}.")
+  
 def prep_train():
   json_path = '../data/splits/asl100.json'
   split = 'train'
@@ -178,7 +222,7 @@ def prep_val():
   
 if __name__ == "__main__":
   # test_video()
-  # test_crop()
-  prep_train()
-  prep_test()
-  prep_val()
+  test_crop()
+  # prep_train()
+  # prep_test()
+  # prep_val()
