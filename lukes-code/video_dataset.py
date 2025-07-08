@@ -107,11 +107,16 @@ class VideoDataset(Dataset):
       fname = os.path.join(self.cache, f"{video_id}.pt")
       if os.path.exists(fname):
         continue
-      torch.save(self.__manual_load__(item), fname)  
+      # torch.save(self.__manual_load__(item), fname)  
+      frames, label = self.__manual_load__(item)
+      torch.save({"frames" : frames, "label_num" : label})
+      
   
   def __load_preprocessed__(self,item):
-    return torch.load(os.path.join(self.cache, f"{item['video_id']}.pt"))
-
+    info =  torch.load(os.path.join(self.cache, f"{item['video_id']}.pt"))
+    return info['frames'], info['label_num']
+  
+  
   def __manual_load__(self,item):
     # frames = crop_frames(
     #   load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
@@ -121,7 +126,8 @@ class VideoDataset(Dataset):
                                         item['frame_end']) 
     if self.transform:
       frames = self.transform(frames)
-    return {"frames" : frames, "label_num" : item['label_num']}
+    # return {"frames" : frames, "label_num" : item['label_num']}
+    return frames, item['label_num']
   
   def __getitem__(self, idx):
     item = self.data[idx]
