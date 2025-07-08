@@ -109,7 +109,7 @@ class VideoDataset(Dataset):
         continue
       # torch.save(self.__manual_load__(item), fname)  
       frames, label = self.__manual_load__(item)
-      torch.save({"frames" : frames, "label_num" : label})
+      torch.save({"frames" : frames, "label_num" : label}, fname)
       
   
   def __load_preprocessed__(self,item):
