@@ -8,7 +8,7 @@ import cv2
 
 import random
 
-def load_rgb_frames_from_video(root, vid, start, end):
+def load_rgb_frames_from_video(video_path, start, end):
   '''Loads RGB frames from a video file.
   Args:
     root (str): The root directory where the video file is located.
@@ -18,7 +18,7 @@ def load_rgb_frames_from_video(root, vid, start, end):
   Returns:
     torch.Tensor: A tensor containing the RGB frames in the shape (num_frames, channels,
   '''
-  video_path = os.path.join(root,vid+'.mp4')
+  
   device = "cuda" if torch.cuda.is_available() else "cpu"
   decoder = VideoDecoder(video_path, device=device)
   num_frames = decoder._num_frames
@@ -35,6 +35,7 @@ def crop_frames(frames, bbox):
   #bbox is a list of [x1, y1, x2, y2]
   x1, y1, x2, y2 = bbox
   return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
+
 
 def pad_frames(frames, target_length):
   num_frames = frames.shape[0]
@@ -80,14 +81,21 @@ def preprocess_info(json_path, split, output_path):
     json.dump(classes, f, indent=4)
     
 
+
 class VideoDataset(Dataset):
   def __init__(self, root, split, instances_path, classes_path, transform=None, preprocess_strat="off", cache_name='data_cache'):
-    self.root = root
+    '''root is the path to the root directory where the video files are located.'''
+    if os.path.exists(root) is False:
+      raise FileNotFoundError(f"Root directory {root} does not exist.")
+    else:
+      self.root = root
     self.cache = os.path.join(self.root,cache_name)
     self.split = split
     self.transform = transform
     with open(instances_path, 'r') as f:
       self.data = json.load(f) #created by preprocess_info
+      if self.data is None:
+        raise ValueError(f"No data found in {instances_path}. Please check the file.")
     with open(classes_path, 'r') as f:
       self.classes = json.load(f)
     if preprocess_strat == "on":
@@ -122,8 +130,12 @@ class VideoDataset(Dataset):
     #   load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
     #                              item['frame_end'])
     #   , item['bbox'])
-    frames = load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
-                                        item['frame_end']) 
+    video_path = os.path.join(self.root,item['video_id']+'.mp4')
+    if os.path.exists(video_path) is False:
+      raise FileNotFoundError(f"Video file {video_path} does not exist.")
+    
+    frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
+                                        end=item['frame_end']) 
     if self.transform:
       frames = self.transform(frames)
     # return {"frames" : frames, "label_num" : item['label_num']}
@@ -145,7 +157,7 @@ def test_video():
   out = 'output'
   if not os.path.exists(out):
     os.makedirs(out)
-  data = load_rgb_frames_from_video('.', video_path, start, num)
+  data = load_rgb_frames_from_video(video_path, start, num)
   #type 
   
   print()
@@ -174,8 +186,8 @@ def test_crop():
     items = json.load(f)
   rand_idx = random.randint(0, len(items) - 1)
   item = items[rand_idx]  # Get the first item for testing
-  
-  frames = load_rgb_frames_from_video(root, item['video_id'], item['frame_start'],
+  path = os.path.join(root, item['video_id'] + '.mp4')
+  frames = load_rgb_frames_from_video(path, item['frame_start'],
                                item['frame_end'])
   
   
