@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 import cv2
 
 import random
-
+import tqdm
 def load_rgb_frames_from_video(video_path, start, end):
   '''Loads RGB frames from a video file.
   Args:
@@ -270,10 +270,50 @@ def prep_val():
     os.makedirs(output_root)
   preprocess_info(json_path, split, output_root)
   
+def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+  bad_frames = []
+  with open(instance_path, 'r') as f:
+    instances = json.load(f)
+  for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
+    vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
+    decoder = VideoDecoder(vid_path, device=device)
+    num_frames = decoder._num_frames
+    start = instance['frame_start']
+    end = instance['frame_end']
+    if start < 0 or start >= num_frames:
+      bad_frames.append(f"Invalid start frame {start} for video {instance['video_id']}. Setting to 0." +
+                        f" Total frames: {num_frames}")
+      start = 0
+    if end <= start or end > num_frames:
+      bad_frames.append(f"Invalid end frame {end} for video {instance['video_id']}. Setting to {num_frames}." +
+                        f" Total frames: {num_frames}")
+      end = num_frames
+    instance['frame_start'] = start
+    instance['frame_end'] = end
+  with open(instance_path, 'w') as f:
+    json.dump(instances, f, indent=4)
+  if bad_frames:
+    with open(log, 'a') as log_file:
+      for line in bad_frames:
+        log_file.write(line + '\n')
+    print(f"Bad frame ranges logged to {log}.")
+    print(f"Updated instances in {instance_path} with valid frame ranges.")
+  else:
+    print("No bad frame ranges found. No changes made to the instance file.")
+    
+    
+  
+  
 if __name__ == "__main__":
   # test_video()
   # test_crop()
-  # prep_train()
-  # prep_test()
-  # prep_val()
-  pass
+  # prep_train() #--run to preprocess the training data
+  # prep_test()  #--run to preprocess the test data
+  # prep_val() #--run to preprocess the validation data
+  # fix_bad_frame_range("./preprocessed_labels/asl100/train_instances.json",
+  #                     "../data/WLASL2000/") #--run to fix bad frame ranges in the training instances
+  # fix_bad_frame_range("./preprocessed_labels/asl100/test_instances.json",
+  #                   "../data/WLASL2000/") #--run to fix bad frame ranges in the test instances
+  # fix_bad_frame_range("./preprocessed_labels/asl100/val_instances.json",
+  #                   "../data/WLASL2000/") #--run to fix bad frame ranges in the validation instances

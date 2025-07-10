@@ -1,8 +1,8 @@
 [
     {
         "label_num": 0,
-        "frame_end": 2249,
-        "frame_start": 2150,
+        "frame_end": 100,
+        "frame_start": 0,
         "video_id": "70212"
     },
     {
@@ -43,8 +43,8 @@
     },
     {
         "label_num": 1,
-        "frame_end": 5831,
-        "frame_start": 5710,
+        "frame_end": 122,
+        "frame_start": 0,
         "video_id": "70173"
     },
     {
@@ -559,8 +559,8 @@
     },
     {
         "label_num": 22,
-        "frame_end": 4596,
-        "frame_start": 4497,
+        "frame_end": 100,
+        "frame_start": 0,
         "video_id": "70270"
     },
     {
@@ -601,8 +601,8 @@
     },
     {
         "label_num": 24,
-        "frame_end": 1638,
-        "frame_start": 1524,
+        "frame_end": 115,
+        "frame_start": 0,
         "video_id": "70308"
     },
     {
@@ -655,8 +655,8 @@
     },
     {
         "label_num": 27,
-        "frame_end": 1938,
-        "frame_start": 1835,
+        "frame_end": 104,
+        "frame_start": 0,
         "video_id": "70310"
     },
     {
@@ -667,8 +667,8 @@
     },
     {
         "label_num": 28,
-        "frame_end": 4943,
-        "frame_start": 4848,
+        "frame_end": 96,
+        "frame_start": 0,
         "video_id": "70323"
     },
     {
@@ -877,8 +877,8 @@
     },
     {
         "label_num": 39,
-        "frame_end": 6474,
-        "frame_start": 6345,
+        "frame_end": 130,
+        "frame_start": 0,
         "video_id": "70176"
     },
     {
@@ -913,8 +913,8 @@
     },
     {
         "label_num": 41,
-        "frame_end": 4798,
-        "frame_start": 4707,
+        "frame_end": 92,
+        "frame_start": 0,
         "video_id": "70016"
     },
     {
@@ -1171,8 +1171,8 @@
     },
     {
         "label_num": 54,
-        "frame_end": 5943,
-        "frame_start": 5827,
+        "frame_end": 117,
+        "frame_start": 0,
         "video_id": "70379"
     },
     {
