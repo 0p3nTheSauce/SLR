@@ -8,20 +8,31 @@ import cv2
 
 import random
 import tqdm
-def load_rgb_frames_from_video(video_path, start, end):
+import matplotlib.pyplot as plt
+import numpy
+
+from ultralytics import YOLO
+def load_rgb_frames_from_video(video_path, start, end, device='cpu',all=False):
   '''Loads RGB frames from a video file.
   Args:
     root (str): The root directory where the video file is located.
     vid (str): The video file name (without extension).
     start (int): The starting frame index (inclusive).
     end (int): The ending frame index (exclusive).
+    device (string): cpu or cuda. 
+    all (bool): All frames are passed
   Returns:
-    torch.Tensor: A tensor containing the RGB frames in the shape (num_frames, channels,
+    torch.Tensor: A tensor containing the RGB frames in the shape:
+    (num_frames, channels, height, width), where channels=3 (RGB).
   '''
-  
-  device = "cuda" if torch.cuda.is_available() else "cpu"
+  if device =='cuda' and not torch.cuda.is_available():
+    device = 'cpu'
+    print("Warning: cuda not available so using cpu")
   decoder = VideoDecoder(video_path, device=device)
   num_frames = decoder._num_frames
+  if all:
+    start = 0
+    end = num_frames
   if start < 0 or end > num_frames or end <= start:
     # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
     print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
@@ -36,6 +47,38 @@ def crop_frames(frames, bbox):
   x1, y1, x2, y2 = bbox
   return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
+def correct_num_frames(frames, target_length=64):
+  '''Corrects the number of frames to match the target length.
+  Args:
+    frames (torch.Tensor): The input frames tensor. (T x C x H x W)
+    target_length (int): The target length for the number of frames.
+  Returns:
+    torch.Tensor: The corrected frames tensor with the specified target length.
+  '''
+  if frames is None or frames.shape[0] == 0:
+    raise ValueError("Input frames tensor is empty or None.")
+  if target_length <= 0:
+    raise ValueError("Target length must be a positive integer.")
+  if frames.shape[0] == target_length:
+    return frames
+  if frames.shape[0] < target_length:
+    # Pad with zeros if the number of frames is less than the target length
+    padding = torch.zeros(target_length - frames.shape[0], frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
+    return torch.cat((frames, padding), dim=0)
+  else:
+    #uniformly sample frames
+    step = frames.shape[0] // target_length
+    sampled_frames = frames[::step]
+    diff = target_length - len(sampled_frames) 
+    if diff > 0:
+      padding = torch.zeros(diff, frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
+      return torch.cat((sampled_frames, padding), dim=0)
+    elif diff < 0:
+      return sampled_frames[:target_length]
+    else:
+      return sampled_frames  
+
+  
 
 def pad_frames(frames, target_length):
   num_frames = frames.shape[0]
@@ -80,18 +123,36 @@ def preprocess_info(json_path, split, output_path):
   with open(os.path.join(output_path, f'{split}_classes.json'), 'w') as f:
     json.dump(classes, f, indent=4)
     
-
-
+def visualise_frames(frames,num):
+  # permute and convert to numpy 
+  '''Args:
+    frames : torch.Tensor (T, C, H, W)
+    num : int, to be visualised'''
+  if num < 1:
+    raise ValueError("num must be >= 1")
+  num_frames = len(frames)
+  if num_frames <= num:
+    step = 1
+  else:
+    step = num_frames // num
+  for frame in frames[::step]:
+    np_frame = frame.permute(1,2,0).cpu().numpy()
+    plt.imshow(np_frame)
+    plt.axis('off')
+    plt.show()
+  
 class VideoDataset(Dataset):
-  def __init__(self, root, split, instances_path, classes_path, transform=None, preprocess_strat="off", cache_name='data_cache'):
+  def __init__(self, root, split, instances_path, classes_path,crop=True, transform=None, device='cpu', preprocess_strat="off", cache_name='data_cache'):
     '''root is the path to the root directory where the video files are located.'''
     if os.path.exists(root) is False:
       raise FileNotFoundError(f"Root directory {root} does not exist.")
     else:
       self.root = root
     self.cache = os.path.join(self.root,cache_name)
-    self.split = split
+    self.split = split # this might not do anything
     self.transform = transform
+    self.crop = crop
+    self.device = device #use cpu if num_workers > 0 in Dataloader
     with open(instances_path, 'r') as f:
       self.data = json.load(f) #created by preprocess_info
       if self.data is None:
@@ -126,16 +187,15 @@ class VideoDataset(Dataset):
   
   
   def __manual_load__(self,item):
-    # frames = crop_frames(
-    #   load_rgb_frames_from_video(self.root, item['video_id'], item['frame_start'],
-    #                              item['frame_end'])
-    #   , item['bbox'])
     video_path = os.path.join(self.root,item['video_id']+'.mp4')
     if os.path.exists(video_path) is False:
       raise FileNotFoundError(f"Video file {video_path} does not exist.")
     
     frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
-                                        end=item['frame_end']) 
+                                        end=item['frame_end'], device=self.device) 
+    if self.crop:
+      frames = crop_frames(frames, item['bbox'])
+    
     if self.transform:
       frames = self.transform(frames)
     # return {"frames" : frames, "label_num" : item['label_num']}
@@ -302,8 +362,86 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
   else:
     print("No bad frame ranges found. No changes made to the instance file.")
     
-    
+def get_largest_bbox(bboxes):
+  if not bboxes:
+    return None
+  x_min, y_min, x_max, y_max = bboxes[0]
+  for box in bboxes:
+    x1, y1, x2, y2 = box
+    if x1 < x_min:
+      x_min = x1
+    if y1 < y_min:
+      y_min = y1
+    if x2 > x_max:
+      x_max = x2
+    if y2 > y_max:
+      y_max = y2
+  return [x_min, y_min, x_max, y_max]
+
+def fix_bad_bboxes(instance_path, raw_path, output='./output'):
+  model = YOLO('yolov8n.pt')  # Load a pre-trained YOLO model
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+  # model.to(device)
+  new_instences = []
   
+  bad_bboxes = []
+  with open(instance_path, 'r') as f:
+    instances = json.load(f)
+  for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
+    vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
+    frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
+    frames = frames.float() / 255.0  # Convert to float and normalize to [0, 1] range
+    results = model(frames, device=device, verbose=False)  
+    bboxes = []
+    for result in results:
+      person_bboxes = result.boxes.xyxy[result.boxes.cls == 0]  
+      if len(person_bboxes) > 0:
+        bboxes.extend(person_bboxes.tolist())
+    if not bboxes:
+      bad_bboxes.append(f"No bounding boxes found for video {instance['video_id']}. Using default bbox.")
+      bboxes = [[0, 0, frames.shape[3], frames.shape[2]]]  # Default bbox covering the whole frame
+    largest_bbox = get_largest_bbox(bboxes)
+    if largest_bbox is None:
+      bad_bboxes.append(f"No bounding boxes found for video {instance['video_id']}. Using default bbox.")
+      largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
+    largest_bbox = [round(coord) for coord in largest_bbox]  # Round the coordinates to integers
+    new_instences.append({
+      'label_num': instance['label_num'],
+      'frame_end': instance['frame_end'],
+      'frame_start': instance['frame_start'],
+      'video_id': instance['video_id'],
+      'bbox': largest_bbox
+    })
+  log_path = os.path.join(output, 'bad_bboxes.txt')
+  if bad_bboxes:
+    with open(log_path, 'a') as log_file:
+      for line in bad_bboxes:
+        log_file.write(line + '\n')
+    print(f"Bad bounding boxes logged to {log_path}.")
+  base_name = os.path.basename(instance_path)
+  mod_instances_path = os.path.join(output, base_name.replace('.json', '_fixed_bboxes.json'))
+  with open(mod_instances_path, 'w') as f:
+    json.dump(new_instences, f, indent=4)
+  print(f"Updated instances with fixed bounding boxes saved to {mod_instances_path}.")
+  
+def remove_short_samples(instances_path, cutoff = 9, output='./output'):
+  '''Preprocessing function which removes data with num frames less 
+  than provided integer from the instances path. Assums the instances 
+  have already been modified by preprocess_info, fix_bad_bboxes, and 
+  fix_bad_frame range'''
+  with open(instances_path, "r") as f:
+    instances = json.load(f)
+  mod_instances = [instance for instance in instances
+    if (instance['frame_end'] - instance['frame_start'])
+    > cutoff]
+  base_name = os.path.basename(instances_path)
+  out_path = os.path.join(output,
+    base_name.replace('.json', '_short.json'))
+  #chose this output path because file will end up with 
+  # the extension *_fixed_bboxes_short.json, so fixed bounding
+  #boxes, and fixed short clips
+  with open(out_path, "w") as f:
+    json.dump(mod_instances, f, indent=4)
   
 if __name__ == "__main__":
   # test_video()
@@ -317,3 +455,16 @@ if __name__ == "__main__":
   #                   "../data/WLASL2000/") #--run to fix bad frame ranges in the test instances
   # fix_bad_frame_range("./preprocessed_labels/asl100/val_instances.json",
   #                   "../data/WLASL2000/") #--run to fix bad frame ranges in the validation instances
+  # fix_bad_bboxes("./preprocessed_labels/asl100/train_instances.json",
+  #               "../data/WLASL2000/", output='./output') #--run to fix bad bounding boxes in the training instances
+  # fix_bad_bboxes("./preprocessed_labels/asl100/test_instances.json",
+  #               "../data/WLASL2000/", output='./output')
+  # fix_bad_bboxes("./preprocessed_labels/asl100/val_instances.json",
+  #               "../data/WLASL2000/", output='./output')
+  # remove_short_samples('./output/train_instances_fixed_bboxes.json',
+  #                      output='./preprocessed_labels/asl100')
+  # remove_short_samples('./output/test_instances_fixed_bboxes.json',
+  #                      output='./preprocessed_labels/asl100')
+  # remove_short_samples('./output/val_instances_fixed_bboxes.json',
+  #                      output='./preprocessed_labels/asl100')
+  pass
