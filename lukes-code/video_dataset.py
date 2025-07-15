@@ -1,33 +1,33 @@
 import torch
 from torch.utils.data import Dataset
-import os
+import torchvision.transforms as transforms
+import torch.nn.functional as F
 from torchcodec.decoders import VideoDecoder
-import json
-from torch.utils.data import Dataset
-import cv2
 
+import os
+import json
+import cv2
 import random
 import tqdm
 import matplotlib.pyplot as plt
 import numpy
 
 from ultralytics import YOLO
-def load_rgb_frames_from_video(video_path, start, end, device='cpu',all=False):
-  '''Loads RGB frames from a video file.
+def load_rgb_frames_from_video(video_path : str, start : int, end : int
+                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
+  '''Loads RGB frames from a video file as a PyTorch Tensor
   Args:
-    root (str): The root directory where the video file is located.
-    vid (str): The video file name (without extension).
-    start (int): The starting frame index (inclusive).
-    end (int): The ending frame index (exclusive).
-    device (string): cpu or cuda. 
-    all (bool): All frames are passed
+    video_path: Path to video file
+    start: Start frame index
+    end: End frame index
+    device: Device to load tensor on ('cpu' or 'cuda')
+    all: If True, load all frames (ignores start/end)
   Returns:
-    torch.Tensor: A tensor containing the RGB frames in the shape:
-    (num_frames, channels, height, width), where channels=3 (RGB).
+    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
   '''
-  if device =='cuda' and not torch.cuda.is_available():
-    device = 'cpu'
-    print("Warning: cuda not available so using cpu")
+  # if device =='cuda' and not torch.cuda.is_available():
+  #   device = 'cpu'
+  #   print("Warning: cuda not available so using cpu")
   decoder = VideoDecoder(video_path, device=device)
   num_frames = decoder._num_frames
   if all:
@@ -123,6 +123,13 @@ def preprocess_info(json_path, split, output_path):
   with open(os.path.join(output_path, f'{split}_classes.json'), 'w') as f:
     json.dump(classes, f, indent=4)
     
+def min_transform_rI3d(frames):
+  '''Prepares videos for rI3d'''
+  return F.interpolate(
+    correct_num_frames(frames) / 255.0,
+    size=(244,244),
+    mode='bilinear').permute(1,0,2,3) #r3id expects (C, T, H, W)
+        
 def visualise_frames(frames,num):
   # permute and convert to numpy 
   '''Args:
@@ -142,23 +149,22 @@ def visualise_frames(frames,num):
     plt.show()
   
 class VideoDataset(Dataset):
-  def __init__(self, root, split, instances_path, classes_path,crop=True, transform=None, device='cpu', preprocess_strat="off", cache_name='data_cache'):
+  def __init__(self, root, instances_path, classes_path,crop=True, transform=None, preprocess_strat="off", cache_name='data_cache'):
     '''root is the path to the root directory where the video files are located.'''
     if os.path.exists(root) is False:
       raise FileNotFoundError(f"Root directory {root} does not exist.")
     else:
       self.root = root
     self.cache = os.path.join(self.root,cache_name)
-    self.split = split # this might not do anything
+    # self.split = split # this might not do anything
     self.transform = transform
     self.crop = crop
-    self.device = device #use cpu if num_workers > 0 in Dataloader
     with open(instances_path, 'r') as f:
       self.data = json.load(f) #created by preprocess_info
       if self.data is None:
         raise ValueError(f"No data found in {instances_path}. Please check the file.")
     with open(classes_path, 'r') as f:
-      self.classes = json.load(f)
+      self.classes = json.load(f) 
     if preprocess_strat == "on":
       self.load_func = self.__load_preprocessed__
     elif preprocess_strat == "off":
@@ -192,7 +198,7 @@ class VideoDataset(Dataset):
       raise FileNotFoundError(f"Video file {video_path} does not exist.")
     
     frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
-                                        end=item['frame_end'], device=self.device) 
+                                        end=item['frame_end']) 
     if self.crop:
       frames = crop_frames(frames, item['bbox'])
     
