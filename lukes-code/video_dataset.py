@@ -2,8 +2,8 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-# from torchcodec.decoders import VideoDecoder
-import torchvision.io as video_io
+from torchcodec.decoders import VideoDecoder
+# import torchvision.io as video_io
 
 import os
 import json
@@ -14,37 +14,9 @@ import matplotlib.pyplot as plt
 import numpy
 
 from ultralytics import YOLO
-# def load_rgb_frames_from_video(video_path : str, start : int, end : int
-#                                ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
-#   '''Loads RGB frames from a video file as a PyTorch Tensor
-#   Args:
-#     video_path: Path to video file
-#     start: Start frame index
-#     end: End frame index
-#     device: Device to load tensor on ('cpu' or 'cuda')
-#     all: If True, load all frames (ignores start/end)
-#   Returns:
-#     torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
-#   '''
-#   # if device =='cuda' and not torch.cuda.is_available():
-#   #   device = 'cpu'
-#   #   print("Warning: cuda not available so using cpu")
-#   decoder = VideoDecoder(video_path, device=device)
-#   num_frames = decoder._num_frames
-#   if all:
-#     start = 0
-#     end = num_frames
-#   if start < 0 or end > num_frames or end <= start:
-#     # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
-#     print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
-#     print(f"Using start=0 and end={num_frames}")
-#     start = 0
-#     end = num_frames
-#   return decoder.get_frames_in_range(start, end).data
-
-def load_rgb_frames_from_video_ioversion(video_path : str, start : int, end : int
-                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor:
-  '''Loads RGB frames from a video file as a PyTorch Tensor using torchvision.io
+def load_rgb_frames_from_video(video_path : str, start : int, end : int
+                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
+  '''Loads RGB frames from a video file as a PyTorch Tensor
   Args:
     video_path: Path to video file
     start: Start frame index
@@ -52,17 +24,13 @@ def load_rgb_frames_from_video_ioversion(video_path : str, start : int, end : in
     device: Device to load tensor on ('cpu' or 'cuda')
     all: If True, load all frames (ignores start/end)
   Returns:
-    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype
-    uint8
+    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
   '''
-  try:
-    video_tensor, audio_tensor, info = video_io.read_video(
-      video_path, 
-      pts_unit='sec'
-    )
-  except Exception as e:
-    raise RuntimeError(f"Failed to read video {video_path}: {e}")
-  num_frames = video_tensor.shape[0]
+  # if device =='cuda' and not torch.cuda.is_available():
+  #   device = 'cpu'
+  #   print("Warning: cuda not available so using cpu")
+  decoder = VideoDecoder(video_path, device=device)
+  num_frames = decoder._num_frames
   if all:
     start = 0
     end = num_frames
@@ -72,8 +40,40 @@ def load_rgb_frames_from_video_ioversion(video_path : str, start : int, end : in
     print(f"Using start=0 and end={num_frames}")
     start = 0
     end = num_frames
-  frames = video_tensor[start:end]
-  return frames
+  return decoder.get_frames_in_range(start, end).data
+
+# def load_rgb_frames_from_video_ioversion(video_path : str, start : int, end : int
+#                                ,device : str ='cpu' , all : bool =False) -> torch.Tensor:
+#   '''Loads RGB frames from a video file as a PyTorch Tensor using torchvision.io
+#   Args:
+#     video_path: Path to video file
+#     start: Start frame index
+#     end: End frame index
+#     device: Device to load tensor on ('cpu' or 'cuda')
+#     all: If True, load all frames (ignores start/end)
+#   Returns:
+#     torch.Tensor: RGB frames of shape (T, H, W, C) with dtype
+#     uint8
+#   '''
+#   try:
+#     video_tensor, audio_tensor, info = video_io.read_video(
+#       video_path, 
+#       pts_unit='sec'
+#     )
+#   except Exception as e:
+#     raise RuntimeError(f"Failed to read video {video_path}: {e}")
+#   num_frames = video_tensor.shape[0]
+#   if all:
+#     start = 0
+#     end = num_frames
+#   if start < 0 or end > num_frames or end <= start:
+#     # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
+#     print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
+#     print(f"Using start=0 and end={num_frames}")
+#     start = 0
+#     end = num_frames
+#   frames = video_tensor[start:end]
+#   return frames
 
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
@@ -237,10 +237,10 @@ class VideoDataset(Dataset):
     if os.path.exists(video_path) is False:
       raise FileNotFoundError(f"Video file {video_path} does not exist.")
     
-    # frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
-    #                                     end=item['frame_end']) 
-    frames = load_rgb_frames_from_video_ioversion(video_path=video_path, start=item['frame_start'],
+    frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
                                         end=item['frame_end']) 
+    # frames = load_rgb_frames_from_video_ioversion(video_path=video_path, start=item['frame_start'],
+    #                                     end=item['frame_end']) 
     if self.crop:
       frames = crop_frames(frames, item['bbox'])
     
@@ -265,8 +265,8 @@ def test_video():
   out = 'output'
   if not os.path.exists(out):
     os.makedirs(out)
-  # data = load_rgb_frames_from_video(video_path, start, num)
-  data = load_rgb_frames_from_video_ioversion(video_path, start, num)
+  data = load_rgb_frames_from_video(video_path, start, num)
+  # data = load_rgb_frames_from_video_ioversion(video_path, start, num)
   # #type 
   print(data.shape)
   # print()
@@ -296,10 +296,10 @@ def test_crop():
   rand_idx = random.randint(0, len(items) - 1)
   item = items[rand_idx]  # Get the first item for testing
   path = os.path.join(root, item['video_id'] + '.mp4')
-  # frames = load_rgb_frames_from_video(path, item['frame_start'],
-  #                              item['frame_end'])
-  frames = load_rgb_frames_from_video_ioversion(path, item['frame_start'],
+  frames = load_rgb_frames_from_video(path, item['frame_start'],
                                item['frame_end'])
+  # frames = load_rgb_frames_from_video_ioversion(path, item['frame_start'],
+  #                              item['frame_end'])
   
   
   show_bbox(frames, item['bbox'])
@@ -440,8 +440,8 @@ def fix_bad_bboxes(instance_path, raw_path, output='./output'):
     instances = json.load(f)
   for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
-    # frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
-    frames = load_rgb_frames_from_video_ioversion(vid_path, instance['frame_start'], instance['frame_end'], all=True)
+    frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
+    # frames = load_rgb_frames_from_video_ioversion(vid_path, instance['frame_start'], instance['frame_end'], all=True)
     frames = frames.float() / 255.0  # Convert to float and normalize to [0, 1] range
     results = model(frames, device=device, verbose=False)  
     bboxes = []
