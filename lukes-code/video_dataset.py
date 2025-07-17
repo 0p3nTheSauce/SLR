@@ -2,7 +2,8 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 import torch.nn.functional as F
-from torchcodec.decoders import VideoDecoder
+# from torchcodec.decoders import VideoDecoder
+import torchvision.io as video_io
 
 import os
 import json
@@ -13,9 +14,37 @@ import matplotlib.pyplot as plt
 import numpy
 
 from ultralytics import YOLO
-def load_rgb_frames_from_video(video_path : str, start : int, end : int
-                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
-  '''Loads RGB frames from a video file as a PyTorch Tensor
+# def load_rgb_frames_from_video(video_path : str, start : int, end : int
+#                                ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
+#   '''Loads RGB frames from a video file as a PyTorch Tensor
+#   Args:
+#     video_path: Path to video file
+#     start: Start frame index
+#     end: End frame index
+#     device: Device to load tensor on ('cpu' or 'cuda')
+#     all: If True, load all frames (ignores start/end)
+#   Returns:
+#     torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
+#   '''
+#   # if device =='cuda' and not torch.cuda.is_available():
+#   #   device = 'cpu'
+#   #   print("Warning: cuda not available so using cpu")
+#   decoder = VideoDecoder(video_path, device=device)
+#   num_frames = decoder._num_frames
+#   if all:
+#     start = 0
+#     end = num_frames
+#   if start < 0 or end > num_frames or end <= start:
+#     # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
+#     print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
+#     print(f"Using start=0 and end={num_frames}")
+#     start = 0
+#     end = num_frames
+#   return decoder.get_frames_in_range(start, end).data
+
+def load_rgb_frames_from_video_ioversion(video_path : str, start : int, end : int
+                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor:
+  '''Loads RGB frames from a video file as a PyTorch Tensor using torchvision.io
   Args:
     video_path: Path to video file
     start: Start frame index
@@ -23,13 +52,17 @@ def load_rgb_frames_from_video(video_path : str, start : int, end : int
     device: Device to load tensor on ('cpu' or 'cuda')
     all: If True, load all frames (ignores start/end)
   Returns:
-    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
+    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype
+    uint8
   '''
-  # if device =='cuda' and not torch.cuda.is_available():
-  #   device = 'cpu'
-  #   print("Warning: cuda not available so using cpu")
-  decoder = VideoDecoder(video_path, device=device)
-  num_frames = decoder._num_frames
+  try:
+    video_tensor, audio_tensor, info = video_io.read_video(
+      video_path, 
+      pts_unit='sec'
+    )
+  except Exception as e:
+    raise RuntimeError(f"Failed to read video {video_path}: {e}")
+  num_frames = video_tensor.shape[0]
   if all:
     start = 0
     end = num_frames
@@ -39,7 +72,8 @@ def load_rgb_frames_from_video(video_path : str, start : int, end : int
     print(f"Using start=0 and end={num_frames}")
     start = 0
     end = num_frames
-  return decoder.get_frames_in_range(start, end).data
+  frames = video_tensor[start:end]
+  return frames
 
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
@@ -123,6 +157,12 @@ def preprocess_info(json_path, split, output_path):
   with open(os.path.join(output_path, f'{split}_classes.json'), 'w') as f:
     json.dump(classes, f, indent=4)
     
+def normalise(frames, mean, std):
+  '''Applies torch vision transform to 4D tensor ''' 
+  return torch.stack([
+    transforms.Normalize(mean=mean, std=std)(frame) for frame in frames
+  ], dim=0)
+    
 def min_transform_rI3d(frames):
   '''Prepares videos for rI3d'''
   return F.interpolate(
@@ -197,7 +237,9 @@ class VideoDataset(Dataset):
     if os.path.exists(video_path) is False:
       raise FileNotFoundError(f"Video file {video_path} does not exist.")
     
-    frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
+    # frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
+    #                                     end=item['frame_end']) 
+    frames = load_rgb_frames_from_video_ioversion(video_path=video_path, start=item['frame_start'],
                                         end=item['frame_end']) 
     if self.crop:
       frames = crop_frames(frames, item['bbox'])
@@ -223,25 +265,26 @@ def test_video():
   out = 'output'
   if not os.path.exists(out):
     os.makedirs(out)
-  data = load_rgb_frames_from_video(video_path, start, num)
-  #type 
-  
-  print()
+  # data = load_rgb_frames_from_video(video_path, start, num)
+  data = load_rgb_frames_from_video_ioversion(video_path, start, num)
+  # #type 
   print(data.shape)
-  print()
-  lent = data.shape[0]
-  print("Number of frames:", lent)
-  # for i in range(lent):
-  #   img = data[i]
-  #   cv2.imshow('Frame', img.permute(1, 2, 0).cpu().numpy())
-  #   cv2.waitKey(100)  # Display each frame for 100 ms
-  # cv2.destroyAllWindows()
-  # img = data[0]
-  # disp_image(img)
-  for i in range(lent-1, -1, -1):
-    img = data[i].permute(1, 2, 0).cpu().numpy()
-    cv2.imwrite(f"{out}/frame_{i:04d}.jpg", img)
-  print("Image displayed successfully.")  
+  # print()
+  # print(data.shape)
+  # print()
+  # lent = data.shape[0]
+  # print("Number of frames:", lent)
+  # # for i in range(lent):
+  # #   img = data[i]
+  # #   cv2.imshow('Frame', img.permute(1, 2, 0).cpu().numpy())
+  # #   cv2.waitKey(100)  # Display each frame for 100 ms
+  # # cv2.destroyAllWindows()
+  # # img = data[0]
+  # # disp_image(img)
+  # for i in range(lent-1, -1, -1):
+  #   img = data[i].permute(1, 2, 0).cpu().numpy()
+  #   cv2.imwrite(f"{out}/frame_{i:04d}.jpg", img)
+  # print("Image displayed successfully.")  
   
 def test_crop():
   output='./output/'
@@ -253,7 +296,9 @@ def test_crop():
   rand_idx = random.randint(0, len(items) - 1)
   item = items[rand_idx]  # Get the first item for testing
   path = os.path.join(root, item['video_id'] + '.mp4')
-  frames = load_rgb_frames_from_video(path, item['frame_start'],
+  # frames = load_rgb_frames_from_video(path, item['frame_start'],
+  #                              item['frame_end'])
+  frames = load_rgb_frames_from_video_ioversion(path, item['frame_start'],
                                item['frame_end'])
   
   
@@ -336,37 +381,37 @@ def prep_val():
     os.makedirs(output_root)
   preprocess_info(json_path, split, output_root)
   
-def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
-  device = "cuda" if torch.cuda.is_available() else "cpu"
-  bad_frames = []
-  with open(instance_path, 'r') as f:
-    instances = json.load(f)
-  for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
-    vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
-    decoder = VideoDecoder(vid_path, device=device)
-    num_frames = decoder._num_frames
-    start = instance['frame_start']
-    end = instance['frame_end']
-    if start < 0 or start >= num_frames:
-      bad_frames.append(f"Invalid start frame {start} for video {instance['video_id']}. Setting to 0." +
-                        f" Total frames: {num_frames}")
-      start = 0
-    if end <= start or end > num_frames:
-      bad_frames.append(f"Invalid end frame {end} for video {instance['video_id']}. Setting to {num_frames}." +
-                        f" Total frames: {num_frames}")
-      end = num_frames
-    instance['frame_start'] = start
-    instance['frame_end'] = end
-  with open(instance_path, 'w') as f:
-    json.dump(instances, f, indent=4)
-  if bad_frames:
-    with open(log, 'a') as log_file:
-      for line in bad_frames:
-        log_file.write(line + '\n')
-    print(f"Bad frame ranges logged to {log}.")
-    print(f"Updated instances in {instance_path} with valid frame ranges.")
-  else:
-    print("No bad frame ranges found. No changes made to the instance file.")
+# def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
+#   device = "cuda" if torch.cuda.is_available() else "cpu"
+#   bad_frames = []
+#   with open(instance_path, 'r') as f:
+#     instances = json.load(f)
+#   for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
+#     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
+#     decoder = VideoDecoder(vid_path, device=device)
+#     num_frames = decoder._num_frames
+#     start = instance['frame_start']
+#     end = instance['frame_end']
+#     if start < 0 or start >= num_frames:
+#       bad_frames.append(f"Invalid start frame {start} for video {instance['video_id']}. Setting to 0." +
+#                         f" Total frames: {num_frames}")
+#       start = 0
+#     if end <= start or end > num_frames:
+#       bad_frames.append(f"Invalid end frame {end} for video {instance['video_id']}. Setting to {num_frames}." +
+#                         f" Total frames: {num_frames}")
+#       end = num_frames
+#     instance['frame_start'] = start
+#     instance['frame_end'] = end
+#   with open(instance_path, 'w') as f:
+#     json.dump(instances, f, indent=4)
+#   if bad_frames:
+#     with open(log, 'a') as log_file:
+#       for line in bad_frames:
+#         log_file.write(line + '\n')
+#     print(f"Bad frame ranges logged to {log}.")
+#     print(f"Updated instances in {instance_path} with valid frame ranges.")
+#   else:
+#     print("No bad frame ranges found. No changes made to the instance file.")
     
 def get_largest_bbox(bboxes):
   if not bboxes:
@@ -395,7 +440,8 @@ def fix_bad_bboxes(instance_path, raw_path, output='./output'):
     instances = json.load(f)
   for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
-    frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
+    # frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
+    frames = load_rgb_frames_from_video_ioversion(vid_path, instance['frame_start'], instance['frame_end'], all=True)
     frames = frames.float() / 255.0  # Convert to float and normalize to [0, 1] range
     results = model(frames, device=device, verbose=False)  
     bboxes = []
@@ -450,7 +496,7 @@ def remove_short_samples(instances_path, cutoff = 9, output='./output'):
     json.dump(mod_instances, f, indent=4)
   
 if __name__ == "__main__":
-  # test_video()
+  test_video()
   # test_crop()
   # prep_train() #--run to preprocess the training data
   # prep_test()  #--run to preprocess the test data

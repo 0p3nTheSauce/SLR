@@ -8,7 +8,7 @@ import os
 
 def save_video(frames, path, fps=30):
   '''Arguments:
-  frames : numpy tensor (T H W C)
+  frames : numpy tensor (T H W C) BGR (cv format)
   path : output path (string) 
   fps : int'''
   
@@ -22,7 +22,7 @@ def save_video(frames, path, fps=30):
     else:
       frames = frames.astype(np.uint8)
   
-  fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+  fourcc = cv2.VideoWriter_fourcc(*'mp4v') # type: ignore
   width = frames.shape[2]
   height = frames.shape[1]
   out = cv2.VideoWriter(path, fourcc, fps, (width, height))
@@ -65,6 +65,8 @@ def watch_video(frames=None, path='',wait=33):
         break
   cv2.destroyAllWindows()
       
+      
+      
 def cv_load(video_path, start, end, all=False):
   cap = cv2.VideoCapture(video_path)
   frame_count = 0
@@ -89,7 +91,7 @@ def torch_to_cv(frames):
     ])
   return np_frames_col
   
-def torch_to_mediapipe(frames : torch.Tensor) -> np.array:
+def torch_to_mediapipe(frames : torch.Tensor) -> np.ndarray:
   '''convert 4D torch.uint8 (T C H W) to mediapipe format'''
   frames = frames.permute(0, 2, 3, 1) # convert to (T H W C)
   np_array = frames.numpy()
@@ -135,7 +137,7 @@ def test_save2():
   vid = f"{inst0['video_id']}.mp4"
   vid_path = os.path.join('../data/WLASL2000',vid)
   # frames = cv_load(vid_path,0,0,True)
-  frames = tools.load_rgb_frames_from_video(
+  frames = tools.load_rgb_frames_from_video_ioversion(
     video_path=vid_path,
     start=0,
     end=0,

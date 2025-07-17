@@ -8,14 +8,14 @@ import time
 class MediaPipeVideoAnalyzer:
     def __init__(self):
         """Initialize MediaPipe solutions"""
-        self.mp_drawing = mp.solutions.drawing_utils
-        self.mp_drawing_styles = mp.solutions.drawing_styles
+        self.mp_drawing = mp.solutions.drawing_utils # type: ignore
+        self.mp_drawing_styles = mp.solutions.drawing_styles # type: ignore
         
         # Initialize different MediaPipe solutions
-        self.mp_pose = mp.solutions.pose
-        self.mp_hands = mp.solutions.hands
-        self.mp_face_mesh = mp.solutions.face_mesh
-        self.mp_holistic = mp.solutions.holistic
+        self.mp_pose = mp.solutions.pose # type: ignore
+        self.mp_hands = mp.solutions.hands # type: ignore
+        self.mp_face_mesh = mp.solutions.face_mesh # type: ignore
+        self.mp_holistic = mp.solutions.holistic # type: ignore
         
         # Initialize pose estimation
         self.pose = self.mp_pose.Pose(
@@ -62,7 +62,7 @@ class MediaPipeVideoAnalyzer:
         cap = cv2.VideoCapture(video_path)
         
         if output_path:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v') # type: ignore
             fps = int(cap.get(cv2.CAP_PROP_FPS))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -100,7 +100,7 @@ class MediaPipeVideoAnalyzer:
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             if output_path:
-                out.write(frame)
+                out.write(frame) # type: ignore
             
             if show_live:
                 cv2.imshow('MediaPipe Pose', frame)
@@ -111,7 +111,7 @@ class MediaPipeVideoAnalyzer:
         
         cap.release()
         if output_path:
-            out.release()
+            out.release() # type: ignore
         cv2.destroyAllWindows()
         
         print(f"Processed {frame_count} frames")
@@ -124,7 +124,7 @@ class MediaPipeVideoAnalyzer:
         cap = cv2.VideoCapture(video_path)
         
         if output_path:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v') # type: ignore
             fps = int(cap.get(cv2.CAP_PROP_FPS))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -167,7 +167,7 @@ class MediaPipeVideoAnalyzer:
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             if output_path:
-                out.write(frame)
+                out.write(frame) # type: ignore
             
             if show_live:
                 cv2.imshow('MediaPipe Hands', frame)
@@ -178,7 +178,7 @@ class MediaPipeVideoAnalyzer:
         
         cap.release()
         if output_path:
-            out.release()
+            out.release() # type: ignore
         cv2.destroyAllWindows()
         
         return self.hand_data
@@ -188,7 +188,7 @@ class MediaPipeVideoAnalyzer:
         cap = cv2.VideoCapture(video_path)
         
         if output_path:
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v') # type: ignore
             fps = int(cap.get(cv2.CAP_PROP_FPS))
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -218,27 +218,27 @@ class MediaPipeVideoAnalyzer:
                 self.mp_drawing.draw_landmarks(
                     frame, results.pose_landmarks, self.mp_holistic.POSE_CONNECTIONS)
                 pose_points = [[lm.x, lm.y, lm.z] for lm in results.pose_landmarks.landmark]
-                frame_data['pose'] = pose_points
+                frame_data['pose'] = pose_points # type: ignore
             
             # Draw hands
             if results.left_hand_landmarks:
                 self.mp_drawing.draw_landmarks(
                     frame, results.left_hand_landmarks, self.mp_holistic.HAND_CONNECTIONS)
                 left_hand_points = [[lm.x, lm.y, lm.z] for lm in results.left_hand_landmarks.landmark]
-                frame_data['left_hand'] = left_hand_points
+                frame_data['left_hand'] = left_hand_points # type: ignore
             
             if results.right_hand_landmarks:
                 self.mp_drawing.draw_landmarks(
                     frame, results.right_hand_landmarks, self.mp_holistic.HAND_CONNECTIONS)
                 right_hand_points = [[lm.x, lm.y, lm.z] for lm in results.right_hand_landmarks.landmark]
-                frame_data['right_hand'] = right_hand_points
+                frame_data['right_hand'] = right_hand_points # type: ignore
             
             # Draw face
             if results.face_landmarks:
                 self.mp_drawing.draw_landmarks(
                     frame, results.face_landmarks, self.mp_holistic.FACEMESH_CONTOURS)
                 face_points = [[lm.x, lm.y, lm.z] for lm in results.face_landmarks.landmark]
-                frame_data['face'] = face_points
+                frame_data['face'] = face_points # type: ignore
             
             holistic_data.append(frame_data)
             
@@ -246,7 +246,7 @@ class MediaPipeVideoAnalyzer:
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             
             if output_path:
-                out.write(frame)
+                out.write(frame) # type: ignore
             
             if show_live:
                 cv2.imshow('MediaPipe Holistic', frame)
@@ -257,7 +257,7 @@ class MediaPipeVideoAnalyzer:
         
         cap.release()
         if output_path:
-            out.release()
+            out.release() # type: ignore
         cv2.destroyAllWindows()
         
         return holistic_data

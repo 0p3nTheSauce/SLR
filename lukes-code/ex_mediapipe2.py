@@ -1,8 +1,8 @@
 import cv2
 import mediapipe as mp
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
-mp_holistic = mp.solutions.holistic
+mp_drawing = mp.solutions.drawing_utils # type: ignore
+mp_drawing_styles = mp.solutions.drawing_styles # type: ignore
+mp_holistic = mp.solutions.holistic # type: ignore
 
 # For webcam input:
 cap = cv2.VideoCapture('./69241.mp4')
@@ -14,8 +14,9 @@ with mp_holistic.Holistic(
     if not success:
       print("Ignoring empty camera frame.")
       # If loading a video, use 'break' instead of 'continue'.
+      
       continue
-
+    
     # To improve performance, optionally mark the image as not writeable to
     # pass by reference.
     image.flags.writeable = False
