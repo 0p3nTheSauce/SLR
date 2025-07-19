@@ -2,7 +2,6 @@ import torch
 import torch.nn.functional as F
 import cv2
 import numpy as np
-import video_dataset as tools
 import json
 import os
 import matplotlib.pyplot as plt
@@ -251,6 +250,17 @@ def plot_from_simple_list(train_loss, val_loss=None,
     print(f'Saved plot to {save_path}')
 
 
+##################### Misc ###################################
+def clean_checkpoints(paths):
+  for path in paths:
+    to_empty = os.path.join(path, 'checkpoints')
+    files = sorted(os.listdir(to_empty))
+    to_remove = files[1:-1] #leave best.pth and the last checkpoint
+    for file in to_remove:
+      os.remove(os.path.join(to_empty, file))
+      print(f'removed {file} in {to_empty}')
+      
+
 ##################### once offs / Testing ######################
 def test_save():
   instances = './preprocessed_labels/asl100/train_instances_fixed_bboxes_short.json'
@@ -301,7 +311,10 @@ def main():
   # test_save()
   # test_save2()
   #  torch_to_mediapipe()
-  watch_video(path='69241.mp4')
+  # watch_video(path='69241.mp4')
+  paths = ['r3d18_exp0', 'r3d18_exp1', 'r3d18_exp2', 'r3d18_exp3']
+  paths = [os.path.join('runs', path) for path in paths]
+  clean_checkpoints(paths)
   
 
 if __name__ == '__main__':

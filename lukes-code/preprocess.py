@@ -49,6 +49,7 @@ def preprocess_info(json_path, split, output_path):
     json.dump(instances, f, indent=4)
   with open(os.path.join(output_path, f'{split}_classes.json'), 'w') as f:
     json.dump(classes, f, indent=4)
+  return instances, classes
     
 def prep_train():
   json_path = '../data/splits/asl100.json'
@@ -187,3 +188,9 @@ def remove_short_samples(instances_path, cutoff = 9, output='./output'):
   #boxes, and fixed short clips
   with open(out_path, "w") as f:
     json.dump(mod_instances, f, indent=4)
+    
+def preprocess_split(split_path, output_path='preprocessed/labels'):
+  preprocess_info(split_path, 'train', output_path)
+  preprocess_info(split_path, 'test', output_path)
+  preprocess_info(split_path, 'val', output_path)
+  
