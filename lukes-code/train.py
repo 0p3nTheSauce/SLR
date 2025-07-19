@@ -78,7 +78,7 @@ def train_model_3(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       if save and avg_val_loss < best_val_loss:
         best_val_loss = avg_val_loss
         torch.save(model.state_dict(),
-                   os.path.join(save_path, 'best.pth'))
+                   os.path.join(save_path, 'best.pth')) # type: ignore
       
       print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
       model.train() # return back to train
@@ -87,7 +87,7 @@ def train_model_3(model, train_loader, optimizer, loss_func, epochs=10,val_loade
     
     if save and epoch % save_every == 0:
       avg_train_loss = avg_train_loss if avg_train_loss else 'N/A'
-      avg_val_loss = avg_val_loss if avg_val_loss else 'N/A'
+      avg_val_loss = avg_val_loss if avg_val_loss else 'N/A' # type: ignore
       torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
@@ -96,7 +96,7 @@ def train_model_3(model, train_loader, optimizer, loss_func, epochs=10,val_loade
         'val loss': avg_val_loss,
         'train losses': train_losses,
         'val losses': val_losses
-        }, os.path.join(save_path, f'checkpoint_{epoch}.pth'))
+        }, os.path.join(save_path, f'checkpoint_{epoch}.pth')) # type: ignore
     
     with open(os.path.join(logs_path, 'train_losses.json'), "w") as f:
       json.dump(train_losses, f)
@@ -106,19 +106,26 @@ def train_model_3(model, train_loader, optimizer, loss_func, epochs=10,val_loade
     
   return train_losses, val_losses
 
+def enum_dir(path, begin_epoch=0, make=False):
+  if os.path.exists(path):
+    if begin_epoch != 0:
+      return path
+    elif not path[-1].isdigit():
+      path += '0'
+    while os.path.exists(path):
+      path = path[:-1] + str(int(path[-1]) + 1)
+  if make:
+    os.makedirs(path, exist_ok=True)
+  return path
+
 def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loader=None, schedular=None,
                   output='runs/exp_0', logs='logs', save='checkpoints', save_every=1, load=None):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   begin_epoch = 0
-  train_losses = []
-  val_losses = []
+  train_metrics = []
+  val_metrics = []
   best_val_loss = float('inf')
-  
-  if os.path.exists(output) and output[-1].isdigit() and begin_epoch == 0:
-    output = output[:-1] + str(int(output[-1])+ 1) #enumerate file name
-  
-  logs_path = os.path.join(output, logs)
-  
+
   if load:
     if os.path.exists(load):
       checkpoint = torch.load(load, map_location=device)
@@ -127,27 +134,40 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       begin_epoch = checkpoint['epoch'] + 1
       print(f"Resuming from epoch {begin_epoch}")
       print(f"Loaded model from {load}")
-      with open(os.path.join(logs_path, 'train_losses.json'), "r") as f:
-        train_losses = json.load(f)
-      if val_loader:
-        with open(os.path.join(logs_path, 'val_losses.json'), "r") as f:
-          val_losses = json.load(f)
+      try:
+        with open(os.path.join(logs_path, 'train_metrics.json'), "r") as f:
+          train_losses = json.load(f)
+        if val_loader:
+          with open(os.path.join(logs_path, 'val_metrics.json'), "r") as f:
+            val_losses = json.load(f)
+      except FileNotFoundError:
+        print("Metrics history files not found, starting fresh metrics tracking")
     else:
-      print(f"Checkpoint {load} does not exist, starting from scratch")
+      cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
+      if cont.lower() != 'y':
+        return
   
+  if output:
+    output = enum_dir(output, begin_epoch, make=True)
+    print(f"Output directory set to: {output}")
+    
   if save:
     save_path = os.path.join(output, save)
-    os.makedirs(save_path,exist_ok=True)
+    save_path = enum_dir(save_path, begin_epoch, make=True)
+    print(f"Save directory set to: {save_path}")
   
-  writer = SummaryWriter(logs_path) #watching loss
-  
+  if logs:
+    logs_path = os.path.join(output, logs)
+    logs_path = enum_dir(logs_path, begin_epoch, make=True)
+    print(f"Logs directory set to: {logs_path}")
+    writer = SummaryWriter(logs_path) #watching loss
+    
   model.train()
   for epoch in tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D"):
     #Training phase
     running_loss = 0.0
     train_samples = 0
-    train_correct = 0
-    val_correct = 0 
+    train_correct = 0 
     
     for data, target in train_loader:
       data, target = data.to(device), target.to(device)
@@ -158,16 +178,27 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       loss.backward()
       optimizer.step()
       
+      #Accumulate metrics
       running_loss += loss.item() * data.size(0) #weight by batch size
       train_samples += data.size(0)
       _, predicted = model_output.max(1)
       train_correct += predicted.eq(target).sum().item()
+    
+    #Calculate average loss and accuracy 
+    avg_train_loss = running_loss / train_samples
+    train_acc = 100. * train_correct / train_samples
+    train_metrics.append({'epoch': epoch, 'loss': avg_train_loss, 'accuracy': train_acc})
+    
+    if logs:
+      writer.add_scalar('Loss/Train', avg_train_loss, epoch)
+      writer.add_scalar('Accuracy/Train', train_acc, epoch)
       
     #Validation phase
     if val_loader:
       model.eval()
       val_loss = 0.0
       val_samples = 0
+      val_correct = 0
       
       with torch.no_grad():
         for data, target in val_loader:
@@ -176,19 +207,19 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
           model_output = model(data)
           loss = loss_func(model_output, target)
           
+          #Accumulate validation metrics
           val_loss += loss.item() * data.size(0) #weight by batch size
           val_samples += data.size(0)
           _, predicted = model_output.max(1)
           val_correct += predicted.eq(target).sum().item()
-          
-      avg_train_loss = running_loss / train_samples
+     
       avg_val_loss = val_loss / val_samples
-      train_acc = 100. * train_correct / train_samples
       val_acc = 100. * val_correct / val_samples
-      val_losses.append(avg_val_loss)
-      train_losses.append(avg_train_loss)
-      writer.add_scalar('Loss/Val', avg_val_loss, epoch)
-      writer.add_scalar('Loss/Train', avg_train_loss, epoch)
+      val_metrics.append({'epoch': epoch, 'loss': avg_val_loss, 'accuracy': val_acc})
+
+      if logs:
+        writer.add_scalar('Loss/Val', avg_val_loss, epoch)
+        writer.add_scalar('Accuracy/Val', val_acc, epoch)
       
       if schedular:
         schedular.step(avg_val_loss)
@@ -198,61 +229,68 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
         torch.save(model.state_dict(),
                    os.path.join(save_path, 'best.pth'))
       
-      # Print progress
-      current_lr = optimizer.param_groups[0]['lr']
-      print(f'  Epoch {epoch+1}/{epochs}:')
-      print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
-      print(f'  Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.2f}%')
-      print(f'  Learning Rate: {current_lr:.6f}')
       model.train() # return back to train
-      
-      # Early stopping check (optional)
-      if current_lr < 1e-6:
-        print(f"Learning rate too small ({current_lr}), stopping training")
-        break
-      
-    else:
-      print(f'  Epoch {epoch+1}/{epochs}:')
-      print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
     
-    if save and epoch % save_every == 0:
-      avg_train_loss = avg_train_loss if avg_train_loss else 'N/A'
-      avg_val_loss = avg_val_loss if avg_val_loss else 'N/A'
-      torch.save({
+    # Print progress
+    current_lr = optimizer.param_groups[0]['lr']
+    print(f'  Epoch {epoch+1}/{epochs}:')
+    print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
+    
+    if val_loader:
+      print(f'  Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.2f}%')
+    
+    print(f'  Learning Rate: {current_lr:.6f}')
+      
+    # Early stopping check 
+    if current_lr < 1e-6:
+      print(f"Learning rate too small ({current_lr}), stopping training")
+      break
+    
+    if save and (epoch % save_every == 0 or epoch == epochs - 1):
+      checkpoint_data = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'train loss': avg_train_loss,
-        'val loss': avg_val_loss,
-        'train losses': train_losses,
-        'val losses': val_losses
-        }, os.path.join(save_path, f'checkpoint_{epoch}.pth'))
-    
-    with open(os.path.join(logs_path, 'train_losses.json'), "w") as f:
-      json.dump(train_losses, f)
-    if val_loader:
-      with open(os.path.join(logs_path, 'val_losses.json'), "w") as f:
-        json.dump(val_losses, f)
-    
+        'train loss': avg_train_loss
+      }
+      
+      if val_loader:
+        checkpoint_data.update({
+          'val loss': avg_val_loss,
+          'best val loss': best_val_loss,
+        })
+      
+      torch.save(checkpoint_data, os.path.join(save_path, f'checkpoint_{epoch}.pth'))
+        
+    if logs:
+      with open(os.path.join(logs_path, 'train_metrics.json'), "w") as f:
+        json.dump(train_metrics, f)
+      if val_loader:
+        with open(os.path.join(logs_path, 'val_metrics.json'), "w") as f:
+          json.dump(val_metrics, f)  
+      
   return train_losses, val_losses
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train a model')
+    # parser = argparse.ArgumentParser(description='Train a model')
     
-    parser.add_argument('model', help='model to use')
-    parser.add_argument('-o', '--output', help='Output file (default: stdout)')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
-    parser.add_argument('-n', '--lines', type=int, default=10, help='Number of lines to process')
+    # parser.add_argument('model', help='model to use')
+    # parser.add_argument('-o', '--output', help='Output file (default: stdout)')
+    # parser.add_argument('-v', '--verbose', action='store_true', help='Verbose output')
+    # parser.add_argument('-n', '--lines', type=int, default=10, help='Number of lines to process')
     
-    args = parser.parse_args()
+    # args = parser.parse_args()
     
-    print(f"Processing {args.input_file}")
-    if args.output:
-        print(f"Output will go to {args.output}")
-    if args.verbose:
-        print("Verbose mode enabled")
-    print(f"Processing {args.lines} lines")
-
+    # print(f"Processing {args.input_file}")
+    # if args.output:
+    #     print(f"Output will go to {args.output}")
+    # if args.verbose:
+    #     print("Verbose mode enabled")
+    # print(f"Processing {args.lines} lines")
+    direc = '/home/luke/ExtraStorage/WLASL/lukes-code/runs/exp_enum'
+    enum = enum_dir(direc)
+    print(f"Enumerated directory: \n{enum}")
+    
 if __name__ == '__main__':
     main()
