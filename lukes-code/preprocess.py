@@ -241,8 +241,17 @@ def remove_short_samples(instances_path, classes_path,
   return mod_instances, mod_classes
     
 def preprocess_split(split_path, raw_path='..data/WLASL2000', output_path='preprocessed/labels'):
-  with open(split_path, 'r') as f:
-    asl_num = json.load(f)
+  
+  try:
+    with open(split_path, 'r') as f:
+      asl_num = json.load(f)
+  except FileNotFoundError:
+    print(f'Split file: {split_path} not found, stopping')
+    return
+  
+  if not os.path.exists(raw_path):
+    print(f"raw folder {raw_path} not found, stopping")
+    return
   
   #create train, test, val splits
   train_instances, train_classes = get_split(asl_num, 'train')
