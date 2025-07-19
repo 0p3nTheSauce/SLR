@@ -75,11 +75,13 @@ def prep_val():
     os.makedirs(output_root)
   preprocess_info(json_path, split, output_root)
   
-def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
+def fix_bad_frame_range(instance_path, raw_path, log='./output',
+                        instances=None, output=None):
   device = "cuda" if torch.cuda.is_available() else "cpu"
   bad_frames = []
-  with open(instance_path, 'r') as f:
-    instances = json.load(f)
+  if instances is None:
+    with open(instance_path, 'r') as f:
+      instances = json.load(f)
   for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
     decoder = VideoDecoder(vid_path, device=device)
@@ -96,16 +98,26 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
       end = num_frames
     instance['frame_start'] = start
     instance['frame_end'] = end
-  with open(instance_path, 'w') as f:
-    json.dump(instances, f, indent=4)
+  
+  log_path = os.path.join(log, 'bad_frame_ranges.txt')
   if bad_frames:
     with open(log, 'a') as log_file:
+      log_file.write('\n New bad frames \n ')
       for line in bad_frames:
         log_file.write(line + '\n')
     print(f"Bad frame ranges logged to {log}.")
-    print(f"Updated instances in {instance_path} with valid frame ranges.")
   else:
-    print("No bad frame ranges found. No changes made to the instance file.")
+    print("No bad frame ranges found")
+  
+  if output is not None:
+    os.makedirs(output, exist_ok=True)
+    base_name = os.basename(instance_path).replace('.json', '')
+    fname = os.path.join(output, f'{base_name}_frange.json' )
+    with open(fname, 'w') as f:
+      json.dump(instances, f, indent=4)  
+    print(f'fixed frame ranges saved to {fname}')
+  
+  return instances
     
 def get_largest_bbox(bboxes):
   if not bboxes:
@@ -123,16 +135,18 @@ def get_largest_bbox(bboxes):
       y_max = y2
   return [x_min, y_min, x_max, y_max]
 
-def fix_bad_bboxes(instance_path, raw_path, output='./output'):
+def fix_bad_bboxes(instance_path, raw_path, log='./output',
+                   instances=None, output=None):
   model = YOLO('yolov8n.pt')  # Load a pre-trained YOLO model
   device = "cuda" if torch.cuda.is_available() else "cpu"
   # model.to(device)
-  new_instences = []
+  new_instances = []
   
   bad_bboxes = []
-  with open(instance_path, 'r') as f:
-    instances = json.load(f)
-  for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
+  if instances is None:
+    with open(instance_path, 'r') as f:
+      instances = json.load(f)
+  for instance in instances:
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
     frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
     # frames = load_rgb_frames_from_video_ioversion(vid_path, instance['frame_start'], instance['frame_end'], all=True)
@@ -151,46 +165,127 @@ def fix_bad_bboxes(instance_path, raw_path, output='./output'):
       bad_bboxes.append(f"No bounding boxes found for video {instance['video_id']}. Using default bbox.")
       largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
     largest_bbox = [round(coord) for coord in largest_bbox]  # Round the coordinates to integers
-    new_instences.append({
+    new_instances.append({
       'label_num': instance['label_num'],
       'frame_end': instance['frame_end'],
       'frame_start': instance['frame_start'],
       'video_id': instance['video_id'],
       'bbox': largest_bbox
     })
-  log_path = os.path.join(output, 'bad_bboxes.txt')
+  
+  log_path = os.path.join(log, 'bad_bboxes.txt')
+  
   if bad_bboxes:
     with open(log_path, 'a') as log_file:
+      log_file.write('\n New bad bboxes \n ')
       for line in bad_bboxes:
         log_file.write(line + '\n')
     print(f"Bad bounding boxes logged to {log_path}.")
-  base_name = os.path.basename(instance_path)
-  mod_instances_path = os.path.join(output, base_name.replace('.json', '_fixed_bboxes.json'))
-  with open(mod_instances_path, 'w') as f:
-    json.dump(new_instences, f, indent=4)
-  print(f"Updated instances with fixed bounding boxes saved to {mod_instances_path}.")
-  
-def remove_short_samples(instances_path, cutoff = 9, output='./output'):
+  else:
+    print("No bad bounding boxes")
+    
+  if output is not None:
+    os.makedirs(output, exist_ok=True)
+    base_name = os.basename(instance_path).replace('.json', '')
+    fname = os.path.join(output, f'{base_name}_bboxes.json' )
+    with open(fname, 'w') as f:
+      json.dump(new_instances, f, indent=4)  
+    print(f'fixed bboxes saved to {fname}')
+    
+  return new_instances
+    
+def remove_short_samples(instances_path, classes_path,
+                         cutoff = 9, log='./output',
+                         instances=None, classes=None, output=None):
   '''Preprocessing function which removes data with num frames less 
   than provided integer from the instances path. Assums the instances 
   have already been modified by preprocess_info, fix_bad_bboxes, and 
   fix_bad_frame range'''
-  with open(instances_path, "r") as f:
-    instances = json.load(f)
-  mod_instances = [instance for instance in instances
-    if (instance['frame_end'] - instance['frame_start'])
-    > cutoff]
-  base_name = os.path.basename(instances_path)
-  out_path = os.path.join(output,
-    base_name.replace('.json', '_short.json'))
-  #chose this output path because file will end up with 
-  # the extension *_fixed_bboxes_short.json, so fixed bounding
-  #boxes, and fixed short clips
-  with open(out_path, "w") as f:
-    json.dump(mod_instances, f, indent=4)
-    
-def preprocess_split(split_path, output_path='preprocessed/labels'):
-  preprocess_info(split_path, 'train', output_path)
-  preprocess_info(split_path, 'test', output_path)
-  preprocess_info(split_path, 'val', output_path)
+  if instances is None:
+    with open(instances_path, "r") as f:
+      instances = json.load(f)
+  if classes is None:
+    with open(classes_path, 'r') as f:
+      classes = json.load(f)
+  mod_instances = []
+  mod_classes = []
+  short_samples = []
+  for i, inst in enumerate(instances):
+    num_frame = inst['frame_end'] - inst['frame_start']
+    if  num_frame > cutoff:
+      mod_instances.append(instances[i])
+      mod_classes.append(classes[i])
+    else:
+      short_samples.append(
+        f"bad number of frames {num_frame} for video {inst['video_id']}, removing.")
+      
+  log_path = os.path.join(log, 'removed_short_samples.txt')
   
+  if short_samples:
+    with open(log_path, 'a') as log_file:
+      log_file.write('\n New short samples \n ')
+      for line in short_samples:
+        log_file.write(line + '\n')
+    print(f'short samples logged to {log_path}')
+  else:
+    print("no short samples")
+    
+  if output is not None:
+    os.makedirs(output, exist_ok=True)
+    base_name = os.basename(instances_path).replace('.json', '')
+    fname = os.path.join(output, f'{base_name}_grtr{cutoff}.json' )
+    with open(fname, 'w') as f:
+      json.dump(instances, f, indent=4)  
+    print(f'fixed short samples saved to {fname}')
+    
+  return mod_instances, mod_classes
+    
+def preprocess_split(split_path, raw_path='..data/WLASL2000', output_path='preprocessed/labels'):
+  with open(split_path, 'r') as f:
+    asl_num = json.load(f)
+  
+  #create train, test, val splits
+  train_instances, train_classes = get_split(asl_num, 'train')
+  test_instances, test_classes = get_split(asl_num, 'test')
+  val_instances, val_classes = get_split(asl_num, 'val')
+  
+  #setup storage
+  base_name = os.path.basename(split_path).replace('json', '')
+  output_path = os.path.join(output_path, base_name)
+  os.makedirs(output_path, exist_ok=True)
+  f_exstension = '_fixed_frange_bboxes_len.json'
+  
+  for split, instances, classes in tqdm.tqdm([('train', train_instances, train_classes),
+                                    ('test', test_instances, test_classes),
+                                    ('val', val_instances, val_classes)],
+                                    desc=f'Preprocessing {base_name}'):
+    print(f'For split: {split}')
+    #fix badly labeled frame ranges
+    print('Fixing frame ranges')
+    instances = fix_bad_frame_range('', raw_path, instances=instances, log=output_path)
+    
+    #fix badly labeled bounding boxes
+    print('Fixing bounding boxes')
+    instances = fix_bad_bboxes('', raw_path, instances=instances, log=output_path)
+    
+    #finally, remove short samples
+    print('Removing small samples')
+    instances, classes = remove_short_samples('', '', instances=instances, classes=classes, log=output_path)
+   
+    #save 
+    print('Saving results')
+    inst_path = os.path.join(output_path, f'{split}_instances{f_exstension}')
+    clss_path = os.path.join(output_path, f'{split}_classes{f_exstension}')
+    with open(inst_path, 'w') as f:
+      json.dump(instances)
+    with open(clss_path, 'w') as f:
+      json.dump(classes)
+      
+  
+  print()
+  print("------------------------- finished preprocessing ---------------")
+  print()
+  
+if __name__ == '__main__':
+  split = '../data/splits/asl300.json'
+  preprocess_split(split)
