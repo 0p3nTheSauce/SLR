@@ -5,6 +5,8 @@ import numpy as np
 import video_dataset as tools
 import json
 import os
+import matplotlib.pyplot as plt
+import gzip
 
 def save_video(frames, path, fps=30):
   '''Arguments:
@@ -103,7 +105,66 @@ def torch_to_mediapipe(frames : torch.Tensor) -> np.ndarray:
   return np_array
   
   
+def plot_from_simple_list(train_loss, val_loss=None, 
+                          title='Training Loss Curve',
+                          xlabel='Epochs',
+                          ylabel='Loss',
+                          save_path=None):
+  # Extract the three components from training loss
+  wall_times = [point[0] for point in train_loss]
+  steps = [point[1] for point in train_loss]
+  values = [point[2] for point in train_loss]
   
+  plt.figure(figsize=(10, 6))
+  
+  # Plot training loss
+  plt.plot(steps, values, color='orange', linewidth=2, label='Training Loss')
+  
+  # Plot validation loss if provided
+  if val_loss:
+    val_steps = [point[1] for point in val_loss]
+    val_values = [point[2] for point in val_loss]
+    plt.plot(val_steps, val_values, color='blue', linewidth=2, label='Validation Loss')
+  
+  plt.xlabel(xlabel)
+  plt.ylabel(ylabel)
+  plt.title(title)
+  plt.grid(True, alpha=0.3)
+  plt.legend()
+  
+  if save_path:
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    print(f"Plot saved to: {save_path}")
+  
+  plt.show()
+
+  if save_path:
+    plt.savefig(save_path, bbox_inches='tight')
+    print(f'Saved plot to {save_path}')
+
+def load_tensorboard_json(filepath):
+  try:
+    # Try regular JSON first
+    with open(filepath, 'r', encoding='utf-8') as f:
+      return json.load(f)
+  except UnicodeDecodeError:
+    try:
+      # Try gzipped JSON
+      with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+        return json.load(f)
+    except:
+        # Try with different encoding
+        try:
+          with open(filepath, 'r', encoding='latin-1') as f:
+            return json.load(f)
+        except:
+          # Last resort - read as binary and try to decode
+          with open(filepath, 'rb') as f:
+            content = f.read()
+            # Check if it's gzipped
+            if content.startswith(b'\x1f\x8b'):
+              content = gzip.decompress(content)
+              return json.loads(content.decode('utf-8', errors='ignore'))
 #####################once offs######################
 def test_save():
   instances = './preprocessed_labels/asl100/train_instances_fixed_bboxes_short.json'

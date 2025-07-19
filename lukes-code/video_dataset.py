@@ -347,8 +347,6 @@ def display(frames,output=None):
       cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
     print(f"Cropped frames saved to {output}.")
   
-
-
 def prep_train():
   json_path = '../data/splits/asl100.json'
   split = 'train'
@@ -373,37 +371,39 @@ def prep_val():
     os.makedirs(output_root)
   preprocess_info(json_path, split, output_root)
   
-# def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
-#   device = "cuda" if torch.cuda.is_available() else "cpu"
-#   bad_frames = []
-#   with open(instance_path, 'r') as f:
-#     instances = json.load(f)
-#   for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
-#     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
-#     decoder = VideoDecoder(vid_path, device=device)
-#     num_frames = decoder._num_frames
-#     start = instance['frame_start']
-#     end = instance['frame_end']
-#     if start < 0 or start >= num_frames:
-#       bad_frames.append(f"Invalid start frame {start} for video {instance['video_id']}. Setting to 0." +
-#                         f" Total frames: {num_frames}")
-#       start = 0
-#     if end <= start or end > num_frames:
-#       bad_frames.append(f"Invalid end frame {end} for video {instance['video_id']}. Setting to {num_frames}." +
-#                         f" Total frames: {num_frames}")
-#       end = num_frames
-#     instance['frame_start'] = start
-#     instance['frame_end'] = end
-#   with open(instance_path, 'w') as f:
-#     json.dump(instances, f, indent=4)
-#   if bad_frames:
-#     with open(log, 'a') as log_file:
-#       for line in bad_frames:
-#         log_file.write(line + '\n')
-#     print(f"Bad frame ranges logged to {log}.")
-#     print(f"Updated instances in {instance_path} with valid frame ranges.")
-#   else:
-#     print("No bad frame ranges found. No changes made to the instance file.")
+
+
+def fix_bad_frame_range(instance_path, raw_path, log='./output/bad_frames.txt'):
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+  bad_frames = []
+  with open(instance_path, 'r') as f:
+    instances = json.load(f)
+  for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
+    vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
+    decoder = VideoDecoder(vid_path, device=device)
+    num_frames = decoder._num_frames
+    start = instance['frame_start']
+    end = instance['frame_end']
+    if start < 0 or start >= num_frames:
+      bad_frames.append(f"Invalid start frame {start} for video {instance['video_id']}. Setting to 0." +
+                        f" Total frames: {num_frames}")
+      start = 0
+    if end <= start or end > num_frames:
+      bad_frames.append(f"Invalid end frame {end} for video {instance['video_id']}. Setting to {num_frames}." +
+                        f" Total frames: {num_frames}")
+      end = num_frames
+    instance['frame_start'] = start
+    instance['frame_end'] = end
+  with open(instance_path, 'w') as f:
+    json.dump(instances, f, indent=4)
+  if bad_frames:
+    with open(log, 'a') as log_file:
+      for line in bad_frames:
+        log_file.write(line + '\n')
+    print(f"Bad frame ranges logged to {log}.")
+    print(f"Updated instances in {instance_path} with valid frame ranges.")
+  else:
+    print("No bad frame ranges found. No changes made to the instance file.")
     
 def get_largest_bbox(bboxes):
   if not bboxes:
