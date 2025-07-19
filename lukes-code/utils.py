@@ -7,6 +7,83 @@ import json
 import os
 import matplotlib.pyplot as plt
 import gzip
+from torchcodec.decoders import VideoDecoder
+
+################# Loading #####################
+def load_rgb_frames_from_video(video_path : str, start : int, end : int
+                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
+  '''Loads RGB frames from a video file as a PyTorch Tensor
+  Args:
+    video_path: Path to video file
+    start: Start frame index
+    end: End frame index
+    device: Device to load tensor on ('cpu' or 'cuda')
+    all: If True, load all frames (ignores start/end)
+  Returns:
+    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
+  '''
+  # if device =='cuda' and not torch.cuda.is_available():
+  #   device = 'cpu'
+  #   print("Warning: cuda not available so using cpu")
+  decoder = VideoDecoder(video_path, device=device)
+  num_frames = decoder._num_frames
+  if all:
+    start = 0
+    end = num_frames
+  if start < 0 or end > num_frames or end <= start:
+    # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
+    print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
+    print(f"Using start=0 and end={num_frames}")
+    start = 0
+    end = num_frames
+  return decoder.get_frames_in_range(start, end).data
+
+
+def cv_load(video_path, start, end, all=False):
+  if not os.path.exists(video_path):
+    raise FileNotFoundError(f'File {video_path} does not exist')
+  cap = cv2.VideoCapture(video_path)
+  frame_count = 0
+  frames = []
+  while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+      break
+    if all:
+      frames.append(frame)
+    elif start <= frame_count < end:
+      frames.append(frame)
+  if len(frames) > 0:
+    return np.asarray(frames) 
+  else:
+    raise ValueError("No frames were loaded")
+
+def load_tensorboard_json(filepath):
+  try:
+    # Try regular JSON first
+    with open(filepath, 'r', encoding='utf-8') as f:
+      return json.load(f)
+  except UnicodeDecodeError:
+    try:
+      # Try gzipped JSON
+      with gzip.open(filepath, 'rt', encoding='utf-8') as f:
+        return json.load(f)
+    except:
+        # Try with different encoding
+        try:
+          with open(filepath, 'r', encoding='latin-1') as f:
+            return json.load(f)
+        except:
+          # Last resort - read as binary and try to decode
+          with open(filepath, 'rb') as f:
+            content = f.read()
+            # Check if it's gzipped
+            if content.startswith(b'\x1f\x8b'):
+              content = gzip.decompress(content)
+              return json.loads(content.decode('utf-8', errors='ignore'))
+
+################## Saving #####################
+
 
 def save_video(frames, path, fps=30):
   '''Arguments:
@@ -34,6 +111,8 @@ def save_video(frames, path, fps=30):
   for frame in frames:
     out.write(frame)
   out.release()
+  
+################## Displaying #####################
   
 def watch_video(frames=None, path='',wait=33):
   if not frames and not path:
@@ -67,26 +146,52 @@ def watch_video(frames=None, path='',wait=33):
         break
   cv2.destroyAllWindows()
       
-      
-      
-def cv_load(video_path, start, end, all=False):
-  if not os.path.exists(video_path):
-    raise FileNotFoundError(f'File {video_path} does not exist')
-  cap = cv2.VideoCapture(video_path)
-  frame_count = 0
-  frames = []
-  while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-      break
-    if all:
-      frames.append(frame)
-    elif start <= frame_count < end:
-      frames.append(frame)
-  if len(frames) > 0:
-    return np.asarray(frames) 
+def show_bbox(frames, bbox):
+  #frames has shape (num_frames, channels, height, width)
+  #bbox is a list of [x1, y1, x2, y2]
+  x1, y1, x2, y2 = bbox
+  print("Bounding box coordinates:", bbox)
+  for i in range(frames.shape[0]):
+    frame = frames[i].permute(1, 2, 0).cpu().numpy()  # Change to (height, width, channels)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)  # Draw the bounding box
+    cv2.imshow('Frame with Bounding Box', frame)
+    cv2.waitKey(0)  # Display each frame for 100 ms
+  cv2.destroyAllWindows()
+
+def display(frames,output=None):
+  if output is None:
+    for i, frame in enumerate(frames):
+      cv2.imshow('Cropped Frames', frame)  # Display the first frame
+      cv2.waitKey(100)  # Wait for a key press to close the window
+    cv2.destroyAllWindows()
   else:
-    raise ValueError("No frames were loaded")
+    if not os.path.exists(output):
+      os.makedirs(output)
+    for i, img in enumerate(frames):
+      cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
+    print(f"Cropped frames saved to {output}.")
+
+def visualise_frames(frames,num):
+  # permute and convert to numpy 
+  '''Args:
+    frames : torch.Tensor (T, C, H, W)
+    num : int, to be visualised'''
+  if num < 1:
+    raise ValueError("num must be >= 1")
+  num_frames = len(frames)
+  if num_frames <= num:
+    step = 1
+  else:
+    step = num_frames // num
+  for frame in frames[::step]:
+    np_frame = frame.permute(1,2,0).cpu().numpy()
+    plt.imshow(np_frame)
+    plt.axis('off')
+    plt.show()
+  
+
+################### Conversions #####################
+
     
 def torch_to_cv(frames):
   '''convert 4D torch tensor (T C H W) to opencv format'''
@@ -104,7 +209,10 @@ def torch_to_mediapipe(frames : torch.Tensor) -> np.ndarray:
   np_array = frames.numpy()
   return np_array
   
-  
+
+####################     Plotting utilities  ####################
+
+
 def plot_from_simple_list(train_loss, val_loss=None, 
                           title='Training Loss Curve',
                           xlabel='Epochs',
@@ -142,30 +250,8 @@ def plot_from_simple_list(train_loss, val_loss=None,
     plt.savefig(save_path, bbox_inches='tight')
     print(f'Saved plot to {save_path}')
 
-def load_tensorboard_json(filepath):
-  try:
-    # Try regular JSON first
-    with open(filepath, 'r', encoding='utf-8') as f:
-      return json.load(f)
-  except UnicodeDecodeError:
-    try:
-      # Try gzipped JSON
-      with gzip.open(filepath, 'rt', encoding='utf-8') as f:
-        return json.load(f)
-    except:
-        # Try with different encoding
-        try:
-          with open(filepath, 'r', encoding='latin-1') as f:
-            return json.load(f)
-        except:
-          # Last resort - read as binary and try to decode
-          with open(filepath, 'rb') as f:
-            content = f.read()
-            # Check if it's gzipped
-            if content.startswith(b'\x1f\x8b'):
-              content = gzip.decompress(content)
-              return json.loads(content.decode('utf-8', errors='ignore'))
-#####################once offs######################
+
+##################### once offs / Testing ######################
 def test_save():
   instances = './preprocessed_labels/asl100/train_instances_fixed_bboxes_short.json'
   with open(instances, 'r') as f:
@@ -208,6 +294,8 @@ def test_save2():
   print(frames.dtype)
   cv_frames = torch_to_cv(frames)
   save_video(cv_frames, vid, fps=24)
+
+
 
 def main():
   # test_save()
