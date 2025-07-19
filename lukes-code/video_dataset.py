@@ -42,38 +42,6 @@ def load_rgb_frames_from_video(video_path : str, start : int, end : int
     end = num_frames
   return decoder.get_frames_in_range(start, end).data
 
-# def load_rgb_frames_from_video_ioversion(video_path : str, start : int, end : int
-#                                ,device : str ='cpu' , all : bool =False) -> torch.Tensor:
-#   '''Loads RGB frames from a video file as a PyTorch Tensor using torchvision.io
-#   Args:
-#     video_path: Path to video file
-#     start: Start frame index
-#     end: End frame index
-#     device: Device to load tensor on ('cpu' or 'cuda')
-#     all: If True, load all frames (ignores start/end)
-#   Returns:
-#     torch.Tensor: RGB frames of shape (T, H, W, C) with dtype
-#     uint8
-#   '''
-#   try:
-#     video_tensor, audio_tensor, info = video_io.read_video(
-#       video_path, 
-#       pts_unit='sec'
-#     )
-#   except Exception as e:
-#     raise RuntimeError(f"Failed to read video {video_path}: {e}")
-#   num_frames = video_tensor.shape[0]
-#   if all:
-#     start = 0
-#     end = num_frames
-#   if start < 0 or end > num_frames or end <= start:
-#     # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
-#     print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
-#     print(f"Using start=0 and end={num_frames}")
-#     start = 0
-#     end = num_frames
-#   frames = video_tensor[start:end]
-#   return frames
 
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
@@ -81,7 +49,26 @@ def crop_frames(frames, bbox):
   x1, y1, x2, y2 = bbox
   return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
-def correct_num_frames(frames, target_length=64):
+def sample(frames, target_length,randomise=False):
+  step = frames.shape[0] // target_length
+  if not randomise:
+    return frames[::step]
+  cnt = 0
+  chunk = []
+  sampled_frames = []
+  for frame in frames:
+    if cnt < step:
+      chunk.append(frame)
+      cnt += 1
+    else:
+      choice = random.choice(chunk)
+      sampled_frames.append(choice)
+      chunk = []
+      cnt = 0
+  return torch.stack(sampled_frames, dim=0)
+  
+  
+def correct_num_frames(frames, target_length=64, randomise=False):
   '''Corrects the number of frames to match the target length.
   Args:
     frames (torch.Tensor): The input frames tensor. (T x C x H x W)
@@ -100,9 +87,8 @@ def correct_num_frames(frames, target_length=64):
     padding = torch.zeros(target_length - frames.shape[0], frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
     return torch.cat((frames, padding), dim=0)
   else:
-    #uniformly sample frames
     step = frames.shape[0] // target_length
-    sampled_frames = frames[::step]
+    sampled_frames = sample(frames, target_length, randomise=randomise)
     diff = target_length - len(sampled_frames) 
     if diff > 0:
       padding = torch.zeros(diff, frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
@@ -162,7 +148,13 @@ def normalise(frames, mean, std):
   return torch.stack([
     transforms.Normalize(mean=mean, std=std)(frame) for frame in frames
   ], dim=0)
-    
+
+def colour_jitter(frames, brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1):
+  '''Applies torchvision colour jitter transform to 4D tensor'''
+  jitter = transforms.ColorJitter(
+    brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)
+  return torch.stack([jitter(frame) for frame in frames], dim=0)
+
 def min_transform_rI3d(frames):
   '''Prepares videos for rI3d'''
   return F.interpolate(
