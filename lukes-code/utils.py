@@ -68,6 +68,8 @@ def watch_video(frames=None, path='',wait=33):
       
       
 def cv_load(video_path, start, end, all=False):
+  if not os.path.exists(video_path):
+    raise FileNotFoundError(f'File {video_path} does not exist')
   cap = cv2.VideoCapture(video_path)
   frame_count = 0
   frames = []
@@ -79,7 +81,10 @@ def cv_load(video_path, start, end, all=False):
       frames.append(frame)
     elif start <= frame_count < end:
       frames.append(frame)
-  return np.asarray(frames) 
+  if len(frames) > 0:
+    return np.asarray(frames) 
+  else:
+    raise ValueError("No frames were loaded")
     
 def torch_to_cv(frames):
   '''convert 4D torch tensor (T C H W) to opencv format'''
@@ -136,13 +141,8 @@ def test_save2():
   inst0 = all_inst[0]
   vid = f"{inst0['video_id']}.mp4"
   vid_path = os.path.join('../data/WLASL2000',vid)
-  # frames = cv_load(vid_path,0,0,True)
-  frames = tools.load_rgb_frames_from_video_ioversion(
-    video_path=vid_path,
-    start=0,
-    end=0,
-    all=True
-  )
+  frames = cv_load(vid_path,0,0,True)
+ 
   print(frames.shape)
   print(frames.dtype)
   cv_frames = torch_to_cv(frames)
