@@ -106,11 +106,9 @@ def train_model_3(model, train_loader, optimizer, loss_func, epochs=10,val_loade
     
   return train_losses, val_losses
 
-def enum_dir(path, begin_epoch=0, make=False):
+def enum_dir(path, make=False):
   if os.path.exists(path):
-    if begin_epoch != 0:
-      return path
-    elif not path[-1].isdigit():
+    if not path[-1].isdigit():
       path += '0'
     while os.path.exists(path):
       path = path[:-1] + str(int(path[-1]) + 1)
@@ -134,31 +132,36 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       begin_epoch = checkpoint['epoch'] + 1
       print(f"Resuming from epoch {begin_epoch}")
       print(f"Loaded model from {load}")
-      try:
-        with open(os.path.join(logs_path, 'train_metrics.json'), "r") as f:
-          train_losses = json.load(f)
-        if val_loader:
-          with open(os.path.join(logs_path, 'val_metrics.json'), "r") as f:
-            val_losses = json.load(f)
-      except FileNotFoundError:
-        print("Metrics history files not found, starting fresh metrics tracking")
+      if output and logs:
+        logs_path = os.path.join(output, logs)
+        try:
+          with open(os.path.join(logs_path, 'train_metrics.json'), "r") as f:
+            train_losses = json.load(f)
+          if val_loader:
+            with open(os.path.join(logs_path, 'val_metrics.json'), "r") as f:
+              val_losses = json.load(f)
+        except FileNotFoundError:
+          print("Metrics history files not found, starting fresh metrics tracking")
     else:
       cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
       if cont.lower() != 'y':
         return
   
   if output:
-    output = enum_dir(output, begin_epoch, make=True)
+    if begin_epoch == 0:
+      output = enum_dir(output, make=True) 
     print(f"Output directory set to: {output}")
     
   if save:
     save_path = os.path.join(output, save)
-    save_path = enum_dir(save_path, begin_epoch, make=True)
+    if begin_epoch == 0:
+      save_path = enum_dir(save_path, make=True)
     print(f"Save directory set to: {save_path}")
   
   if logs:
     logs_path = os.path.join(output, logs)
-    logs_path = enum_dir(logs_path, begin_epoch, make=True)
+    if begin_epoch == 0:
+      logs_path = enum_dir(logs_path, make=True)
     print(f"Logs directory set to: {logs_path}")
     writer = SummaryWriter(logs_path) #watching loss
     
@@ -189,9 +192,9 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
     train_acc = 100. * train_correct / train_samples
     train_metrics.append({'epoch': epoch, 'loss': avg_train_loss, 'accuracy': train_acc})
     
-    if logs:
-      writer.add_scalar('Loss/Train', avg_train_loss, epoch)
-      writer.add_scalar('Accuracy/Train', train_acc, epoch)
+    if logs: 
+      writer.add_scalar('Loss/Train', avg_train_loss, epoch) # type: ignore
+      writer.add_scalar('Accuracy/Train', train_acc, epoch) # type: ignore
       
     #Validation phase
     if val_loader:
@@ -218,8 +221,8 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       val_metrics.append({'epoch': epoch, 'loss': avg_val_loss, 'accuracy': val_acc})
 
       if logs:
-        writer.add_scalar('Loss/Val', avg_val_loss, epoch)
-        writer.add_scalar('Accuracy/Val', val_acc, epoch)
+        writer.add_scalar('Loss/Val', avg_val_loss, epoch) # type: ignore
+        writer.add_scalar('Accuracy/Val', val_acc, epoch) # type: ignore
       
       if schedular:
         schedular.step(avg_val_loss)
@@ -227,7 +230,7 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       if save and avg_val_loss < best_val_loss:
         best_val_loss = avg_val_loss
         torch.save(model.state_dict(),
-                   os.path.join(save_path, 'best.pth'))
+                   os.path.join(save_path, 'best.pth')) # type: ignore
       
       model.train() # return back to train
     
@@ -237,7 +240,7 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
     print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
     
     if val_loader:
-      print(f'  Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.2f}%')
+      print(f'  Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.2f}%') # type: ignore
     
     print(f'  Learning Rate: {current_lr:.6f}')
       
@@ -256,20 +259,20 @@ def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loade
       
       if val_loader:
         checkpoint_data.update({
-          'val loss': avg_val_loss,
+          'val loss': avg_val_loss, # type: ignore
           'best val loss': best_val_loss,
         })
       
-      torch.save(checkpoint_data, os.path.join(save_path, f'checkpoint_{epoch}.pth'))
+      torch.save(checkpoint_data, os.path.join(save_path, f'checkpoint_{epoch}.pth')) # type: ignore
         
     if logs:
-      with open(os.path.join(logs_path, 'train_metrics.json'), "w") as f:
-        json.dump(train_metrics, f)
+      with open(os.path.join(logs_path, 'train_metrics.json'), "w") as f: # type: ignore
+        json.dump(train_metrics, f) 
       if val_loader:
-        with open(os.path.join(logs_path, 'val_metrics.json'), "w") as f:
+        with open(os.path.join(logs_path, 'val_metrics.json'), "w") as f: # type: ignore
           json.dump(val_metrics, f)  
       
-  return train_losses, val_losses
+  return train_metrics, val_metrics
 
 
 def main():

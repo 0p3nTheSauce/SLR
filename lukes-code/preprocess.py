@@ -77,14 +77,14 @@ def prep_val():
   
 def fix_bad_frame_range(instance_path, raw_path, log='./output',
                         instances=None, output=None):
-  device = "cuda" if torch.cuda.is_available() else "cpu"
+  # device = 'cuda' if torch.cuda.is_available() else 'cpu'
   bad_frames = []
   if instances is None:
     with open(instance_path, 'r') as f:
       instances = json.load(f)
-  for instance in tqdm.tqdm(instances, desc="Fixing frame ranges"):
+  for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
-    decoder = VideoDecoder(vid_path, device=device)
+    decoder = VideoDecoder(vid_path)
     num_frames = decoder._num_frames
     start = instance['frame_start']
     end = instance['frame_end']
@@ -101,7 +101,7 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output',
   
   log_path = os.path.join(log, 'bad_frame_ranges.txt')
   if bad_frames:
-    with open(log, 'a') as log_file:
+    with open(log_path, 'a') as log_file:
       log_file.write('\n New bad frames \n ')
       for line in bad_frames:
         log_file.write(line + '\n')
@@ -146,7 +146,7 @@ def fix_bad_bboxes(instance_path, raw_path, log='./output',
   if instances is None:
     with open(instance_path, 'r') as f:
       instances = json.load(f)
-  for instance in instances:
+  for instance in tqdm.tqdm(instances, desc='Fixing bounding boxes'):
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
     frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
     # frames = load_rgb_frames_from_video_ioversion(vid_path, instance['frame_start'], instance['frame_end'], all=True)
@@ -240,7 +240,7 @@ def remove_short_samples(instances_path, classes_path,
     
   return mod_instances, mod_classes
     
-def preprocess_split(split_path, raw_path='..data/WLASL2000', output_path='preprocessed/labels'):
+def preprocess_split(split_path, raw_path='../data/WLASL2000', output_path='preprocessed/labels'):
   
   try:
     with open(split_path, 'r') as f:
@@ -259,15 +259,15 @@ def preprocess_split(split_path, raw_path='..data/WLASL2000', output_path='prepr
   val_instances, val_classes = get_split(asl_num, 'val')
   
   #setup storage
-  base_name = os.path.basename(split_path).replace('json', '')
+  base_name = os.path.basename(split_path).replace('.json', '')
   output_path = os.path.join(output_path, base_name)
   os.makedirs(output_path, exist_ok=True)
   f_exstension = '_fixed_frange_bboxes_len.json'
   
-  for split, instances, classes in tqdm.tqdm([('train', train_instances, train_classes),
+  print(f"Processing {base_name}")
+  for split, instances, classes in [('train', train_instances, train_classes),
                                     ('test', test_instances, test_classes),
-                                    ('val', val_instances, val_classes)],
-                                    desc=f'Preprocessing {base_name}'):
+                                    ('val', val_instances, val_classes)]:
     print(f'For split: {split}')
     #fix badly labeled frame ranges
     print('Fixing frame ranges')
