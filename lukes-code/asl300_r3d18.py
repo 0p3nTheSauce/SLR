@@ -13,6 +13,7 @@ import json
 
 from train import train_model_4
 import video_dataset as Dataset
+
 # from test import test_model
 
 train_inst_path = './preprocessed/labels/asl300/train_instances_fixed_frange_bboxes_len.json'
@@ -27,6 +28,8 @@ transform0 = transforms.Compose([
     transforms.Lambda(lambda x: Dataset.normalise(x,  mean=[0.43216, 0.394666, 0.37645], std=[0.22803, 0.22145, 0.216989])),  # Normalize per channel
     transforms.Lambda(lambda x: x.permute(1, 0, 2, 3)),  # (T, C, H, W) -> (C, T, H, W)
 ]) #The transform that got the best result
+
+
 train_set = Dataset.VideoDataset(
     root=raw_path,
     instances_path=train_inst_path,
@@ -106,12 +109,12 @@ optimizer = torch.optim.Adam(trainable_params, lr=1e-4)  #this learning rate mig
 print(len(trainable_params), "trainable parameters")
 loss_func = nn.CrossEntropyLoss() #TODO : try Contrastive loss
 
-# schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
-#   optimizer,
-#   mode='min',
-#   factor=0.1,
-#   patience=15,
-# ) #not sure if i should use the schedular, but will try
+schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
+  optimizer,
+  mode='min',
+  factor=0.1,
+  patience=30,
+) 
 
 train_losses, val_losses = train_model_4(
   model=model,
@@ -120,5 +123,25 @@ train_losses, val_losses = train_model_4(
   loss_func=loss_func,
   epochs=100,
   val_loader=val_loader,
-  output='runs/asl300/r3d18_exp1'
+  output='runs/asl300/r3d18_exp2'
 )
+
+#exp0 : with 
+# schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#   optimizer,
+#   mode='min',
+#   factor=0.1,
+#   patience=15,
+# ) 
+
+# exp1: without schedular
+
+# exp2 : with 
+# schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#   optimizer,
+#   mode='min',
+#   factor=0.1,
+#   patience=30,
+# ) 
+
+

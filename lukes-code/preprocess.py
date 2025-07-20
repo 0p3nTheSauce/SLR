@@ -4,6 +4,8 @@ import torch
 import tqdm
 from ultralytics import YOLO # type: ignore (have a feeling this will bork the system)
 # from torchcodec.decoders import VideoDecoder #this thing causes too many problems
+import cv2
+
 
 #local imports
 from utils import load_rgb_frames_from_video 
@@ -84,8 +86,21 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output',
       instances = json.load(f)
   for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
     vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
-    decoder = VideoDecoder(vid_path)
-    num_frames = decoder._num_frames
+    # decoder = VideoDecoder(vid_path)
+    
+    num_frames = 0
+    cap = cv2.VideoCapture(vid_path)
+    if not cap.isOpened():
+      print("Error: Could not open video.")
+    else:
+      num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+      
+    if num_frames == 0:  
+      bad_frames.append(f"No frames detected for video {instance['video_id']}. Skipping")
+      instance['frame_start'] = 0
+      instance['frame_end'] = 0 # a different function handles short samples anyway
+      continue
+    
     start = instance['frame_start']
     end = instance['frame_end']
     if start < 0 or start >= num_frames:
