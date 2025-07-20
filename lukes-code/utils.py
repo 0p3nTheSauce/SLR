@@ -6,37 +6,50 @@ import json
 import os
 import matplotlib.pyplot as plt
 import gzip
-from torchcodec.decoders import VideoDecoder
+# from torchcodec.decoders import VideoDecoder
 
 ################# Loading #####################
-def load_rgb_frames_from_video(video_path : str, start : int, end : int
+def load_rgb_frames_from_video_codec(video_path : str, start : int, end : int
                                ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
-  '''Loads RGB frames from a video file as a PyTorch Tensor
-  Args:
-    video_path: Path to video file
-    start: Start frame index
-    end: End frame index
-    device: Device to load tensor on ('cpu' or 'cuda')
-    all: If True, load all frames (ignores start/end)
-  Returns:
-    torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
-  '''
-  # if device =='cuda' and not torch.cuda.is_available():
-  #   device = 'cpu'
-  #   print("Warning: cuda not available so using cpu")
-  decoder = VideoDecoder(video_path, device=device)
-  num_frames = decoder._num_frames
-  if all:
-    start = 0
-    end = num_frames
-  if start < 0 or end > num_frames or end <= start:
-    # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
-    print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
-    print(f"Using start=0 and end={num_frames}")
-    start = 0
-    end = num_frames
-  return decoder.get_frames_in_range(start, end).data
+  # '''Loads RGB frames from a video file as a PyTorch Tensor
+  # Args:
+  #   video_path: Path to video file
+  #   start: Start frame index
+  #   end: End frame index
+  #   device: Device to load tensor on ('cpu' or 'cuda')
+  #   all: If True, load all frames (ignores start/end)
+  # Returns:
+  #   torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
+  # '''
+  # # if device =='cuda' and not torch.cuda.is_available():
+  # #   device = 'cpu'
+  # #   print("Warning: cuda not available so using cpu")
+  # decoder = VideoDecoder(video_path, device=device)
+  # num_frames = decoder._num_frames
+  # if all:
+  #   start = 0
+  #   end = num_frames
+  # if start < 0 or end > num_frames or end <= start:
+  #   # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
+  #   print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
+  #   print(f"Using start=0 and end={num_frames}")
+  #   start = 0
+  #   end = num_frames
+  # return decoder.get_frames_in_range(start, end).data
+  
+  #stinking torchcodec is borked
+  return torch.rand(2)
 
+def load_rgb_frames_from_video(video_path : str, start : int, end : int
+                              , all : bool =False, recover=True) -> torch.Tensor:
+  if recover:
+    try:
+      frames = cv_load(video_path, start, end, all)
+    except ValueError:
+      frames = cv_load(video_path, start, end, all=True)
+    return cv_to_torch(frames)
+  else:
+    return cv_to_torch(cv_load(video_path, start, end, all))
 
 def cv_load(video_path, start, end, all=False):
   if not os.path.exists(video_path):
@@ -48,14 +61,14 @@ def cv_load(video_path, start, end, all=False):
     ret, frame = cap.read()
     if not ret:
       break
-    if all:
-      frames.append(frame)
-    elif start <= frame_count < end:
-      frames.append(frame)
+    frames.append(frame)
   if len(frames) > 0:
-    return np.asarray(frames) 
+    if all:
+      return np.asarray(frames) 
+    else:
+      return np.asarray(frames[start:end])
   else:
-    raise ValueError("No frames were loaded")
+    raise ValueError(f"No frames were loaded for file {video_path}")
 
 def load_tensorboard_json(filepath):
   try:
@@ -207,6 +220,15 @@ def torch_to_mediapipe(frames : torch.Tensor) -> np.ndarray:
   frames = frames.permute(0, 2, 3, 1) # convert to (T H W C)
   np_array = frames.numpy()
   return np_array
+
+def cv_to_torch(frames):
+  '''convert 4D opencvformat to torch Tensor (T C H W)'''
+  frames_rgb = np.asarray([
+    cv2.cvtColor(cv_frame, cv2.COLOR_BGR2RGB)
+    for cv_frame in frames])
+  torch_frames = torch.from_numpy(frames)
+  torch_frames = torch_frames.permute(0,3,1,2)
+  return torch_frames
   
 
 ####################     Plotting utilities  ####################
@@ -312,10 +334,14 @@ def main():
   # test_save2()
   #  torch_to_mediapipe()
   # watch_video(path='69241.mp4')
-  paths = ['r3d18_exp0', 'r3d18_exp1', 'r3d18_exp2', 'r3d18_exp3']
-  paths = [os.path.join('runs', path) for path in paths]
-  clean_checkpoints(paths)
   
+  # paths = ['r3d18_exp0', 'r3d18_exp1', 'r3d18_exp2', 'r3d18_exp3']
+  # paths = [os.path.join('runs', path) for path in paths]
+  # clean_checkpoints(paths)
+  
+  test_vid = '../data/WLASL2000/07393.mp4'
+  torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
+  print(torch_frames.shape)
 
 if __name__ == '__main__':
   main()

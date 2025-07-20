@@ -119,6 +119,7 @@ def enum_dir(path, make=False):
 def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loader=None, schedular=None,
                   output='runs/exp_0', logs='logs', save='checkpoints', save_every=1, load=None):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  model.to(device)
   begin_epoch = 0
   train_metrics = []
   val_metrics = []
