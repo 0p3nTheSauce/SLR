@@ -124,7 +124,9 @@ def save_video(frames, path, fps=30):
     out.write(frame)
   out.release()
   
-################## Displaying #####################
+################## Displaying  #####################
+  
+  ################  CV based ####################
   
 def watch_video(frames=None, path='',wait=33):
   if not frames and not path:
@@ -183,6 +185,8 @@ def display(frames,output=None):
       cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
     print(f"Cropped frames saved to {output}.")
 
+  ###############   PLOT Based       #################
+
 def visualise_frames(frames,num):
   # permute and convert to numpy 
   '''Args:
@@ -226,7 +230,7 @@ def cv_to_torch(frames):
   frames_rgb = np.asarray([
     cv2.cvtColor(cv_frame, cv2.COLOR_BGR2RGB)
     for cv_frame in frames])
-  torch_frames = torch.from_numpy(frames)
+  torch_frames = torch.from_numpy(frames_rgb)
   torch_frames = torch_frames.permute(0,3,1,2)
   return torch_frames
   
@@ -335,13 +339,13 @@ def main():
   #  torch_to_mediapipe()
   # watch_video(path='69241.mp4')
   
-  # paths = ['r3d18_exp0', 'r3d18_exp1', 'r3d18_exp2', 'r3d18_exp3']
-  # paths = [os.path.join('runs', path) for path in paths]
-  # clean_checkpoints(paths)
+  paths = ['r3d18_exp0', 'r3d18_exp1', 'r3d18_exp2', 'r3d18_exp3']
+  paths = [os.path.join('runs/asl100', path) for path in paths]
+  clean_checkpoints(['runs/asl300/r3d18_exp0'])
   
-  test_vid = '../data/WLASL2000/07393.mp4'
-  torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
-  print(torch_frames.shape)
+  # test_vid = '../data/WLASL2000/07393.mp4'
+  # torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
+  # print(torch_frames.shape)
 
 if __name__ == '__main__':
   main()
