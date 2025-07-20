@@ -8,7 +8,8 @@ class RandomNormalizationAugmentation:
     """
     Randomly adjusts normalization parameters as augmentation
     """
-    def __init__(self, base_mean, base_std, mean_var=0.1, std_var=0.1, prob=0.5):
+    def __init__(self, base_mean, base_std, mean_var=0.1,
+                 std_var=0.1, prob=0.5):
         """
         Args:
             base_mean: Original normalization mean [R, G, B]

@@ -13,6 +13,7 @@ import json
 
 from train import train_model_4
 import video_dataset as Dataset
+import video_transforms as vt
 
 # from test import test_model
 
@@ -21,26 +22,38 @@ train_clss_path = './preprocessed/labels/asl300/train_classes_fixed_frange_bboxe
 val_inst_path = './preprocessed/labels/asl300/val_instances_fixed_frange_bboxes_len.json'
 val_clss_path = './preprocessed/labels/asl300/val_classes_fixed_frange_bboxes_len.json'
 raw_path = '../data/WLASL2000'
-transform0 = transforms.Compose([
-    transforms.Lambda(lambda x: Dataset.correct_num_frames(x, 16)),  # (T, C, H, W)
-    transforms.Lambda(lambda x: x.float() / 255.0),  # Convert to float and normalize to [0,1]
-    transforms.Lambda(lambda x: F.interpolate(x, size=(112, 112), mode='bilinear', align_corners=False)),  # Resize after normalization
-    transforms.Lambda(lambda x: Dataset.normalise(x,  mean=[0.43216, 0.394666, 0.37645], std=[0.22803, 0.22145, 0.216989])),  # Normalize per channel
-    transforms.Lambda(lambda x: x.permute(1, 0, 2, 3)),  # (T, C, H, W) -> (C, T, H, W)
-]) #The transform that got the best result
 
+base_mean = [0.43216, 0.394666, 0.37645]
+base_std = [0.22803, 0.22145, 0.216989]
+permute_fin = lambda x: x.permute(1,0,2,3)
+base_transform = vt.get_base_transform()
+
+rand_norm_aug =lambda x: \
+  vt.RandomNormalizationAugmentation(x,
+    base_mean=base_mean,
+    base_std=base_std,
+    mean_var=0.05,
+    std_var=0.03,
+    prob=0.5,                                 
+  )
+
+base_rand_norm = transforms.Compose([
+  base_transform,
+  transforms.Lambda(rand_norm_aug),
+  transforms.Lambda(permute_fin)
+])
 
 train_set = Dataset.VideoDataset(
     root=raw_path,
     instances_path=train_inst_path,
     classes_path=train_clss_path,
-    transform=transform0
+    transform=base_rand_norm
 )
 val_set = Dataset.VideoDataset(
     root=raw_path,
     instances_path=val_inst_path,
     classes_path=val_clss_path,
-    transform=transform0
+    transform=base_rand_norm
 )
 print(f"Number of training samples: {len(train_set)}")
 print(f"Number of training classes: {len(set(train_set.classes))}")
@@ -65,12 +78,10 @@ val_loader = DataLoader(
   drop_last=False,
   num_workers=2
 )
-
-print(f"Validation loader:\n{val_loader}")
-
+print('-----------------------')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
-
+print('-----------------------')
 model = video_models.r3d_18(pretrained=True) #weights=R3D_18_Weights.KINETICS400_V1d
 num_classes = 300
 model.fc = nn.Linear(model.fc.in_features, num_classes)
@@ -123,7 +134,8 @@ train_losses, val_losses = train_model_4(
   loss_func=loss_func,
   epochs=100,
   val_loader=val_loader,
-  output='runs/asl300/r3d18_exp2'
+  scheduler=schedular,
+  output='runs/asl300/r3d18_exp3'
 )
 
 #exp0 : with 
@@ -131,12 +143,12 @@ train_losses, val_losses = train_model_4(
 #   optimizer,
 #   mode='min',
 #   factor=0.1,
-#   patience=15,
+#   patience=15,   NB
 # ) 
 
-# exp1: without schedular
+# exp1 : better : without schedular
 
-# exp2 : with 
+# exp2 : best? : with 
 # schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
 #   optimizer,
 #   mode='min',
@@ -144,4 +156,37 @@ train_losses, val_losses = train_model_4(
 #   patience=30,
 # ) 
 
+#exp3 : without
+# transform0 = transforms.Compose([
+#     transforms.Lambda(lambda x: Dataset.correct_num_frames(x, 16)),  # (T, C, H, W)
+#     transforms.Lambda(lambda x: x.float() / 255.0),  # Convert to float and normalize to [0,1]
+#     transforms.Lambda(lambda x: F.interpolate(x, size=(112, 112), mode='bilinear', align_corners=False)),  # Resize after normalization
+#     transforms.Lambda(lambda x: Dataset.normalise(x,  mean=[0.43216, 0.394666, 0.37645], std=[0.22803, 0.22145, 0.216989])),  # Normalize per channel
+#     transforms.Lambda(lambda x: x.permute(1, 0, 2, 3)),  # (T, C, H, W) -> (C, T, H, W)
+# ]) #The transform that got the best result
 
+#      : with
+# base_transform = transforms.Compose([
+#   transforms.Lambda(lambda x: vd.correct_num_frames(x, 16)),
+#   transforms.Lambda(lambda x: x.float() / 255.0),
+#   transforms.Lambda(lambda x: F.interpolate(x, size=(112, 112), 
+#                     mode='bilinear', align_corners=False)),
+# ])
+# rand_norm_aug = lambda x: vd.RandomNormalizationAugmentation(x,
+#   base_mean=base_mean,
+#   base_std=base_std,
+#   mean_var=0.05,
+#   std_var=0.03,
+#   prob=augment_prob
+# )
+# base_rand_norm = transforms.Compose([
+#   base_transform, 
+#   transforms.Lambda(rand_norm_aug)
+# ])
+
+# schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#   optimizer,
+#   mode='min',
+#   factor=0.1,
+#   patience=30,
+# ) 
