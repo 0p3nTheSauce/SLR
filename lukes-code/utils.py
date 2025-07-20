@@ -187,11 +187,17 @@ def display(frames,output=None):
 
   ###############   PLOT Based       #################
 
-def visualise_frames(frames,num):
+def visualise_frames(frames,num, size=(5,5), adapt=False):
   # permute and convert to numpy 
   '''Args:
     frames : torch.Tensor (T, C, H, W)
     num : int, to be visualised'''
+  if adapt:
+    #256 ~ 5
+    factor = 5 / 256
+    w, h = frames.shape[2], frames.shape[3]
+    size = (w * factor, h * factor)
+    
   if num < 1:
     raise ValueError("num must be >= 1")
   num_frames = len(frames)
@@ -201,6 +207,7 @@ def visualise_frames(frames,num):
     step = num_frames // num
   for frame in frames[::step]:
     np_frame = frame.permute(1,2,0).cpu().numpy()
+    plt.figure(figsize=size)
     plt.imshow(np_frame)
     plt.axis('off')
     plt.show()
