@@ -13,4 +13,4 @@ code/I3D/archived/
 data/
 .venv
 *.jpg
-lukes-code/runs/*/checkpoints/
+lukes-code/runs/*/*/checkpoints/*.pth
