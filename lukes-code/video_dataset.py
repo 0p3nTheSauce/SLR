@@ -1,100 +1,10 @@
 import torch
 from torch.utils.data import Dataset
-import torchvision.transforms as transforms
-import torch.nn.functional as F
 import os
 import json
-import random
 
 #local imports
-from utils import load_rgb_frames_from_video 
-
-########################## Transforms ##########################
-
-def crop_frames(frames, bbox):
-  #frames hase shape (num_frames, channels, height, width)
-  #bbox is a list of [x1, y1, x2, y2]
-  x1, y1, x2, y2 = bbox
-  return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
-
-def sample(frames, target_length,randomise=False):
-  step = frames.shape[0] // target_length
-  if not randomise:
-    return frames[::step]
-  cnt = 0
-  chunk = []
-  sampled_frames = []
-  for frame in frames:
-    if cnt < step:
-      chunk.append(frame)
-      cnt += 1
-    else:
-      choice = random.choice(chunk)
-      sampled_frames.append(choice)
-      chunk = []
-      cnt = 0
-  return torch.stack(sampled_frames, dim=0)
-  
-def correct_num_frames(frames, target_length=64, randomise=False):
-  '''Corrects the number of frames to match the target length.
-  Args:
-    frames (torch.Tensor): The input frames tensor. (T x C x H x W)
-    target_length (int): The target length for the number of frames.
-  Returns:
-    torch.Tensor: The corrected frames tensor with the specified target length.
-  '''
-  if frames is None or frames.shape[0] == 0:
-    raise ValueError("Input frames tensor is empty or None.")
-  if target_length <= 0:
-    raise ValueError("Target length must be a positive integer.")
-  if frames.shape[0] == target_length:
-    return frames
-  if frames.shape[0] < target_length:
-    # Pad with zeros if the number of frames is less than the target length
-    padding = torch.zeros(target_length - frames.shape[0], frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
-    return torch.cat((frames, padding), dim=0)
-  else:
-    step = frames.shape[0] // target_length
-    sampled_frames = sample(frames, target_length, randomise=randomise)
-    diff = target_length - len(sampled_frames) 
-    if diff > 0:
-      padding = torch.zeros(diff, frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
-      return torch.cat((sampled_frames, padding), dim=0)
-    elif diff < 0:
-      return sampled_frames[:target_length]
-    else:
-      return sampled_frames  
-
-def pad_frames(frames, target_length):
-  num_frames = frames.shape[0]
-  if num_frames == target_length:
-    return frames
-  elif num_frames < target_length:
-    # Pad with zeros if the number of frames is less than the target length
-    padding = torch.zeros(target_length - num_frames, frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
-    return torch.cat((frames, padding), dim=0)
-  else:
-    # Trim the frames if the number of frames is greater than the target length
-    return frames[:target_length, :, :, :]    
-    
-def normalise(frames, mean, std):
-  '''Applies torch vision transform to 4D tensor ''' 
-  return torch.stack([
-    transforms.Normalize(mean=mean, std=std)(frame) for frame in frames
-  ], dim=0)
-
-def colour_jitter(frames, brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1):
-  '''Applies torchvision colour jitter transform to 4D tensor'''
-  jitter = transforms.ColorJitter(
-    brightness=brightness, contrast=contrast, saturation=saturation, hue=hue)
-  return torch.stack([jitter(frame) for frame in frames], dim=0)
-
-def min_transform_rI3d(frames):
-  '''Prepares videos for rI3d'''
-  return F.interpolate(
-    correct_num_frames(frames) / 255.0,
-    size=(244,244),
-    mode='bilinear').permute(1,0,2,3) #r3id expects (C, T, H, W)
+from utils import load_rgb_frames_from_video, crop_frames
         
 ############################ Dataset Class ############################
 

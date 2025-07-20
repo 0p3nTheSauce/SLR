@@ -172,7 +172,7 @@ def show_bbox(frames, bbox):
     cv2.waitKey(0)  # Display each frame for 100 ms
   cv2.destroyAllWindows()
 
-def display(frames,output=None):
+def cv_display_or_save(frames,output=None):
   if output is None:
     for i, frame in enumerate(frames):
       cv2.imshow('Cropped Frames', frame)  # Display the first frame
@@ -245,20 +245,21 @@ def cv_to_torch(frames):
 ####################     Plotting utilities  ####################
 
 
-def plot_from_simple_list(train_loss, val_loss=None, 
+def plot_from_lists(train_loss, val_loss=None, 
                           title='Training Loss Curve',
                           xlabel='Epochs',
                           ylabel='Loss',
-                          save_path=None):
+                          save_path=None,
+                          show=True):
   # Extract the three components from training loss
-  wall_times = [point[0] for point in train_loss]
-  steps = [point[1] for point in train_loss]
-  values = [point[2] for point in train_loss]
-  
+  # wall_times = [point[0] for point in train_loss]
+  # steps = [point[1] for point in train_loss]
+  # values = [point[2] for point in train_loss]
+  steps = list(range(len(train_loss)))
   plt.figure(figsize=(10, 6))
   
   # Plot training loss
-  plt.plot(steps, values, color='orange', linewidth=2, label='Training Loss')
+  plt.plot(steps, train_loss, color='orange', linewidth=2, label='Training Loss')
   
   # Plot validation loss if provided
   if val_loss:
@@ -276,11 +277,9 @@ def plot_from_simple_list(train_loss, val_loss=None,
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     print(f"Plot saved to: {save_path}")
   
-  plt.show()
+  if show:
+    plt.show()
 
-  if save_path:
-    plt.savefig(save_path, bbox_inches='tight')
-    print(f'Saved plot to {save_path}')
 
 
 ##################### Misc ###################################
@@ -293,6 +292,11 @@ def clean_checkpoints(paths):
       os.remove(os.path.join(to_empty, file))
       print(f'removed {file} in {to_empty}')
       
+def crop_frames(frames, bbox):
+  #frames hase shape (num_frames, channels, height, width)
+  #bbox is a list of [x1, y1, x2, y2]
+  x1, y1, x2, y2 = bbox
+  return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
 ##################### once offs / Testing ######################
 def test_save():
