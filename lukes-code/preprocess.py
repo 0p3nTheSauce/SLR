@@ -2,8 +2,8 @@ import json
 import os
 import torch
 import tqdm
-from ultralytics import YOLO
-from torchcodec.decoders import VideoDecoder
+from ultralytics import YOLO # type: ignore (have a feeling this will bork the system)
+# from torchcodec.decoders import VideoDecoder #this thing causes too many problems
 
 #local imports
 from utils import load_rgb_frames_from_video 
@@ -111,7 +111,7 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output',
   
   if output is not None:
     os.makedirs(output, exist_ok=True)
-    base_name = os.basename(instance_path).replace('.json', '')
+    base_name = os.path.basename(instance_path).replace('.json', '')
     fname = os.path.join(output, f'{base_name}_frange.json' )
     with open(fname, 'w') as f:
       json.dump(instances, f, indent=4)  
@@ -137,6 +137,7 @@ def get_largest_bbox(bboxes):
 
 def fix_bad_bboxes(instance_path, raw_path, log='./output',
                    instances=None, output=None):
+  # TODO: could be a bit faster
   model = YOLO('yolov8n.pt')  # Load a pre-trained YOLO model
   device = "cuda" if torch.cuda.is_available() else "cpu"
   # model.to(device)
@@ -186,7 +187,7 @@ def fix_bad_bboxes(instance_path, raw_path, log='./output',
     
   if output is not None:
     os.makedirs(output, exist_ok=True)
-    base_name = os.basename(instance_path).replace('.json', '')
+    base_name = os.path.basename(instance_path).replace('.json', '')
     fname = os.path.join(output, f'{base_name}_bboxes.json' )
     with open(fname, 'w') as f:
       json.dump(new_instances, f, indent=4)  
@@ -232,7 +233,7 @@ def remove_short_samples(instances_path, classes_path,
     
   if output is not None:
     os.makedirs(output, exist_ok=True)
-    base_name = os.basename(instances_path).replace('.json', '')
+    base_name = os.path.basename(instances_path).replace('.json', '')
     fname = os.path.join(output, f'{base_name}_grtr{cutoff}.json' )
     with open(fname, 'w') as f:
       json.dump(instances, f, indent=4)  
@@ -286,9 +287,9 @@ def preprocess_split(split_path, raw_path='../data/WLASL2000', output_path='prep
     inst_path = os.path.join(output_path, f'{split}_instances{f_exstension}')
     clss_path = os.path.join(output_path, f'{split}_classes{f_exstension}')
     with open(inst_path, 'w') as f:
-      json.dump(instances)
+      json.dump(instances, f, indent=2)
     with open(clss_path, 'w') as f:
-      json.dump(classes)
+      json.dump(classes, f, indent=2)
       
   
   print()
