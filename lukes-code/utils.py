@@ -263,9 +263,10 @@ def plot_from_lists(train_loss, val_loss=None,
   
   # Plot validation loss if provided
   if val_loss:
-    val_steps = [point[1] for point in val_loss]
-    val_values = [point[2] for point in val_loss]
-    plt.plot(val_steps, val_values, color='blue', linewidth=2, label='Validation Loss')
+    # val_steps = [point[1] for point in val_loss]
+    # val_values = [point[2] for point in val_loss]
+    
+    plt.plot(steps, val_loss, color='blue', linewidth=2, label='Validation Loss')
   
   plt.xlabel(xlabel)
   plt.ylabel(ylabel)
@@ -292,6 +293,20 @@ def clean_checkpoints(paths):
       os.remove(os.path.join(to_empty, file))
       print(f'removed {file} in {to_empty}')
       
+def clean_experiments(path):
+  if not os.path.exists(path):
+    raise FileNotFoundError(f'Experiments path: {path} was not found')
+  sub_paths = os.listdir(path)
+  return clean_checkpoints([os.path.join(path, sub_path) \
+    for sub_path in sub_paths])
+    
+def clean_runs(path):
+  if not os.path.exists(path):
+    raise FileNotFoundError(f'Runs directory: {path} was not found')
+  sub_paths = os.listdir(path)
+  for sub_path in sub_paths:
+    clean_experiments(os.path.join(path, sub_path))
+  
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
   #bbox is a list of [x1, y1, x2, y2]
@@ -350,10 +365,7 @@ def main():
   #  torch_to_mediapipe()
   # watch_video(path='69241.mp4')
   
-  paths = ['r3d18_exp0', 'r3d18_exp1', 'r3d18_exp2', 'r3d18_exp3']
-  paths = [os.path.join('runs/asl100', path) for path in paths]
-  clean_checkpoints(['runs/asl300/r3d18_exp0'])
-  
+  clean_runs('runs')
   # test_vid = '../data/WLASL2000/07393.mp4'
   # torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
   # print(torch_frames.shape)
