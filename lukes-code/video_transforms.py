@@ -4,7 +4,7 @@ from typing import Callable
 import torch.nn.functional as F
 import random
 
-def get_base_transform(numframes=16, size=(112, 112)) -> \
+def get_base(numframes=16, size=(112, 112)) -> \
     Callable[[torch.Tensor], torch.Tensor]:
   '''Args:
       x : torch.Tensor (T C H W) RGB torch.uint8
@@ -17,9 +17,33 @@ def get_base_transform(numframes=16, size=(112, 112)) -> \
                     mode='bilinear', align_corners=False)),
   ])
 
-def get_base_norm(mean=[0.43216, 0.394666, 0.37645], #r3d_18
-                  std=[0.43216, 0.394666, 0.37645],
-                  numframes=16, size=(112, 112), norm_func=None)-> \
+def get_norm(mean,std) -> \
+    Callable[[torch.Tensor], torch.Tensor]:
+  return lambda x: normalise(x, mean, std)
+
+def get_swap_ct() -> Callable[[torch.Tensor], torch.Tensor]:
+  return lambda x: x.permute(1,0,2,3)
+
+def get_rand_norm_aug(base_mean, base_std, mean_var=0.05, std_var=0.03,
+    prob=0.5) -> Callable[[torch.Tensor], torch.Tensor]:
+  return lambda x: RandomNormalizationAugmentation(x,
+    base_mean=base_mean,
+    base_std=base_std,
+    mean_var=mean_var,
+    std_var=std_var,
+    prob=prob,                                 
+  )
+  
+def get_adapt_norm(base_mean, base_std, adaption_strength=0.3, prob=0.5) -> \
+    Callable[[torch.Tensor], torch.Tensor]:
+  return lambda x: AdaptiveNormalisation(x,
+    base_mean=base_mean,
+    base_std=base_std,
+    adaption_strength=adaption_strength,
+    prob=prob                                       
+  )
+
+def get_base_norm(mean, std, numframes=16, size=(112, 112), norm_func=None)-> \
     Callable[[torch.Tensor], torch.Tensor]:
   '''Args:
       x : torch.Tensor (T C H W) RGB torch.uint8
@@ -27,11 +51,12 @@ def get_base_norm(mean=[0.43216, 0.394666, 0.37645], #r3d_18
       base_transform : x -> normalised torch.Tensor (T C H W) RGB torch.float'''
   if norm_func is None:
     norm_func = lambda x: normalise(x, mean=mean, std=std)
-  base_transform = get_base_transform(numframes=numframes, size=size)
+  base_transform = get_base(numframes=numframes, size=size)
   return ts.Compose([
     base_transform,
     ts.Lambda(norm_func)
   ])
+
 
 
 
