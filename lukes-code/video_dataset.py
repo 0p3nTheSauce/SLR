@@ -5,7 +5,8 @@ import torch
 
 #local imports
 from utils import load_rgb_frames_from_video, crop_frames
-        
+from video_transforms import get_base, get_swap_ct
+import torchvision.transforms as ts
 
 ############################ Dataset Classes ############################
 
@@ -50,20 +51,25 @@ class VideoDataset(Dataset):
   #TODO: Make a ca
   
 class ContrastiveVideoDataset(VideoDataset):
-  def __init__(self, *args, transform1=None, transform2=None, **kwargs):
+  def __init__(self, *args, augmentation, **kwargs):
     # Remove transform from kwargs to prevent parent from using it
-    kwargs.pop('transform', None)
     super().__init__(*args, **kwargs)
-    self.transform1 = transform1
-    self.transform2 = transform2
+    #Assume that self.transform will be the base_norm_fin, ie the standard
+    #But transform should atleast have base_transform, otherwise shape issues when 
+    # loading
+    #By extension, augmementation must have at least base_tansform
+    #But may just be that (augmentation through lack of normalisation)
+    self.augmentation = augmentation
 
   def __getitem__(self, idx):
     item = self.data[idx]
     frames, _ = self.__manual_load__(item)  # Get raw frames, ignore label
     
     # Apply two different augmentations
-    view1 = self.transform1(frames) if self.transform1 else frames
-    view2 = self.transform2(frames) if self.transform2 else frames
+    view1 = self.transform(frames) if self.transform else frames
+    view2 = self.augmentation(frames) if self.augmentation else frames
+    #leaving like this for now, but likely to cause errors if same base_transform is not used
+    
     
     return (view1, view2)
 

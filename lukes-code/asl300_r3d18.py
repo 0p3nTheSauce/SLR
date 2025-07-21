@@ -50,49 +50,53 @@ base_rand_norm_fin = transforms.Compose([
   permute_fin
 ])
 
-train_set = Dataset.VideoDataset(
-    root=raw_path,
-    instances_path=train_inst_path,
-    classes_path=train_clss_path,
-    transform=base_rand_norm_fin
-)
+# train_set = Dataset.VideoDataset(
+#     root=raw_path,
+#     instances_path=train_inst_path,
+#     classes_path=train_clss_path,
+#     transform=base_rand_norm_fin
+# )
 
 contr_train_set = Dataset.ContrastiveVideoDataset(
   root=raw_path,
   instances_path=train_inst_path,  
   classes_path=train_clss_path,
-  transform1=base_fin, #try contrastive learning with no normalisation
-  transform2=base_norm_fin
+  transform=base_norm_fin, 
+  augmentation=base_fin #augmentation through lack of transform
 )
 
-val_set = Dataset.VideoDataset(
-  root=raw_path,
-  instances_path=val_inst_path,
-  classes_path=val_clss_path,
-  transform=base_norm_fin, 
-)
+# val_set = Dataset.VideoDataset(
+#   root=raw_path,
+#   instances_path=val_inst_path,
+#   classes_path=val_clss_path,
+#   transform=base_norm_fin, 
+# )
 
 contr_val_set = Dataset.ContrastiveVideoDataset(
   root=raw_path,
   instances_path=val_inst_path,
   classes_path=val_clss_path,
-  transform1=base_fin, #try contrastive learning with no transformation
-  transform2=base_norm_fin
+  transform=base_norm_fin, 
+  augmentation=base_fin #augmentation through lack of transform
 )
 
-print(f"Number of training samples: {len(train_set)}")
-print(f"Number of training classes: {len(set(train_set.classes))}")
-print(f"Number of validation samples: {len(val_set)}")
-print(f"Number of validation classes: {len(set(val_set.classes))}")
+# print(f"Number of training samples: {len(train_set)}")
+# print(f"Number of training classes: {len(set(train_set.classes))}")
+# print(f"Number of validation samples: {len(val_set)}")
+# print(f"Number of validation classes: {len(set(val_set.classes))}")
+print(f"Number of training samples: {len(contr_train_set)}")
+print(f"Number of training classes: {len(set(contr_train_set.classes))}")
+print(f"Number of validation samples: {len(contr_val_set)}")
+print(f"Number of validation classes: {len(set(contr_val_set.classes))}")
 
 # torch.manual_seed(42) #probably doesnt work because of numworkers
-train_loader = DataLoader(
-  train_set,
-  batch_size=32, 
-  shuffle=True,
-  num_workers=2, #this was 4 but I previously had issues with the computer crashing (though this was with more data)
-  drop_last=True
-)
+# train_loader = DataLoader(
+#   train_set,
+#   batch_size=32, 
+#   shuffle=True,
+#   num_workers=2, #this was 4 but I previously had issues with the computer crashing (though this was with more data)
+#   drop_last=True
+# )
 
 contr_train_loader = DataLoader(
   contr_train_set,
@@ -103,14 +107,14 @@ contr_train_loader = DataLoader(
   # collate_fn=Dataset.contrastive_collate_fn
 )
 
-val_loader = DataLoader(
-  val_set,
-  batch_size=32,
-  shuffle=False,
-  drop_last=False,
-  num_workers=2,
-  drop_last=False
-)
+# val_loader = DataLoader(
+#   val_set,
+#   batch_size=32,
+#   shuffle=False,
+#   drop_last=False,
+#   num_workers=2,
+#   drop_last=False
+# )
 
 contr_val_loader = DataLoader(
   contr_val_set,
@@ -171,7 +175,7 @@ train_losses_cont, val_losses_cont = train.train_model_contrastive(
   loss_func=loss_func,
   epochs=100,
   val_loader=contr_val_loader,
-  output='runs/asl300/r3d18_exp5'
+  output='runs/asl300/r3d18_exp7'
 )
 
 #exp0 : with 
