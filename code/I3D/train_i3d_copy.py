@@ -22,13 +22,13 @@ from datasets.nslt_dataset import NSLT as Dataset
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('-mode', type=str, help='rgb or flow')
-# parser.add_argument('-save_model', type=str)
-# parser.add_argument('-root', type=str)
-# parser.add_argument('--num_class', type=int)
+parser = argparse.ArgumentParser()
+parser.add_argument('-mode', type=str, help='rgb or flow')
+parser.add_argument('-save_model', type=str)
+parser.add_argument('-root', type=str)
+parser.add_argument('--num_class', type=int)
 
-# args = parser.parse_args()
+args = parser.parse_args()
 
 torch.manual_seed(0)
 np.random.seed(0)
@@ -39,7 +39,7 @@ torch.backends.cudnn.benchmark = False
 
 def run(configs,
         mode='rgb',
-        root={'word':'../../data/WLASL2000'},
+        root='/ssd/Charades_v1_rgb',
         train_split='charades/charades.json',
         save_model='',
         weights=None):
@@ -49,19 +49,7 @@ def run(configs,
     train_transforms = transforms.Compose([videotransforms.RandomCrop(224),
                                            videotransforms.RandomHorizontalFlip(), ])
     test_transforms = transforms.Compose([videotransforms.CenterCrop(224)])
-    
-    # train_transforms = transforms.Compose([
-    #     videotransforms.Resize(128),
-    #     videotransforms.RandomCrop(112),  # Small random crop for augmentation
-    #     videotransforms.RandomHorizontalFlip(),
-    # ])
-    # test_transforms = transforms.Compose([
-    #     # videotransforms.Resize(112),  # Direct resize to target size
-    # # OR
-    # videotransforms.Resize(128),
-    # videotransforms.CenterCrop(112),
-    # ])
-    
+
     dataset = Dataset(train_split, 'train', root, mode, train_transforms)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=configs.batch_size, shuffle=True, num_workers=0,
                                              pin_memory=True)
@@ -122,8 +110,7 @@ def run(configs,
             num_iter = 0
             optimizer.zero_grad()
 
-            # confusion_matrix = np.zeros((num_classes, num_classes), dtype=np.int)
-            confusion_matrix = torch.zeros((num_classes, num_classes), dtype=torch.int64)
+            confusion_matrix = np.zeros((num_classes, num_classes), dtype=np.int)
             # Iterate over data.
             for data in dataloaders[phase]:
                 num_iter += 1
@@ -156,7 +143,7 @@ def run(configs,
                 tot_cls_loss += cls_loss.data.item()
 
                 for i in range(per_frame_logits.shape[0]):
-                    confusion_matrix[torch.argmax(gt[i]), torch.argmax(predictions[i])] += 1
+                    confusion_matrix[torch.argmax(gt[i]).item(), torch.argmax(predictions[i]).item()] += 1
 
                 loss = (0.5 * loc_loss + 0.5 * cls_loss) / num_steps_per_update
                 tot_loss += loss.data.item()
@@ -171,8 +158,7 @@ def run(configs,
                     optimizer.zero_grad()
                     # lr_sched.step()
                     if steps % 10 == 0:
-                        confusion_matrix_np = confusion_matrix.numpy()
-                        acc = float(np.trace(confusion_matrix_np)) / np.sum(confusion_matrix_np)
+                        acc = float(np.trace(confusion_matrix)) / np.sum(confusion_matrix)
                         print(
                             'Epoch {} {} Loc Loss: {:.4f} Cls Loss: {:.4f} Tot Loss: {:.4f} Accu :{:.4f}'.format(epoch,
                                                                                                                  phase,
@@ -183,8 +169,7 @@ def run(configs,
                         
                         tot_loss = tot_loc_loss = tot_cls_loss = 0.
             if phase == 'test':
-                confusion_matrix_np = confusion_matrix.numpy()
-                val_score = float(np.trace(confusion_matrix_np)) / np.sum(confusion_matrix_np)
+                val_score = float(np.trace(confusion_matrix)) / np.sum(confusion_matrix)
                 if val_score > best_val_score or epoch % 2 == 0:
                     best_val_score = val_score
                     model_name = save_model + "nslt_" + str(num_classes) + "_" + str(steps).zfill(
@@ -209,11 +194,11 @@ if __name__ == '__main__':
     root = {'word': '../../data/WLASL2000'}
 
     save_model = 'checkpoints/'
-    train_split = 'preprocess/nslt_300.json'
+    train_split = 'preprocess/nslt_2000.json'
 
     #weights = 'archived/asl2000/FINAL_nslt_2000_iters=5104_top1=32.48_top5=57.31_top10=66.31.pt'
     weights = None
-    config_file = 'configfiles/asl300.ini'
+    config_file = 'configfiles/asl2000.ini'
 
     configs = Config(config_file)
     print(root, train_split)

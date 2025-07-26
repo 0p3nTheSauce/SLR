@@ -57,7 +57,8 @@ base_rand_norm_fin = transforms.Compose([
 #     transform=base_rand_norm_fin
 # )
 
-contr_train_set = Dataset.ContrastiveVideoDataset(
+# contr_train_set = Dataset.ContrastiveVideoDataset(
+contr_train_set = Dataset.SemiContrastiveVideoDataset(
   root=raw_path,
   instances_path=train_inst_path,  
   classes_path=train_clss_path,
@@ -72,7 +73,8 @@ contr_train_set = Dataset.ContrastiveVideoDataset(
 #   transform=base_norm_fin, 
 # )
 
-contr_val_set = Dataset.ContrastiveVideoDataset(
+# contr_val_set = Dataset.ContrastiveVideoDataset(
+contr_val_set = Dataset.SemiContrastiveVideoDataset(
   root=raw_path,
   instances_path=val_inst_path,
   classes_path=val_clss_path,
@@ -165,18 +167,30 @@ loss_func = nn.CrossEntropyLoss() #TODO : try Contrastive loss
 # gc.collect()  # Python garbage collectio
 
 model5, train_params5 = models.get_bas_r3d18()
-optimizer = torch.optim.Adam(train_params4, lr=1e-3)
-loss_func = contr_l.InfoNCELoss()
+optimizer = torch.optim.Adam(train_params4, lr=1e-4)
+contr_loss_func = contr_l.InfoNCELoss()
+super_loss_func = nn.CrossEntropyLoss()
+# train_losses_cont, val_losses_cont = train.train_model_contrastive(
+#   model=model5,
+#   train_loader=contr_train_loader,
+#   optimizer=optimizer,
+#   loss_func=loss_func,
+#   epochs=100,
+#   val_loader=contr_val_loader,
+#   output='runs/asl300/r3d18_exp7'
+# )
 
-train_losses_cont, val_losses_cont = train.train_model_contrastive(
+train_losses_cont, val_losses_cont = train.train_model_semi_contrastive(
   model=model5,
   train_loader=contr_train_loader,
   optimizer=optimizer,
-  loss_func=loss_func,
+  contr_loss_func=contr_loss_func,
+  super_loss_func=super_loss_func,
   epochs=100,
   val_loader=contr_val_loader,
-  output='runs/asl300/r3d18_exp7'
+  output='runs/asl300/r3d18_exp8'
 )
+
 
 #exp0 : with 
 # schedular = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -244,3 +258,7 @@ train_losses_cont, val_losses_cont = train.train_model_contrastive(
 #this loss is starting off awfully low
 #exp 6: bot exp5 and exp6 has zero change in loss overtime, due to a fault in the 
 #way the contrastive loss video dataset is applying transforms
+
+#exp 7: train switch around and checking the augmentation function, but no luck
+
+#exp 8 with semi supervised contrastive loss, otherwise same as 7

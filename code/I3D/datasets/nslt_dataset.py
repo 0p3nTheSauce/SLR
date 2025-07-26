@@ -23,24 +23,24 @@ def video_to_tensor(pic):
     return torch.from_numpy(pic.transpose([3, 0, 1, 2]))
 
 
-def load_rgb_frames(image_dir, vid, start, num):
-    frames = []
-    for i in range(start, start + num):
-        try:
-            img = cv2.imread(os.path.join(image_dir, vid, "image_" + str(i).zfill(5) + '.jpg'))[:, :, [2, 1, 0]]
-        except:
-            print(os.path.join(image_dir, vid, str(i).zfill(6) + '.jpg'))
-        w, h, c = img.shape
-        if w < 226 or h < 226:
-            d = 226. - min(w, h)
-            sc = 1 + d / min(w, h)
-            img = cv2.resize(img, dsize=(0, 0), fx=sc, fy=sc)
-        img = (img / 255.) * 2 - 1
-        frames.append(img)
-    return np.asarray(frames, dtype=np.float32)
+# def load_rgb_frames(image_dir, vid, start, num):
+#     frames = []
+#     for i in range(start, start + num):
+#         try:
+#             img = cv2.imread(os.path.join(image_dir, vid, "image_" + str(i).zfill(5) + '.jpg'))[:, :, [2, 1, 0]]
+#         except:
+#             print(os.path.join(image_dir, vid, str(i).zfill(6) + '.jpg'))
+#         w, h, c = img.shape
+#         if w < 226 or h < 226:
+#             d = 226. - min(w, h)
+#             sc = 1 + d / min(w, h)
+#             img = cv2.resize(img, dsize=(0, 0), fx=sc, fy=sc)
+#         img = (img / 255.) * 2 - 1
+#         frames.append(img)
+#     return np.asarray(frames, dtype=np.float32)
 
 
-def load_rgb_frames_from_video(vid_root, vid, start, num, resize=(256, 256)):
+def load_rgb_frames_from_video_old(vid_root, vid, start, num, resize=(256, 256)):
     video_path = os.path.join(vid_root, vid + '.mp4')
 
     vidcap = cv2.VideoCapture(video_path)
@@ -65,7 +65,41 @@ def load_rgb_frames_from_video(vid_root, vid, start, num, resize=(256, 256)):
         img = (img / 255.) * 2 - 1
 
         frames.append(img)
+    
+    return np.asarray(frames, dtype=np.float32)
 
+
+def load_rgb_frames_from_video(vid_root, vid, start, num, resize=(256, 256)):
+    video_path = os.path.join(vid_root, vid + '.mp4')
+
+    vidcap = cv2.VideoCapture(video_path)
+
+    frames = []
+
+    total_frames = vidcap.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    vidcap.set(cv2.CAP_PROP_POS_FRAMES, start)
+    step = round(total_frames, num)
+    
+    for idx in range(int(total_frames - start)):
+        success, img = vidcap.read()
+
+        if idx % step != 0:
+            continue               #incase your gpu can't handle 64 frames
+        
+        w, h, c = img.shape
+        if w < 226 or h < 226:
+            d = 226. - min(w, h)
+            sc = 1 + d / min(w, h)
+            img = cv2.resize(img, dsize=(0, 0), fx=sc, fy=sc)
+
+        if w > 256 or h > 256:
+            img = cv2.resize(img, (math.ceil(w * (256 / w)), math.ceil(h * (256 / h))))
+
+        img = (img / 255.) * 2 - 1
+
+        frames.append(img)
+    frames = frames[:num] #Justin Case
     return np.asarray(frames, dtype=np.float32)
 
 
@@ -152,7 +186,7 @@ def get_num_class(split_file):
 
 class NSLT(data_utl.Dataset):
 
-    def __init__(self, split_file, split, root, mode, transforms=None):
+    def __init__(self, split_file, split, root, mode, transforms=None, total_frames=16):
         self.num_classes = get_num_class(split_file)
 
         self.data = make_dataset(split_file, split, root, mode, num_classes=self.num_classes)
@@ -160,7 +194,8 @@ class NSLT(data_utl.Dataset):
         self.transforms = transforms
         self.mode = mode
         self.root = root
-
+        self.total_frames = total_frames
+        
     def __getitem__(self, index):
         """
         Args:
@@ -171,18 +206,19 @@ class NSLT(data_utl.Dataset):
         """
         vid, label, src, start_frame, nf = self.data[index]
 
-        total_frames = 64
+        # total_frames = 64
 
         try:
-            start_f = random.randint(0, nf - total_frames - 1) + start_frame
+            start_f = random.randint(0, nf - self.total_frames - 1) + start_frame
         except ValueError:
             start_f = start_frame
 
-        imgs = load_rgb_frames_from_video(self.root['word'], vid, start_f, total_frames)
+        imgs = load_rgb_frames_from_video(self.root['word'], vid, start_f, self.total_frames)
 
-        imgs, label = self.pad(imgs, label, total_frames)
+        imgs, label = self.pad(imgs, label, self.total_frames)
 
-        imgs = self.transforms(imgs)
+        if self.transforms is not None:
+            imgs = self.transforms(imgs)
 
         ret_lab = torch.from_numpy(label)
         ret_img = video_to_tensor(imgs)
@@ -193,6 +229,11 @@ class NSLT(data_utl.Dataset):
         return len(self.data)
 
     def pad(self, imgs, label, total_frames):
+        label = label[:, 0]
+        label = np.tile(label, (total_frames, 1)).transpose((1, 0))
+        if len(imgs) == 0:
+            return imgs, label
+        padded_imgs = imgs
         if imgs.shape[0] < total_frames:
             num_padding = total_frames - imgs.shape[0]
 
@@ -205,17 +246,15 @@ class NSLT(data_utl.Dataset):
                 else:
                     pad_img = imgs[-1]
                     pad = np.tile(np.expand_dims(pad_img, axis=0), (num_padding, 1, 1, 1))
-                    padded_imgs = np.concatenate([imgs, pad], axis=0)
-        else:
-            padded_imgs = imgs
+                    padded_imgs = np.concatenate([imgs, pad], axis=0)            
 
-        label = label[:, 0]
-        label = np.tile(label, (total_frames, 1)).transpose((1, 0))
+        
 
-        return padded_imgs, label
+        return padded_imgs, label 
 
     @staticmethod
     def pad_wrap(imgs, label, total_frames):
+        padded_imgs = imgs
         if imgs.shape[0] < total_frames:
             num_padding = total_frames - imgs.shape[0]
 
@@ -231,8 +270,7 @@ class NSLT(data_utl.Dataset):
                     padded_imgs = np.concatenate([imgs, pad1, pad2], axis=0)
                 else:
                     padded_imgs = np.concatenate([imgs, pad2], axis=0)
-        else:
-            padded_imgs = imgs
+            
 
         label = label[:, 0]
         label = np.tile(label, (total_frames, 1)).transpose((1, 0))

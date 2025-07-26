@@ -2,6 +2,7 @@ import numpy as np
 import numbers
 import random
 
+import cv2
 class RandomCrop(object):
     """Crop the given video sequences (t x h x w) at a random location.
     Args:
@@ -25,6 +26,7 @@ class RandomCrop(object):
         Returns:
             tuple: params (i, j, h, w) to be passed to ``crop`` for random crop.
         """
+        
         t, h, w, c = img.shape
         th, tw = output_size
         if w == tw and h == th:
@@ -100,3 +102,46 @@ class RandomHorizontalFlip(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(p={})'.format(self.p)
+
+class Resize(object):
+    """Resize the given video sequences (t x h x w x c) to given size.
+    Args:
+        size (sequence or int): Desired output size. If size is an int instead of 
+            sequence like (h, w), a square resize (size, size) is made.
+        interpolation: Interpolation method. Default is cv2.INTER_LINEAR.
+    """
+
+    def __init__(self, size, interpolation=cv2.INTER_LINEAR):
+        if isinstance(size, numbers.Number):
+            self.size = (int(size), int(size))
+        else:
+            self.size = size
+        self.interpolation = interpolation
+
+    def __call__(self, imgs):
+        """
+        Args:
+            imgs (numpy array): Video frames to be resized with shape (t, h, w, c)
+        Returns:
+            numpy array: Resized video frames with shape (t, new_h, new_w, c)
+        """
+        t, h, w, c = imgs.shape
+        new_h, new_w = self.size
+        
+        # If already the right size, return as-is
+        if h == new_h and w == new_w:
+            return imgs
+        
+        # Resize each frame
+        resized_frames = np.zeros((t, new_h, new_w, c), dtype=imgs.dtype)
+        
+        for i in range(t):
+            # cv2.resize expects (w, h) not (h, w)
+            resized_frames[i] = cv2.resize(imgs[i], (new_w, new_h), 
+                                         interpolation=self.interpolation)
+        
+        return resized_frames
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(size={0})'.format(self.size)
+
