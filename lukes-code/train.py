@@ -5,509 +5,514 @@ import tqdm   # type: ignore
 from torch.utils.tensorboard import SummaryWriter # type: ignore
 import json
 import utils
+from utils import enum_dir
+from torchvision.transforms import v2
+from  torchvision.models.video.resnet import  R3D_18_Weights #, r3d_18
+from torch.utils.data import DataLoader
+import torch.nn as nn
+import torch.optim as optim
+import models.pytorch_r3d as resnet_3d
+#local imports
+from video_dataset import VideoDataset
 
-def train_model_3(model, train_loader, optimizer, loss_func, epochs=10,val_loader=None, 
-                  output='runs/exp_0', logs='logs', save='checkpoints', save_every=1, load=None):
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-  begin_epoch = 0
+def setup_optimizer_scheduler(model, total_epochs=100): 
+  # Separate learning rates - exactly what you want
+  param_groups = [
+    {
+      'params': model.backbone.parameters(),
+      'lr': 1e-5,  # Low LR for pretrained backbone
+      'weight_decay': 1e-4
+    },
+    {
+      'params': model.classifier.parameters(), 
+      'lr': 1e-3,  # Higher LR for new classifier
+      'weight_decay': 1e-4
+    }
+  ]
   
+  optimizer = optim.AdamW(param_groups, betas=(0.9, 0.999))
+  
+  # Single scheduler affects both groups proportionally
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                                                         T_max=total_epochs,
+                                                         eta_min=1e-6)
+  
+  return optimizer, scheduler
+
+def freeze_layers(model, frozen_layers):
+  """Freeze specified layers of the model"""
+  for layer_name in frozen_layers:
+    if hasattr(model.backbone, layer_name):
+      layer = getattr(model.backbone, layer_name)
+      for param in layer.parameters():
+        param.requires_grad = False
+      print(f"Frozen layer: {layer_name}")
+    else:
+      print(f"Warning: Layer {layer_name} not found")
+
+def train_run_r3d18_1(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300',
+        output='runs/exp_0', logs='logs', save='checkpoints', load=None,
+        weights=R3D_18_Weights.DEFAULT, save_every=5):
+  print(configs)
+  
+  base_mean = [0.43216, 0.394666, 0.37645]
+  base_std = [0.22803, 0.22145, 0.216989]
+  
+  r3d18_final = v2.Compose([
+    v2.Lambda(lambda x: x.float() / 255.0),
+    # v2.Lambda(lambda x: vt.normalise(x, base_mean, base_std)),
+    v2.Normalize(mean=base_mean, std=base_std),
+    v2.Lambda(lambda x: x.permute(1,0,2,3)) 
+  ])
+  
+  #setup dataset 
+  train_transforms = v2.Compose([v2.RandomCrop(224),
+                                 v2.RandomHorizontalFlip(),
+                                 r3d18_final])
+  test_transforms = v2.Compose([v2.CenterCrop(224),
+                                r3d18_final])
+  
+  train_instances = os.path.join(labels, 'train_instances_fixed_frange_bboxes_len.json')
+  val_instances = os.path.join(labels,'val_instances_fixed_frange_bboxes_len.json' )
+  train_classes = os.path.join(labels, 'train_classes_fixed_frange_bboxes_len.json')
+  val_classes = os.path.join(labels,'val_classes_fixed_frange_bboxes_len.json' )
+  
+  dataset = VideoDataset(root,train_instances, train_classes,
+    transforms=train_transforms, num_frames=32)
+  dataloader = DataLoader(dataset, batch_size=configs.batch_size,
+    shuffle=True, num_workers=2,pin_memory=True)
+  num_classes = len(set(dataset.classes))
+  
+  val_dataset = VideoDataset(root, val_instances, val_classes,
+    transforms=test_transforms, num_frames=32)
+  val_dataloader = torch.utils.data.DataLoader(val_dataset,
+    batch_size=configs.batch_size, shuffle=True, num_workers=2,pin_memory=False)
+  val_classes = len(set(val_dataset.classes))
+  assert num_classes == val_classes
+  
+  dataloaders = {'train': dataloader, 'val': val_dataloader}
+  datasets = {'train': dataset, 'val': val_dataset}
+  
+  #setup model
+  # r3d18 = r3d_18( weights=weights)
+
+  # in_features = r3d18.fc.in_features  # Store before replacement
+    
+  # r3d18.fc = nn.Sequential(
+  #   nn.Dropout(p=configs.drop_p),
+  #   nn.Linear(in_features, num_classes)
+  # )
+  r3d18 = resnet_3d.Resnet3D18_basic(num_classes=num_classes, drop_p=configs.drop_p,
+                                     weights=weights)
+  
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+  r3d18.to(device)
+  
+  num_steps_per_update = configs.update_per_step #gradient accumulation
+  steps=0
+  epoch=0
+  
+  best_val_score=0
+
+  # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min',
+  #                                               patience=5, factor=0.3)
+  # lr = configs.init_lr
+  # weight_decay = configs.adam_weight_decay
+  # optimizer = optim.AdamW(r3d18.parameters(), lr=lr, weight_decay=weight_decay)
+  # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+  #                                                        T_max=configs.t_max,
+  #                                                        eta_min=configs.eta_min)
+  param_groups = [
+    {
+      'params': r3d18.backbone.parameters(),
+      'lr': 1e-5,  # Low LR for pretrained backbone
+      'weight_decay': 1e-4
+    },
+    {
+      'params': r3d18.classifier.parameters(), 
+      'lr': 1e-3,  # Higher LR for new classifier
+      'weight_decay': 1e-4
+    }
+  ]
+  
+  optimizer = optim.AdamW(param_groups, betas=(0.9, 0.999))
+  
+  # Single scheduler affects both groups proportionally
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                                                         T_max=100,
+                                                         eta_min=1e-6)
+  loss_func = nn.CrossEntropyLoss()
+  #setup recovery 
   if load:
     if os.path.exists(load):
       checkpoint = torch.load(load, map_location=device)
-      model.load_state_dict(checkpoint['model_state_dict'])
+      r3d18.load_state_dict(checkpoint['model_state_dict'])
       optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+      scheduler.load_state_dict(checkpoint['schedular_state_dict'])
       begin_epoch = checkpoint['epoch'] + 1
       print(f"Resuming from epoch {begin_epoch}")
       print(f"Loaded model from {load}")
     else:
-      print(f"Checkpoint {load} does not exist, starting from scratch")
+      cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
+      if cont.lower() != 'y':
+        return
   
-  if os.path.exists(output) and output[-1].isdigit() and begin_epoch == 0:
-    output = output[:-1] + str(int(output[-1])+ 1) #enumerate file name
+  #admin
+  if output:
+    if load is None: #fresh run, fresh folder
+      output = enum_dir(output, make=True) 
+    print(f"Output directory set to: {output}")
     
   if save:
     save_path = os.path.join(output, save)
-    os.makedirs(save_path,exist_ok=True)
+    if load is None:
+      save_path = enum_dir(save_path, make=True)
+    print(f"Save directory set to: {save_path}")
   
-  logs_path = os.path.join(output, logs)
-  writer = SummaryWriter(logs_path) #watching loss
-  train_losses = []
-  val_losses = []
-  best_val_loss = float('inf')
+  if logs:
+    logs_path = os.path.join(output, logs)
+    if load is None:
+      logs_path = enum_dir(logs_path, make=True)
+    print(f"Logs directory set to: {logs_path}")
+    writer = SummaryWriter(logs_path) #watching loss
   
-  model.train()
-  for epoch in tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D"):
-    #Training phase
-    running_loss = 0.0
-    train_samples = 0
+  #train it
+  # pbar = tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D")
+  while steps < configs.max_steps and epoch < 400:
+    print(f'Step {steps}/{configs.max_steps}')
+    print('-'*10)
     
-    for data, target in train_loader:
-      data, target = data.to(device), target.to(device)
+    epoch+=1
+    #each epoch has training and validation stage
+    for phase in ['train', 'val']:
       
+      if phase == 'train':
+        r3d18.train()
+      else:
+        r3d18.eval()
+        
+      #Reset matrics for this phase
+      running_loss = 0.0
+      running_corrects = 0
+      total_samples = 0
+      num_batches = 0
+      # tot_loc_loss = 0.0  #TODO once this gets working try the fancy loss
+      # tot_cls_loss = 0.0
+      
+      #for gradient accumulation  
+      accumulated_loss = 0.0
+      accumulated_steps = 0
       optimizer.zero_grad()
-      model_output = model(data)
-      loss = loss_func(model_output, target)
-      loss.backward()
-      optimizer.step()
-      
-      running_loss += loss.item() * data.size(0) #weight by batch size
-      train_samples += data.size(0)
-      
-    avg_train_loss = running_loss / train_samples
-    train_losses.append(avg_train_loss)
-    writer.add_scalar('Loss/Train', avg_train_loss, epoch)
-    #Validation phase
-    if val_loader:
-      model.eval()
-      val_loss = 0.0
-      val_samples = 0
-      
-      with torch.no_grad():
-        for data, target in val_loader:
-          data, target = data.to(device), target.to(device)
-          
-          model_output = model(data)
-          loss = loss_func(model_output, target)
-          
-          val_loss += loss.item() * data.size(0) #weight by batch size
-          val_samples += data.size(0)
-          
-      avg_val_loss = val_loss / val_samples
-      val_losses.append(avg_val_loss)
-      writer.add_scalar('Loss/Val', avg_val_loss, epoch)
-      
-      if save and avg_val_loss < best_val_loss:
-        best_val_loss = avg_val_loss
-        torch.save(model.state_dict(),
-                   os.path.join(save_path, 'best.pth')) # type: ignore
-      
-      print(f"Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
-      model.train() # return back to train
-    else:
-      print(f'Epoch [{epoch+1}/{epochs}], Average Loss: {avg_train_loss:.4f}')
     
-    if save and epoch % save_every == 0:
-      avg_train_loss = avg_train_loss if avg_train_loss else 'N/A'
-      avg_val_loss = avg_val_loss if avg_val_loss else 'N/A' # type: ignore
-      torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'train loss': avg_train_loss,
-        'val loss': avg_val_loss,
-        'train losses': train_losses,
-        'val losses': val_losses
-        }, os.path.join(save_path, f'checkpoint_{epoch}.pth')) # type: ignore
-    
-    with open(os.path.join(logs_path, 'train_losses.json'), "w") as f:
-      json.dump(train_losses, f)
-    if val_loader:
-      with open(os.path.join(logs_path, 'val_losses.json'), "w") as f:
-        json.dump(val_losses, f)
-    
-  return train_losses, val_losses
-
-def enum_dir(path, make=False):
-  if os.path.exists(path):
-    if not path[-1].isdigit():
-      path += '0'
-    while os.path.exists(path):
-      path = path[:-1] + str(int(path[-1]) + 1)
-  if make:
-    os.makedirs(path, exist_ok=True)
-  return path
-
-def train_model_4(model, train_loader, optimizer, loss_func, epochs=10,val_loader=None, scheduler=None,
-                  output='runs/exp_0', logs='logs', save='checkpoints', save_every=1, load=None,
-                  cutoff_train_loss=0.1):
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-  model.to(device)
-  begin_epoch = 0
-  train_metrics = []
-  val_metrics = []
-  best_val_loss = float('inf')
-
-  if load:
-    if os.path.exists(load):
-      checkpoint = torch.load(load, map_location=device)
-      model.load_state_dict(checkpoint['model_state_dict'])
-      optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-      if scheduler is not None:
-        scheduler.load_state_dict(checkpoint['schedular_state_dict'])
-      begin_epoch = checkpoint['epoch'] + 1
-      print(f"Resuming from epoch {begin_epoch}")
-      print(f"Loaded model from {load}")
-      if output and logs:
-        logs_path = os.path.join(output, logs)
-        try:
-          with open(os.path.join(logs_path, 'train_metrics.json'), "r") as f:
-            train_metrics = json.load(f)
-          if val_loader:
-            with open(os.path.join(logs_path, 'val_metrics.json'), "r") as f:
-              val_metrics = json.load(f)
-        except FileNotFoundError:
-          print("Metrics history files not found, starting fresh metrics tracking")
-    else:
-      cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
-      if cont.lower() != 'y':
-        return
-  
-  if output:
-    if begin_epoch == 0:
-      output = enum_dir(output, make=True) 
-    print(f"Output directory set to: {output}")
-    
-  if save:
-    save_path = os.path.join(output, save)
-    if begin_epoch == 0:
-      save_path = enum_dir(save_path, make=True)
-    print(f"Save directory set to: {save_path}")
-  
-  if logs:
-    logs_path = os.path.join(output, logs)
-    if begin_epoch == 0:
-      logs_path = enum_dir(logs_path, make=True)
-    print(f"Logs directory set to: {logs_path}")
-    writer = SummaryWriter(logs_path) #watching loss
-    
-  model.train()
-  pbar = tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D")
-  try:
-    for epoch in pbar:
-      #Training phase
-      running_loss = 0.0
-      train_samples = 0
-      train_correct = 0 
-      
-      for data, target in train_loader:
+      #Iterate over data for this phase
+      for batch_idx, (data, target) in enumerate(dataloaders[phase]):
         data, target = data.to(device), target.to(device)
+        batch_size = data.size(0)
+        total_samples += batch_size
+        num_batches += 1
         
-        optimizer.zero_grad()
-        model_output = model(data)
+        #Forward pass
+        if phase == 'train':
+          model_output = r3d18(data)
+        else:
+          with torch.no_grad():
+            model_output = r3d18(data)
+            
+        # Calculate loss
         loss = loss_func(model_output, target)
-        loss.backward()
-        optimizer.step()
-        
+
         #Accumulate metrics
-        running_loss += loss.item() * data.size(0) #weight by batch size
-        train_samples += data.size(0)
+        running_loss += loss.item() * batch_size  
         _, predicted = model_output.max(1)
-        train_correct += predicted.eq(target).sum().item()
-      
-      #Calculate average loss and accuracy 
-      avg_train_loss = running_loss / train_samples
-      train_acc = 100. * train_correct / train_samples
-      train_metrics.append({'epoch': epoch, 'loss': avg_train_loss, 'accuracy': train_acc})
+        running_corrects += predicted.eq(target).sum().item()
         
-      if logs: 
-        writer.add_scalar('Loss/Train', avg_train_loss, epoch) # type: ignore
-        writer.add_scalar('Accuracy/Train', train_acc, epoch) # type: ignore
-        
-      #Validation phase
-      if val_loader:
-        model.eval()
-        val_loss = 0.0
-        val_samples = 0
-        val_correct = 0
-        
-        with torch.no_grad():
-          for data, target in val_loader:
-            data, target = data.to(device), target.to(device)
-            
-            model_output = model(data)
-            loss = loss_func(model_output, target)
-            
-            #Accumulate validation metrics
-            val_loss += loss.item() * data.size(0) #weight by batch size
-            val_samples += data.size(0)
-            _, predicted = model_output.max(1)
-            val_correct += predicted.eq(target).sum().item()
-      
-        avg_val_loss = val_loss / val_samples
-        val_acc = 100. * val_correct / val_samples
-        val_metrics.append({'epoch': epoch, 'loss': avg_val_loss, 'accuracy': val_acc})
 
-        if logs:
-          writer.add_scalar('Loss/Val', avg_val_loss, epoch) # type: ignore
-          writer.add_scalar('Accuracy/Val', val_acc, epoch) # type: ignore
-        
-        if scheduler:
-          scheduler.step(avg_val_loss)
-        
-        if save and avg_val_loss < best_val_loss:
-          best_val_loss = avg_val_loss
-          torch.save(model.state_dict(),
-                    os.path.join(save_path, 'best.pth')) # type: ignore
-        
-        model.train() # return back to train
-      
-      # Print progress
-      current_lr = optimizer.param_groups[0]['lr']
-      print(f'  Epoch {epoch+1}/{epochs}:')
-      print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
-      
-      if val_loader:
-        print(f'  Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.2f}%') # type: ignore
-      
-      print(f'  Learning Rate: {current_lr:.6f}')
-      
-      if save and (epoch % save_every == 0 or epoch == epochs - 1):
-        checkpoint_data = {
-          'epoch': epoch,
-          'model_state_dict': model.state_dict(),
-          'optimizer_state_dict': optimizer.state_dict(),
-          'train loss': avg_train_loss
-        }
-        if scheduler is not None:
-          checkpoint_data['scheduler_state_dict'] = scheduler.state_dict()
-        
-        if val_loader:
-          checkpoint_data.update({
-            'val loss': avg_val_loss, # type: ignore
-            'best val loss': best_val_loss,
-          })
-        
-        torch.save(checkpoint_data, os.path.join(save_path, f'checkpoint_{epoch}.pth')) # type: ignore
+        if phase == 'train':
+          scaled_loss = loss / num_steps_per_update
+          scaled_loss.backward()
           
-      if logs:
-        with open(os.path.join(logs_path, 'train_metrics.json'), "w") as f: # type: ignore
-          json.dump(train_metrics, f) 
-        if val_loader:
-          with open(os.path.join(logs_path, 'val_metrics.json'), "w") as f: # type: ignore
-            json.dump(val_metrics, f) 
-        
-      
-      # Early stopping check 
-      if current_lr < 1e-6:
-        print(f"Learning rate too small ({current_lr}), stopping training")
-        break
-      if avg_train_loss <= cutoff_train_loss:
-        print(f"Training loss too small ({avg_train_loss}), stopping training")
-        break
-  finally:
-    pbar.close()
-  
-  if logs:
-    train_losses = [metric['loss'] for metric in train_metrics]
-    train_accs = [metric['accuracy'] for metric in train_metrics]
-    val_losses = [metric['loss'] for metric in val_metrics]
-    val_accs = [metric['accuracy'] for metric in val_metrics]
-    loss_fname = os.path.join(logs_path, 'losses.png') #type: ignore
-    try:
-      utils.plot_from_lists(train_losses,
-                            val_losses,
-                            save_path=loss_fname,
-                            show=False)
-      utils.plot_from_lists(train_accs,
-                            val_accs,
-                            title='Training accuracy Curve',
-                            ylabel='Accuracy (%)',
-                            save_path=loss_fname,
-                            show=False)
-    except Exception as e:
-      print(f'saving png failed due to {e}')
+          accumulated_loss += loss.item()
+          accumulated_steps += 1
+          
+          if accumulated_steps == num_steps_per_update:
+            optimizer.step()
+            optimizer.zero_grad()
+            steps += 1
+            
+            # Print progress every few steps
+            if steps % 10 == 0:
+              avg_acc_loss = accumulated_loss / accumulated_steps
+              current_acc = 100.0 * running_corrects / total_samples
+              print(f'Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, '
+                    f'Current Accuracy: {current_acc:.2f}%')
+              
+              if logs:
+                writer.add_scalar('Loss/Train_Step', avg_acc_loss, steps) # type: ignore
+                writer.add_scalar('Accuracy/Train_Step', current_acc, steps) # type: ignore
+            
+            # Reset accumulation
+            accumulated_loss = 0.0
+            accumulated_steps = 0
     
-  return train_metrics, val_metrics
+      #calculate  epoch metrics
+      epoch_loss = running_loss / total_samples # Average loss per sample
+      epoch_acc = 100.0 * running_corrects / total_samples
 
-def train_model_contrastive(model, train_loader, optimizer, loss_func, epochs=10,val_loader=None, scheduler=None,
-                  output='runs/exp_0', logs='logs', save='checkpoints', save_every=1, load=None,
-                  cutoff_train_loss=0.1):
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      print(f'{phase.upper()} - Epoch {epoch}:')
+      print(f'  Loss: {epoch_loss:.4f}')
+      print(f'  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})')
+      
+      # Log epoch metrics
+      if logs:
+        writer.add_scalar(f'Loss/{phase.capitalize()}', epoch_loss, epoch) # type: ignore
+        writer.add_scalar(f'Accuracy/{phase.capitalize()}', epoch_acc, epoch) # type: ignore
+      
+      # Validation specific logic
+      if phase == 'val':
+          # Save best model
+          if epoch_acc > best_val_score:
+              best_val_score = epoch_acc
+              model_name = os.path.join(save_path, f'best.pth') # type: ignore
+              torch.save(r3d18.state_dict(), model_name)
+              print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
+          
+          # Step scheduler with validation loss
+          scheduler.step(epoch_loss) # type: ignore
+          
+          print(f'Best validation accuracy so far: {best_val_score:.2f}%')
+      
+     # Save checkpoint
+    if save and (epoch % save_every == 0 or not (steps < configs.max_steps and epoch < 400)):
+        checkpoint_data = {
+            'epoch': epoch,
+            'steps': steps,
+            'model_state_dict': r3d18.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            'best_val_score': best_val_score
+        }
+        checkpoint_path = os.path.join(save_path, f'checkpoint_{epoch}.pth') # type: ignore
+        torch.save(checkpoint_data, checkpoint_path)
+        print(f'Checkpoint saved: {checkpoint_path}')
+        
+    
+  print('Finished training successfully')
+
+  
+def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300',
+        label_suffix='_fixed_frange_bboxes_len.json', output='runs/exp_0', logs='logs',
+        save='checkpoints', load=None, save_every=5):
+  # print(configs)
+  
+  train_transforms, test_transforms = configs.get_transforms()
+  
+  train_instances = os.path.join(labels, f'train_instances{label_suffix}')
+  val_instances = os.path.join(labels, f'val_instances{label_suffix}' )
+  train_classes = os.path.join(labels, f'train_classes{label_suffix}')
+  val_classes = os.path.join(labels,f'val_classes{label_suffix}' )
+  
+  dataset = VideoDataset(root,train_instances, train_classes,
+    transforms=train_transforms, num_frames=configs.num_frames)
+  dataloader = DataLoader(dataset, batch_size=configs.batch_size,
+    shuffle=True, num_workers=2,pin_memory=True)
+  num_classes = len(set(dataset.classes))
+  
+  val_dataset = VideoDataset(root, val_instances, val_classes,
+    transforms=test_transforms, num_frames=configs.num_frames)
+  val_dataloader = torch.utils.data.DataLoader(val_dataset,
+    batch_size=configs.batch_size, shuffle=True, num_workers=2,pin_memory=False)
+  val_classes = len(set(val_dataset.classes))
+  assert num_classes == val_classes
+  
+  dataloaders = {'train': dataloader, 'val': val_dataloader}
+  datasets = {'train': dataset, 'val': val_dataset}
+  
+  model = configs.create_model() #this handles new fc, freezing, different learning rates
+
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   model.to(device)
-  begin_epoch = 0
-  train_metrics = []
-  val_metrics = []
-  best_val_loss = float('inf')
+  
+  num_steps_per_update = configs.update_per_step #gradient accumulation
+  steps=0
+  epoch=0
+  
+  best_val_score=0
 
+  param_groups = [ #TODO: this code is currently r3d18 specific, but could be more generalisable
+    {
+      'params': model.backbone.parameters(),
+      'lr': configs.backbone_init_lr,  # Low LR for pretrained backbone
+      'weight_decay': configs.backbone_weight_decay
+    },
+    {
+      'params': model.classifier.parameters(), 
+      'lr': configs.classifier_init_lr,  # Higher LR for new classifier
+      'weight_decay': configs.classifier_weight_decay
+    }
+  ]
+  
+  optimizer = optim.AdamW(param_groups)
+  
+  # Single scheduler affects both groups proportionally
+  scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
+                                                         T_max=configs.t_max,
+                                                         eta_min=configs.eta_min)
+  loss_func = nn.CrossEntropyLoss()
+  #setup recovery 
   if load:
     if os.path.exists(load):
       checkpoint = torch.load(load, map_location=device)
       model.load_state_dict(checkpoint['model_state_dict'])
       optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-      if scheduler is not None:
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+      scheduler.load_state_dict(checkpoint['schedular_state_dict'])
       begin_epoch = checkpoint['epoch'] + 1
       print(f"Resuming from epoch {begin_epoch}")
       print(f"Loaded model from {load}")
-      if output and logs:
-        logs_path = os.path.join(output, logs)
-        try:
-          with open(os.path.join(logs_path, 'train_metrics.json'), "r") as f:
-            train_metrics = json.load(f)
-          if val_loader:
-            with open(os.path.join(logs_path, 'val_metrics.json'), "r") as f:
-              val_metrics = json.load(f)
-        except FileNotFoundError:
-          print("Metrics history files not found, starting fresh metrics tracking")
     else:
       cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
       if cont.lower() != 'y':
         return
   
+  #admin
   if output:
-    if begin_epoch == 0:
+    if load is None: #fresh run, fresh folder
       output = enum_dir(output, make=True) 
     print(f"Output directory set to: {output}")
     
   if save:
     save_path = os.path.join(output, save)
-    if begin_epoch == 0:
+    if load is None:
       save_path = enum_dir(save_path, make=True)
     print(f"Save directory set to: {save_path}")
   
   if logs:
     logs_path = os.path.join(output, logs)
-    if begin_epoch == 0:
+    if load is None:
       logs_path = enum_dir(logs_path, make=True)
     print(f"Logs directory set to: {logs_path}")
     writer = SummaryWriter(logs_path) #watching loss
-    
-  model.train()
-  pbar = tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D")
-  try:
-    for epoch in pbar:
-      #Training phase
-      running_loss = 0.0
-      train_samples = 0
-      train_correct = 0 
-      
-      # for data, target in train_loader:
-      for batch in train_loader:
-        view1, view2 = batch
-        view1, view2 = view1.to(device), view2.to(device)
-        
-        optimizer.zero_grad()
-        # model_output = model(data)
-        z1 = model(view1)
-        z2 = model(view2)
-        # loss = loss_func(model_output, target)
-        loss = loss_func(z1, z2)
-        loss.backward()
-        optimizer.step()
-        
-        #Accumulate metrics
-        running_loss += loss.item() * view1.size(0) #weight by batch size
-        train_samples += view1.size(0)
-        # _, predicted = model_output.max(1)
-        # train_correct += predicted.eq(target).sum().item()
-      
-      #Calculate average loss and accuracy 
-      avg_train_loss = running_loss / train_samples
-      # train_acc = 100. * train_correct / train_samples
-      # train_metrics.append({'epoch': epoch, 'loss': avg_train_loss, 'accuracy': train_acc})
-      train_metrics.append({'epoch': epoch, 'loss': avg_train_loss})
-        
-      if logs: 
-        writer.add_scalar('Loss/Train', avg_train_loss, epoch) # type: ignore
-        # writer.add_scalar('Accuracy/Train', train_acc, epoch) # type: ignore
-        
-      #Validation phase
-      if val_loader:
-        model.eval()
-        val_loss = 0.0
-        val_samples = 0
-        val_correct = 0
-        
-        with torch.no_grad():
-          for batch in val_loader:
-            view1, view2 = batch
-            view1, view2 = view1.to(device), view2.to(device)
-            z1 = model(view1)
-            z2 = model(view2) 
-            loss = loss_func(z1, z2)           
-            #Accumulate validation metrics
-            val_loss += loss.item() * view1.size(0) #weight by batch size
-            val_samples += view1.size(0)
-            # _, predicted = model_output.max(1)
-            # val_correct += predicted.eq(target).sum().item()
-      
-        avg_val_loss = val_loss / val_samples
-        # val_acc = 100. * val_correct / val_samples
-        # val_metrics.append({'epoch': epoch, 'loss': avg_val_loss, 'accuracy': val_acc})
-        val_metrics.append({'epoch': epoch, 'loss': avg_val_loss})
-
-        if logs:
-          writer.add_scalar('Loss/Val', avg_val_loss, epoch) # type: ignore
-          # writer.add_scalar('Accuracy/Val', val_acc, epoch) # type: ignore
-        
-        if scheduler:
-          scheduler.step(avg_val_loss)
-        
-        if save and avg_val_loss < best_val_loss:
-          best_val_loss = avg_val_loss
-          torch.save(model.state_dict(),
-                    os.path.join(save_path, 'best.pth')) # type: ignore
-        
-        model.train() # return back to train
-      
-      # Print progress
-      current_lr = optimizer.param_groups[0]['lr']
-      print(f'  Epoch {epoch+1}/{epochs}:')
-      # print(f'  Train Loss: {avg_train_loss:.4f}, Train Acc: {train_acc:.2f}%')
-      print(f'  Train Loss: {avg_train_loss:.4f}')
-
-      if val_loader:
-        # print(f'  Val Loss: {avg_val_loss:.4f}, Val Acc: {val_acc:.2f}%') # type: ignore
-        print(f'  Val Loss: {avg_val_loss:.4f}') # type: ignore
-      print(f'  Learning Rate: {current_lr:.6f}')
-      
-      if save and (epoch % save_every == 0 or epoch == epochs - 1):
-        checkpoint_data = {
-          'epoch': epoch,
-          'model_state_dict': model.state_dict(),
-          'optimizer_state_dict': optimizer.state_dict(),
-          'train loss': avg_train_loss
-        }
-        if scheduler is not None:
-          checkpoint_data['scheduler_state_dict'] = scheduler.state_dict()
-        
-        if val_loader:
-          checkpoint_data.update({
-            'val loss': avg_val_loss, # type: ignore
-            'best val loss': best_val_loss,
-          })
-        
-        torch.save(checkpoint_data, os.path.join(save_path, f'checkpoint_{epoch}.pth')) # type: ignore
-          
-      if logs:
-        with open(os.path.join(logs_path, 'train_metrics.json'), "w") as f: # type: ignore
-          json.dump(train_metrics, f) 
-        if val_loader:
-          with open(os.path.join(logs_path, 'val_metrics.json'), "w") as f: # type: ignore
-            json.dump(val_metrics, f) 
-        
-      
-      # Early stopping check 
-      if current_lr < 1e-6:
-        print(f"Learning rate too small ({current_lr}), stopping training")
-        break
-      if avg_train_loss <= cutoff_train_loss: #TODO might adjust this for contrastive 
-        print(f"Training loss too small ({avg_train_loss}), stopping training")
-        break
-  finally:
-    pbar.close()
   
-  if logs:
-    train_losses = [metric['loss'] for metric in train_metrics]
-    # train_accs = [metric['accuracy'] for metric in train_metrics]
-    val_losses = [metric['loss'] for metric in val_metrics]
-    # val_accs = [metric['accuracy'] for metric in val_metrics]
-    loss_fname = os.path.join(logs_path, 'losses.png') #type: ignore
-    try:
-      utils.plot_from_lists(train_losses,
-                            val_losses,
-                            save_path=loss_fname,
-                            show=False)
-    except Exception as e:
-      print(f'saving png failed due to {e}')
-    # utils.plot_from_lists(train_accs,
-    #                       val_accs,
-    #                       title='Training accuracy Curve',
-    #                       ylabel='Accuracy (%)',
-    #                       save_path=loss_fname,
-    #                       show=False)
+  #train it
+  # pbar = tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D")
+  while steps < configs.max_steps and epoch < 400:
+    print(f'Step {steps}/{configs.max_steps}')
+    print('-'*10)
     
-  return train_metrics, val_metrics
+    epoch+=1
+    #each epoch has training and validation stage
+    for phase in ['train', 'val']:
+      
+      if phase == 'train':
+        model.train()
+      else:
+        model.eval()
+        
+      #Reset matrics for this phase
+      running_loss = 0.0
+      running_corrects = 0
+      total_samples = 0
+      num_batches = 0
+      # tot_loc_loss = 0.0  #TODO once this gets working try the fancy loss
+      # tot_cls_loss = 0.0
+      
+      #for gradient accumulation  
+      accumulated_loss = 0.0
+      accumulated_steps = 0
+      optimizer.zero_grad()
+    
+      #Iterate over data for this phase
+      for batch_idx, (data, target) in enumerate(dataloaders[phase]):
+        data, target = data.to(device), target.to(device)
+        batch_size = data.size(0)
+        total_samples += batch_size
+        num_batches += 1
+        
+        #Forward pass
+        if phase == 'train':
+          model_output = model(data)
+        else:
+          with torch.no_grad():
+            model_output = model(data)
+            
+        # Calculate loss
+        loss = loss_func(model_output, target)
+
+        #Accumulate metrics
+        running_loss += loss.item() * batch_size  
+        _, predicted = model_output.max(1)
+        running_corrects += predicted.eq(target).sum().item()
+        
+
+        if phase == 'train':
+          scaled_loss = loss / num_steps_per_update
+          scaled_loss.backward()
+          
+          accumulated_loss += loss.item()
+          accumulated_steps += 1
+          
+          if accumulated_steps == num_steps_per_update:
+            optimizer.step()
+            optimizer.zero_grad()
+            steps += 1
+            
+            # Print progress every few steps
+            if steps % 10 == 0:
+              avg_acc_loss = accumulated_loss / accumulated_steps
+              current_acc = 100.0 * running_corrects / total_samples
+              print(f'Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, '
+                    f'Current Accuracy: {current_acc:.2f}%')
+              
+              if logs:
+                writer.add_scalar('Loss/Train_Step', avg_acc_loss, steps) # type: ignore
+                writer.add_scalar('Accuracy/Train_Step', current_acc, steps) # type: ignore
+            
+            # Reset accumulation
+            accumulated_loss = 0.0
+            accumulated_steps = 0
+    
+      #calculate  epoch metrics
+      epoch_loss = running_loss / total_samples # Average loss per sample
+      epoch_acc = 100.0 * running_corrects / total_samples
+
+      print(f'{phase.upper()} - Epoch {epoch}:')
+      print(f'  Loss: {epoch_loss:.4f}')
+      print(f'  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})')
+      
+      # Log epoch metrics
+      if logs:
+        writer.add_scalar(f'Loss/{phase.capitalize()}', epoch_loss, epoch) # type: ignore
+        writer.add_scalar(f'Accuracy/{phase.capitalize()}', epoch_acc, epoch) # type: ignore
+      
+      # Validation specific logic
+      if phase == 'val':
+          # Save best model
+          if epoch_acc > best_val_score:
+              best_val_score = epoch_acc
+              model_name = os.path.join(save_path, f'best.pth') # type: ignore
+              torch.save(model.state_dict(), model_name)
+              print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
+          
+          # Step scheduler with validation loss
+          scheduler.step(epoch_loss) # type: ignore
+          
+          print(f'Best validation accuracy so far: {best_val_score:.2f}%')
+      
+     # Save checkpoint
+    if save and (epoch % save_every == 0 or not (steps < configs.max_steps and epoch < 400)):
+        checkpoint_data = {
+            'epoch': epoch,
+            'steps': steps,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            'best_val_score': best_val_score
+        }
+        checkpoint_path = os.path.join(save_path, f'checkpoint_{str(epoch).zfill(3)}.pth') # type: ignore
+        torch.save(checkpoint_data, checkpoint_path)
+        print(f'Checkpoint saved: {checkpoint_path}')
+        
+    
+  print('Finished training successfully')
 
 def main():
     # parser = argparse.ArgumentParser(description='Train a model')

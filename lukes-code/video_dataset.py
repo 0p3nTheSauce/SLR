@@ -5,46 +5,61 @@ import torch
 
 #local imports
 from utils import load_rgb_frames_from_video, crop_frames
-from video_transforms import get_base, get_swap_ct
+from video_transforms import get_base, get_swap_ct,  correct_num_frames
 import torchvision.transforms as ts
 
 ############################ Dataset Classes ############################
 
 class VideoDataset(Dataset):
-  def __init__(self, root, instances_path, classes_path,crop=True, transform=None):
+  def __init__(self, root, instances_path, classes_path,
+               crop=False, num_frames=64, transforms=None, include_meta=False):
     '''root is the path to the root directory where the video files are located.'''
     if os.path.exists(root) is False:
       raise FileNotFoundError(f"Root directory {root} does not exist.")
     else:
       self.root = root
-    self.transform = transform
+    self.transforms = transforms
     self.crop = crop
+    self.num_frames = num_frames
+    self.include_meta = include_meta
     with open(instances_path, 'r') as f:
       self.data = json.load(f) #created by preprocess.py
       if self.data is None:
         raise ValueError(f"No data found in {instances_path}. Please check the file.")
     with open(classes_path, 'r') as f:
       self.classes = json.load(f) 
-  
+
   def __manual_load__(self,item):
     video_path = os.path.join(self.root,item['video_id']+'.mp4')
     if os.path.exists(video_path) is False:
       raise FileNotFoundError(f"Video file {video_path} does not exist.")
     
+    
+    
     frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
-                                        end=item['frame_end']) 
+                                        end=item['frame_end'])
+    sampled_frames = correct_num_frames(frames, self.num_frames) 
 
     if self.crop:
-      frames = crop_frames(frames, item['bbox'])
+      sampled_frames = crop_frames(frames, item['bbox'])
   
-    return frames, item['label_num']
+    if self.include_meta:
+      return sampled_frames, item['label_num'], item
+    else:
+      return sampled_frames, item['label_num']
   
   def __getitem__(self, idx):
     item = self.data[idx]
-    frames, target= self.__manual_load__(item)
-    if self.transform is not None:
-      frames = self.transform(frames)
-    return frames, target
+    if self.include_meta: 
+      frames, target, meta = self.__manual_load__(item) 
+    else:
+      frames, target= self.__manual_load__(item)
+    if self.transforms is not None:
+      frames = self.transforms(frames)
+    if self.include_meta:
+      return frames, target, meta
+    else:
+      return frames, target
   
   def __len__(self):
     return len(self.data)
@@ -66,13 +81,35 @@ class ContrastiveVideoDataset(VideoDataset):
     frames, _ = self.__manual_load__(item)  # Get raw frames, ignore label
     
     # Apply two different augmentations
-    view1 = self.transform(frames) if self.transform else frames
+    view1 = self.transforms(frames) if self.transforms else frames
     view2 = self.augmentation(frames) if self.augmentation else frames
     #leaving like this for now, but likely to cause errors if same base_transform is not used
     
     
     return (view1, view2)
 
+class SemiContrastiveVideoDataset(VideoDataset):
+  def __init__(self, *args, augmentation, **kwargs):
+    # Remove transform from kwargs to prevent parent from using it
+    super().__init__(*args, **kwargs)
+    #Assume that self.transform will be the base_norm_fin, ie the standard
+    #But transform should atleast have base_transform, otherwise shape issues when 
+    # loading
+    #By extension, augmementation must have at least base_tansform
+    #But may just be that (augmentation through lack of normalisation)
+    self.augmentation = augmentation
+
+  def __getitem__(self, idx):
+    item = self.data[idx]
+    frames, label = self.__manual_load__(item)  # Get raw frames, ignore label
+    
+    # Apply two different augmentations
+    view1 = self.transforms(frames) if self.transforms else frames
+    view2 = self.augmentation(frames) if self.augmentation else frames
+    #leaving like this for now, but likely to cause errors if same base_transform is not used
+    
+    
+    return ((view1, view2), label)
 
 def contrastive_collate_fn(batch):
   """Custom collate function for contrastive learning dataset"""

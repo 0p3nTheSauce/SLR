@@ -312,5 +312,5 @@ def preprocess_split(split_path, raw_path='../data/WLASL2000', output_path='prep
   print()
   
 if __name__ == '__main__':
-  split = '../data/splits/asl300.json'
+  split = '../data/splits/asl100.json'
   preprocess_split(split)

@@ -1,0 +1,73 @@
+import configparser
+import importlib
+
+class Config:
+	def __init__(self, config_path):
+		config = configparser.ConfigParser()
+		config.read(config_path)
+
+		# Training
+		train_config = config['TRAIN'] 
+		self.batch_size = int(train_config['BATCH_SIZE'])
+		self.max_steps = int(train_config['MAX_STEPS'])
+		self.update_per_step = int(train_config['UPDATE_PER_STEP'])
+		self.drop_p = float(train_config['DROP_P'])
+		
+		# Optimizer
+		opt_config = config['OPTIMIZER']
+		self.init_lr = float(opt_config['INIT_LR'])
+		self.adam_eps = float(opt_config['ADAM_EPS']) 
+		self.adam_weight_decay = float(opt_config['ADAM_WEIGHT_DECAY'])
+		self.backbone_init_lr = float(opt_config['BACKBONE_INIT_LR'])
+		self.backbone_weight_decay = float(opt_config['BACKBONE_WEIGHT_DECAY'])
+		self.classifier_init_lr = float(opt_config['CLASSIFIER_INIT_LR'])
+		self.classifier_weight_decay = float(opt_config['CLASSIFIER_WEIGHT_DECAY'])
+		
+		# Scheduler
+		sched_config = config['SCHEDULER']
+		self.t_max = int(sched_config['T_MAX'])
+		self.eta_min = float(sched_config['ETA_MIN'])
+
+		# Model
+		model_config = config['MODEL']
+		self.model_wrapper = self._import_from_string(model_config['WRAPPER'])
+		self.transform_method = model_config['TRANSFORMS_METHOD']
+		# self.weights = self._import_from_string(model_config['WEIGHTS'])
+		self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else []
+		self.num_classes = int(model_config['NUM_CLASSES'])
+		# Dataset 
+		dataset_config = config['DATASET']
+		self.frame_size = int(dataset_config['FRAME_SIZE'])
+		self.num_frames = int(dataset_config['NUM_FRAMES'])
+
+	def create_model(self):
+		"""Create model using the wrapper's from_config method"""
+		return self.model_wrapper.from_config(self)
+	
+	def get_transforms(self):
+		'''Create train and test transforms using wrapper's
+		  get_transforms method'''
+		return getattr(self.model_wrapper,
+                 self.transform_method) \
+                  (self.frame_size) #TODO: might change to self 
+
+	def __str__(self):
+		return f"""Config:
+			Model: {self.model_wrapper}
+			Frozen layers: {self.frozen}
+			Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
+			Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
+			Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}
+			Backbone: lr={self.backbone_init_lr}, wd={self.backbone_weight_decay}
+			Classifier: lr={self.classifier_init_lr}, wd={self.classifier_weight_decay}"""
+
+	def _import_from_string(self, import_string):
+		"""Import a class/function from a module string like 'models.pytorch_r3d18.Resnet3d18_basic'"""
+		module_path, class_name = import_string.rsplit('.', 1)
+		module = importlib.import_module(module_path)
+		return getattr(module, class_name)
+
+
+if __name__ == '__main__':
+	config_path = '/home/dxli/workspace/nslt/code/VGG-GRU/configs/test.ini'
+	print(str(Config(config_path)))

@@ -1,9 +1,17 @@
 import torch
+import json
 from sklearn.metrics import accuracy_score, classification_report
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from torchvision.transforms import v2
+import os
+from video_dataset import VideoDataset
+from torch.utils.data import DataLoader
+from models.pytorch_r3d import Resnet3D18_basic
+from configs import Config
+import tqdm
 
 def test_model(model, test_loader):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -13,7 +21,7 @@ def test_model(model, test_loader):
   all_targets = []
   
   with torch.no_grad():
-    for data, target in test_loader:
+    for data, target in tqdm.tqdm(test_loader, desc='Testing'):
       data, target = data.to(device), target.to(device)
       output = model(data)
       _, preds = torch.max(output, 1)
@@ -25,17 +33,26 @@ def test_model(model, test_loader):
   
   return accuracy, report
 
-def plot_heatmap(report, test_classes):
+def plot_heatmap(report, classes_path):
+  with open(classes_path, 'r') as f:
+    test_classes = json.load(f)
+  
   df = pd.DataFrame(report).iloc[:-1,:].T
+  num_classes_to_plot = min(len(df)-2, len(test_classes))
+  
   plt.figure(figsize=(10,10))
-  sns.heatmap(df.iloc[:-2, :3], annot=True, cmap='Blues', fmt='.2f', 
-            xticklabels=['Precision', 'Recall', 'F1-Score'],
-            yticklabels=[f'{test_classes[i]}' for i in range(len(df)-2)])
+  sns.heatmap(df.iloc[:num_classes_to_plot, :3], annot=True, cmap='Blues', fmt='.2f', 
+              xticklabels=['Precision', 'Recall', 'F1-Score'],
+              yticklabels=[test_classes[i] for i in range(num_classes_to_plot)])
   plt.title('Classification Report Heatmap')
   plt.tight_layout()
   plt.show()
   
-def plot_bar_graph(report, test_classes):
+    
+def plot_bar_graph(report, classes_path):
+  with open(classes_path, 'r') as f:
+    test_classes = json.load(f)
+  
   classes = list(report.keys())[:-3]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
   metrics = ['precision', 'recall', 'f1-score']
 
@@ -57,9 +74,121 @@ def plot_bar_graph(report, test_classes):
   ax.set_xlabel('Scores')
   ax.set_title('Classification Report - Per Class Metrics')
   ax.set_yticks(x)
-  ax.set_yticklabels(test_classes)
+  
+  # Fix: Only use as many class names as we have classes in the report
+  num_classes = len(classes)
+  class_labels = [test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}" 
+                  for cls in classes]
+  ax.set_yticklabels(class_labels)
+  
   ax.legend()
   ax.set_xlim(0, 1.1)
 
   plt.tight_layout()
   plt.show()
+  
+def run_test_r3d18_1(configs, root='../data/WLASL2000',
+               labels='./preprocessed/labels/asl100',
+               output='runs/exp_0',model_dict='best.pth',
+               verbose=False, save=False):
+  
+  torch.manual_seed(42)
+  
+  #setup transforms
+  base_mean = [0.43216, 0.394666, 0.37645]
+  base_std = [0.22803, 0.22145, 0.216989]
+  
+  r3d18_final = v2.Compose([
+    v2.Lambda(lambda x: x.float() / 255.0),
+    # v2.Lambda(lambda x: vt.normalise(x, base_mean, base_std)),
+    v2.Normalize(mean=base_mean, std=base_std),
+    v2.Lambda(lambda x: x.permute(1,0,2,3)) 
+  ])
+  
+  test_transforms = v2.Compose([v2.CenterCrop(224),
+                                r3d18_final])
+  
+  #setup data
+  test_instances = os.path.join(labels, 'test_instances_fixed_frange_bboxes_len.json')
+  test_classes = os.path.join(labels, 'test_classes_fixed_frange_bboxes_len.json')
+  
+  test_set = VideoDataset(root, test_instances, test_classes,
+                          transforms=test_transforms, num_frames=32, include_meta=True)
+  test_loader = DataLoader(test_set, batch_size=1,shuffle=False,
+                           num_workers=0)
+  num_classes = len(set(test_set.classes))
+  # print(num_classes)
+  
+  #setup model
+  r3d18 = Resnet3D18_basic(num_classes=num_classes, drop_p=configs.drop_p,)
+  r3d18_dict = torch.load(os.path.join(output,'checkpoints', model_dict)) #future warning, use weights_only=True (security stuff if you dont know the file)
+  # print(r3d18_dict)
+  r3d18.load_state_dict(r3d18_dict)
+  r3d18.cuda()
+  r3d18.eval()
+  
+  correct = 0
+  correct_5 = 0
+  correct_10 = 0
+  
+  top1_fp = np.zeros(num_classes, dtype=np.int64)
+  top1_tp = np.zeros(num_classes, dtype=np.int64)
+  
+  top5_fp = np.zeros(num_classes, dtype=np.int64)
+  top5_tp = np.zeros(num_classes, dtype=np.int64)
+  
+  top10_fp = np.zeros(num_classes, dtype=np.int64)
+  top10_tp = np.zeros(num_classes, dtype=np.int64)
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+  # device = torch.device('cpu') #TODO: change when gpu available
+  print(f'Using device: {device}')
+  # batch = next(iter(test_loader))
+  # data, target = batch
+  # print(data.shape) #torch.Size([1, 3, 32, 224, 224])
+  for batch in tqdm.tqdm(test_loader, desc="Testing"):
+    data, target, meta_info = batch
+    data, target = data.to(device), target.to(device)
+    
+    # per_frame_logits = r3d18(data)    
+    # predictions = torch.max(per_frame_logits, dim=2)[0]
+    predictions = r3d18(data)
+
+    out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
+    
+    if target[0].item() in out_labels[-5:]:
+      correct_5 += 1
+      top5_tp[target[0].item()] += 1
+    else:
+      top5_fp[target[0].item()] += 1
+    if target[0].item() in out_labels[-10:]:
+      correct_10 += 1
+      top10_tp[target[0].item()] += 1
+    else:
+      top10_fp[target[0].item()] += 1
+    if torch.argmax(predictions[0]).item() == target[0].item():
+      correct += 1
+      top1_tp[target[0].item()] += 1
+    else:
+      top1_fp[target[0].item()] += 1
+    
+    if verbose:
+      print(f"Video ID: {meta_info['video_id']}\n\
+              Correct 1: {float(correct) / len(test_loader)}\n\
+              Correct 5: {float(correct_5) / len(test_loader)}\n\
+              Correct 10: {float(correct_10) / len(test_loader)}")
+
+  #per class accuracy
+  top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
+  top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
+  top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
+  fstr = 'top-k average per class acc: {}, {}, {}'.format(top1_per_class, top5_per_class, top10_per_class)
+  print(fstr)
+  if save:
+    save_path = os.path.join(output, 'top_k.txt')
+    with open(save_path, 'w') as f:
+      f.write(fstr)
+
+if __name__ == '__main__':
+  config_path = './configfiles/asl100.ini'
+  configs = Config(config_path)
+  run_test_r3d18_1(configs, output='runs/asl100/r3d18_exp5')

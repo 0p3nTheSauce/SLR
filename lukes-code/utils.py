@@ -40,16 +40,20 @@ def load_rgb_frames_from_video_codec(video_path : str, start : int, end : int
   #stinking torchcodec is borked
   return torch.rand(2)
 
+# def load_rgb_frames_from_video(video_path : str, start : int, end : int
+#                               , all : bool =False, recover=True) -> torch.Tensor:
+#   if recover:
+#     try:
+#       frames = cv_load(video_path, start, end, all)
+#     except ValueError:
+#       frames = cv_load(video_path, start, end, all=True)
+#     return cv_to_torch(frames)
+#   else:
+#     return cv_to_torch(cv_load(video_path, start, end, all))
+  
 def load_rgb_frames_from_video(video_path : str, start : int, end : int
-                              , all : bool =False, recover=True) -> torch.Tensor:
-  if recover:
-    try:
-      frames = cv_load(video_path, start, end, all)
-    except ValueError:
-      frames = cv_load(video_path, start, end, all=True)
-    return cv_to_torch(frames)
-  else:
-    return cv_to_torch(cv_load(video_path, start, end, all))
+                              , all : bool =False) -> torch.Tensor:
+  return cv_to_torch(cv_load(video_path, start, end, all))
 
 def cv_load(video_path, start, end, all=False):
   if not os.path.exists(video_path):
@@ -292,7 +296,7 @@ def clean_checkpoints(paths):
     for file in to_remove:
       os.remove(os.path.join(to_empty, file))
       print(f'removed {file} in {to_empty}')
-      
+
 def clean_experiments(path):
   if not os.path.exists(path):
     raise FileNotFoundError(f'Experiments path: {path} was not found')
@@ -312,6 +316,28 @@ def crop_frames(frames, bbox):
   #bbox is a list of [x1, y1, x2, y2]
   x1, y1, x2, y2 = bbox
   return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
+
+# def enum_dir(path, make=False):
+#   if os.path.exists(path):
+#     if not path[-1].isdigit():
+#       path += '0'
+#     while os.path.exists(path):
+#       path = path[:-1] + str(int(path[-1]) + 1)
+#   if make:
+#     os.makedirs(path, exist_ok=True)
+#   return path
+
+def enum_dir(path, make=False, decimals=3):
+  '''Enumerate filenames'''
+  if os.path.exists(path):
+    if not path[-1].isdigit():
+      path += '0'.zfill(decimals)
+    while os.path.exists(path):
+      num = int(path[-decimals:]) 
+      path = path[:-decimals] + str(num + 1)
+  if make:
+    os.makedirs(path, exist_ok=True)
+  return path
 
 ##################### once offs / Testing ######################
 def test_save():
