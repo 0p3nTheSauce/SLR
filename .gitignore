@@ -14,3 +14,5 @@ data/
 .venv
 *.jpg
 lukes-code/runs/*/*/checkpoints/*.pth
+lukes-code/experiments/
+lukes-code/media/
