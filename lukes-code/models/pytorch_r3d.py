@@ -186,6 +186,9 @@ class Resnet3D18_basic(nn.Module):
                                   r3d18_final])
     return train_transforms, test_transforms
 
+
+    
+
 # Example usage:
 if __name__ == "__main__":
   # Create model instance
