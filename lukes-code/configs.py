@@ -32,13 +32,26 @@ class Config:
 		model_config = config['MODEL']
 		self.model_wrapper = self._import_from_string(model_config['WRAPPER'])
 		self.transform_method = model_config['TRANSFORMS_METHOD']
-		self.weights = model_config['WEIGHTS']
+		
+		# Handle weights parameter - could be enum or file path
+		weights_value = model_config['WEIGHTS']
+		if weights_value.startswith('../') or weights_value.startswith('/'):
+			# It's a file path
+			self.weights_path = weights_value
+			self.weights = None  # Will use DEFAULT in model
+		else:
+			# It's a weights enum (like 'DEFAULT', 'KINETICS400_V1')
+			self.weights = weights_value
+			self.weights_path = None
+		
 		self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else []
 		self.num_classes = int(model_config['NUM_CLASSES'])
+		
+		# Optional attention parameters
 		self.in_linear = int(model_config.get('IN_LINEAR', 1))
 		self.n_attention = int(model_config.get('N_ATTENTION', 5))
-  
-  # Dataset 
+		
+		# Dataset 
 		dataset_config = config['DATASET']
 		self.frame_size = int(dataset_config['FRAME_SIZE'])
 		self.num_frames = int(dataset_config['NUM_FRAMES'])
@@ -48,28 +61,25 @@ class Config:
 		return self.model_wrapper.from_config(self)
 	
 	def get_transforms(self):
-		'''Create train and test transforms using wrapper's
-		  get_transforms method'''
-		return getattr(self.model_wrapper,
-                 self.transform_method) \
-                  (self.frame_size) #TODO: might change to self 
+		'''Create train and test transforms using wrapper's get_transforms method'''
+		return getattr(self.model_wrapper, self.transform_method)(self.frame_size)
 
 	def __str__(self):
 		return f"""Config:
-			Model: {self.model_wrapper}
-			Frozen layers: {self.frozen}
-			Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
-			Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
-			Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}
-			Backbone: lr={self.backbone_init_lr}, wd={self.backbone_weight_decay}
-			Classifier: lr={self.classifier_init_lr}, wd={self.classifier_weight_decay}"""
+		Model: {self.model_wrapper}
+		Weights: {self.weights or self.weights_path}
+		Frozen layers: {self.frozen}
+		Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
+		Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
+		Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}
+		Backbone: lr={self.backbone_init_lr}, wd={self.backbone_weight_decay}
+		Classifier: lr={self.classifier_init_lr}, wd={self.classifier_weight_decay}"""
 
 	def _import_from_string(self, import_string):
-		"""Import a class/function from a module string like 'models.pytorch_r3d18.Resnet3d18_basic'"""
+		"""Import a class/function from a module string like 'models.pytorch_r3d.Resnet3D18_basic'"""
 		module_path, class_name = import_string.rsplit('.', 1)
 		module = importlib.import_module(module_path)
 		return getattr(module, class_name)
-
 
 if __name__ == '__main__':
 	config_path = '/home/dxli/workspace/nslt/code/VGG-GRU/configs/test.ini'
