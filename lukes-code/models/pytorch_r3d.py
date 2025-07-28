@@ -6,7 +6,7 @@ from torchvision.models.video.resnet import BasicBlock, Bottleneck, Conv3DSimple
 from typing import Union, Callable, Sequence, Optional, Any
 from  torchvision.models.video.resnet import r3d_18, R3D_18_Weights
 from torchvision.transforms import v2
-
+from .classifiers import AttentionClassifier
 #for reference, the r3d18 wrapper class from pytorch essentially does the following:
     # return _video_resnet(
     #     BasicBlock,
@@ -124,22 +124,6 @@ class Resnet3D18_basic(nn.Module):
     if config.frozen:  # Only freeze if layers specified
       instance.freeze_layers(config.frozen)
     return instance
-  
-  # def freeze_layers(self, frozen_layers):
-  #   """Freeze specified layers of the model"""
-  #   if not frozen_layers:
-  #     print('Warning: no frozen layers')
-  #     return
-        
-  #   for layer_name in frozen_layers:
-  #     if hasattr(self.backbone, layer_name):
-  #         layer = getattr(self.backbone, layer_name)
-  #         for param in layer.parameters():
-  #           param.requires_grad = False
-  #         print(f"Frozen layer: {layer_name}")
-  #     else:
-  #         available_layers = [name for name, _ in self.backbone.named_children()]
-  #         print(f"Warning: Layer '{layer_name}' not found. Available layers: {available_layers}")
 
   def freeze_layers(self, frozen_layers):
     """Freeze specified layers of the model"""
@@ -159,19 +143,42 @@ class Resnet3D18_basic(nn.Module):
     
     for layer_name in frozen_layers:
         # Convert intuitive name to actual layer name if needed
-        actual_layer_name = layer_mapping.get(layer_name, layer_name)
+        actual_layer_name = layer_mapping.get(layer_name, 'none')
         
-        if hasattr(self.backbone, actual_layer_name): #type: ignore
-            layer = getattr(self.backbone, actual_layer_name) #type: ignore
+        if actual_layer_name == 'none':
+          raise ValueError(f"Layer name: {layer_name} not found")
+        
+        if hasattr(self.backbone, actual_layer_name):
+            layer = getattr(self.backbone, actual_layer_name)
+            
+            # Freeze all parameters in the layer
             for param in layer.parameters():
                 param.requires_grad = False
+            
+            # Handle BatchNorm layers specifically
+            def freeze_batchnorm(module):
+                if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+                    # Set to eval mode to prevent running mean/var updates
+                    module.eval()
+                    # Freeze the parameters (weight, bias, running_mean, running_var)
+                    for param in module.parameters():
+                        param.requires_grad = False
+                    # Optional: Freeze running statistics
+                    if hasattr(module, 'track_running_stats'):
+                        module.track_running_stats = False
+            
+            # Apply BatchNorm freezing recursively to all submodules
+            layer.apply(freeze_batchnorm)
+            
             print(f"Frozen layer: {layer_name} -> {actual_layer_name}")
         else:
             available_layers = [name for name, _ in self.backbone.named_children()]
             print(f"Warning: Layer '{layer_name}' not found. Available layers: {available_layers}")
-  
+    
+    
   @staticmethod
   def basic_transforms(size=224):
+    '''used by kinetics'''
     base_mean = [0.43216, 0.394666, 0.37645]
     base_std = [0.22803, 0.22145, 0.216989]
     r3d18_final = v2.Compose([
@@ -187,19 +194,106 @@ class Resnet3D18_basic(nn.Module):
     return train_transforms, test_transforms
 
 
+class Resnet3D18_AttnHead(Resnet3D18_basic):
+    def __init__(self, num_classes=100, drop_p=0.3,
+                 weights_path='../runs/asl100/r3d18_exp005/checkpoints/best.pth',
+                 in_linear=1, n_attention=5, weights=R3D_18_Weights.DEFAULT):
+        
+        # Initialize the parent class (this sets up backbone and basic classifier)
+        super().__init__(num_classes=num_classes, drop_p=drop_p, weights=weights)
+        
+        # Load pretrained weights if provided
+        if weights_path:
+            checkpoint = torch.load(weights_path, map_location='cpu')
+            self.load_state_dict(checkpoint)
+            print(f"Loaded pretrained weights from {weights_path}")
+        
+        # Get the feature dimension from the backbone
+        # R3D-18 backbone outputs 512 features after global average pooling
+        in_features = 512  # This is the standard R3D-18 feature dimension
+        
+        # Replace the basic classifier with attention-based classifier
+        self.classifier = AttentionClassifier(
+            in_features=in_features,
+            out_features=num_classes,
+            drop_p=drop_p,
+            in_linear=in_linear,
+            n_attention=n_attention
+        )
+        
+        # Store attention-specific parameters
+        self.in_linear = in_linear
+        self.n_attention = n_attention
+    
+    def __str__(self):
+        """Return string representation of the model"""
+        return f"Resnet3D18_AttnHead(num_classes={self.num_classes},\n\
+      drop_p={self.drop_p}, n_attention={self.n_attention})\n\
+        Model architecture:\n\
+          Backbone: {self.backbone}\n\
+          Classifier: {self.classifier}"
+    
+    def forward(self, x):
+        """Forward pass through the model"""
+        # Extract features from backbone
+        # Shape: [batch, 512, 1, 1, 1] after avgpool
+        features = self.backbone(x)
+        
+        # Remove spatial dimensions: [batch, 512, 1, 1, 1] -> [batch, 512]
+        features = features.view(features.size(0), -1)
+        
+        # For attention classifier, we need sequence dimension
+        # Add sequence dimension: [batch, 512] -> [batch, 1, 512]
+        # This treats each video as a single timestep
+        features = features.unsqueeze(1)
+        
+        # Pass through attention classifier
+        return self.classifier(features)
+    
+    @classmethod
+    def from_config(cls, config):
+        """Create model instance from config object"""
+        instance = cls(
+            num_classes=config.num_classes,
+            drop_p=config.drop_p,
+            weights_path=config.weights,
+            in_linear=getattr(config, 'in_linear', 1),
+            n_attention=getattr(config, 'n_attention', 5)
+        )
+        # if hasattr(config, 'frozen') and config.frozen:
+        #     instance.freeze_layers(config.frozen)
+        if config.frozen:  # Only freeze if layers specified
+          instance.freeze_layers(config.frozen)
+        return instance
+    
+    # def freeze_backbone(self):
+    #     """Freeze the backbone parameters - convenience method"""
+    #     backbone_layers = ['stem', 'layer1', 'layer2', 'layer3', 'layer4', 'avgpool']
+    #     self.freeze_layers(backbone_layers)
+    #     print("Backbone frozen - only attention classifier will be trained")
+    
+    @classmethod
+    def from_pretrained(cls, weights_path, num_classes, **kwargs):
+        """Alternative constructor for loading from pretrained weights"""
+        return cls(
+            num_classes=num_classes,
+            weights_path=weights_path,
+            **kwargs
+        )
+        
     
 
 # Example usage:
 if __name__ == "__main__":
   # Create model instance
-  model = Resnet3D18_basic(num_classes=10, drop_p=0.5)
+  model = Resnet3D18_AttnHead(num_classes=100, drop_p=0.5)
     
   # Print model info
   print(model)
     
   # Example inference (assuming input shape: [batch, channels, depth, height, width])
   dummy_input = torch.randn(1, 3, 16, 112, 112)  # Example video input
-    
+  
   # Forward pass
   output = model(dummy_input)
     
@@ -210,4 +304,4 @@ if __name__ == "__main__":
   # model.to(device)
     
   # Set to training/eval mode
-  model.train()  # or model.eval()
+  # model.train()  # or model.eval()

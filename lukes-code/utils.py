@@ -288,28 +288,38 @@ def plot_from_lists(train_loss, val_loss=None,
 
 
 ##################### Misc ###################################
-def clean_checkpoints(paths):
+def clean_checkpoints(paths, ask=False):
   for path in paths:
     to_empty = os.path.join(path, 'checkpoints')
     files = sorted(os.listdir(to_empty))
-    to_remove = files[1:-1] #leave best.pth and the last checkpoint
+    if len(files) <= 2:
+      continue 
+    #leave best.pth and the last checkpoint
+    to_remove = files[1:-1]  # not great safety wise, assumes files sort correctly
+    ans = 'none'
+    while ans != 'y' and ans != '' and ans != 'n':
+      print(f'Only keep {files[0]} and {files[-1]} in {to_empty}?')
+      ans = input('[y]/n: ')
+    
     for file in to_remove:
-      os.remove(os.path.join(to_empty, file))
+      name = os.path.join(to_empty, file)
+      os.remove(name)
       print(f'removed {file} in {to_empty}')
 
-def clean_experiments(path):
+
+def clean_experiments(path, ask=False):
   if not os.path.exists(path):
     raise FileNotFoundError(f'Experiments path: {path} was not found')
   sub_paths = os.listdir(path)
   return clean_checkpoints([os.path.join(path, sub_path) \
-    for sub_path in sub_paths])
+    for sub_path in sub_paths], ask)
     
-def clean_runs(path):
+def clean_runs(path, ask=False):
   if not os.path.exists(path):
     raise FileNotFoundError(f'Runs directory: {path} was not found')
   sub_paths = os.listdir(path)
   for sub_path in sub_paths:
-    clean_experiments(os.path.join(path, sub_path))
+    clean_experiments(os.path.join(path, sub_path), ask)
   
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
@@ -340,6 +350,40 @@ def enum_dir(path, make=False, decimals=3):
   return path
 
 ##################### once offs / Testing ######################
+
+import tensorflow as tf
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+
+def rename_scalars_in_eventfile(input_path, output_path, name_mapping):
+    """
+    name_mapping: dict like {'Loss/Train_epoch': 'Loss/Train'}
+    """
+    # Read events
+    ea = EventAccumulator(input_path)
+    ea.Reload()
+    
+    # Write new events with corrected names
+    writer = tf.summary.create_file_writer(output_path)
+    
+    
+    
+    for tag in ea.Tags()['scalars']:
+      if tag in name_mapping.keys():
+        print(f'Updating {tag} to {name_mapping[tag]}')
+        scalar_events = ea.Scalars(tag)
+        for event in scalar_events:
+          with writer.as_default():
+            tf.summary.scalar(name_mapping[tag], event.value, step=event.step)
+      else:
+        print(f'Keeping {tag}')
+        scalar_events = ea.Scalars(tag)
+        for event in scalar_events:
+          with writer.as_default():
+            tf.summary.scalar(tag, event.value, event.step)
+    
+    writer.close()
+
+
 def test_save():
   instances = './preprocessed_labels/asl100/train_instances_fixed_bboxes_short.json'
   with open(instances, 'r') as f:
@@ -390,8 +434,15 @@ def main():
   # test_save2()
   #  torch_to_mediapipe()
   # watch_video(path='69241.mp4')
+  # name_mapping = {'Loss/Train_Epoch': 'Loss/Train',
+  #                 'Loss/Test_Epoch' : 'Loss/Val',
+  #                 'Accuracy/Train_Epoch' : 'Accuracy/Train',
+  #                 'Accuracy/Test_Epoch' : 'Accuracy/Val'}
   
-  clean_runs('runs')
+  # rename_scalars_in_eventfile('./runs/asl100/r3d18_exp004/logs',
+  #                             './runs/asl100/r3d18_exp004/logs_fixed',
+  #                             name_mapping)
+  clean_runs('runs', ask=True)
   # test_vid = '../data/WLASL2000/07393.mp4'
   # torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
   # print(torch_frames.shape)

@@ -233,7 +233,12 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
       print(f'{phase.upper()} - Epoch {epoch}:')
       print(f'  Loss: {epoch_loss:.4f}')
       print(f'  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})')
-      
+      try:
+        for i, param_group in enumerate(optimizer.param_groups):
+          print(f"Group {i} learning rate: {param_group['lr']}")
+      except Exception as e:
+        print(f'Failed to print all learning rates due to {e}')
+        
       # Log epoch metrics
       if logs:
         writer.add_scalar(f'Loss/{phase.capitalize()}', epoch_loss, epoch) # type: ignore
@@ -271,7 +276,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   print('Finished training successfully')
 
 def main():
-    models_implemented = ['r3d18']
+    models_implemented = ['r3d18', 'r3d18_attn']
     splits_available = ['asl100', 'asl300']
 
     parser = argparse.ArgumentParser(description='Train a model')
