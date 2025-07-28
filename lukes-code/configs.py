@@ -32,10 +32,13 @@ class Config:
 		model_config = config['MODEL']
 		self.model_wrapper = self._import_from_string(model_config['WRAPPER'])
 		self.transform_method = model_config['TRANSFORMS_METHOD']
-		# self.weights = self._import_from_string(model_config['WEIGHTS'])
+		self.weights = model_config['WEIGHTS']
 		self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else []
 		self.num_classes = int(model_config['NUM_CLASSES'])
-		# Dataset 
+		self.in_linear = int(model_config.get('IN_LINEAR', 1))
+		self.n_attention = int(model_config.get('N_ATTENTION', 5))
+  
+  # Dataset 
 		dataset_config = config['DATASET']
 		self.frame_size = int(dataset_config['FRAME_SIZE'])
 		self.num_frames = int(dataset_config['NUM_FRAMES'])
