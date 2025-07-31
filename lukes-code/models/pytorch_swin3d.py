@@ -4,34 +4,40 @@ import torchvision.models.video as video_models
 from torchvision.models.video.resnet import BasicBlock, Bottleneck, Conv3DSimple,\
   Conv3DNoTemporal, Conv2Plus1D, VideoResNet, WeightsEnum, _ovewrite_named_param
 from typing import Union, Callable, Sequence, Optional, Any
-from torchvision.models.video.s3d import s3d,  S3D_Weights
+# from  torchvision.models.video.resnet import r3d_18, R3D_18_Weights
+from torchvision.models.video import swin3d_t, Swin3D_T_Weights
 from torchvision.transforms import v2
+# from .classifiers import AttentionClassifier
 
-
-class S3D_basic(nn.Module):
-  def __init__(self, num_classes=100, drop_p=0.5,
+class Swin3DTiny_basic(nn.Module):
+  def __init__(self, num_classes=100, drop_p=0.3, 
                weights_path=None):
-    #TODO: look into using norm layers
     super().__init__()
     self.num_classes = num_classes
-    self.drop_p = drop_p
+    self.drop_p=drop_p
     
-    #Load pretrained S3D
-    s3d_model = s3d(weights=S3D_Weights.KINETICS400_V1)
+    swin3dt = swin3d_t(weights=Swin3D_T_Weights.KINETICS400_V1)
     
     self.backbone = nn.ModuleList([
-      s3d_model.features,
-      s3d_model.avgpool
+      swin3dt.patch_embed,
+      swin3dt.pos_drop, 
+      swin3dt.features,
+      swin3dt.norm,
+      swin3dt.avgpool
     ])
     
-    #replace head
+    in_features = swin3dt.head.in_features
     self.classifier = nn.Sequential(
-      nn.Dropout(p=drop_p),
-      nn.Conv3d(1024, num_classes, kernel_size=1, stride=1, bias=True)
+        nn.Dropout(p=drop_p),
+        nn.Linear(in_features, num_classes),
     )
     
-    self.features = self.backbone[0]
-    self.avgpool = self.backbone[1]
+    self.patch_embed = self.backbone[0]
+    self.pos_drop = self.backbone[1] 
+    self.features = self.backbone[2]
+    self.norm = self.backbone[3]
+    self.avgpool = self.backbone[4]
+    self.head = self.classifier  # Alias
     
     if weights_path:
       checkpoint = torch.load(weights_path, map_location='cpu')
@@ -39,33 +45,37 @@ class S3D_basic(nn.Module):
       print(f"Loaded pretrained weights from {weights_path}")
       
   def __str__(self):
-    """Return string rep of model"""
-    return f"""S3D basic implementation
-  (num_classes={self.num_classes}, drop_p={self.drop_p})
-  Model architecture:
-    Backbone: {len(self.backbone)} layers
-    Classifier: {self.classifier}"""
+    """Return string representation of model"""
+    return f"""Swin3D Tiny basic implementation
+    (num_classes={self.num_classes}, drop_p={self.drop_p})
+    Model architecture:
+      Backbone: {len(self.backbone)} layers
+      Classifier: {self.classifier}"""
     
-  def forward(self,x):
-    """Forward pass"""
+  def forward(self, x):
+    """Forward pass through the model"""
+    x = self.patch_embed(x)
+    x = self.pos_drop(x)
     x = self.features(x)
+    x = self.norm(x)
+    x = x.permute(0, 4, 1, 2, 3) # B, C, _T, _H, _W
     x = self.avgpool(x)
-    x = self.classifier(x)
-    x = torch.mean(x, dim=(2,3,4))
+    x = torch.flatten(x, 1)
+    x = self.head(x)  
     return x
   
   @classmethod
   def from_config(cls, config):
-    """Create model instance from config objct"""
+    """Create model instance from config object"""
     instance = cls(
       num_classes=config.num_classes,
       drop_p=config.drop_p,
       weights_path=config.weights_path
     )
-    if config.frozen:
+    if config.frozen:  # Only freeze if layers specified
       instance.freeze_layers(config.frozen)
     return instance
-  
+
   def freeze_layers(self, frozen_layers):
     """Freeze specified layers of the model"""
     if not frozen_layers:
@@ -95,7 +105,7 @@ class S3D_basic(nn.Module):
           layer_to_freeze = getattr(self, top_layer_name)
           print(f"Frozen layer: {layer_name}")
           
-        for param in layer_to_freeze.parameters(): #type: ignore
+        for param in layer_to_freeze.parameters():
           param.requires_grad = False
 
         # Handle BatchNorm and LayerNorm layers specifically
@@ -121,7 +131,7 @@ class S3D_basic(nn.Module):
               param.requires_grad = False
         
         # Apply normalization layer freezing recursively
-        layer_to_freeze.apply(freeze_norm_layers)  #type: ignore
+        layer_to_freeze.apply(freeze_norm_layers) 
       else:
         available_layers = [name for name, _ in self.named_children()]
         print(f"Warning: Layer '{layer_name}' not found. Available layers: {available_layers}")
@@ -142,4 +152,18 @@ class S3D_basic(nn.Module):
     test_transforms = v2.Compose([v2.CenterCrop(size),
                                   r3d18_final])
     return train_transforms, test_transforms
-  
+        
+if __name__ == '__main__':
+  # swin3d = swin3d_t(weights=Swin3D_T_Weights.KINETICS400_V1)
+  swin3d = Swin3DTiny_basic()
+  input = torch.rand(1, 3, 16, 112, 112)
+  # for name, module in swin3d.named_modules():
+  #   print(f"{name}: {module}")
+  # for param in swin3d.backbone.parameters():
+  #   print(param)
+  # for param in swin3d.classifier.parameters():
+  #   print(param)
+  output = swin3d(input)
+  print(output.shape)
+  # features = output.view(output.size(0), -1)
+  # print(features)

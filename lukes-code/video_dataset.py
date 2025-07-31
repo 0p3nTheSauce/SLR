@@ -43,27 +43,19 @@ class VideoDataset(Dataset):
     if self.crop:
       sampled_frames = crop_frames(frames, item['bbox'])
   
-    if self.include_meta:
-      return sampled_frames, item['label_num'], item
-    else:
-      return sampled_frames, item['label_num']
+    return sampled_frames
   
   def __getitem__(self, idx):
     item = self.data[idx]
-    if self.include_meta: 
-      frames, target, meta = self.__manual_load__(item) 
-    else:
-      frames, target= self.__manual_load__(item)
-    if self.transforms is not None:
-      frames = self.transforms(frames)
+    frames = self.__manual_load__(item)
     if self.include_meta:
-      return frames, target, meta
+      return frames, item
     else:
-      return frames, target
+      return frames, item['label_num']
   
   def __len__(self):
     return len(self.data)
-  #TODO: Make a ca
+    
   
 class ContrastiveVideoDataset(VideoDataset):
   def __init__(self, *args, augmentation, **kwargs):

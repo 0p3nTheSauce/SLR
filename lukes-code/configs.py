@@ -33,23 +33,23 @@ class Config:
 		self.model_wrapper = self._import_from_string(model_config['WRAPPER'])
 		self.transform_method = model_config['TRANSFORMS_METHOD']
 		
-		# Handle weights parameter - could be enum or file path
-		weights_value = model_config['WEIGHTS']
-		if weights_value.startswith('../') or weights_value.startswith('/'):
-			# It's a file path
-			self.weights_path = weights_value
-			self.weights = None  # Will use DEFAULT in model
-		else:
-			# It's a weights enum (like 'DEFAULT', 'KINETICS400_V1')
-			self.weights = weights_value
-			self.weights_path = None
+		# Always treat WEIGHTS as a file path
+		self.weights_path = model_config.get('WEIGHTS_PATH', None)
+		# If WEIGHTS is specified, use it as weights_path for backward compatibility
+		if 'WEIGHTS' in model_config:
+			self.weights_path = model_config['WEIGHTS']
+		if 'BACKBONE_WEIGHTS' in model_config:
+			self.backbone_weights_path = model_config['BACKBONE_WEIGHTS']
 		
-		self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else []
+		#TODO :some validation on frozen layers
+		self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else [] 
 		self.num_classes = int(model_config['NUM_CLASSES'])
 		
 		# Optional attention parameters
-		self.in_linear = int(model_config.get('IN_LINEAR', 1))
-		self.n_attention = int(model_config.get('N_ATTENTION', 5))
+		if 'IN_LINEAR' in model_config:
+			self.in_linear = int(model_config.get('IN_LINEAR', 1))
+		if 'N_ATTENTION' in model_config:
+			self.n_attention = int(model_config.get('N_ATTENTION', 5))
 		
 		# Dataset 
 		dataset_config = config['DATASET']
@@ -67,7 +67,7 @@ class Config:
 	def __str__(self):
 		return f"""Config:
 		Model: {self.model_wrapper}
-		Weights: {self.weights or self.weights_path}
+		Weights Path: {self.weights_path}
 		Frozen layers: {self.frozen}
 		Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
 		Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
@@ -80,7 +80,9 @@ class Config:
 		module_path, class_name = import_string.rsplit('.', 1)
 		module = importlib.import_module(module_path)
 		return getattr(module, class_name)
-
+ 
+ 
+ 
 if __name__ == '__main__':
 	config_path = '/home/dxli/workspace/nslt/code/VGG-GRU/configs/test.ini'
 	print(str(Config(config_path)))

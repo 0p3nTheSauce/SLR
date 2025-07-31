@@ -80,13 +80,13 @@ def get_video_resnet(
 
 class Resnet3D18_basic(nn.Module):
   def __init__(self, num_classes=100, drop_p=0.5,
-               weights=R3D_18_Weights.DEFAULT):
+               weights_path=None):
     super().__init__()
     self.num_classes = num_classes
     self.drop_p = drop_p
     
     # Load pretrained R3D-18
-    r3d18 = r3d_18(weights=weights)
+    r3d18 = r3d_18(weights=R3D_18_Weights.KINETICS400_V1)
     
     # Replace the final fully connected layer
     in_features = r3d18.fc.in_features
@@ -95,6 +95,12 @@ class Resnet3D18_basic(nn.Module):
       nn.Dropout(p=drop_p),
       nn.Linear(in_features, num_classes)
     )
+    
+    if weights_path:
+      checkpoint = torch.load(weights_path, map_location='cpu')
+      self.load_state_dict(checkpoint)
+      print(f"Loaded pretrained weights from {weights_path}")
+      
     
   def __str__(self):
     """Return string representation of the model"""
@@ -118,8 +124,8 @@ class Resnet3D18_basic(nn.Module):
     """Create model instance from config object"""
     instance = cls(
       num_classes=config.num_classes,
-      drop_p=config.drop_p
-      # weights=config.weights #TODO add if needed
+      drop_p=config.drop_p,
+      weights_path=config.weights_path
     )
     if config.frozen:  # Only freeze if layers specified
       instance.freeze_layers(config.frozen)
@@ -195,91 +201,93 @@ class Resnet3D18_basic(nn.Module):
 
 
 class Resnet3D18_AttnHead(Resnet3D18_basic):
-    def __init__(self, num_classes=100, drop_p=0.3,
-                 weights_path='../runs/asl100/r3d18_exp005/checkpoints/best.pth',
-                 in_linear=1, n_attention=5, weights=R3D_18_Weights.DEFAULT):
-        
-        # Initialize the parent class (this sets up backbone and basic classifier)
-        super().__init__(num_classes=num_classes, drop_p=drop_p, weights=weights)
-        
-        # Load pretrained weights if provided
-        if weights_path:
-            checkpoint = torch.load(weights_path, map_location='cpu')
-            self.load_state_dict(checkpoint)
-            print(f"Loaded pretrained weights from {weights_path}")
-        
-        # Get the feature dimension from the backbone
-        # R3D-18 backbone outputs 512 features after global average pooling
-        in_features = 512  # This is the standard R3D-18 feature dimension
-        
-        # Replace the basic classifier with attention-based classifier
-        self.classifier = AttentionClassifier(
-            in_features=in_features,
-            out_features=num_classes,
-            drop_p=drop_p,
-            in_linear=in_linear,
-            n_attention=n_attention
-        )
-        
-        # Store attention-specific parameters
-        self.in_linear = in_linear
-        self.n_attention = n_attention
+  def __init__(self, num_classes=100, drop_p=0.3,
+                weights_path=None, backbone_weights_path=None,
+                in_linear=1, n_attention=5):
+      
+    # Initialize the parent class (this sets up backbone and basic classifier)
+    super().__init__(num_classes=num_classes, drop_p=drop_p,
+                      weights_path=backbone_weights_path)
     
-    def __str__(self):
-        """Return string representation of the model"""
-        return f"Resnet3D18_AttnHead(num_classes={self.num_classes},\n\
-      drop_p={self.drop_p}, n_attention={self.n_attention})\n\
-        Model architecture:\n\
-          Backbone: {self.backbone}\n\
-          Classifier: {self.classifier}"
+    # Load pretrained weights if provided
+    if weights_path:
+      checkpoint = torch.load(weights_path, map_location='cpu')
+      self.load_state_dict(checkpoint)
+      print(f"Loaded pretrained weights from {weights_path}")
     
-    def forward(self, x):
-        """Forward pass through the model"""
-        # Extract features from backbone
-        # Shape: [batch, 512, 1, 1, 1] after avgpool
-        features = self.backbone(x)
-        
-        # Remove spatial dimensions: [batch, 512, 1, 1, 1] -> [batch, 512]
-        features = features.view(features.size(0), -1)
-        
-        # For attention classifier, we need sequence dimension
-        # Add sequence dimension: [batch, 512] -> [batch, 1, 512]
-        # This treats each video as a single timestep
-        features = features.unsqueeze(1)
-        
-        # Pass through attention classifier
-        return self.classifier(features)
+    # Get the feature dimension from the backbone
+    # R3D-18 backbone outputs 512 features after global average pooling
+    in_features = 512  # This is the standard R3D-18 feature dimension
     
-    @classmethod
-    def from_config(cls, config):
-        """Create model instance from config object"""
-        instance = cls(
-            num_classes=config.num_classes,
-            drop_p=config.drop_p,
-            weights_path=config.weights,
-            in_linear=getattr(config, 'in_linear', 1),
-            n_attention=getattr(config, 'n_attention', 5)
-        )
-        # if hasattr(config, 'frozen') and config.frozen:
-        #     instance.freeze_layers(config.frozen)
-        if config.frozen:  # Only freeze if layers specified
-          instance.freeze_layers(config.frozen)
-        return instance
+    # Replace the basic classifier with attention-based classifier
+    self.classifier = AttentionClassifier(
+      in_features=in_features,
+      out_features=num_classes,
+      drop_p=drop_p,
+      in_linear=in_linear,
+      n_attention=n_attention
+    )
     
-    # def freeze_backbone(self):
-    #     """Freeze the backbone parameters - convenience method"""
-    #     backbone_layers = ['stem', 'layer1', 'layer2', 'layer3', 'layer4', 'avgpool']
-    #     self.freeze_layers(backbone_layers)
-    #     print("Backbone frozen - only attention classifier will be trained")
-    
-    @classmethod
-    def from_pretrained(cls, weights_path, num_classes, **kwargs):
-        """Alternative constructor for loading from pretrained weights"""
-        return cls(
-            num_classes=num_classes,
-            weights_path=weights_path,
-            **kwargs
-        )
+    # Store attention-specific parameters
+    self.in_linear = in_linear
+    self.n_attention = n_attention
+  
+  def __str__(self):
+    """Return string representation of the model"""
+    return f"Resnet3D18_AttnHead(num_classes={self.num_classes},\n\
+            drop_p={self.drop_p}, n_attention={self.n_attention})\n\
+            Model architecture:\n\
+            Backbone: {self.backbone}\n\
+            Classifier: {self.classifier}"
+  
+  def forward(self, x):
+      """Forward pass through the model"""
+      # Extract features from backbone
+      # Shape: [batch, 512, 1, 1, 1] after avgpool
+      features = self.backbone(x)
+      
+      # Remove spatial dimensions: [batch, 512, 1, 1, 1] -> [batch, 512]
+      features = features.view(features.size(0), -1)
+      
+      # For attention classifier, we need sequence dimension
+      # Add sequence dimension: [batch, 512] -> [batch, 1, 512]
+      # This treats each video as a single timestep
+      features = features.unsqueeze(1)
+      
+      # Pass through attention classifier
+      return self.classifier(features)
+  
+  @classmethod
+  def from_config(cls, config):
+      """Create model instance from config object"""
+      instance = cls(
+          num_classes=config.num_classes,
+          drop_p=config.drop_p,
+          weights_path=config.weights_path,
+          backbone_weights_path=config.backbone_weights_path,
+          in_linear=getattr(config, 'in_linear', 1),
+          n_attention=getattr(config, 'n_attention', 5)
+      )
+      # if hasattr(config, 'frozen') and config.frozen:
+      #     instance.freeze_layers(config.frozen)
+      if config.frozen:  # Only freeze if layers specified
+        instance.freeze_layers(config.frozen)
+      return instance
+  
+  # def freeze_backbone(self):
+  #     """Freeze the backbone parameters - convenience method"""
+  #     backbone_layers = ['stem', 'layer1', 'layer2', 'layer3', 'layer4', 'avgpool']
+  #     self.freeze_layers(backbone_layers)
+  #     print("Backbone frozen - only attention classifier will be trained")
+  
+  @classmethod
+  def from_pretrained(cls, weights_path, num_classes, **kwargs):
+      """Alternative constructor for loading from pretrained weights"""
+      return cls(
+          num_classes=num_classes,
+          weights_path=weights_path,
+          **kwargs
+      )
         
     
 
