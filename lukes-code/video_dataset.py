@@ -48,6 +48,8 @@ class VideoDataset(Dataset):
   def __getitem__(self, idx):
     item = self.data[idx]
     frames = self.__manual_load__(item)
+    if self.transforms is not None:
+      frames = self.transforms(frames)
     if self.include_meta:
       return frames, item
     else:
