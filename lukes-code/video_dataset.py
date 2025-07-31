@@ -50,10 +50,14 @@ class VideoDataset(Dataset):
     frames = self.__manual_load__(item)
     if self.transforms is not None:
       frames = self.transforms(frames)
+      
+    result = {
+      'frames': frames,
+      'label_num': item['label_num']
+    }
     if self.include_meta:
-      return frames, item
-    else:
-      return frames, item['label_num']
+      result.update(item)
+    return result
   
   def __len__(self):
     return len(self.data)

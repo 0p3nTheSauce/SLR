@@ -145,8 +145,8 @@ def run_test_r3d18_1(configs, root='../data/WLASL2000',
   # batch = next(iter(test_loader))
   # data, target = batch
   # print(data.shape) #torch.Size([1, 3, 32, 224, 224])
-  for batch in tqdm.tqdm(test_loader, desc="Testing"):
-    data, meta_info = batch
+  for item in tqdm.tqdm(test_loader, desc="Testing"):
+    data, target = item['frames'], item['label_num'] 
     data, target = data.to(device), target.to(device)
     
     # per_frame_logits = r3d18(data)    
@@ -172,7 +172,7 @@ def run_test_r3d18_1(configs, root='../data/WLASL2000',
       top1_fp[target[0].item()] += 1
     
     if verbose:
-      print(f"Video ID: {meta_info['video_id']}\n\
+      print(f"Video ID: {item['video_id']}\n\
               Correct 1: {float(correct) / len(test_loader)}\n\
               Correct 5: {float(correct_5) / len(test_loader)}\n\
               Correct 10: {float(correct_10) / len(test_loader)}")
