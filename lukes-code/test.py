@@ -146,7 +146,7 @@ def run_test_r3d18_1(configs, root='../data/WLASL2000',
   # data, target = batch
   # print(data.shape) #torch.Size([1, 3, 32, 224, 224])
   for batch in tqdm.tqdm(test_loader, desc="Testing"):
-    data, target, meta_info = batch
+    data, meta_info = batch
     data, target = data.to(device), target.to(device)
     
     # per_frame_logits = r3d18(data)    
