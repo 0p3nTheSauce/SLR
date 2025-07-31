@@ -9,47 +9,7 @@ import gzip
 # from torchcodec.decoders import VideoDecoder
 
 ################# Loading #####################
-def load_rgb_frames_from_video_codec(video_path : str, start : int, end : int
-                               ,device : str ='cpu' , all : bool =False) -> torch.Tensor: 
-  # '''Loads RGB frames from a video file as a PyTorch Tensor
-  # Args:
-  #   video_path: Path to video file
-  #   start: Start frame index
-  #   end: End frame index
-  #   device: Device to load tensor on ('cpu' or 'cuda')
-  #   all: If True, load all frames (ignores start/end)
-  # Returns:
-  #   torch.Tensor: RGB frames of shape (T, H, W, C) with dtype uint8
-  # '''
-  # # if device =='cuda' and not torch.cuda.is_available():
-  # #   device = 'cpu'
-  # #   print("Warning: cuda not available so using cpu")
-  # decoder = VideoDecoder(video_path, device=device)
-  # num_frames = decoder._num_frames
-  # if all:
-  #   start = 0
-  #   end = num_frames
-  # if start < 0 or end > num_frames or end <= start:
-  #   # raise ValueError(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}")
-  #   print(f"Invalid frame range: start={start}, end={end}, num_frames={num_frames}. Adjusting to valid range.")
-  #   print(f"Using start=0 and end={num_frames}")
-  #   start = 0
-  #   end = num_frames
-  # return decoder.get_frames_in_range(start, end).data
-  
-  #stinking torchcodec is borked
-  return torch.rand(2)
 
-# def load_rgb_frames_from_video(video_path : str, start : int, end : int
-#                               , all : bool =False, recover=True) -> torch.Tensor:
-#   if recover:
-#     try:
-#       frames = cv_load(video_path, start, end, all)
-#     except ValueError:
-#       frames = cv_load(video_path, start, end, all=True)
-#     return cv_to_torch(frames)
-#   else:
-#     return cv_to_torch(cv_load(video_path, start, end, all))
   
 def load_rgb_frames_from_video(video_path : str, start : int, end : int
                               , all : bool =False) -> torch.Tensor:
@@ -133,9 +93,11 @@ def save_video(frames, path, fps=30):
   ################  CV based ####################
   
 def watch_video(frames=None, path='',wait=33):
-  if not frames and not path:
+  if frames is None and not path:
     raise ValueError('pass either a tensor or path')
-  elif frames:
+  elif frames is not None:
+    if not (type(frames) is torch.Tensor or type(frames) is np.ndarray):
+      raise ValueError('frames must be torch.Tensor or np.ndarray')
     if frames.dtype == torch.uint8:
       frames = torch_to_cv(frames)
     elif frames.dtype != np.uint8:
@@ -220,8 +182,8 @@ def visualise_frames(frames,num, size=(5,5), adapt=False):
 ################### Conversions #####################
 
     
-def torch_to_cv(frames):
-  '''convert 4D torch tensor (T C H W) to opencv format'''
+def torch_to_cv(frames: torch.Tensor) -> np.ndarray:
+  '''convert 4D torch tensor (T C H W) uint8 to opencv format'''
   frames = frames.permute(0, 2, 3, 1) # change to T H W C
   np_frames = frames.numpy()
   np_frames_col = np.asarray([
@@ -344,7 +306,7 @@ def enum_dir(path, make=False, decimals=3):
       path += '0'.zfill(decimals)
     while os.path.exists(path):
       num = int(path[-decimals:]) 
-      path = path[:-decimals] + str(num + 1)
+      path = path[:-decimals] + str(num + 1).zfill(decimals)
   if make:
     os.makedirs(path, exist_ok=True)
   return path

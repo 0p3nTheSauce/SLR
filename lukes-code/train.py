@@ -53,11 +53,14 @@ def freeze_layers(model, frozen_layers):
       print(f"Warning: Layer {layer_name} not found")
 
 
-
+def get_last_checkpoint(dir):
+  '''Recover the filename of the last saved checkpoint'''
+  files = sorted(os.listdir(dir))
+  return files[-1]
   
 def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300',
         label_suffix='_fixed_frange_bboxes_len.json', output='runs/exp_0', logs='logs',
-        save='checkpoints', load=None, save_every=5):
+        save='checkpoints', load=None, save_every=5, recover=False):
   # print(configs)
   
   train_transforms, test_transforms = configs.get_transforms()
@@ -114,13 +117,29 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
                                                          T_max=configs.t_max,
                                                          eta_min=configs.eta_min)
   loss_func = nn.CrossEntropyLoss()
-  #setup recovery 
+  
+  #check if we are continuing
+  if recover:
+    save_dir = os.path.join(output, save)
+    fname = ''
+    if os.path.exists(save_dir):
+      files = sorted(os.listdir(save_dir))
+      if len(files) > 0:
+        fname = files[-1]
+      else:
+        raise ValueError(f'Directory: {save_dir} is empty')
+    else:
+      raise ValueError(f'Could not find directory: {save_dir}')
+        #setup recovery
+    
+    load = os.path.join(save_dir, fname)
+    
   if load:
     if os.path.exists(load):
       checkpoint = torch.load(load, map_location=device)
       model.load_state_dict(checkpoint['model_state_dict'])
       optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-      scheduler.load_state_dict(checkpoint['schedular_state_dict'])
+      scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
       begin_epoch = checkpoint['epoch'] + 1
       print(f"Resuming from epoch {begin_epoch}")
       print(f"Loaded model from {load}")
@@ -148,6 +167,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
     print(f"Logs directory set to: {logs_path}")
     writer = SummaryWriter(logs_path) #watching loss
   
+      
   #train it
   # pbar = tqdm.tqdm(range(begin_epoch, epochs), desc="Training R3D")
   while steps < configs.max_steps and epoch < 400:
@@ -276,14 +296,16 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   print('Finished training successfully')
 
 def main():
-    models_implemented = ['r3d18', 'r3d18_attn']
+    models_implemented = ['r3d18', 'r3d18_attn', 'swin3dt', 's3d']
     splits_available = ['asl100', 'asl300']
+    recover = False
 
     parser = argparse.ArgumentParser(description='Train a model')
     
     parser.add_argument('model', help='model to use (e.g. r3d18)')
     parser.add_argument('-s', '--split', help='the class split (e.g. asl100)')
     parser.add_argument('-e', '--experiment', help='Experiment number (e.g. 10)')
+    parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
     
     args = parser.parse_args()
     if args.model in models_implemented:
@@ -295,25 +317,28 @@ def main():
     else:
       raise ValueError(f"Sorry {args.split} not processed yet")
     exp_no = str(int(args.experiment)).zfill(3) 
+    recover = args.recover
     
     root = '../data/WLASL2000'
     labels=f'./preprocessed/labels/{split}'
     output=f'runs/{split}/{model}_exp{exp_no}'
     config_path = f'./configfiles/{split}/{model}_{exp_no}.ini'
     configs = Config(config_path)
-
+    
     title = f'''Training {model} on split {split} 
               Experiment no: {exp_no} 
               Raw videos at: {root}
               Labels at: {labels}
               Saving files to: {output}
+              Recovering: {recover}
               {str(configs)}
               \n
           '''
     print(title)
     proceed = input("Confirm: y/n: ")
     if proceed == 'y':
-      run_2(configs=configs, root=root, labels=labels, output=output)
+      run_2(configs=configs, root=root,
+            labels=labels, output=output, recover=recover)
     
     
 if __name__ == '__main__':
