@@ -197,7 +197,8 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
       optimizer.zero_grad()
     
       #Iterate over data for this phase
-      for batch_idx, (data, target) in enumerate(dataloaders[phase]):
+      for batch_idx, item in enumerate(dataloaders[phase]):
+        data, target = item['frames'], item['label_num']
         data, target = data.to(device), target.to(device)
         batch_size = data.size(0)
         total_samples += batch_size
