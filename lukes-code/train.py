@@ -91,13 +91,11 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   model.to(device)
   
-  num_steps_per_update = configs.update_per_step #gradient accumulation
   steps=0
   epoch=0
-  
   best_val_score=0
 
-  param_groups = [ #TODO: this code is currently r3d18 specific, but could be more generalisable
+  param_groups = [ 
     {
       'params': model.backbone.parameters(),
       'lr': configs.backbone_init_lr,  # Low LR for pretrained backbone
@@ -118,8 +116,8 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
                                                          eta_min=configs.eta_min)
   loss_func = nn.CrossEntropyLoss()
   
-  #check if we are continuing
-  if recover: #TODO: this method messes up the logged statistics
+  #check if we are continuing, if so set 'load'
+  if recover: 
     save_dir = os.path.join(output, save)
     fname = ''
     if os.path.exists(save_dir):
@@ -140,13 +138,18 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
       model.load_state_dict(checkpoint['model_state_dict'])
       optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
       scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-      begin_epoch = checkpoint['epoch'] + 1
-      print(f"Resuming from epoch {begin_epoch}")
+      epoch = checkpoint['epoch'] + 1
+      steps = checkpoint['steps']
+      if 'best_val_score' in checkpoint:
+        best_val_score = checkpoint['best_val_score']
+      print(f"Resuming from epoch {epoch}, steps {steps}")
       print(f"Loaded model from {load}")
     else:
       cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
       if cont.lower() != 'y':
         return
+      epoch = 0
+      steps = 0
   
   #admin
   if output:
@@ -165,7 +168,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
     if load is None:
       logs_path = enum_dir(logs_path, make=True)
     print(f"Logs directory set to: {logs_path}")
-    writer = SummaryWriter(logs_path) #watching loss
+    writer = SummaryWriter(logs_path, purge_step=steps)#cognisant of recovery
   
       
   #train it
@@ -187,7 +190,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
       running_loss = 0.0
       running_corrects = 0
       total_samples = 0
-      num_batches = 0
+      # num_batches = 0
       # tot_loc_loss = 0.0  #TODO once this gets working try the fancy loss
       # tot_cls_loss = 0.0
       
@@ -202,7 +205,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
         data, target = data.to(device), target.to(device)
         batch_size = data.size(0)
         total_samples += batch_size
-        num_batches += 1
+        # num_batches += 1
         
         #Forward pass
         if phase == 'train':
@@ -221,13 +224,13 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
         
 
         if phase == 'train':
-          scaled_loss = loss / num_steps_per_update
+          scaled_loss = loss / configs.update_per_step
           scaled_loss.backward()
           
           accumulated_loss += loss.item()
           accumulated_steps += 1
           
-          if accumulated_steps == num_steps_per_update:
+          if accumulated_steps == configs.update_per_step:
             optimizer.step()
             optimizer.zero_grad()
             steps += 1
@@ -256,6 +259,8 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
       print(f'  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})')
       try:
         for i, param_group in enumerate(optimizer.param_groups):
+          if logs:
+            writer.add_scalar(f'LearningRate/Group_{i}', param_group['lr'], epoch)
           print(f"Group {i} learning rate: {param_group['lr']}")
       except Exception as e:
         print(f'Failed to print all learning rates due to {e}')
@@ -275,7 +280,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
               print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
           
           # Step scheduler with validation loss
-          scheduler.step(epoch_loss) # type: ignore
+          scheduler.step() 
           
           print(f'Best validation accuracy so far: {best_val_score:.2f}%')
       
@@ -292,9 +297,10 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
         checkpoint_path = os.path.join(save_path, f'checkpoint_{str(epoch).zfill(3)}.pth') # type: ignore
         torch.save(checkpoint_data, checkpoint_path)
         print(f'Checkpoint saved: {checkpoint_path}')
-        
-    
+  
   print('Finished training successfully')
+  if logs:
+    writer.close() # Close the SummaryWriter at the end
 
 def main():
     models_implemented = ['r3d18', 'r3d18_attn', 'swin3dt', 's3d']
