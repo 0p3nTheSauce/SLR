@@ -92,7 +92,7 @@ def save_video(frames, path, fps=30):
   
   ################  CV based ####################
   
-def watch_video(frames=None, path='',wait=33):
+def watch_video(frames=None, path='',wait=33, title='Video'):
   if frames is None and not path:
     raise ValueError('pass either a tensor or path')
   elif frames is not None:
@@ -103,7 +103,7 @@ def watch_video(frames=None, path='',wait=33):
     elif frames.dtype != np.uint8:
       raise ValueError('frames must be torch.uint8 (T C H W) RGB OR np.uint8 (T H W C) BGR')
     for img in frames:
-      cv2.imshow('Tensor as video', img)
+      cv2.imshow(f'{title} from tensor', img)
       key = cv2.waitKey(wait) & 0xFF
       if key == ord('q') or key == 27:
         break
@@ -119,7 +119,7 @@ def watch_video(frames=None, path='',wait=33):
         else:
           print('finished') 
           break #works for files, not well for webcam
-      cv2.imshow('File as video', img)
+      cv2.imshow(f'{title} from file', img)
       beg = False
       key = cv2.waitKey(wait) & 0xFF
       if key == ord('q') or key == 27:
