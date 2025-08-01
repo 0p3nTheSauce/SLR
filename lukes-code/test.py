@@ -21,7 +21,8 @@ def test_model(model, test_loader):
   all_targets = []
   
   with torch.no_grad():
-    for data, target in tqdm.tqdm(test_loader, desc='Testing'):
+    for item in tqdm.tqdm(test_loader, desc='Testing'):
+      data, target = item['frames'], item['label_num']
       data, target = data.to(device), target.to(device)
       output = model(data)
       _, preds = torch.max(output, 1)

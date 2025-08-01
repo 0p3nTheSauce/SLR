@@ -43,7 +43,7 @@ class VideoDataset(Dataset):
     if self.crop:
       sampled_frames = crop_frames(frames, item['bbox'])
   
-    return sampled_frames
+    return sampled_frames.to(torch.uint8)
   
   def __getitem__(self, idx):
     item = self.data[idx]

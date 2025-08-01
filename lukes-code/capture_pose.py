@@ -136,8 +136,8 @@ def checkpose():
     
 ############ Finished tests
 def main():
-  # test_get_draw()
-  checkpose()
+  test_get_draw()
+  # checkpose()
   print('Test completed')
 
 if __name__ == '__main__':

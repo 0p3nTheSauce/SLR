@@ -390,7 +390,8 @@ if __name__ == "__main__":
     
     # Example 1: Process video with pose estimation
     print("Processing video with pose estimation...")
-    video_path = "00333.mp4"  # Replace with your video path
+    # video_path = "00333.mp4"  # Replace with your video path
+    video_path = 0
     
     # Process video (set show_live=False if you don't want live preview)
     pose_data = analyzer.process_video_pose(

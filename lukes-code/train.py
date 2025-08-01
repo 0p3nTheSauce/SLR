@@ -119,7 +119,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   loss_func = nn.CrossEntropyLoss()
   
   #check if we are continuing
-  if recover:
+  if recover: #TODO: this method messes up the logged statistics
     save_dir = os.path.join(output, save)
     fname = ''
     if os.path.exists(save_dir):

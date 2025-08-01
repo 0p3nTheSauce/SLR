@@ -198,7 +198,7 @@ class Resnet3D18_basic(nn.Module):
     test_transforms = v2.Compose([v2.CenterCrop(size),
                                   r3d18_final])
     return train_transforms, test_transforms
-
+  
 
 class Resnet3D18_AttnHead(Resnet3D18_basic):
   def __init__(self, num_classes=100, drop_p=0.3,

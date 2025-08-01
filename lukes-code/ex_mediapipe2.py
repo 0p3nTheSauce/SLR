@@ -5,7 +5,8 @@ mp_drawing_styles = mp.solutions.drawing_styles # type: ignore
 mp_holistic = mp.solutions.holistic # type: ignore
 
 # For webcam input:
-cap = cv2.VideoCapture('./69241.mp4')
+# cap = cv2.VideoCapture('./69241.mp4')
+cap = cv2.VideoCapture(0)
 with mp_holistic.Holistic(
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5) as holistic:

@@ -3,6 +3,139 @@ import torchvision.transforms as ts
 from typing import Callable
 import torch.nn.functional as F
 import random
+import utils
+from torchvision.transforms import v2
+import time
+
+import time
+import torch
+import gc
+from typing import Callable, Any, Optional
+import statistics
+
+def bench_mark(data, transform, iters=100):
+  start = time.perf_counter()
+  for _ in range(iters):
+    _ = transform(data)
+  end = time.perf_counter()
+  time_taken = end- start
+  return f'''
+    Num iters: {iters},
+    Transform: {transform},
+    total time: {time_taken:.4f} seconds,
+    Average exec time: {(time_taken / iters):.4f} seconds
+  '''
+
+def bench_mark_enhanced(data, transform: Callable, iters: int = 100, 
+                       warmup: int = 10, device: Optional[str] = None):
+    """
+    Enhanced benchmarking with warmup, memory tracking, and statistics
+    """
+    # Move data to specified device if provided
+    if device and hasattr(data, 'to'):
+        data = data.to(device)
+    
+    # Warmup runs (not timed)
+    print(f"Running {warmup} warmup iterations...")
+    for _ in range(warmup):
+        _ = transform(data)
+    
+    # Clear cache and collect garbage
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
+    
+    # Track memory if on GPU
+    memory_before = None
+    memory_after = None
+    if device and device.startswith('cuda') and torch.cuda.is_available():
+        torch.cuda.synchronize()
+        memory_before = torch.cuda.memory_allocated()
+    
+    # Actual benchmark runs
+    times = []
+    for i in range(iters):
+        start = time.perf_counter()
+        result = transform(data)
+        end = time.perf_counter()
+        times.append(end - start)
+        
+        # Clear result to prevent memory buildup
+        del result
+    
+    # Memory tracking
+    if device and device.startswith('cuda') and torch.cuda.is_available():
+        torch.cuda.synchronize()
+        memory_after = torch.cuda.memory_allocated()
+    
+    # Calculate statistics
+    total_time = sum(times)
+    avg_time = statistics.mean(times)
+    median_time = statistics.median(times)
+    std_time = statistics.stdev(times) if len(times) > 1 else 0
+    min_time = min(times)
+    max_time = max(times)
+    
+    # Format results
+    result = f'''
+Benchmark Results:
+=================
+Transform: {transform}
+Data shape: {data.shape if hasattr(data, 'shape') else 'N/A'}
+Device: {device or 'CPU'}
+Warmup iterations: {warmup}
+Benchmark iterations: {iters}
+
+Timing Statistics:
+  Total time: {total_time:.4f} seconds
+  Average time: {avg_time:.6f} seconds
+  Median time: {median_time:.6f} seconds
+  Std deviation: {std_time:.6f} seconds
+  Min time: {min_time:.6f} seconds
+  Max time: {max_time:.6f} seconds
+  
+Throughput: {iters/total_time:.2f} transforms/second'''
+
+    if memory_before is not None and memory_after is not None:
+        memory_used = memory_after - memory_before
+        result += f'''
+        
+Memory Usage:
+  Before: {memory_before / 1024**2:.2f} MB
+  After: {memory_after / 1024**2:.2f} MB
+  Used: {memory_used / 1024**2:.2f} MB'''
+    
+    return result
+
+
+class RandomColourSwap: #actually fast, but also perhaps available through built in methods
+  def __init__(self, p=0.5, swap_type='random'):
+    self.p = p
+    self.swap_type = swap_type
+  def __call__(self, frames):
+    #expecting data in T C H W Tensor
+    if random.random() < self.p:
+      frames = frames.permute(1, 0, 2, 3) #will be easier if C T H W
+      
+      if self.swap_type == 'random':
+        og_channels = [frames[i].clone() for i in range(3)]
+        for i in range(3):
+          frames[i] = random.choice(og_channels)
+      
+      elif self.swap_type == 'permute': #tbh doesn't do much
+        idxs = [0,1,2]
+        random.shuffle(idxs)
+        frames = frames[idxs]
+      
+      else:
+        raise ValueError(f'swap_type can only be random or permute,\
+          not {self.swap_type}')  
+        
+      frames = frames.permute(1, 0, 2, 3)
+    return frames
+  def __repr__(self):
+    return f"{self.__class__.__name__}(p={self.p})"
+
 
 def get_base(numframes=16, size=(112, 112)) -> \
     Callable[[torch.Tensor], torch.Tensor]:
@@ -219,3 +352,31 @@ def min_transform_rI3d(frames):
     correct_num_frames(frames) / 255.0,
     size=(244,244),
     mode='bilinear').permute(1,0,2,3) #r3id expects (C, T, H, W)
+
+
+
+
+if __name__ =='__main__':
+  vid = './media/00333.mp4'
+  frames = utils.load_rgb_frames_from_video(vid, 0, 0, all=True)
+  utils.watch_video(frames, title='Unswapped')
+  # t = RandomColourSwap(swap_type='random')
+  # # swapped_frames = t(frames)
+  # # utils.watch_video(frames, title='Swapped')
+  # t2 = v2.RandomChannelPermutation()
+  # permed_frames = t2(frames)
+  # utils.watch_video(frames)
+  # # print(bench_mark(frames, t))
+  # # print(bench_mark(frames, t2))
+  
+  
+  # t3 = v2.RandomPhotometricDistort()
+  # warped_frames = t3(frames)
+  # utils.watch_video(warped_frames)
+  b = (0.4, 2)
+  c = (0.4, 2)
+  s = (0.4, 2)
+  h = (0.5, 0.5)
+  t4 = v2.ColorJitter(hue=h)
+  f4 = t4(frames)
+  utils.watch_video(f4)
