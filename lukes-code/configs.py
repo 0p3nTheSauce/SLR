@@ -36,12 +36,7 @@ class Config:
 		model_config = config['MODEL']
 		self.model_wrapper = self._import_from_string(model_config['WRAPPER'])
 		self.transform_method = model_config['TRANSFORMS_METHOD']
-		
-		# Always treat WEIGHTS as a file path
 		self.weights_path = model_config.get('WEIGHTS_PATH', None)
-		# If WEIGHTS is specified, use it as weights_path for backward compatibility
-		if 'WEIGHTS' in model_config:
-			self.weights_path = model_config['WEIGHTS']
 		if 'BACKBONE_WEIGHTS' in model_config:
 			self.backbone_weights_path = model_config['BACKBONE_WEIGHTS']
 		if 'FROZEN' in model_config:
@@ -49,6 +44,10 @@ class Config:
 		if 'NUM_CLASSES' in model_config:
 			self.num_classes = int(model_config['NUM_CLASSES'])
 		
+		# Transforms specific parameters
+		#TODO
+
+
 		# Optional attention parameters
 		if 'IN_LINEAR' in model_config:
 			self.in_linear = int(model_config.get('IN_LINEAR', 1))
