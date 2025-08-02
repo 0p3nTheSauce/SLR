@@ -18,10 +18,14 @@ class Config:
 		self.init_lr = float(opt_config['INIT_LR'])
 		self.adam_eps = float(opt_config['ADAM_EPS']) 
 		self.adam_weight_decay = float(opt_config['ADAM_WEIGHT_DECAY'])
-		self.backbone_init_lr = float(opt_config['BACKBONE_INIT_LR'])
-		self.backbone_weight_decay = float(opt_config['BACKBONE_WEIGHT_DECAY'])
-		self.classifier_init_lr = float(opt_config['CLASSIFIER_INIT_LR'])
-		self.classifier_weight_decay = float(opt_config['CLASSIFIER_WEIGHT_DECAY'])
+		if 'BACKBONE_INIT_LR' in opt_config: #backwards compatibility
+			self.backbone_init_lr = float(opt_config['BACKBONE_INIT_LR'])
+		if 'BACKBONE_WEIGHT_DECAY' in opt_config:
+			self.backbone_weight_decay = float(opt_config['BACKBONE_WEIGHT_DECAY'])
+		if 'CLASSIFIER_INIT_LR' in opt_config:
+			self.classifier_init_lr = float(opt_config['CLASSIFIER_INIT_LR'])
+		if 'CLASSIFIER_WEIGHT_DECAY' in opt_config:
+			self.classifier_weight_decay = float(opt_config['CLASSIFIER_WEIGHT_DECAY'])
 		
 		# Scheduler
 		sched_config = config['SCHEDULER']
@@ -40,10 +44,10 @@ class Config:
 			self.weights_path = model_config['WEIGHTS']
 		if 'BACKBONE_WEIGHTS' in model_config:
 			self.backbone_weights_path = model_config['BACKBONE_WEIGHTS']
-		
-		#TODO :some validation on frozen layers
-		self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else [] 
-		self.num_classes = int(model_config['NUM_CLASSES'])
+		if 'FROZEN' in model_config:
+			self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else [] 
+		if 'NUM_CLASSES' in model_config:
+			self.num_classes = int(model_config['NUM_CLASSES'])
 		
 		# Optional attention parameters
 		if 'IN_LINEAR' in model_config:
@@ -65,15 +69,20 @@ class Config:
 		return getattr(self.model_wrapper, self.transform_method)(self.frame_size)
 
 	def __str__(self):
-		return f"""Config:
-		Model: {self.model_wrapper}
-		Weights Path: {self.weights_path}
-		Frozen layers: {self.frozen}
-		Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
-		Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
-		Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}
-		Backbone: lr={self.backbone_init_lr}, wd={self.backbone_weight_decay}
-		Classifier: lr={self.classifier_init_lr}, wd={self.classifier_weight_decay}"""
+		if hasattr(self, 'frozen'):
+			return f"""Config:
+			Model: {self.model_wrapper}
+			Weights Path: {self.weights_path}
+			Frozen layers: {self.frozen}
+			Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
+			Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
+			Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}
+			Backbone: lr={self.backbone_init_lr}, wd={self.backbone_weight_decay}
+			Classifier: lr={self.classifier_init_lr}, wd={self.classifier_weight_decay}"""
+		else:
+			return f"""Config:
+			Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
+			Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}"""
 
 	def _import_from_string(self, import_string):
 		"""Import a class/function from a module string like 'models.pytorch_r3d.Resnet3D18_basic'"""
