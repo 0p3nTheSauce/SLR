@@ -81,7 +81,8 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   val_dataloader = torch.utils.data.DataLoader(val_dataset,
     batch_size=configs.batch_size, shuffle=True, num_workers=2,pin_memory=False)
   val_classes = len(set(val_dataset.classes))
-  assert num_classes == val_classes
+  assert num_classes == val_classes 
+  assert num_classes == configs.num_classes
   
   dataloaders = {'train': dataloader, 'val': val_dataloader}
   datasets = {'train': dataset, 'val': val_dataset}
