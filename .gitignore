@@ -17,3 +17,4 @@ lukes-code/runs/*/*/checkpoints/*.pth
 lukes-code/experiments/
 lukes-code/media/
 lukes-code/weights/
+*.pth
