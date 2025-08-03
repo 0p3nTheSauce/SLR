@@ -88,7 +88,30 @@ def plot_bar_graph(report, classes_path):
   plt.tight_layout()
   plt.show()
   
-def run_test_r3d18_1(configs, root='../data/WLASL2000',
+def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
+  with open(classes_path, 'r') as f:
+    test_classes = json.load(f)
+  classes = list(reports[0].keys())[:-3]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
+
+  #prepare for plotting
+  metrics = [[report[cls][metric] for cls in classes] for report in reports]
+  
+  num_reports = len(reports)
+  assert num_reports == len(names) #it may be better to extract names from reports
+  
+  #Create bar plot
+  x = np.arange(len(classes))
+  width = 0.8 / num_reports  # 0.8 gives good spacing, adjust as needed
+
+  
+  fig, ax = plt.subplots(figsize=(10, 18))
+  for i, report in enumerate(reports):
+    f1_scores = [report[cls]['f1-score'] for cls in classes]
+    offset = (i - (num_reports - 1) / 2) * width  # Center the bars
+    ax.barh(x + offset, f1_scores, height=width, 
+            label=f'Report {i+1}', alpha=0.8)
+  
+def run_test_r3d18_1(root='../data/WLASL2000',
                labels='./preprocessed/labels/asl100',
                output='runs/exp_0',model_dict='best.pth',
                verbose=False, save=False):
@@ -121,7 +144,7 @@ def run_test_r3d18_1(configs, root='../data/WLASL2000',
   # print(num_classes)
   
   #setup model
-  r3d18 = Resnet3D18_basic(num_classes=num_classes, drop_p=configs.drop_p,)
+  r3d18 = Resnet3D18_basic(num_classes=num_classes)
   r3d18_dict = torch.load(os.path.join(output,'checkpoints', model_dict)) #future warning, use weights_only=True (security stuff if you dont know the file)
   # print(r3d18_dict)
   r3d18.load_state_dict(r3d18_dict)
@@ -190,6 +213,6 @@ def run_test_r3d18_1(configs, root='../data/WLASL2000',
       f.write(fstr)
 
 if __name__ == '__main__':
-  config_path = './configfiles/asl100.ini'
-  configs = Config(config_path)
-  run_test_r3d18_1(configs, output='runs/asl100/r3d18_exp5')
+  # config_path = './configfiles/asl100.ini'
+  # configs = Config(config_path)
+  run_test_r3d18_1( output='runs/asl100/r3d18_exp5')
