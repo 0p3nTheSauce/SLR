@@ -63,51 +63,51 @@ class VideoDataset(Dataset):
     return len(self.data)
     
   
-class ContrastiveVideoDataset(VideoDataset):
-  def __init__(self, *args, augmentation, **kwargs):
-    # Remove transform from kwargs to prevent parent from using it
-    super().__init__(*args, **kwargs)
-    #Assume that self.transform will be the base_norm_fin, ie the standard
-    #But transform should atleast have base_transform, otherwise shape issues when 
-    # loading
-    #By extension, augmementation must have at least base_tansform
-    #But may just be that (augmentation through lack of normalisation)
-    self.augmentation = augmentation
+# class ContrastiveVideoDataset(VideoDataset):
+#   def __init__(self, *args, augmentation, **kwargs):
+#     # Remove transform from kwargs to prevent parent from using it
+#     super().__init__(*args, **kwargs)
+#     #Assume that self.transform will be the base_norm_fin, ie the standard
+#     #But transform should atleast have base_transform, otherwise shape issues when 
+#     # loading
+#     #By extension, augmementation must have at least base_tansform
+#     #But may just be that (augmentation through lack of normalisation)
+#     self.augmentation = augmentation
 
-  def __getitem__(self, idx):
-    item = self.data[idx]
-    frames, _ = self.__manual_load__(item)  # Get raw frames, ignore label
+#   def __getitem__(self, idx):
+#     item = self.data[idx]
+#     frames, _ = self.__manual_load__(item)  # Get raw frames, ignore label
     
-    # Apply two different augmentations
-    view1 = self.transforms(frames) if self.transforms else frames
-    view2 = self.augmentation(frames) if self.augmentation else frames
-    #leaving like this for now, but likely to cause errors if same base_transform is not used
+#     # Apply two different augmentations
+#     view1 = self.transforms(frames) if self.transforms else frames
+#     view2 = self.augmentation(frames) if self.augmentation else frames
+#     #leaving like this for now, but likely to cause errors if same base_transform is not used
     
     
-    return (view1, view2)
+#     return (view1, view2)
 
-class SemiContrastiveVideoDataset(VideoDataset):
-  def __init__(self, *args, augmentation, **kwargs):
-    # Remove transform from kwargs to prevent parent from using it
-    super().__init__(*args, **kwargs)
-    #Assume that self.transform will be the base_norm_fin, ie the standard
-    #But transform should atleast have base_transform, otherwise shape issues when 
-    # loading
-    #By extension, augmementation must have at least base_tansform
-    #But may just be that (augmentation through lack of normalisation)
-    self.augmentation = augmentation
+# class SemiContrastiveVideoDataset(VideoDataset):
+#   def __init__(self, *args, augmentation, **kwargs):
+#     # Remove transform from kwargs to prevent parent from using it
+#     super().__init__(*args, **kwargs)
+#     #Assume that self.transform will be the base_norm_fin, ie the standard
+#     #But transform should atleast have base_transform, otherwise shape issues when 
+#     # loading
+#     #By extension, augmementation must have at least base_tansform
+#     #But may just be that (augmentation through lack of normalisation)
+#     self.augmentation = augmentation
 
-  def __getitem__(self, idx):
-    item = self.data[idx]
-    frames, label = self.__manual_load__(item)  # Get raw frames, ignore label
+#   def __getitem__(self, idx):
+#     item = self.data[idx]
+#     frames, label = self.__manual_load__(item)  # Get raw frames, ignore label
     
-    # Apply two different augmentations
-    view1 = self.transforms(frames) if self.transforms else frames
-    view2 = self.augmentation(frames) if self.augmentation else frames
-    #leaving like this for now, but likely to cause errors if same base_transform is not used
+#     # Apply two different augmentations
+#     view1 = self.transforms(frames) if self.transforms else frames
+#     view2 = self.augmentation(frames) if self.augmentation else frames
+#     #leaving like this for now, but likely to cause errors if same base_transform is not used
     
     
-    return ((view1, view2), label)
+#     return ((view1, view2), label)
 
 def contrastive_collate_fn(batch):
   """Custom collate function for contrastive learning dataset"""

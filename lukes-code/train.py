@@ -15,6 +15,8 @@ import models.pytorch_r3d as resnet_3d
 #local imports
 from video_dataset import VideoDataset
 from configs import Config
+import numpy as np
+import random
 
 #Temporarily put this here for testing
 
@@ -250,7 +252,8 @@ def train_run_r3d18_1(configs, root='../data/WLASL2000',labels='./preprocessed/l
               print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
           
           # Step scheduler with validation loss
-          scheduler.step(epoch_loss) # type: ignore
+          # scheduler.step(epoch_loss) # type: ignore
+          scheduler.step() # type: ignore
           
           print(f'Best validation accuracy so far: {best_val_score:.2f}%')
       
@@ -313,11 +316,21 @@ def get_last_checkpoint(dir):
   '''Recover the filename of the last saved checkpoint'''
   files = sorted(os.listdir(dir))
   return files[-1]
-  
+
+def set_seed(seed=42):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
 def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300',
         label_suffix='_fixed_frange_bboxes_len.json', output='runs/exp_0', logs='logs',
         save='checkpoints', load=None, save_every=5, recover=False):
   # print(configs)
+  set_seed()
   
   train_transforms, test_transforms = configs.get_transforms()
   
@@ -517,7 +530,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
       try:
         for i, param_group in enumerate(optimizer.param_groups):
           if logs:
-            writer.add_scalar(f'LearningRate/Group_{i}', param_group['lr'], epoch)
+            writer.add_scalar(f'LearningRate/Group_{i}', param_group['lr'], epoch) #type: ignore
           print(f"Group {i} learning rate: {param_group['lr']}")
       except Exception as e:
         print(f'Failed to print all learning rates due to {e}')
@@ -557,7 +570,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   
   print('Finished training successfully')
   if logs:
-    writer.close() # Close the SummaryWriter at the end
+    writer.close() #type: ignore
 
 def main():
     models_implemented = ['r3d18', 'r3d18_attn', 'swin3dt', 's3d']

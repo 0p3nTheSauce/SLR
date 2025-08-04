@@ -1,6 +1,6 @@
 import torch
 import json
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -48,6 +48,34 @@ def plot_heatmap(report, classes_path):
   plt.title('Classification Report Heatmap')
   plt.tight_layout()
   plt.show()
+
+def plot_heatmap_reports_metric(reports, classes_path, metric, names):
+  with open(classes_path, 'r') as f:
+    test_classes = json.load(f)
+    
+  assert len(reports) == len(names)
+  
+  classes = list(reports[0].keys())[:-3]
+  metric_scores = [[report[cls][metric] 
+                    for cls in classes] for report in reports]
+  
+  df = pd.DataFrame(metric_scores, 
+                    index=names,
+                    columns=classes)
+  df = df.T
+  
+  num_to_plot = min(len(classes), len(test_classes))
+  
+  plt.figure(figsize=(10, 10))
+  sns.heatmap(df.iloc[:num_to_plot, :], 
+              annot=True, 
+              cmap='Blues', 
+              fmt='.2f',
+              xticklabels=names,
+              yticklabels=[test_classes[i] for i in range(num_to_plot)])
+  plt.title(f'Classification Report Heatmap - {metric.title()}')
+  plt.tight_layout()
+  plt.show()
   
     
 def plot_bar_graph(report, classes_path):
@@ -92,9 +120,6 @@ def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
   with open(classes_path, 'r') as f:
     test_classes = json.load(f)
   classes = list(reports[0].keys())[:-3]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
-
-  #prepare for plotting
-  metrics = [[report[cls][metric] for cls in classes] for report in reports]
   
   num_reports = len(reports)
   assert num_reports == len(names) #it may be better to extract names from reports
@@ -103,14 +128,53 @@ def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
   x = np.arange(len(classes))
   width = 0.8 / num_reports  # 0.8 gives good spacing, adjust as needed
 
-  
   fig, ax = plt.subplots(figsize=(10, 18))
   for i, report in enumerate(reports):
-    f1_scores = [report[cls]['f1-score'] for cls in classes]
+    metric_list = [report[cls][metric] for cls in classes]
     offset = (i - (num_reports - 1) / 2) * width  # Center the bars
-    ax.barh(x + offset, f1_scores, height=width, 
-            label=f'Report {i+1}', alpha=0.8)
+    ax.barh(x + offset, metric_list, height=width, 
+            label=f'{names[i]}', alpha=0.8)
   
+  ax.set_ylabel('Classes')
+  ax.set_xlabel(f'{metric} scores')
+  ax.set_title(f'{metric}')
+
+  class_labels = [test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}" 
+                  for cls in classes]
+  ax.set_yticks(x)  # This is the key missing line!
+  ax.set_yticklabels(class_labels)
+  
+  ax.legend()
+  ax.set_xlim(0, 1.1)
+
+  plt.tight_layout()
+  plt.show() 
+
+def plot_confusion_matrix(y_true, y_pred,classes_path, title="Confusion Matrix"):
+  """
+  Plot confusion matrix from true and predicted labels
+  
+  Parameters:
+  y_true: array-like, true labels
+  y_pred: array-like, predicted labels  
+  classes_path: str, path to JSON file with class names (optional)
+  title: str, plot title
+  """
+  
+  cm = confusion_matrix(y_true, y_pred)
+  
+  with open(classes_path, 'r') as f:
+    test_classes = json.load(f)
+    class_names = test_classes[:len(y_true)]
+  
+  disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=test_classes[:len(y_true)])
+  
+  fig, ax = plt.subplots(figsize=(10,8))
+  disp.plot(ax=ax, cmap='Blues', values_format='d')
+  ax.set_title(title)
+  plt.tight_layout()
+  plt.show()
+
 def run_test_r3d18_1(root='../data/WLASL2000',
                labels='./preprocessed/labels/asl100',
                output='runs/exp_0',model_dict='best.pth',
