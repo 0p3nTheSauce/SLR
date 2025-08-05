@@ -63,18 +63,6 @@ def train_run_r3d18_1(configs, root='../data/WLASL2000',labels='./preprocessed/l
   dataloaders = {'train': dataloader, 'val': val_dataloader}
   datasets = {'train': dataset, 'val': val_dataset}
   
-  #setup model
-  # r3d18 = r3d_18( weights=weights)
-
-  # in_features = r3d18.fc.in_features  # Store before replacement
-    
-  # r3d18.fc = nn.Sequential(
-  #   nn.Dropout(p=configs.drop_p),
-  #   nn.Linear(in_features, num_classes)
-  # )
-
-  # r3d18 = resnet_3d.Resnet3D18_basic(num_classes=num_classes, drop_p=configs.drop_p,
-  #                                    weights=weights)
   r3d18 = resnet_3d.Resnet3D18_basic(num_classes=num_classes,
                                       drop_p=configs.drop_p,) #for compatibility with new class
   
@@ -378,7 +366,7 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
     }
   ]
   
-  optimizer = optim.AdamW(param_groups)
+  optimizer = optim.AdamW(param_groups, eps=configs.adam_eps)
   
   # Single scheduler affects both groups proportionally
   scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
