@@ -15,9 +15,9 @@ class Config:
 		
 		# Optimizer
 		opt_config = config['OPTIMIZER']
-		self.init_lr = float(opt_config['INIT_LR'])
-		self.adam_eps = float(opt_config['ADAM_EPS']) 
-		self.adam_weight_decay = float(opt_config['ADAM_WEIGHT_DECAY'])
+		self.init_lr = float(opt_config['INIT_LR']) #deprecated
+		self.adam_eps = float(opt_config['ADAM_EPS'])  #deprecated
+		self.adam_weight_decay = float(opt_config['ADAM_WEIGHT_DECAY']) #deprecated
 		if 'BACKBONE_INIT_LR' in opt_config: #backwards compatibility
 			self.backbone_init_lr = float(opt_config['BACKBONE_INIT_LR'])
 		if 'BACKBONE_WEIGHT_DECAY' in opt_config:

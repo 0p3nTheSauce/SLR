@@ -7,7 +7,7 @@ import os
 import matplotlib.pyplot as plt
 import gzip
 # from torchcodec.decoders import VideoDecoder
-
+import re
 ################# Loading #####################
 
   
@@ -250,19 +250,58 @@ def plot_from_lists(train_loss, val_loss=None,
 
 
 ##################### Misc ###################################
-def clean_checkpoints(paths, ask=False):
+
+def extract_num(fname):
+  num_substrs = re.findall(r'\d+', fname)
+  if len(num_substrs) > 1:
+    num_str_concat = ' '.join(sub for sub in num_substrs)
+    print(f'fname has multuple number substrings: ')
+    print(num_str_concat)
+    idx = -1
+    while True:
+      ans = input('zfill which substring? [-1]')
+      if ans == '':
+        break
+      elif ans.isdigit():
+        idx = int(ans)
+        if -len(num_substrs) <= idx < len(num_substrs):
+          break
+        else:
+          print(f'invalid index: {idx} for {len(num_substrs)} substrings')
+      else:
+        print(f'{ans} is not a digit')
+    return num_substrs[idx]
+  elif len(num_substrs) == 0:
+    raise ValueError(f'No valid number substrings found in {fname}')
+  else:
+    return num_substrs[0]
+     
+   
+
+
+def clean_checkpoints(paths, ask=False, add_zfill=False, decimals=3):
   for path in paths:
     to_empty = os.path.join(path, 'checkpoints')
     files = sorted(os.listdir(to_empty))
+    
+    if add_zfill:
+      for i, f in enumerate(files):
+        num = extract_num(f)
+        files[i] = f.replace(num, num.zfill(decimals))
+        
     if len(files) <= 2:
       continue 
     #leave best.pth and the last checkpoint
     to_remove = files[1:-1]  # not great safety wise, assumes files sort correctly
-    ans = 'none'
-    while ans != 'y' and ans != '' and ans != 'n':
-      print(f'Only keep {files[0]} and {files[-1]} in {to_empty}?')
-      ans = input('[y]/n: ')
-    
+    if ask:
+      ans = 'none'
+      while ans != 'y' and ans != '' and ans != 'n':
+        print(f'Only keep {files[0]} and {files[-1]} in {to_empty}?')
+        ans = input('[y]/n: ')
+      
+      if ans == 'n':
+        continue
+
     for file in to_remove:
       name = os.path.join(to_empty, file)
       os.remove(name)
