@@ -460,7 +460,7 @@ def train_loop_A(r3d18A, confA,optimizerA, loss_funcA, device,
             'scheduler_state_dict': schedulerA.state_dict(),
             'best_val_score': best_val_score
         }
-        checkpoint_path = os.path.join(save_path, f'checkpoint_{epoch}.pth') # type: ignore
+        checkpoint_path = os.path.join(save_pathA, f'checkpoint_{epoch}.pth') 
         torch.save(checkpoint_data, checkpoint_path)
         print(f'Checkpoint saved: {checkpoint_path}')
         

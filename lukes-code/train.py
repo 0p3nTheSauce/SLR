@@ -560,6 +560,8 @@ def run_2(configs, root='../data/WLASL2000',labels='./preprocessed/labels/asl300
   if logs:
     writer.close() #type: ignore
 
+# def train_loop(model, dataloaders, loss_func, )
+
 def main():
     models_implemented = ['r3d18', 'r3d18_attn', 'swin3dt', 's3d']
     splits_available = ['asl100', 'asl300']
