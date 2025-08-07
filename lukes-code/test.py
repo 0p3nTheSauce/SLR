@@ -42,7 +42,7 @@ def run_test_r3d18_1(root='../data/WLASL2000',
                output='runs/exp_0',model_dict='best.pth',
                verbose=False, save=False):
   
-  torch.manual_seed(42)
+  # torch.manual_seed(42)
   
   #setup transforms
   base_mean = [0.43216, 0.394666, 0.37645]

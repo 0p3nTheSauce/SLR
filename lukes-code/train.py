@@ -55,7 +55,7 @@ def train_run_r3d18_1(configs, root='../data/WLASL2000',labels='./preprocessed/l
   
   val_dataset = VideoDataset(root, val_instances, val_classes,
     transforms=test_transforms, num_frames=32)
-  val_dataloader = torch.utils.data.DataLoader(val_dataset,
+  val_dataloader = DataLoader(val_dataset,
     batch_size=configs.batch_size, shuffle=True, num_workers=2,pin_memory=False)
   val_classes = len(set(val_dataset.classes))
   assert num_classes == val_classes
