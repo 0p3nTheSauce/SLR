@@ -148,13 +148,14 @@ def train_loop_B(r3d18B,device, confB, dataloadersB, optimizerB, schedulerB,
             'scheduler_state_dict': schedulerB.state_dict(),
             'best_val_score': best_val_score
         }
-        checkpoint_path = os.path.join(save_pathA, f'checkpoint_{str(epoch).zfill(3)}.pth') 
+        checkpoint_path = os.path.join(save_pathB, f'checkpoint_{str(epoch).zfill(3)}.pth') 
         torch.save(checkpoint_data, checkpoint_path)
         print(f'Checkpoint saved: {checkpoint_path}')
 
   print('Finished training successfully')
   if logsB:
     writerB.close()
+
 
 def set_seed(seed=42):
   torch.manual_seed(seed)
