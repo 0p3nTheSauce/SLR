@@ -1,6 +1,62 @@
 import configparser
 import importlib
+from typing import Dict, Any
 
+def load_config(arg_dict):
+	# Load from .ini
+	config = parse_ini_config(arg_dict['config_path'], flatten=False)
+	
+	# Override with command line args if provided
+	if arg_dict:
+		for key, value in arg_dict.items():
+			config[key] = value
+	
+	return config
+ 
+def parse_ini_config(ini_file: str, flatten: bool = True) -> Dict[str, Any]:
+	"""Parse .ini file for wandb config"""
+	config = configparser.ConfigParser()
+	config.read(ini_file)
+	
+	if flatten:
+			# Flat structure: section_key format
+			wandb_config = {}
+			for section in config.sections():
+					for key, value in config[section].items():
+							wandb_config[f"{section}_{key}"] = _convert_type(value)
+	else:
+			# Nested structure
+			wandb_config = {}
+			for section in config.sections():
+					wandb_config[section] = {}
+					for key, value in config[section].items():
+							wandb_config[section][key] = _convert_type(value)
+	
+	return wandb_config
+
+def _convert_type(value: str) -> Any:
+	"""Convert string values to appropriate types"""
+	# Boolean
+	if value.lower() in ['true', 'false']:
+		return value.lower() == 'true'
+	
+	# Integer
+	try:
+		return int(value)
+	except ValueError:
+		pass
+	
+	# Float
+	try:
+		return float(value)
+	except ValueError:
+		pass
+	
+	# String
+	return value
+
+############################################old config style#########################
+	
 class Config:
 	def __init__(self, config_path):
 		config = configparser.ConfigParser()
@@ -88,7 +144,6 @@ class Config:
 		module_path, class_name = import_string.rsplit('.', 1)
 		module = importlib.import_module(module_path)
 		return getattr(module, class_name)
- 
  
  
 if __name__ == '__main__':

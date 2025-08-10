@@ -19,6 +19,8 @@ import numpy as np
 import random
 import wandb
 
+
+
 def train_loop_B(r3d18B,device, confB, dataloadersB, optimizerB, schedulerB,
                  loss_funcB, writerB, logsB, saveB, save_pathB,
                  save_every=5, max_epochs=400):
@@ -165,9 +167,6 @@ def set_seed(seed=42):
   torch.backends.cudnn.deterministic = True
   torch.backends.cudnn.benchmark = False
 
-def train_big_swin(split, output, seed=420, conf):
-  set_seed(seed)
-  root = '../data/WLASL2000'
-  labels = f'./preprocessed/labels/{split}'
+
   
   
