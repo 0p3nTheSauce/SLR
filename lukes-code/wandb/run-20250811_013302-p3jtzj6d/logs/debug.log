@@ -1,0 +1,22 @@
+2025-08-11 01:33:02,997 INFO    MainThread:4004715 [wandb_setup.py:_flush():80] Current SDK version is 0.21.1
+2025-08-11 01:33:02,997 INFO    MainThread:4004715 [wandb_setup.py:_flush():80] Configure stats pid to 4004715
+2025-08-11 01:33:02,997 INFO    MainThread:4004715 [wandb_setup.py:_flush():80] Loading settings from /home/luke/.config/wandb/settings
+2025-08-11 01:33:02,997 INFO    MainThread:4004715 [wandb_setup.py:_flush():80] Loading settings from /home/luke/ExtraStorage/WLASL/lukes-code/wandb/settings
+2025-08-11 01:33:02,997 INFO    MainThread:4004715 [wandb_setup.py:_flush():80] Loading settings from environment variables
+2025-08-11 01:33:02,998 INFO    MainThread:4004715 [wandb_init.py:setup_run_log_directory():703] Logging user logs to /home/luke/ExtraStorage/WLASL/lukes-code/wandb/run-20250811_013302-p3jtzj6d/logs/debug.log
+2025-08-11 01:33:02,998 INFO    MainThread:4004715 [wandb_init.py:setup_run_log_directory():704] Logging internal logs to /home/luke/ExtraStorage/WLASL/lukes-code/wandb/run-20250811_013302-p3jtzj6d/logs/debug-internal.log
+2025-08-11 01:33:02,998 INFO    MainThread:4004715 [wandb_init.py:init():830] calling init triggers
+2025-08-11 01:33:02,998 INFO    MainThread:4004715 [wandb_init.py:init():835] wandb.init called with sweep_config: {}
+config: {'ADMIN_experiment': 0, 'TRAIN_batch_size': 6, 'TRAIN_update_per_step': 1, 'TRAIN_max_steps': 64000, 'TRAIN_max_epoch': 200, 'OPTIMIZER_lr': 0.001, 'OPTIMIZER_eps': 0.001, 'OPTIMIZER_weight_decay': 1e-07, 'SCHEDULER_schd_tmax': 100, 'SCHEDULER_schd_eta_min': 1e-05, 'DATA_num_frames': 32, 'DATA_frame_size': 224, 'experiment': 0, 'recover': False, 'max_steps': None, 'max_epoch': None, 'config': None, 'split': 'asl100', 'nf__num_frames': None, 'fs__frame_size': None, 'bs__batch_size': None, 'us__update_per_step': None, 'exp_no': '000', 'root': '../data/WLASL2000', 'labels': './preprocessed/labels/asl100', 'save_path': 'runs/asl100/MViT_V2_S_exp000/checkpoints/', 'config_path': './configfiles/asl100/MViT_V2_S_000.ini', '_wandb': {}}
+2025-08-11 01:33:02,998 INFO    MainThread:4004715 [wandb_init.py:init():871] starting backend
+2025-08-11 01:33:03,203 INFO    MainThread:4004715 [wandb_init.py:init():874] sending inform_init request
+2025-08-11 01:33:03,206 INFO    MainThread:4004715 [wandb_init.py:init():882] backend started and connected
+2025-08-11 01:33:03,207 INFO    MainThread:4004715 [wandb_init.py:init():953] updated telemetry
+2025-08-11 01:33:03,212 INFO    MainThread:4004715 [wandb_init.py:init():977] communicating run to backend with 90.0 second timeout
+2025-08-11 01:33:04,018 INFO    MainThread:4004715 [wandb_init.py:init():1029] starting run threads in backend
+2025-08-11 01:33:04,139 INFO    MainThread:4004715 [wandb_run.py:_console_start():2494] atexit reg
+2025-08-11 01:33:04,139 INFO    MainThread:4004715 [wandb_run.py:_redirect():2342] redirect: wrap_raw
+2025-08-11 01:33:04,139 INFO    MainThread:4004715 [wandb_run.py:_redirect():2411] Wrapping output streams.
+2025-08-11 01:33:04,139 INFO    MainThread:4004715 [wandb_run.py:_redirect():2434] Redirects installed.
+2025-08-11 01:33:04,140 INFO    MainThread:4004715 [wandb_init.py:init():1075] run started, returning control to user process
+2025-08-11 01:33:04,489 INFO    MsgRouterThr:4004715 [mailbox.py:close():129] [no run ID] Closing mailbox, abandoning 1 handles.

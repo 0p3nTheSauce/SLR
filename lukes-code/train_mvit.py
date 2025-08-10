@@ -1,10 +1,7 @@
 import argparse
-import torch # type: ignore
+import torch 
 import os
-import tqdm   # type: ignore
-from torch.utils.tensorboard import SummaryWriter # type: ignore
-import json
-import utils
+
 from utils import enum_dir
 from torchvision.transforms import v2
 # from  torchvision.models.video.resnet import  R3D_18_Weights #, r3d_18
@@ -72,9 +69,9 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   best_val_score=0
   
   optimizer = optim.AdamW(mvitv2s.parameters(), 
-                          lr = config.adm_lr,
-                          eps = config.adm_eps,
-                          weight_decay= config.adm_weight_decay)
+                          lr = config.lr,
+                          eps = config.eps,
+                          weight_decay= config.weight_decay)
   
   scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                    T_max=config.schd_tmax,
@@ -206,7 +203,7 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
         # Save best model
         if epoch_acc > best_val_score:
           best_val_score = epoch_acc
-          model_name = os.path.join(save_path, f'best.pth') # type: ignore
+          model_name = os.path.join(config.save_path, f'best.pth') 
           torch.save(mvitv2s.state_dict(), model_name)
           print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
       
@@ -225,7 +222,7 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
           'scheduler_state_dict': scheduler.state_dict(),
           'best_val_score': best_val_score
         }
-        checkpoint_path = os.path.join(save_path, f'checkpoint_{str(epoch).zfill(3)}.pth') # type: ignore
+        checkpoint_path = os.path.join(config.save_path, f'checkpoint_{str(epoch).zfill(3)}.pth')
         torch.save(checkpoint_data, checkpoint_path)
         print(f'Checkpoint saved: {checkpoint_path}')
         
@@ -234,7 +231,6 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   
 def main():
   splits_available = ['asl100', 'asl300']
-  recover = False
   model = 'MViT_V2_S'
   
   parser = argparse.ArgumentParser(description='Train a mvit model')
@@ -242,51 +238,86 @@ def main():
   #runs
   parser.add_argument('-e', '--experiment',type=int, help='Experiment number (e.g. 10)', required=True)
   parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
-  parser.add_argument('-ms' '--max_steps', type=int,help='gradient accumulation')
-  parser.add_argument('-me' '--max_epoch', type=int,help='mixumum training epoch')
+  parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
+  parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
   parser.add_argument('-c' , '--config', help='path to config .ini file')
   
   #data
   parser.add_argument('-s', '--split',type=str, help='the class split (e.g. asl100)', required=True)
-  parser.add_argument('-nf' '--num_frames', type=int, help='video length')
-  parser.add_argument('-fs' '--frame_size', type=int, help='width, height')
-  parser.add_argument('-bs' '--batch_size', type=int,help='data_loader')
-  parser.add_argument('-us' '--update_per_step', type=int, help='gradient accumulation')
+  parser.add_argument('-nf','--num_frames', type=int, help='video length')
+  parser.add_argument('-fs', '--frame_size', type=int, help='width, height')
+  parser.add_argument('-bs', '--batch_size', type=int,help='data_loader')
+  parser.add_argument('-us', '--update_per_step', type=int, help='gradient accumulation')
   
   args = parser.parse_args()
-  arg_dict = vars(args)
   
-  if args.split in splits_available:
-    split = args.split
-  else:
+  if args.split not in splits_available:
     raise ValueError(f"Sorry {args.split} not processed yet")
-  exp_no = str(int(args.experiment)).zfill(3) 
   
-  #defaults
-  arg_dict['root'] = '../data/WLASL2000'
-  arg_dict['labels'] = f'./preprocessed/labels/{split}'
-  arg_dict['save_path'] = f'runs/{split}/{model}_exp{exp_no}/checkpoints/'
+  exp_no = str(int(args.experiment)).zfill(3)
   
-  if 'config' in arg_dict:
-    arg_dict['config_path'] = arg_dict['config']
+  args.exp_no = exp_no
+  args.root = '../data/WLASL2000'
+  args.labels = f'./preprocessed/labels/{args.split}'
+  output = f'runs/{args.split}/{model}_exp{exp_no}'
+  
+  if not args.recover: #fresh run
+    output = enum_dir(output, make=True)  
+  
+  args.save_path = f'{output}/checkpoints'
+  
+  # Set config path
+  if args.config:
+    args.config_path = args.config
   else:
-    arg_dict['config_path'] = f'./configfiles/{split}/{model}_{exp_no}.ini'
-    
-  config = load_config(arg_dict['config_path'])
-  title = f'''Training {model} on split {split} 
-              Experiment no: {exp_no} 
-              Raw videos at: {arg_dict['root']}
-              Labels at: {arg_dict['labels']}
-              Saving files to: {arg_dict['output']}
-              Recovering: {recover}
-              {config}
-              \n
-              '''
+    args.config_path = f'./configfiles/{args.split}/{model}_{exp_no}.ini'
+  
+  # Load config
+  arg_dict = vars(args)
+  config = load_config(arg_dict)
+  
+  # Create tags for wandb
+  tags = [
+      args.split,
+      model,
+      f"exp-{exp_no}"
+  ]
+  
+  if args.recover:
+      tags.append("recovered")
+  
+  # Print summary
+  title = f"""Training {model} on split {args.split}
+              Experiment no: {exp_no}
+              Raw videos at: {args.root}
+              Labels at: {args.labels}
+              Saving files to: {args.save_path}
+              Recovering: {args.recover}
+              Config: {args.config_path}
+              """
   print(title)
+  
+  print("Available config keys:")
+  print("-" * 40)
+  for key, value in config.items():
+      print(f"{key}: {value}")
+  print("-" * 40)
+  return 
+  
   proceed = input("Confirm: y/n: ")
-  if proceed == 'y':
+  if proceed.lower() == 'y':
     run = wandb.init(
       entity='ljgoodall2001-rhodes-university',
       project='WLASL-SLR',
+      name=f"{model}_{args.split}_exp{exp_no}",
+      tags=tags,
       config=config      
     )
+      
+    # Start training
+    train(run, recover=args.recover)
+  else:
+    print("Training cancelled")
+
+if __name__ =='__main__':
+  main()

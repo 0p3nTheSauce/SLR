@@ -2,58 +2,109 @@ import configparser
 import importlib
 from typing import Dict, Any
 
+import configparser
+import importlib
+from typing import Dict, Any
+
+def parse_flat_config(config_file: str) -> Dict[str, Any]:
+    """Parse a simple flat key=value config file"""
+    config = {}
+    
+    with open(config_file, 'r') as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            
+            # Skip empty lines and comments
+            if not line or line.startswith('#'):
+                continue
+                
+            # Parse key=value pairs
+            if '=' in line:
+                key, value = line.split('=', 1)  # Split only on first '='
+                key = key.strip()
+                value = value.strip()
+                
+                # Convert to appropriate type
+                config[key] = _convert_type(value)
+            else:
+                print(f"Warning: Skipping invalid line {line_num}: {line}")
+    
+    return config
+
 def load_config(arg_dict):
-	# Load from .ini
-	config = parse_ini_config(arg_dict['config_path'], flatten=False)
-	
-	# Override with command line args if provided
-	if arg_dict:
-		for key, value in arg_dict.items():
-			config[key] = value
-	
-	return config
- 
-def parse_ini_config(ini_file: str, flatten: bool = True) -> Dict[str, Any]:
-	"""Parse .ini file for wandb config"""
-	config = configparser.ConfigParser()
-	config.read(ini_file)
-	
-	if flatten:
-			# Flat structure: section_key format
-			wandb_config = {}
-			for section in config.sections():
-					for key, value in config[section].items():
-							wandb_config[f"{section}_{key}"] = _convert_type(value)
-	else:
-			# Nested structure
-			wandb_config = {}
-			for section in config.sections():
-					wandb_config[section] = {}
-					for key, value in config[section].items():
-							wandb_config[section][key] = _convert_type(value)
-	
-	return wandb_config
+    """Load config from flat file and merge with command line args"""
+    config = parse_flat_config(arg_dict['config_path'])
+    
+    # Define which command line arguments should override config values
+    allowed_overrides = {
+        'max_steps': 'max_steps',
+        'max_epoch': 'max_epoch', 
+        'batch_size': 'batch_size',
+        'num_frames': 'num_frames',
+        'frame_size': 'frame_size',
+        'update_per_step': 'update_per_step',
+    }
+    
+    # Always add these path-related arguments (they're essential for training)
+    always_add = ['root', 'labels', 'save_path']
+    
+    if arg_dict:
+        # Add allowed overrides
+        for arg_name, config_key in allowed_overrides.items():
+            if arg_name in arg_dict and arg_dict[arg_name] is not None:
+                config[config_key] = arg_dict[arg_name]
+                print(f"Override: {config_key} = {arg_dict[arg_name]} (from command line)")
+        
+        # Always add essential paths
+        for key in always_add:
+            if key in arg_dict and arg_dict[key] is not None:
+                config[key] = arg_dict[key]
+                print(f"Added: {key} = {arg_dict[key]}")
+    
+    return config
 
 def _convert_type(value: str) -> Any:
-	"""Convert string values to appropriate types"""
-	# Boolean
-	if value.lower() in ['true', 'false']:
-		return value.lower() == 'true'
-	
-	# Integer
-	try:
-		return int(value)
-	except ValueError:
-		pass
-	
-	# Float
-	try:
-		return float(value)
-	except ValueError:
-		pass
-	
-	# String
-	return value
+    """Convert string values to appropriate types"""
+    # Boolean
+    if value.lower() in ['true', 'false']:
+        return value.lower() == 'true'
+    
+    # Integer
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    
+    # Float
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    
+    # String
+    return value
+
+# Keep your old functions for backward compatibility if needed
+def parse_ini_config(ini_file: str, flatten: bool = True) -> Dict[str, Any]:
+    """Parse .ini file for wandb config (OLD VERSION - for sections)"""
+    config = configparser.ConfigParser()
+    config.read(ini_file)
+    
+    if flatten:
+        # Flat structure: section_key format
+        wandb_config = {}
+        for section in config.sections():
+            for key, value in config[section].items():
+                wandb_config[f"{section}_{key}"] = _convert_type(value)
+    else:
+        # Nested structure
+        wandb_config = {}
+        for section in config.sections():
+            wandb_config[section] = {}
+            for key, value in config[section].items():
+                wandb_config[section][key] = _convert_type(value)
+    
+    return wandb_config
 
 ############################################old config style#########################
 	
