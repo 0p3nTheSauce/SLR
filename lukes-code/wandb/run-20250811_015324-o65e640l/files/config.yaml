@@ -1,0 +1,90 @@
+_wandb:
+    value:
+        cli_version: 0.21.1
+        e:
+            5xky1gats1m2bb2qozphzuzj16ecshg1:
+                args:
+                    - -e
+                    - "0"
+                    - -s
+                    - asl100
+                codePath: lukes-code/train_mvit.py
+                codePathLocal: train_mvit.py
+                cpu_count: 6
+                cpu_count_logical: 12
+                cudaVersion: "12.5"
+                disk:
+                    /:
+                        total: "370608730112"
+                        used: "290680791040"
+                email: ljgoodall2001@gmail.com
+                executable: /home/luke/miniconda3/envs/wlasl/bin/python
+                git:
+                    commit: 926dc6536f6cbc83d957c8dea2e7d3343beb8226
+                    remote: git@github.com:0p3nTheSauce/WLASL.git
+                gpu: NVIDIA GeForce GTX 1080 Ti
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Pascal
+                      cudaCores: 3584
+                      memoryTotal: "11811160064"
+                      name: NVIDIA GeForce GTX 1080 Ti
+                      uuid: GPU-319028de-b377-32bc-7c0c-63b81dd01ad1
+                host: luke-PPB660M-C
+                memory:
+                    total: "16498356224"
+                os: Linux-6.8.0-65-generic-x86_64-with-glibc2.35
+                program: /home/luke/ExtraStorage/WLASL/lukes-code/train_mvit.py
+                python: CPython 3.10.18
+                root: /home/luke/ExtraStorage/WLASL/lukes-code
+                startedAt: "2025-08-10T23:53:24.307445Z"
+                writerId: 5xky1gats1m2bb2qozphzuzj16ecshg1
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 2
+                - 3
+                - 12
+                - 41
+                - 49
+            "2":
+                - 1
+                - 2
+                - 3
+                - 12
+                - 41
+                - 49
+            "3":
+                - 13
+                - 15
+                - 16
+            "4": 3.10.18
+            "5": 0.21.1
+            "8":
+                - 2
+            "12": 0.21.1
+            "13": linux-x86_64
+batch_size:
+    value: 6
+eps:
+    value: 0.001
+eta_min:
+    value: 1e-05
+frame_size:
+    value: 224
+lr:
+    value: 0.001
+max_epoch:
+    value: 200
+max_steps:
+    value: 64000
+num_frames:
+    value: 32
+tmax:
+    value: 100
+update_per_step:
+    value: 1
+weight_decay:
+    value: 1e-07

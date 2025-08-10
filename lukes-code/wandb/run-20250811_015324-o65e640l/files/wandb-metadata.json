@@ -1,0 +1,46 @@
+{
+  "os": "Linux-6.8.0-65-generic-x86_64-with-glibc2.35",
+  "python": "CPython 3.10.18",
+  "startedAt": "2025-08-10T23:53:24.307445Z",
+  "args": [
+    "-e",
+    "0",
+    "-s",
+    "asl100"
+  ],
+  "program": "/home/luke/ExtraStorage/WLASL/lukes-code/train_mvit.py",
+  "codePath": "lukes-code/train_mvit.py",
+  "codePathLocal": "train_mvit.py",
+  "git": {
+    "remote": "git@github.com:0p3nTheSauce/WLASL.git",
+    "commit": "926dc6536f6cbc83d957c8dea2e7d3343beb8226"
+  },
+  "email": "ljgoodall2001@gmail.com",
+  "root": "/home/luke/ExtraStorage/WLASL/lukes-code",
+  "host": "luke-PPB660M-C",
+  "executable": "/home/luke/miniconda3/envs/wlasl/bin/python",
+  "cpu_count": 6,
+  "cpu_count_logical": 12,
+  "gpu": "NVIDIA GeForce GTX 1080 Ti",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "370608730112",
+      "used": "290680791040"
+    }
+  },
+  "memory": {
+    "total": "16498356224"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce GTX 1080 Ti",
+      "memoryTotal": "11811160064",
+      "cudaCores": 3584,
+      "architecture": "Pascal",
+      "uuid": "GPU-319028de-b377-32bc-7c0c-63b81dd01ad1"
+    }
+  ],
+  "cudaVersion": "12.5",
+  "writerId": "5xky1gats1m2bb2qozphzuzj16ecshg1"
+}
