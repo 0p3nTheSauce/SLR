@@ -39,7 +39,8 @@ def test_model(model, test_loader):
 
 def run_test_r3d18_1(root='../data/WLASL2000',
                labels='./preprocessed/labels/asl100',
-               output='runs/exp_0',model_dict='best.pth',
+               output='runs/exp_0',
+               checkpoint='best.pth',
                verbose=False, save=False):
   
   # torch.manual_seed(42)
@@ -71,7 +72,7 @@ def run_test_r3d18_1(root='../data/WLASL2000',
   
   #setup model
   r3d18 = Resnet3D18_basic(num_classes=num_classes)
-  r3d18_dict = torch.load(os.path.join(output,'checkpoints', model_dict)) #future warning, use weights_only=True (security stuff if you dont know the file)
+  r3d18_dict = torch.load(os.path.join(output, checkpoint)) #future warning, use weights_only=True (security stuff if you dont know the file)
   # print(r3d18_dict)
   r3d18.load_state_dict(r3d18_dict)
   r3d18.cuda()
@@ -137,6 +138,7 @@ def run_test_r3d18_1(root='../data/WLASL2000',
   print(fstr)
   print(f'Overall top1 (sklearn style) {overall_top1}')
   if save:
+    
     save_path = os.path.join(output, 'top_k.txt')
     with open(save_path, 'w') as f:
       f.write(fstr)
