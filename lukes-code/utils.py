@@ -279,33 +279,47 @@ def extract_num(fname):
    
 
 
-def clean_checkpoints(paths, ask=False, add_zfill=False, decimals=3):
+def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3):
   for path in paths:
-    to_empty = os.path.join(path, 'checkpoints')
-    files = sorted(os.listdir(to_empty))
+    check_point_dirs = []
+    for dir_name in os.listdir(path):
+      if 'checkpoint' in dir_name: #ignore logs
+        check_point_dirs.append(dir_name)
     
-    if add_zfill:
-      for i, f in enumerate(files):
-        num = extract_num(f)
-        files[i] = f.replace(num, num.zfill(decimals))
-        
-    if len(files) <= 2:
-      continue 
-    #leave best.pth and the last checkpoint
-    to_remove = files[1:-1]  # not great safety wise, assumes files sort correctly
-    if ask:
-      ans = 'none'
-      while ans != 'y' and ans != '' and ans != 'n':
-        print(f'Only keep {files[0]} and {files[-1]} in {to_empty}?')
-        ans = input('[y]/n: ')
+    if len(check_point_dirs) == 0:
+      print(f'Warning, no checkpoints found in {path}') 
+      continue
+    
+    for check in check_point_dirs:
+      to_empty = os.path.join(path, check)
       
-      if ans == 'n':
-        continue
+      dirty = sorted(os.listdir(to_empty))
+      files = [file for file in dirty 
+               if file.endswith('.pth')
+               and 'best' not in file]
+      
+      if add_zfill:
+        for i, f in enumerate(files):
+          num = extract_num(f)
+          files[i] = f.replace(num, num.zfill(decimals))
+          
+      if len(files) <= 2:
+        continue 
+      #leave best.pth and the last checkpoint
+      to_remove = files[1:-1]  # not great safety wise, assumes files sort correctly
+      if ask:
+        ans = 'none'
+        while ans != 'y' and ans != '' and ans != 'n':
+          print(f'Only keep {files[0]} and {files[-1]} in {to_empty}?')
+          ans = input('[y]/n: ')
+        
+        if ans == 'n':
+          continue
 
-    for file in to_remove:
-      name = os.path.join(to_empty, file)
-      os.remove(name)
-      print(f'removed {file} in {to_empty}')
+      for file in to_remove:
+        name = os.path.join(to_empty, file)
+        os.remove(name)
+        print(f'removed {file} in {to_empty}')
 
 
 def clean_experiments(path, ask=False):
