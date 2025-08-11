@@ -1,0 +1,15 @@
+{"time":"2025-08-11T15:20:46.482949595+02:00","level":"INFO","msg":"stream: starting","core version":"0.21.1"}
+{"time":"2025-08-11T15:20:46.948023549+02:00","level":"INFO","msg":"stream: created new stream","id":"vi15vmfh"}
+{"time":"2025-08-11T15:20:46.948099521+02:00","level":"INFO","msg":"stream: started","id":"vi15vmfh"}
+{"time":"2025-08-11T15:20:46.948237927+02:00","level":"INFO","msg":"writer: started","stream_id":"vi15vmfh"}
+{"time":"2025-08-11T15:20:46.948321356+02:00","level":"INFO","msg":"handler: started","stream_id":"vi15vmfh"}
+{"time":"2025-08-11T15:20:46.94834355+02:00","level":"INFO","msg":"sender: started","stream_id":"vi15vmfh"}
+{"time":"2025-08-11T15:40:10.667648257+02:00","level":"ERROR","msg":"runconsolelogs: failed to write to file: failed to open file: open /home/luke/ExtraStorage/WLASL/lukes-code/wandb/run-20250811_152046-vi15vmfh/files/output.log: no such file or directory"}
+{"time":"2025-08-11T15:40:30.640968095+02:00","level":"INFO","msg":"stream: closing","id":"vi15vmfh"}
+{"time":"2025-08-11T15:40:30.642637956+02:00","level":"ERROR","msg":"sender: failed to upload run summary: open /home/luke/ExtraStorage/WLASL/lukes-code/wandb/run-20250811_152046-vi15vmfh/files/wandb-summary.json: no such file or directory"}
+{"time":"2025-08-11T15:40:30.645944709+02:00","level":"ERROR","msg":"sender: failed to upload run config: open /home/luke/ExtraStorage/WLASL/lukes-code/wandb/run-20250811_152046-vi15vmfh/files/config.yaml: no such file or directory"}
+{"time":"2025-08-11T15:40:30.693426481+02:00","level":"WARN","msg":"runfiles: upload: file does not exist","path":"/home/luke/ExtraStorage/WLASL/lukes-code/wandb/run-20250811_152046-vi15vmfh/files/output.log"}
+{"time":"2025-08-11T15:40:30.695001695+02:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-08-11T15:40:31.121221662+02:00","level":"INFO","msg":"handler: closed","stream_id":"vi15vmfh"}
+{"time":"2025-08-11T15:40:31.169741458+02:00","level":"INFO","msg":"sender: closed","stream_id":"vi15vmfh"}
+{"time":"2025-08-11T15:40:31.169826487+02:00","level":"INFO","msg":"stream: closed","id":"vi15vmfh"}
