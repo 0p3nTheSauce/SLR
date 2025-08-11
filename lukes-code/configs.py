@@ -6,105 +6,127 @@ import configparser
 import importlib
 from typing import Dict, Any
 
-def parse_flat_config(config_file: str) -> Dict[str, Any]:
-    """Parse a simple flat key=value config file"""
-    config = {}
-    
-    with open(config_file, 'r') as f:
-        for line_num, line in enumerate(f, 1):
-            line = line.strip()
-            
-            # Skip empty lines and comments
-            if not line or line.startswith('#'):
-                continue
-                
-            # Parse key=value pairs
-            if '=' in line:
-                key, value = line.split('=', 1)  # Split only on first '='
-                key = key.strip()
-                value = value.strip()
-                
-                # Convert to appropriate type
-                config[key] = _convert_type(value)
-            else:
-                print(f"Warning: Skipping invalid line {line_num}: {line}")
-    
-    return config
-
-def load_config(arg_dict):
-    """Load config from flat file and merge with command line args"""
-    config = parse_flat_config(arg_dict['config_path'])
-    
-    # Define which command line arguments should override config values
-    allowed_overrides = {
-        'max_steps': 'max_steps',
-        'max_epoch': 'max_epoch', 
-        'batch_size': 'batch_size',
-        'num_frames': 'num_frames',
-        'frame_size': 'frame_size',
-        'update_per_step': 'update_per_step',
-    }
-    
-    # Always add these path-related arguments (they're essential for training)
-    always_add = ['root', 'labels', 'save_path']
-    
-    if arg_dict:
-        # Add allowed overrides
-        for arg_name, config_key in allowed_overrides.items():
-            if arg_name in arg_dict and arg_dict[arg_name] is not None:
-                config[config_key] = arg_dict[arg_name]
-                print(f"Override: {config_key} = {arg_dict[arg_name]} (from command line)")
-        
-        # Always add essential paths
-        for key in always_add:
-            if key in arg_dict and arg_dict[key] is not None:
-                config[key] = arg_dict[key]
-                print(f"Added: {key} = {arg_dict[key]}")
-    
-    return config
+def load_config(arg_dict, verbose=False):
+	"""Load config from flat file and merge with command line args"""
+	config = parse_ini_config(arg_dict['config_path'])
+	
+	finished_keys = []
+	
+	if verbose:
+		print()
+	#update existing sections
+	for key, value in arg_dict.items():
+		if value is None:
+			finished_keys.append(key)
+			continue
+		# print(f'{key}: {value}')
+		for section in config.keys():#config is nested
+			if key in section: 
+				if verbose:
+					print(f'Overide:\n config[{section}][{key}] = {config[section][key]}')
+				config[section][key] = value
+				finished_keys.append(key)
+				if verbose:
+					print(f'Becomes: \n config[{section}][{key}] = {value}')    		
+	
+	#update unset section
+	not_finished = [key for key in arg_dict.keys() if key not in finished_keys]
+	admin = {}
+	for key in not_finished:
+		admin[key] = arg_dict[key]
+		if verbose:
+			print(f'Added: conf[admin][{key}] = {arg_dict[key]}')
+	config['admin'] = admin
+	if verbose:	
+		print()
+	return post_process(config)
 
 def _convert_type(value: str) -> Any:
-    """Convert string values to appropriate types"""
-    # Boolean
-    if value.lower() in ['true', 'false']:
-        return value.lower() == 'true'
-    
-    # Integer
-    try:
-        return int(value)
-    except ValueError:
-        pass
-    
-    # Float
-    try:
-        return float(value)
-    except ValueError:
-        pass
-    
-    # String
-    return value
+	"""Convert string values to appropriate types"""
+	# Boolean
+	if value.lower() in ['true', 'false']:
+		return value.lower() == 'true'
+	
+	# Integer
+	try:
+		return int(value)
+	except ValueError:
+		pass
+	
+	# Float
+	try:
+		return float(value)
+	except ValueError:
+		pass
+	
+	# String
+	return value
 
-# Keep your old functions for backward compatibility if needed
-def parse_ini_config(ini_file: str, flatten: bool = True) -> Dict[str, Any]:
-    """Parse .ini file for wandb config (OLD VERSION - for sections)"""
-    config = configparser.ConfigParser()
-    config.read(ini_file)
-    
-    if flatten:
-        # Flat structure: section_key format
-        wandb_config = {}
-        for section in config.sections():
-            for key, value in config[section].items():
-                wandb_config[f"{section}_{key}"] = _convert_type(value)
-    else:
-        # Nested structure
-        wandb_config = {}
-        for section in config.sections():
-            wandb_config[section] = {}
-            for key, value in config[section].items():
-                wandb_config[section][key] = _convert_type(value)
-    
-    return wandb_config
+def parse_ini_config(ini_file: str) -> Dict[str, Any]:
+	"""Parse .ini file for wandb config """
+	config = configparser.ConfigParser()
+	config.read(ini_file)
+
+	# Nested structure
+	wandb_config = {}
+	for section in config.sections():
+		wandb_config[section] = {}
+		for key, value in config[section].items():
+			wandb_config[section][key] = _convert_type(value)
+	
+	return wandb_config
+
+def post_process(conf):
+	#remove unused keys
+	to_remove = [
+		'experiment',
+		'recover'
+	]
+	for key in to_remove:
+		for section in conf: #nested
+			conf[section].pop(key, None)
+	return conf
+
+def print_config(config_dict):
+	"""
+	Print configuration dictionary in a more readable format.
+	
+	Args:
+			config_dict (dict): Dictionary containing configuration sections
+	"""
+	# Extract admin info for header
+	admin = config_dict.get('admin', {})
+	model = admin.get('model', 'Unknown Model')
+	split = admin.get('split', 'unknown')
+	exp_no = admin.get('exp_no', '000')
+	
+	# Print header
+	print(f"Training {model} on split {split}")
+	
+	# Print admin section in formatted way
+	if 'admin' in config_dict:
+		print(f"              Experiment no: {admin.get('exp_no', 'N/A')}")
+		print(f"              Raw videos at: {admin.get('root', 'N/A')}")
+		print(f"              Labels at: {admin.get('labels', 'N/A')}")
+		print(f"              Saving files to: {admin.get('save_path', 'N/A')}")
+		print(f"              Recovering: {admin.get('recovering', False)}")
+		print(f"              Config: {admin.get('config_path', 'N/A')}")
+		print()
+
+	# Print other sections in organized format
+	sections_order = ['training', 'optimizer', 'scheduler', 'data']
+	
+	for section in sections_order:
+		if section in config_dict:
+			print(f"{section.upper()}:")
+			section_data = config_dict[section]
+			
+			# Calculate max key length for alignment
+			max_key_len = max(len(str(k)) for k in section_data.keys()) if section_data else 0
+			
+			for key, value in section_data.items():
+				print(f"    {key:<{max_key_len}} : {value}")
+			print()
 
 ############################################old config style#########################
 	
@@ -198,5 +220,14 @@ class Config:
  
  
 if __name__ == '__main__':
-	config_path = '/home/dxli/workspace/nslt/code/VGG-GRU/configs/test.ini'
-	print(str(Config(config_path)))
+	config_path = './configfiles/asl100/MViT_V2_S_000.ini'
+	# config = configparser.ConfigParser()
+	# config.read(config_path)    
+	# for section in config.sections():
+	# 	print(section)
+	
+	wb_config = parse_ini_config(config_path)
+	print(wb_config)
+
+	
+ 
