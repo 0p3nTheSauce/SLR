@@ -14,7 +14,7 @@ import torch.optim as optim
 
 #local imports
 from video_dataset import VideoDataset
-from configs import load_config
+from configs import load_config, print_config
 import numpy as np
 import random
 import wandb
@@ -39,27 +39,36 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   test_transforms = v2.Compose([v2.CenterCrop(224),
                                 mvitv2s_final])
   
-  train_instances = os.path.join(config.labels, 'train_instances_fixed_frange_bboxes_len.json')
-  val_instances = os.path.join(config.labels,'val_instances_fixed_frange_bboxes_len.json' )
-  train_classes = os.path.join(config.labels, 'train_classes_fixed_frange_bboxes_len.json')
-  val_classes = os.path.join(config.labels,'val_classes_fixed_frange_bboxes_len.json' )
+  train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
+  val_instances = os.path.join(config.admin['labels'],'val_instances_fixed_frange_bboxes_len.json' )
+  train_classes = os.path.join(config.admin['labels'], 'train_classes_fixed_frange_bboxes_len.json')
+  val_classes = os.path.join(config.admin['labels'],'val_classes_fixed_frange_bboxes_len.json' )
   
-  dataset = VideoDataset(config.root,train_instances, train_classes,
-    transforms=train_transforms, num_frames=config.num_frames)
-  dataloader = DataLoader(dataset, batch_size=config.batch_size,
+  dataset = VideoDataset(config.admin['root'],train_instances, train_classes,
+    transforms=train_transforms, num_frames=config.data['num_frames'])
+  dataloader = DataLoader(dataset, batch_size=config.training['batch_size'],
     shuffle=True, num_workers=2,pin_memory=True)
   num_classes = len(set(dataset.classes))
   
-  val_dataset = VideoDataset(config.root, val_instances, val_classes,
-    transforms=test_transforms, num_frames=config.num_frames)
+  val_dataset = VideoDataset(config.admin['root'], val_instances, val_classes,
+    transforms=test_transforms, num_frames=config.data['num_frames'])
   val_dataloader = DataLoader(val_dataset,
-    batch_size=config.batch_size, shuffle=True, num_workers=2,pin_memory=False)
+    batch_size=config.training['batch_size'], shuffle=True, num_workers=2,pin_memory=False)
   val_classes = len(set(val_dataset.classes))
   assert num_classes == val_classes
   
   dataloaders = {'train': dataloader, 'val': val_dataloader}
   
-  mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1, num_classes=num_classes)
+  # mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1, num_classes=num_classes)
+  mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1)
+  
+  #does not allow altering num_classes, so need to replace head
+  original_linear = mvitv2s.head[1]  # The Linear layer
+  in_features = original_linear.in_features
+  mvitv2s.head = nn.Sequential(
+    nn.Dropout(0.5, inplace=True),
+    nn.Linear(in_features, num_classes)
+  )
   
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   mvitv2s.to(device)
@@ -69,30 +78,30 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   best_val_score=0
   
   optimizer = optim.AdamW(mvitv2s.parameters(), 
-                          lr = config.lr,
-                          eps = config.eps,
-                          weight_decay= config.weight_decay)
+                          lr = config.optimizer['lr'],
+                          eps = config.optimizer['eps'],
+                          weight_decay= config.optimizer['weight_decay'])
   
   scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,
-                                                   T_max=config.schd_tmax,
-                                                   eta_min=config.schd_eta_min)
+                                                   T_max=config.scheduler['tmax'],
+                                                   eta_min=config.scheduler['eta_min'])
   
   loss_func = nn.CrossEntropyLoss()
   
   #check if we are continuing, if so set 'load'
   if recover: 
     fname = ''
-    if os.path.exists(config.save_path):
-      files = sorted(os.listdir(config.save_path))
+    if os.path.exists(config.admin['save_path']):
+      files = sorted(os.listdir(config.admin['save_path']))
       if len(files) > 0:
         fname = files[-1]
       else:
-        raise ValueError(f'Directory: {config.save_path} is empty')
+        raise ValueError(f"Directory: {config.admin['save_path']} is empty")
     else:
-      raise ValueError(f'Could not find directory: {config.save_path}')
+      raise ValueError(f"Could not find directory: {config.admin['save_path']}")
         #setup recovery
     
-    load = os.path.join(config.save_path, fname)
+    load = os.path.join(config.admin['save_path'], fname)
   
   if load:
     if os.path.exists(load):
@@ -114,8 +123,8 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
       steps = 0
       
   #train it
-  while steps < config.max_steps and epoch < config.max_epoch:
-    print(f'Step {steps}/{config.max_steps}')
+  while steps < config.training['max_steps'] and epoch < config.training['max_epoch']:
+    print(f"Step {steps}/{config.training['max_steps']}")
     print('-'*10)
     
     epoch += 1
@@ -156,13 +165,13 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
         running_corrects += predicted.eq(target).sum().item()
         
         if phase == 'train':
-          scaled_loss = loss / config.update_per_step
+          scaled_loss = loss / config.training['update_per_step']
           scaled_loss.backward()
           
           accumulated_loss += loss.item()
           accumulated_steps += 1
           
-          if accumulated_steps == config.update_per_step:
+          if accumulated_steps == config.training['update_per_step']:
             optimizer.step()
             optimizer.zero_grad()
             steps += 1
@@ -203,7 +212,7 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
         # Save best model
         if epoch_acc > best_val_score:
           best_val_score = epoch_acc
-          model_name = os.path.join(config.save_path, f'best.pth') 
+          model_name = os.path.join(config.admin['save_path'], f'best.pth') 
           torch.save(mvitv2s.state_dict(), model_name)
           print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
       
@@ -213,7 +222,8 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
         print(f'Best validation accuracy so far: {best_val_score:.2f}%')
       
     # Save checkpoint
-    if epoch % save_every == 0 or not (steps < config.max_steps and epoch < config.max_epoch):
+    if epoch % save_every == 0 or not (steps < config.training['max_steps'] 
+                                       and epoch < config.training['max_epoch']):
         checkpoint_data = {
           'epoch': epoch,
           'steps': steps,
@@ -222,7 +232,7 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
           'scheduler_state_dict': scheduler.state_dict(),
           'best_val_score': best_val_score
         }
-        checkpoint_path = os.path.join(config.save_path, f'checkpoint_{str(epoch).zfill(3)}.pth')
+        checkpoint_path = os.path.join(config.admin['save_path'], f'checkpoint_{str(epoch).zfill(3)}.pth')
         torch.save(checkpoint_data, checkpoint_path)
         print(f'Checkpoint saved: {checkpoint_path}')
         
@@ -256,6 +266,7 @@ def main():
   
   exp_no = str(int(args.experiment)).zfill(3)
   
+  args.model = model
   args.exp_no = exp_no
   args.root = '../data/WLASL2000'
   args.labels = f'./preprocessed/labels/{args.split}'
@@ -287,22 +298,23 @@ def main():
       tags.append("recovered")
   
   # Print summary
-  title = f"""Training {model} on split {args.split}
-              Experiment no: {exp_no}
-              Raw videos at: {args.root}
-              Labels at: {args.labels}
-              Saving files to: {args.save_path}
-              Recovering: {args.recover}
-              Config: {args.config_path}
-              """
-  print(title)
+  # title = f"""Training {model} on split {args.split}
+  #             Experiment no: {exp_no}
+  #             Raw videos at: {args.root}
+  #             Labels at: {args.labels}
+  #             Saving files to: {args.save_path}
+  #             Recovering: {args.recover}
+  #             Config: {args.config_path}
+  #             """
+  # print(title)
   
-  print("Available config keys:")
-  print("-" * 40)
-  for key, value in config.items():
-      print(f"{key}: {value}")
-  print("-" * 40)
-  return 
+  # print("Available config keys:")
+  # print("-" * 40)
+  # for key, value in config.items():
+  #     print(f"{key}: {value}")
+  # print("-" * 40)
+  print_config(config)
+  
   
   proceed = input("Confirm: y/n: ")
   if proceed.lower() == 'y':
