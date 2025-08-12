@@ -1,1 +1,0 @@
-{"Loss/Val":6.14967798199174,"Loss/Train":0.3872990102664036,"Loss/Train_Step":0.6646180152893066,"_timestamp":1.7549748972045565e+09,"_runtime":54801,"_step":3999,"_wandb":{"runtime":54801},"Accuracy/Train_Step":88.95833333333333,"Accuracy/Train":88.97364771151179,"Epoch":200,"Accuracy/Val":15.088757396449704,"Step":36000}

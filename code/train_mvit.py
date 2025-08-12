@@ -1,23 +1,20 @@
 import argparse
 import torch 
 import os
-
 from utils import enum_dir
 from torchvision.transforms import v2
-# from  torchvision.models.video.resnet import  R3D_18_Weights #, r3d_18
-from torchvision.models.video import mvit_v2_s, MViT_V2_S_Weights
+from torchvision.models.video import MViT_V2_S_Weights #mvit_v2_s
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
-# import models.pytorch_r3d as resnet_3d
-
+import numpy as np
+import random
+import wandb
 
 #local imports
 from video_dataset import VideoDataset
 from configs import load_config, print_config
-import numpy as np
-import random
-import wandb
+from models.pytorch_mvit import MViTv2S_basic 
 
 def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   config = wandb_run.config
@@ -33,10 +30,10 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   ])
   
   #setup dataset
-  train_transforms = v2.Compose([v2.RandomCrop(224),
+  train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
                                  v2.RandomHorizontalFlip(),
                                  mvitv2s_final])
-  test_transforms = v2.Compose([v2.CenterCrop(224),
+  test_transforms = v2.Compose([v2.CenterCrop(config.data['frame_size']),
                                 mvitv2s_final])
   
   train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
@@ -60,15 +57,17 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   dataloaders = {'train': dataloader, 'val': val_dataloader}
   
   # mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1, num_classes=num_classes)
-  mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1)
+  # mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1)
   
-  #does not allow altering num_classes, so need to replace head
-  original_linear = mvitv2s.head[1]  # The Linear layer
-  in_features = original_linear.in_features
-  mvitv2s.head = nn.Sequential(
-    nn.Dropout(0.5, inplace=True),
-    nn.Linear(in_features, num_classes)
-  )
+  # #does not allow altering num_classes, so need to replace head
+  # original_linear = mvitv2s.head[1]  # The Linear layer
+  # in_features = original_linear.in_features
+  # mvitv2s.head = nn.Sequential(
+  #   nn.Dropout(0.5, inplace=True),
+  #   nn.Linear(in_features, num_classes)
+  # )
+  
+  mvitv2s = MViTv2S_basic(num_classes)
   
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   mvitv2s.to(device)
@@ -77,10 +76,21 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   epoch = 0 
   best_val_score=0
   
-  optimizer = optim.AdamW(mvitv2s.parameters(), 
-                          lr = config.optimizer['lr'],
-                          eps = config.optimizer['eps'],
-                          weight_decay= config.optimizer['weight_decay'])
+  param_groups = [
+    {
+      'params': mvitv2s.backbone.parameters(),
+      'lr': config.optimizer['BACKBONE_INIT_LR'],  # Low LR for pretrained backbone
+      'weight_decay': config.optimizer['BACKBONE_WEIGHT_DECAY'] #also higher weight decay
+    },
+    {
+      'params': mvitv2s.classifier.parameters(), 
+      'lr': config.optimizer['CLASSIFIER_INIT_LR'],  # Higher LR for new classifier
+      'weight_decay': config.optimizer['CLASSIFIER_WEIGHT_DECAY'] #lower weight decay
+    }
+  ]
+  
+  optimizer = optim.AdamW(param_groups, 
+                          eps = config.optimizer['eps'])
   
   scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                    T_max=config.scheduler['tmax'],
