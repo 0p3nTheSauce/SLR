@@ -1,0 +1,14 @@
+{"time":"2025-08-11T15:48:15.469388955+02:00","level":"INFO","msg":"stream: starting","core version":"0.21.1"}
+{"time":"2025-08-11T15:48:15.945361392+02:00","level":"INFO","msg":"stream: created new stream","id":"mhacapfz"}
+{"time":"2025-08-11T15:48:15.945430896+02:00","level":"INFO","msg":"stream: started","id":"mhacapfz"}
+{"time":"2025-08-11T15:48:15.945559261+02:00","level":"INFO","msg":"writer: started","stream_id":"mhacapfz"}
+{"time":"2025-08-11T15:48:15.945559798+02:00","level":"INFO","msg":"sender: started","stream_id":"mhacapfz"}
+{"time":"2025-08-11T15:48:15.945580844+02:00","level":"INFO","msg":"handler: started","stream_id":"mhacapfz"}
+{"time":"2025-08-11T18:27:16.758050824+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-08-11T21:10:46.85365131+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-08-12T07:01:38.587397972+02:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"uploading output.log","runtime_seconds":0.677624172,"progress":"262.2KB/262.2KB"},{"desc":"uploading wandb-summary.json","runtime_seconds":0.674158252,"progress":"325B/325B"},{"desc":"uploading config.yaml","runtime_seconds":0.34259351,"progress":"2.8KB/2.8KB"}],"total_operations":3}}
+{"time":"2025-08-12T07:01:40.099468281+02:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-08-12T07:01:40.511337487+02:00","level":"INFO","msg":"stream: closing","id":"mhacapfz"}
+{"time":"2025-08-12T07:01:40.511547948+02:00","level":"INFO","msg":"sender: closed","stream_id":"mhacapfz"}
+{"time":"2025-08-12T07:01:40.511715779+02:00","level":"INFO","msg":"handler: closed","stream_id":"mhacapfz"}
+{"time":"2025-08-12T07:01:40.51178795+02:00","level":"INFO","msg":"stream: closed","id":"mhacapfz"}

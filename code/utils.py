@@ -306,11 +306,11 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3):
       if len(files) <= 2:
         continue 
       #leave best.pth and the last checkpoint
-      to_remove = files[1:-1]  # not great safety wise, assumes files sort correctly
+      to_remove = files[:-1]  # not great safety wise, assumes files sort correctly
       if ask:
         ans = 'none'
         while ans != 'y' and ans != '' and ans != 'n':
-          print(f'Only keep {files[0]} and {files[-1]} in {to_empty}?')
+          print(f'Only keep checkpoint {files[-1]} in {to_empty} (excluding best.pth and non pth files)?')
           ans = input('[y]/n: ')
         
         if ans == 'n':
