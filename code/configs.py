@@ -87,12 +87,13 @@ def post_process(conf):
 			conf[section].pop(key, None)
 	return conf
 
-def print_config(config_dict):
+def print_config(config_dict, title='Training'):
 	"""
 	Print configuration dictionary in a more readable format.
 	
 	Args:
-			config_dict (dict): Dictionary containing configuration sections
+		config_dict (dict): Dictionary containing configuration sections
+		title: 'Testing' or 'Training' 
 	"""
 	# Extract admin info for header
 	admin = config_dict.get('admin', {})
@@ -101,7 +102,7 @@ def print_config(config_dict):
 	exp_no = admin.get('exp_no', '000')
 	
 	# Print header
-	print(f"Training {model} on split {split}")
+	print(f"{title} {model} on split {split}")
 	
 	# Print admin section in formatted way
 	if 'admin' in config_dict:
@@ -109,7 +110,8 @@ def print_config(config_dict):
 		print(f"              Raw videos at: {admin.get('root', 'N/A')}")
 		print(f"              Labels at: {admin.get('labels', 'N/A')}")
 		print(f"              Saving files to: {admin.get('save_path', 'N/A')}")
-		print(f"              Recovering: {admin.get('recovering', False)}")
+		if title == 'Training':
+			print(f"              Recovering: {admin.get('recovering', False)}")
 		print(f"              Config: {admin.get('config_path', 'N/A')}")
 		print()
 

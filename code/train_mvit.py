@@ -310,24 +310,8 @@ def main():
   ]
   
   if args.recover:
-      tags.append("recovered")
+    tags.append("recovered")
   
-  # Print summary
-  # title = f"""Training {model} on split {args.split}
-  #             Experiment no: {exp_no}
-  #             Raw videos at: {args.root}
-  #             Labels at: {args.labels}
-  #             Saving files to: {args.save_path}
-  #             Recovering: {args.recover}
-  #             Config: {args.config_path}
-  #             """
-  # print(title)
-  
-  # print("Available config keys:")
-  # print("-" * 40)
-  # for key, value in config.items():
-  #     print(f"{key}: {value}")
-  # print("-" * 40)
   print_config(config)
   
   

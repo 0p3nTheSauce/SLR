@@ -12,7 +12,9 @@ from torch.utils.data import DataLoader
 from models.pytorch_r3d import Resnet3D18_basic
 from configs import Config
 import tqdm
+import torch.nn.functional as F
 
+from train import set_seed
 
 #################################### Testing #################################
 
@@ -36,6 +38,79 @@ def test_model(model, test_loader):
   report = classification_report(all_targets, all_preds, output_dict=True, zero_division=0)
   
   return accuracy, report, all_preds, all_targets
+
+def test_top_k(model, test_loader, seed=None, verbose=False, save_dir=None):
+  
+  if seed is not None:
+    set_seed(0)
+  
+  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+  model.to(device)
+  model.eval()
+  
+  correct = 0
+  correct_5 = 0
+  correct_10 = 0
+  
+  num_classes = len(set(test_loader.dataset.classes))
+  
+  top1_fp = np.zeros(num_classes, dtype=np.int64)
+  top1_tp = np.zeros(num_classes, dtype=np.int64)
+  
+  top5_fp = np.zeros(num_classes, dtype=np.int64)
+  top5_tp = np.zeros(num_classes, dtype=np.int64)
+  
+  top10_fp = np.zeros(num_classes, dtype=np.int64)
+  top10_tp = np.zeros(num_classes, dtype=np.int64)
+  
+  for item in tqdm.tqdm(test_loader, desc="Testing"):
+    data, target = item['frames'], item['label_num'] 
+    data, target = data.to(device), target.to(device)
+    
+    predictions = model(data)
+
+    out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
+    
+    if target[0].item() in out_labels[-5:]:
+      correct_5 += 1
+      top5_tp[target[0].item()] += 1
+    else:
+      top5_fp[target[0].item()] += 1
+    if target[0].item() in out_labels[-10:]:
+      correct_10 += 1
+      top10_tp[target[0].item()] += 1
+    else:
+      top10_fp[target[0].item()] += 1
+    if torch.argmax(predictions[0]).item() == target[0].item():
+      correct += 1
+      top1_tp[target[0].item()] += 1
+    else:
+      top1_fp[target[0].item()] += 1
+    
+    if verbose:
+      print(f"Video ID: {item['video_id']}\n\
+              Correct 1: {float(correct) / len(test_loader)}\n\
+              Correct 5: {float(correct_5) / len(test_loader)}\n\
+              Correct 10: {float(correct_10) / len(test_loader)}")
+
+  #per class accuracy
+  top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
+  top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
+  top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
+  overall_top1 = correct / len(test_loader)
+  fstr = 'top-k average per class acc: {}, {}, {}'.format(top1_per_class, top5_per_class, top10_per_class)
+  
+  print(fstr)
+  print(f'Overall top1 (sklearn style) {overall_top1}')
+  if save_dir is not None:
+    while not os.path.exists(save_dir):
+      print(f'Warning: {save_dir} not found')
+      save_dir = input("Enter alternative path (or nothing to exit): ")
+      if save_dir == '':
+        return 
+    save_path = os.path.join(save_dir, 'top_k.txt')
+    with open(save_path, 'w') as f:
+      f.write(fstr)
 
 def run_test_r3d18_1(root='../data/WLASL2000',
                labels='./preprocessed/labels/asl100',
@@ -260,6 +335,7 @@ def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
 
   plt.tight_layout()
   plt.show() 
+  
 def plot_confusion_matrix(y_true, y_pred, classes_path=None, num_classes=100,
                           title="Confusion Matrix", size=(10, 8), row_perc=True):
   """
@@ -305,6 +381,9 @@ def plot_confusion_matrix(y_true, y_pred, classes_path=None, num_classes=100,
   plt.ylabel("True", fontsize=12)
   plt.tight_layout()
   plt.show()
+
+########################### Other testing functions #############
+
 
 
 if __name__ == '__main__':
