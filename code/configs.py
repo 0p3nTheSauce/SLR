@@ -1,9 +1,6 @@
 import configparser
 import importlib
-from typing import Dict, Any
-
-import configparser
-import importlib
+import ast
 from typing import Dict, Any
 
 def load_config(arg_dict, verbose=False):
@@ -21,9 +18,9 @@ def load_config(arg_dict, verbose=False):
 			continue
 		# print(f'{key}: {value}')
 		for section in config.keys():#config is nested
-			if key in section: 
+			if key in config[section]: 
 				if verbose:
-					print(f'Overide:\n config[{section}][{key}] = {config[section][key]}')
+					print(f'Overide:\n config[{section}][{key}] = {value}')
 				config[section][key] = value
 				finished_keys.append(key)
 				if verbose:
@@ -43,25 +40,11 @@ def load_config(arg_dict, verbose=False):
 
 def _convert_type(value: str) -> Any:
 	"""Convert string values to appropriate types"""
-	# Boolean
-	if value.lower() in ['true', 'false']:
-		return value.lower() == 'true'
-	
-	# Integer
 	try:
-		return int(value)
-	except ValueError:
-		pass
-	
-	# Float
-	try:
-		return float(value)
-	except ValueError:
-		pass
-	
-	# String
-	return value
-
+		return ast.literal_eval(value)
+	except (ValueError, SyntaxError):
+	 	return value
+ 
 def parse_ini_config(ini_file: str) -> Dict[str, Any]:
 	"""Parse .ini file for wandb config """
 	config = configparser.ConfigParser()
@@ -116,7 +99,7 @@ def print_config(config_dict, title='Training'):
 		print()
 
 	# Print other sections in organized format
-	sections_order = ['training', 'optimizer', 'scheduler', 'data']
+	sections_order = ['training', 'optimizer', 'scheduler', 'data', 'model_params']
 	
 	for section in sections_order:
 		if section in config_dict:

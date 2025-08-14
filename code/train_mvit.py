@@ -16,7 +16,7 @@ from video_dataset import VideoDataset
 from configs import load_config, print_config
 from models.pytorch_mvit import MViTv2S_basic 
 
-def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
+def train(wandb_run, load=None, save_every=5, recover=False):
   config = wandb_run.config
   
   #setup transforms
@@ -67,7 +67,7 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   #   nn.Linear(in_features, num_classes)
   # )
   
-  mvitv2s = MViTv2S_basic(num_classes)
+  mvitv2s = MViTv2S_basic(num_classes, config.model['drop_p'])
   
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   mvitv2s.to(device)
@@ -79,13 +79,13 @@ def train(wandb_run, load=None, weights=None, save_every=5, recover=False):
   param_groups = [
     {
       'params': mvitv2s.backbone.parameters(),
-      'lr': config.optimizer['BACKBONE_INIT_LR'],  # Low LR for pretrained backbone
-      'weight_decay': config.optimizer['BACKBONE_WEIGHT_DECAY'] #also higher weight decay
+      'lr': config.optimizer['backbone_init_lr'],  # Low LR for pretrained backbone
+      'weight_decay': config.optimizer['backbone_weight_decay'] #also higher weight decay
     },
     {
       'params': mvitv2s.classifier.parameters(), 
-      'lr': config.optimizer['CLASSIFIER_INIT_LR'],  # Higher LR for new classifier
-      'weight_decay': config.optimizer['CLASSIFIER_WEIGHT_DECAY'] #lower weight decay
+      'lr': config.optimizer['classifier_init_lr'],  # Higher LR for new classifier
+      'weight_decay': config.optimizer['classifier_weight_decay'] #lower weight decay
     }
   ]
   
