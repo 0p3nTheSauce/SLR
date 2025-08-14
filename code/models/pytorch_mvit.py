@@ -1,5 +1,7 @@
 from torchvision.models.video import mvit_v2_s, MViT_V2_S_Weights
 from typing import Union, Callable, Sequence, Optional, Any
+import torch
+import torch.nn as nn
 
 def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> tuple[torch.Tensor, int]:
   tensor_dim = x.dim()
@@ -33,7 +35,7 @@ class MViTv2S_basic(nn.Module):
     in_features = original_linear.in_features
     
     self.classifier = nn.Sequential(
-      nn.Dropout(dropout, inplace=True),
+      nn.Dropout(drop_p, inplace=True),
       nn.Linear(in_features, num_classes),
     )
     
@@ -66,7 +68,7 @@ class MViTv2S_basic(nn.Module):
     # pass patches through the encoder
     thw = (self.pos_encoding.temporal_size,) + self.pos_encoding.spatial_size
     for block in self.blocks:
-        x, thw = block(x, thw)
+      x, thw = block(x, thw)
     x = self.norm(x)
 
     # classifier "token" as used by standard language architectures

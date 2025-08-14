@@ -1,6 +1,7 @@
 import argparse
 import torch # type: ignore
 import os
+import shutil
 import tqdm   # type: ignore
 from torch.utils.tensorboard import SummaryWriter # type: ignore
 import json
@@ -18,146 +19,9 @@ from configs import Config
 import numpy as np
 import random
 import wandb
-
-
-
-def train_loop_B(r3d18B,device, confB, dataloadersB, optimizerB, schedulerB,
-                 loss_funcB, writerB, logsB, saveB, save_pathB,
-                 save_every=5, max_epochs=400):
-  r3d18B.to(device)
-  steps=0
-  epoch=0
-  best_val_score=0
-
-  while steps < confB.max_steps and epoch < max_epochs:
-    print(f'Step {steps}/{confB.max_steps}')
-    print('-'*10)
-    
-    epoch+=1
-    #each epoch has training and validation stage
-    for phase in ['train', 'val']:
-      
-      if phase == 'train':
-        r3d18B.train()
-      else:
-        r3d18B.eval()
-        
-      #Reset matrics for this phase
-      running_loss = 0.0
-      running_corrects = 0
-      total_samples = 0
-      # num_batches = 0
-      # tot_loc_loss = 0.0  #TODO once this gets working try the fancy loss
-      # tot_cls_loss = 0.0
-      
-      #for gradient accumulation  
-      accumulated_loss = 0.0
-      accumulated_steps = 0
-      optimizerB.zero_grad()
-    
-      #Iterate over data for this phase
-      for batch_idx, item in enumerate(dataloadersB[phase]):
-        data, target = item['frames'], item['label_num']
-        data, target = data.to(device), target.to(device)
-        batch_size = data.size(0)
-        total_samples += batch_size
-        # num_batches += 1
-        
-        #Forward pass
-        if phase == 'train':
-          model_output = r3d18B(data)
-        else:
-          with torch.no_grad():
-            model_output = r3d18B(data)
-            
-        # Calculate loss
-        loss = loss_funcB(model_output, target)
-
-        #Accumulate metrics
-        running_loss += loss.item() * batch_size  
-        _, predicted = model_output.max(1)
-        running_corrects += predicted.eq(target).sum().item()
-        
-
-        if phase == 'train':
-          scaled_loss = loss / confB.update_per_step
-          scaled_loss.backward()
-          
-          accumulated_loss += loss.item()
-          accumulated_steps += 1
-          
-          if accumulated_steps == confB.update_per_step:
-            optimizerB.step()
-            optimizerB.zero_grad()
-            steps += 1
-            
-            # Print progress every few steps
-            if steps % 10 == 0:
-              avg_acc_loss = accumulated_loss / accumulated_steps
-              current_acc = 100.0 * running_corrects / total_samples
-              print(f'Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, '
-                    f'Current Accuracy: {current_acc:.2f}%')
-              
-              if logsB:
-                writerB.add_scalar('Loss/Train_Step', avg_acc_loss, steps) 
-                writerB.add_scalar('Accuracy/Train_Step', current_acc, steps) 
-            
-            # Reset accumulation
-            accumulated_loss = 0.0
-            accumulated_steps = 0
-    
-      #calculate  epoch metrics
-      epoch_loss = running_loss / total_samples # Average loss per sample
-      epoch_acc = 100.0 * running_corrects / total_samples
-
-      print(f'{phase.upper()} - Epoch {epoch}:')
-      print(f'  Loss: {epoch_loss:.4f}')
-      print(f'  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})')
-      try:
-        for i, param_group in enumerate(optimizerB.param_groups):
-          if logsB:
-            writerB.add_scalar(f'LearningRate/Group_{i}', param_group['lr'], epoch) 
-          print(f"Group {i} learning rate: {param_group['lr']}")
-      except Exception as e:
-        print(f'Failed to print all learning rates due to {e}')
-        
-      # Log epoch metrics
-      if logsB:
-        writerB.add_scalar(f'Loss/{phase.capitalize()}', epoch_loss, epoch) 
-        writerB.add_scalar(f'Accuracy/{phase.capitalize()}', epoch_acc, epoch) 
-      
-      # Validation specific logic
-      if phase == 'val':
-          # Save best model
-          if epoch_acc > best_val_score:
-              best_val_score = epoch_acc
-              model_name = os.path.join(save_pathB, f'best.pth') 
-              torch.save(r3d18B.state_dict(), model_name)
-              print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
-          
-          # Step scheduler with validation loss
-          schedulerB.step() 
-          
-          print(f'Best validation accuracy so far: {best_val_score:.2f}%')
-      
-      # Save checkpoint
-    if saveB and (epoch % save_every == 0 or not (steps < confB.max_steps and epoch < 400)):
-        checkpoint_data = {
-            'epoch': epoch,
-            'steps': steps,
-            'model_state_dict': r3d18B.state_dict(),
-            'optimizer_state_dict': optimizerB.state_dict(),
-            'scheduler_state_dict': schedulerB.state_dict(),
-            'best_val_score': best_val_score
-        }
-        checkpoint_path = os.path.join(save_pathB, f'checkpoint_{str(epoch).zfill(3)}.pth') 
-        torch.save(checkpoint_data, checkpoint_path)
-        print(f'Checkpoint saved: {checkpoint_path}')
-
-  print('Finished training successfully')
-  if logsB:
-    writerB.close()
-
+from configs import load_config, print_config
+from models.pytorch_mvit import MViTv2S_basic 
+from models.pytorch_swin3d import Swin3DBig_basic
 
 def set_seed(seed=42):
   torch.manual_seed(seed)
@@ -167,15 +31,20 @@ def set_seed(seed=42):
   torch.backends.cudnn.deterministic = True
   torch.backends.cudnn.benchmark = False
 
-
-def train_loop(model, datasets, wandb_run, load=None, weights=None, save_every=5,
-                 recover=False):
-
-  config = wandb_run.config
+def setup_data(mean, std, config):
   
-  train_transforms, test_transforms = transforms
+  final_transform =  v2.Compose([
+    v2.Lambda(lambda x: x.float() / 255.0),
+    v2.Normalize(mean=mean, std=std),
+    v2.Lambda(lambda x: x.permute(1,0,2,3)) 
+  ])
   
-  #setup data
+  #setup dataset
+  train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
+                                 v2.RandomHorizontalFlip(),
+                                 final_transform])
+  test_transforms = v2.Compose([v2.CenterCrop(config.data['frame_size']),
+                                final_transform])
   
   train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
   val_instances = os.path.join(config.admin['labels'],'val_instances_fixed_frange_bboxes_len.json' )
@@ -196,6 +65,35 @@ def train_loop(model, datasets, wandb_run, load=None, weights=None, save_every=5
   assert num_classes == val_classes
   
   dataloaders = {'train': dataloader, 'val': val_dataloader}
+  
+  return dataloaders, num_classes
+
+def get_model(name):
+
+  available_models = {
+    "MViT_V2_S" : {
+      "class" : MViTv2S_basic,
+      "mean" : [0.45, 0.45, 0.45],
+      "std" : [0.225, 0.225, 0.225]
+    },
+    "Swin3D_B" : {
+      "class" : Swin3DBig_basic,
+      "mean" : [0.485, 0.456, 0.406],
+      "std" : [0.229, 0.224, 0.225],
+    }
+  }
+  if name == '':
+    return available_models.keys()
+  return available_models[name]
+  
+  
+def train_loop(model, dataloaders, wandb_run, load=None, save_every=5,
+                 recover=False, seed=None):
+  
+  if seed is not None:
+    set_seed(seed)
+
+  config = wandb_run.config
   
   #model, metrics, optimizer, schedular, loss
   
@@ -370,3 +268,102 @@ def train_loop(model, datasets, wandb_run, load=None, weights=None, save_every=5
         
   print('Finished training successfully')
   wandb_run.finish()
+
+def train_model(wandb_run, recover=False):
+  #I am aware this is a bit extra. Will probably fix later.
+  config = wandb_run.config
+  model_dict = get_model(config.admin['model'])
+  dataloaders, num_classes = setup_data(model_dict['mean'], model_dict['std'], config)
+  model = model_dict['class'](num_classes=num_classes, drop_p=config.model_params['drop_p'])
+  train_loop(model, dataloaders, wandb_run, recover)
+
+def configure_run():
+  splits_available = ['asl100', 'asl300']
+  models_available = get_model('')
+
+  parser = argparse.ArgumentParser(description='Train a swin3d model')
+  
+  #runs
+  parser.add_argument('-e', '--experiment',type=int, help='Experiment number (e.g. 10)', required=True)
+  parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
+  parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
+  parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
+  parser.add_argument('-c' , '--config', help='path to config .ini file')
+  
+  #model
+  parser.add_argument('-m', '--model', type=str,
+                      help=f'One of the implemented models: {models_available}', required=True)
+  
+  #data
+  parser.add_argument('-s', '--split',type=str, help='the class split (e.g. asl100)', required=True)
+  parser.add_argument('-nf','--num_frames', type=int, help='video length')
+  parser.add_argument('-fs', '--frame_size', type=int, help='width, height')
+  parser.add_argument('-bs', '--batch_size', type=int,help='data_loader')
+  parser.add_argument('-us', '--update_per_step', type=int, help='gradient accumulation')
+  
+  args = parser.parse_args()
+  
+  if args.split not in splits_available:
+    raise ValueError(f"Sorry {args.split} not processed yet.\n\
+      Currently available: {splits_available}")
+  if args.model not in models_available:
+    raise ValueError(f"Sorry {args.model} not implemented yet.\n\
+      Currently available: {models_available}")
+  
+  exp_no = str(int(args.experiment)).zfill(3)
+  
+  # args.model = model
+  args.exp_no = exp_no
+  args.root = '../data/WLASL/WLASL2000'
+  args.labels = f'./preprocessed/labels/{args.split}'
+  output = f'runs/{args.split}/{args.model}_exp{exp_no}'
+  
+  if not args.recover: #fresh run
+    output = enum_dir(output, make=True)  
+  
+  save_path = f'{output}/checkpoints'
+  if not args.recover:
+    args.save_path = enum_dir(save_path, make=True) 
+  
+  # Set config path
+  if args.config:
+    args.config_path = args.config
+  else:
+    args.config_path = f'./configfiles/{args.split}/{args.model}_{exp_no}.ini'
+  
+  # Load config
+  arg_dict = vars(args)
+  config = load_config(arg_dict, verbose=True)
+  
+  # Create tags for wandb
+  tags = [
+    args.split,
+    args.model,
+    f"exp-{exp_no}"
+  ]
+  
+  if args.recover:
+    tags.append("recovered")
+  
+  print_config(config)
+  
+  
+  proceed = input("Confirm: y/n: ")
+  if proceed.lower() == 'y':
+    run = wandb.init(
+      entity='ljgoodall2001-rhodes-university',
+      project='WLASL-SLR',
+      name=f"{args.model}_{args.split}_exp{exp_no}",
+      tags=tags,
+      config=config      
+    )
+      
+    # Start training
+    train_model(run, recover=args.recover)
+  else:
+    print("Training cancelled")
+    # os.removedirs(output,)
+    shutil.rmtree(output)
+    
+if __name__ == '__main__':
+  configure_run()

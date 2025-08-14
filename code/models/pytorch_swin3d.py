@@ -5,9 +5,66 @@ from torchvision.models.video.resnet import BasicBlock, Bottleneck, Conv3DSimple
   Conv3DNoTemporal, Conv2Plus1D, VideoResNet, WeightsEnum, _ovewrite_named_param
 from typing import Union, Callable, Sequence, Optional, Any
 # from  torchvision.models.video.resnet import r3d_18, R3D_18_Weights
-from torchvision.models.video import swin3d_t, Swin3D_T_Weights
+from torchvision.models.video import swin3d_t, swin3d_b, Swin3D_T_Weights, Swin3D_B_Weights
 from torchvision.transforms import v2
 # from .classifiers import AttentionClassifier
+
+class Swin3DBig_basic(nn.Module):
+  def __init__(self, num_classes=100, drop_p=0.5, 
+               weights_path=None):
+    super().__init__()
+    self.num_classes = num_classes
+    self.drop_p=drop_p
+    
+    swin3db = swin3d_b(weights=Swin3D_B_Weights.KINETICS400_IMAGENET22K_V1)
+    
+    self.backbone = nn.ModuleList([
+      swin3db.patch_embed,
+      swin3db.pos_drop, 
+      swin3db.features,
+      swin3db.norm,
+      swin3db.avgpool
+    ])
+    
+    in_features = swin3db.head.in_features
+    self.classifier = nn.Sequential(
+        nn.Dropout(p=drop_p),
+        nn.Linear(in_features, num_classes),
+    )
+    
+    self.patch_embed = self.backbone[0]
+    self.pos_drop = self.backbone[1] 
+    self.features = self.backbone[2]
+    self.norm = self.backbone[3]
+    self.avgpool = self.backbone[4]
+    self.head = self.classifier  # Alias
+    
+    if weights_path:
+      checkpoint = torch.load(weights_path, map_location='cpu')
+      self.load_state_dict(checkpoint)
+      print(f"Loaded pretrained weights from {weights_path}")
+      
+  def __str__(self):
+    """Return string representation of model"""
+    return f"""Swin3D Tiny basic implementation
+    (num_classes={self.num_classes}, drop_p={self.drop_p})
+    Model architecture:
+      Backbone: {len(self.backbone)} layers
+      Classifier: {self.classifier}"""
+    
+  def forward(self, x):
+    """Forward pass through the model"""
+    x = self.patch_embed(x)
+    x = self.pos_drop(x)
+    x = self.features(x)
+    x = self.norm(x)
+    x = x.permute(0, 4, 1, 2, 3) # B, C, _T, _H, _W
+    x = self.avgpool(x)
+    x = torch.flatten(x, 1)
+    x = self.head(x)  
+    return x
+
+
 
 class Swin3DTiny_basic(nn.Module):
   def __init__(self, num_classes=100, drop_p=0.3, 
@@ -91,6 +148,7 @@ class Swin3DTiny_basic(nn.Module):
         top_layer_name = layer_name
         nested_path = None
 
+      layer_to_freeze = None
       if hasattr(self, top_layer_name):
         if nested_path:
           try:
@@ -104,9 +162,6 @@ class Swin3DTiny_basic(nn.Module):
         else:
           layer_to_freeze = getattr(self, top_layer_name)
           print(f"Frozen layer: {layer_name}")
-          
-        for param in layer_to_freeze.parameters():
-          param.requires_grad = False
 
         # Handle BatchNorm and LayerNorm layers specifically
         def freeze_norm_layers(module):
@@ -130,8 +185,11 @@ class Swin3DTiny_basic(nn.Module):
             for param in module.parameters():
               param.requires_grad = False
         
-        # Apply normalization layer freezing recursively
-        layer_to_freeze.apply(freeze_norm_layers) 
+        if layer_to_freeze is not None:
+          for param in layer_to_freeze.parameters():
+            param.requires_grad = False
+          # Apply normalization layer freezing recursively
+          layer_to_freeze.apply(freeze_norm_layers) 
       else:
         available_layers = [name for name, _ in self.named_children()]
         print(f"Warning: Layer '{layer_name}' not found. Available layers: {available_layers}")
