@@ -1,7 +1,11 @@
 import configparser
+import argparse
 import importlib
 import ast
 from typing import Dict, Any
+
+from utils import enum_dir
+import wandb
 
 def load_config(arg_dict, verbose=False):
 	"""Load config from flat file and merge with command line args"""
@@ -36,7 +40,8 @@ def load_config(arg_dict, verbose=False):
 	config['admin'] = admin
 	if verbose:	
 		print()
-	return post_process(config)
+	# return post_process(config, verbose)
+	return config
 
 def _convert_type(value: str) -> Any:
 	"""Convert string values to appropriate types"""
@@ -59,19 +64,7 @@ def parse_ini_config(ini_file: str) -> Dict[str, Any]:
 	
 	return wandb_config
 
-def post_process(conf):
-	#remove unused keys
-	to_remove = [
-		'experiment',
-		'config', #use config path
-		'recover'
-	]
-	for key in to_remove:
-		for section in conf: #nested
-			conf[section].pop(key, None)
-	return conf
-
-def print_config(config_dict, title='Training'):
+def print_config_old(config_dict, title='Training'):
 	"""
 	Print configuration dictionary in a more readable format.
 	
@@ -114,106 +107,146 @@ def print_config(config_dict, title='Training'):
 				print(f"    {key:<{max_key_len}} : {value}")
 			print()
 
-############################################old config style#########################
+def print_config(config_dict):
+	"""
+	Print configuration dictionary in a more readable format.
 	
-class Config:
-	def __init__(self, config_path):
-		config = configparser.ConfigParser()
-		config.read(config_path)
+	Args:
+		config_dict (dict): Dictionary containing configuration sections
+		title: 'Testing' or 'Training' 
+	"""
 
-		# Training
-		train_config = config['TRAIN'] 
-		self.batch_size = int(train_config['BATCH_SIZE'])
-		self.max_steps = int(train_config['MAX_STEPS'])
-		self.update_per_step = int(train_config['UPDATE_PER_STEP'])
-		self.drop_p = float(train_config['DROP_P'])
+	for section in config_dict.keys():
+		print(f"{section.upper()}:")
+		section_data = config_dict[section]
 		
-		# Optimizer
-		opt_config = config['OPTIMIZER']
-		self.init_lr = float(opt_config['INIT_LR']) #deprecated
-		self.adam_eps = float(opt_config['ADAM_EPS'])  #deprecated
-		self.adam_weight_decay = float(opt_config['ADAM_WEIGHT_DECAY']) #deprecated
-		if 'BACKBONE_INIT_LR' in opt_config: #backwards compatibility
-			self.backbone_init_lr = float(opt_config['BACKBONE_INIT_LR'])
-		if 'BACKBONE_WEIGHT_DECAY' in opt_config:
-			self.backbone_weight_decay = float(opt_config['BACKBONE_WEIGHT_DECAY'])
-		if 'CLASSIFIER_INIT_LR' in opt_config:
-			self.classifier_init_lr = float(opt_config['CLASSIFIER_INIT_LR'])
-		if 'CLASSIFIER_WEIGHT_DECAY' in opt_config:
-			self.classifier_weight_decay = float(opt_config['CLASSIFIER_WEIGHT_DECAY'])
+		# Calculate max key length for alignment
+		max_key_len = max(len(str(k)) for k in section_data.keys()) if section_data else 0
 		
-		# Scheduler
-		sched_config = config['SCHEDULER']
-		self.t_max = int(sched_config['T_MAX'])
-		self.eta_min = float(sched_config['ETA_MIN'])
+		for key, value in section_data.items():
+			print(f"    {key:<{max_key_len}} : {value}")
+		print()
 
-		# Model
-		model_config = config['MODEL']
-		self.model_wrapper = self._import_from_string(model_config['WRAPPER'])
-		self.transform_method = model_config['TRANSFORMS_METHOD']
-		self.weights_path = model_config.get('WEIGHTS_PATH', None)
-		if 'BACKBONE_WEIGHTS' in model_config:
-			self.backbone_weights_path = model_config['BACKBONE_WEIGHTS']
-		if 'FROZEN' in model_config:
-			self.frozen = model_config['FROZEN'].split() if model_config['FROZEN'] else [] 
-		if 'NUM_CLASSES' in model_config:
-			self.num_classes = int(model_config['NUM_CLASSES'])
-		
-		# Transforms specific parameters
-		#TODO
-
-
-		# Optional attention parameters
-		if 'IN_LINEAR' in model_config:
-			self.in_linear = int(model_config.get('IN_LINEAR', 1))
-		if 'N_ATTENTION' in model_config:
-			self.n_attention = int(model_config.get('N_ATTENTION', 5))
-		
-		# Dataset 
-		dataset_config = config['DATASET']
-		self.frame_size = int(dataset_config['FRAME_SIZE'])
-		self.num_frames = int(dataset_config['NUM_FRAMES'])
-
-	def create_model(self):
-		"""Create model using the wrapper's from_config method"""
-		return self.model_wrapper.from_config(self)
+def take_args(splits_available, models_available, make=False):
+	parser = argparse.ArgumentParser(description='Train a swin3d model')
 	
-	def get_transforms(self):
-		'''Create train and test transforms using wrapper's get_transforms method'''
-		return getattr(self.model_wrapper, self.transform_method)(self.frame_size)
+	#runs
+	parser.add_argument('-e', '--exp_no',type=int, help='Experiment number (e.g. 10)', required=True)
+	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
+	parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
+	parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
+	parser.add_argument('-c' , '--config_path', help='path to config .ini file')
 
-	def __str__(self):
-		if hasattr(self, 'frozen'):
-			return f"""Config:
-			Model: {self.model_wrapper}
-			Weights Path: {self.weights_path}
-			Frozen layers: {self.frozen}
-			Scheduler: t_max={self.t_max}, eta_min={self.eta_min}
-			Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
-			Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}
-			Backbone: lr={self.backbone_init_lr}, wd={self.backbone_weight_decay}
-			Classifier: lr={self.classifier_init_lr}, wd={self.classifier_weight_decay}"""
-		else:
-			return f"""Config:
-			Training: bs={self.batch_size}, steps={self.max_steps}, ups={self.update_per_step}
-			Optimizer: lr={self.init_lr}, eps={self.adam_eps}, wd={self.adam_weight_decay}"""
+	#TODO: maybe add tags for wandb as parameters
+	#model
+	parser.add_argument('-m', '--model', type=str,
+											help=f'One of the implemented models: {models_available}', required=True)
+	
+	#data
+	parser.add_argument('-s', '--split',type=str, help='the class split (e.g. asl100)', required=True)
+	parser.add_argument('-nf','--num_frames', type=int, help='video length')
+	parser.add_argument('-fs', '--frame_size', type=int, help='width, height')
+	parser.add_argument('-bs', '--batch_size', type=int,help='data_loader')
+	parser.add_argument('-us', '--update_per_step', type=int, help='gradient accumulation')
+	
+	args = parser.parse_args()
+	
+	if args.split not in splits_available:
+		raise ValueError(f"Sorry {args.split} not processed yet.\n\
+			Currently available: {splits_available}")
+	if args.model not in models_available:
+		raise ValueError(f"Sorry {args.model} not implemented yet.\n\
+			Currently available: {models_available}")
+	
+	exp_no = str(int(args.exp_no)).zfill(3)
+	
+	# args.model = model
+	args.exp_no = exp_no
+	args.root = '../data/WLASL/WLASL2000'
+	args.labels = f'./preprocessed/labels/{args.split}'
+	output = f'runs/{args.split}/{args.model}_exp{exp_no}'
+	
+	if not args.recover: #fresh run
+		output = enum_dir(output, make)  
+	
+	save_path = f'{output}/checkpoints'
+	if not args.recover:
+		args.save_path = enum_dir(save_path, make) 
+	
+	# Set config path
+	if args.config_path is None:
+		args.config_path = f'./configfiles/{args.split}/{args.model}_{exp_no}.ini'
+	
+	# Load config
+	arg_dict = vars(args)
+	clean_dict = {}
+	for key, value in arg_dict.items():
+		if value is not None:
+			clean_dict[key] = value
+	 
+	tags = [
+		args.split,
+		args.model,
+		f"exp-{exp_no}"
+	]
+ 
+	return clean_dict, tags, output, save_path
 
-	def _import_from_string(self, import_string):
-		"""Import a class/function from a module string like 'models.pytorch_r3d.Resnet3D18_basic'"""
-		module_path, class_name = import_string.rsplit('.', 1)
-		module = importlib.import_module(module_path)
-		return getattr(module, class_name)
- 
- 
+def print_dict(dict):
+	print(string_nested_dict(dict))
+	
+def string_nested_dict(dict):
+	ans = ""
+	if type(dict) == type({}):
+		ans += "{\n"
+		for key, value in dict.items():
+			ans += f'{key} : {string_nested_dict(value)}\n'
+		ans += "}\n"
+	else:
+		ans += str(dict)
+	return ans
+
+def print_wandb_config(config):
+  
+  
+	
 if __name__ == '__main__':
-	config_path = './configfiles/asl100/MViT_V2_S_000.ini'
+	from models.pytorch_mvit import MViTv2S_basic 
+	from models.pytorch_swin3d import Swin3DBig_basic
+	# config_path = './configfiles/asl100/MViT_V2_S_000.ini'
 	# config = configparser.ConfigParser()
 	# config.read(config_path)    
 	# for section in config.sections():
 	# 	print(section)
-	
-	wb_config = parse_ini_config(config_path)
-	print(wb_config)
+	model_info = {
+		"MViT_V2_S" : {
+			"class" : MViTv2S_basic,
+			"mean" : [0.45, 0.45, 0.45],
+			"std" : [0.225, 0.225, 0.225]
+		},
+		"Swin3D_B" : {
+			"class" : Swin3DBig_basic,
+			"mean" : [0.485, 0.456, 0.406],
+			"std" : [0.229, 0.224, 0.225],
+		}
+	}
+	available_model = model_info.keys()
+	available_splits = ['asl100', 'asl300']
+	arg_dict, tags, output, save_path = take_args(available_splits, available_model, make=False)
+	print_dict(arg_dict)
+	print()
+	config = load_config(arg_dict, verbose=True)
+	# print_dict(config)
+	print()
+	print_config(config)
 
-	
+	run = wandb.init(
+		entity='ljgoodall2001-rhodes-university',
+		project='Testing-configs',
+		name=f"{config['admin']['model']}_{config['admin']['split']}_exp{config['admin']['split']}",
+		tags=tags,
+		config=config      
+	)
+	wconf = run.config
+	print(type(wconf))
  

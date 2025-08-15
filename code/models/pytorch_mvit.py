@@ -11,6 +11,7 @@ def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> tuple[torch
       raise ValueError(f"Unsupported input dimension {x.shape}")
   return x, tensor_dim
 
+
 class MViTv2S_basic(nn.Module):
   def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
     super().__init__()
