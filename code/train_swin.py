@@ -50,7 +50,7 @@ def train_swin(wandb_run, load=None, save_every=5, recover=False, seed=None):
   
   dataloaders = {'train': dataloader, 'val': val_dataloader}
   
-  swin3db = Swin3DBig_basic(num_classes, config.model['drop_p'])
+  swin3db = Swin3DBig_basic(num_classes, config.model_params['drop_p'])
   
   train.train_loop(
     model=swin3db,

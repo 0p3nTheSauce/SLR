@@ -366,37 +366,6 @@ def enum_dir(path, make=False, decimals=3):
 
 ##################### once offs / Testing ######################
 
-import tensorflow as tf
-from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-
-def rename_scalars_in_eventfile(input_path, output_path, name_mapping):
-    """
-    name_mapping: dict like {'Loss/Train_epoch': 'Loss/Train'}
-    """
-    # Read events
-    ea = EventAccumulator(input_path)
-    ea.Reload()
-    
-    # Write new events with corrected names
-    writer = tf.summary.create_file_writer(output_path)
-    
-    
-    
-    for tag in ea.Tags()['scalars']:
-      if tag in name_mapping.keys():
-        print(f'Updating {tag} to {name_mapping[tag]}')
-        scalar_events = ea.Scalars(tag)
-        for event in scalar_events:
-          with writer.as_default():
-            tf.summary.scalar(name_mapping[tag], event.value, step=event.step)
-      else:
-        print(f'Keeping {tag}')
-        scalar_events = ea.Scalars(tag)
-        for event in scalar_events:
-          with writer.as_default():
-            tf.summary.scalar(tag, event.value, event.step)
-    
-    writer.close()
 
 
 def test_save():

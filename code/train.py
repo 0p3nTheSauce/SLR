@@ -14,27 +14,14 @@ import torch.nn as nn
 import torch.optim as optim
 import models.pytorch_r3d as resnet_3d
 #local imports
-from video_dataset import VideoDataset
-from configs import Config
 import numpy as np
 import random
 import wandb
-from configs import load_config, print_config
-from models.pytorch_mvit import MViTv2S_basic 
+from video_dataset import VideoDataset
+from configs import load_config, print_config, take_args
+from models.pytorch_mvit import MViTv2S_basic
 from models.pytorch_swin3d import Swin3DBig_basic
 
-available_models = {
-  "MViT_V2_S" : {
-    "class" : MViTv2S_basic,
-    "mean" : [0.45, 0.45, 0.45],
-    "std" : [0.225, 0.225, 0.225]
-  },
-  "Swin3D_B" : {
-    "class" : Swin3DBig_basic,
-    "mean" : [0.485, 0.456, 0.406],
-    "std" : [0.229, 0.224, 0.225],
-  }
-}
 
 def set_seed(seed=42):
   torch.manual_seed(seed)
@@ -80,12 +67,9 @@ def setup_data(mean, std, config):
   dataloaders = {'train': dataloader, 'val': val_dataloader}
   
   return dataloaders, num_classes
-
-def get_model(name):
-  return available_models[name]
   
   
-def train_loop(model, dataloaders, wandb_run, load=None, save_every=5,
+def train_loop(model_info, wandb_run, load=None, save_every=5,
                  recover=False, seed=None):
   
   if seed is not None:
@@ -93,7 +77,52 @@ def train_loop(model, dataloaders, wandb_run, load=None, save_every=5,
 
   config = wandb_run.config
   
+  #setup transforms
+  final_transform = v2.Compose([
+    v2.Lambda(lambda x: x.float() / 255.0),
+    v2.Normalize(mean=model_info['mean'], std=model_info['mean']),
+    v2.Lambda(lambda x: x.permute(1,0,2,3)) 
+  ])
+  
+  train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
+                                 v2.RandomHorizontalFlip(),
+                                 final_transform])
+  test_transforms = v2.Compose([v2.CenterCrop(config.data['frame_size']),
+                                final_transform])
+  
+  #setup data
+  train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
+  val_instances = os.path.join(config.admin['labels'],'val_instances_fixed_frange_bboxes_len.json' )
+  train_classes = os.path.join(config.admin['labels'], 'train_classes_fixed_frange_bboxes_len.json')
+  val_classes = os.path.join(config.admin['labels'],'val_classes_fixed_frange_bboxes_len.json' )
+  
+  dataset = VideoDataset(config.admin['root'],train_instances, train_classes,
+    transforms=train_transforms, num_frames=config.data['num_frames'])
+  dataloader = DataLoader(dataset, batch_size=config.training['batch_size'],
+    shuffle=True, num_workers=2,pin_memory=True)
+  num_classes = len(set(dataset.classes))
+  
+  val_dataset = VideoDataset(config.admin['root'], val_instances, val_classes,
+    transforms=test_transforms, num_frames=config.data['num_frames'])
+  val_dataloader = DataLoader(val_dataset,
+    batch_size=config.training['batch_size'], shuffle=True, num_workers=2,pin_memory=False)
+  val_classes = len(set(val_dataset.classes))
+  assert num_classes == val_classes
+  
+  dataloaders = {'train': dataloader, 'val': val_dataloader}
+  
   #model, metrics, optimizer, schedular, loss
+  if model_info['idx'] == 0:
+    model = MViTv2S_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model MViTv2S_basic')
+  elif model_info['idx'] == 1:
+    model = Swin3DBig_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model Swin3DBig_basic')
+  else:
+    raise ValueError(f'something went wrong when trying to load: {model_info} \n\
+      probably need to add an if statement to train.py')
+  
+  
   
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   model.to(device)
@@ -102,10 +131,21 @@ def train_loop(model, dataloaders, wandb_run, load=None, save_every=5,
   epoch = 0 
   best_val_score=0
   
-  optimizer = optim.AdamW(model.parameters(), 
-                          lr = config.optimizer['lr'],
-                          eps = config.optimizer['eps'],
-                          weight_decay= config.optimizer['weight_decay'])
+  param_groups = [
+    {
+      'params': model.backbone.parameters(),
+      'lr': config.optimizer['backbone_init_lr'],  # Low LR for pretrained backbone
+      'weight_decay': config.optimizer['backbone_weight_decay'] #also higher weight decay
+    },
+    {
+      'params': model.classifier.parameters(), 
+      'lr': config.optimizer['classifier_init_lr'],  # Higher LR for new classifier
+      'weight_decay': config.optimizer['classifier_weight_decay'] #lower weight decay
+    }
+  ]
+  
+  optimizer = optim.AdamW(param_groups, 
+                          eps = config.optimizer['eps'])
   
   scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                    T_max=config.scheduler['tmax'],
@@ -267,101 +307,40 @@ def train_loop(model, dataloaders, wandb_run, load=None, save_every=5,
   print('Finished training successfully')
   wandb_run.finish()
 
-def train_model(wandb_run, recover=False):
-  #I am aware this is a bit extra. Will probably fix later.
-  config = wandb_run.config
-  model_dict = get_model(config.admin['model'])
-  dataloaders, num_classes = setup_data(model_dict['mean'], model_dict['std'], config)
-  model = model_dict['class'](num_classes=num_classes, drop_p=config.model_params['drop_p'])
-  train_loop(model, dataloaders, wandb_run, recover)
 
-def configure_run():
-  splits_available = ['asl100', 'asl300']
-  models_available = available_models.keys()
-
-  parser = argparse.ArgumentParser(description='Train a swin3d model')
+def main():
+  with open('./wlasl_implemented_info.json') as f:
+    info = json.load(f)
+  available_splits = info['splits']
+  model_info = info['models']
   
-  #runs
-  parser.add_argument('-e', '--experiment',type=int, help='Experiment number (e.g. 10)', required=True)
-  parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
-  parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
-  parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
-  parser.add_argument('-c' , '--config', help='path to config .ini file')
-  #TODO: maybe add tags for wandb as parameters
-  #model
-  parser.add_argument('-m', '--model', type=str,
-                      help=f'One of the implemented models: {models_available}', required=True)
+  arg_dict, tags, output, save_path = take_args(available_splits, model_info.keys())
   
-  #data
-  parser.add_argument('-s', '--split',type=str, help='the class split (e.g. asl100)', required=True)
-  parser.add_argument('-nf','--num_frames', type=int, help='video length')
-  parser.add_argument('-fs', '--frame_size', type=int, help='width, height')
-  parser.add_argument('-bs', '--batch_size', type=int,help='data_loader')
-  parser.add_argument('-us', '--update_per_step', type=int, help='gradient accumulation')
-  
-  args = parser.parse_args()
-  
-  if args.split not in splits_available:
-    raise ValueError(f"Sorry {args.split} not processed yet.\n\
-      Currently available: {splits_available}")
-  if args.model not in models_available:
-    raise ValueError(f"Sorry {args.model} not implemented yet.\n\
-      Currently available: {models_available}")
-  
-  exp_no = str(int(args.experiment)).zfill(3)
-  
-  # args.model = model
-  args.exp_no = exp_no
-  args.root = '../data/WLASL/WLASL2000'
-  args.labels = f'./preprocessed/labels/{args.split}'
-  output = f'runs/{args.split}/{args.model}_exp{exp_no}'
-  
-  if not args.recover: #fresh run
-    output = enum_dir(output, make=True)  
-  
-  save_path = f'{output}/checkpoints'
-  if not args.recover:
-    args.save_path = enum_dir(save_path, make=True) 
-  
-  # Set config path
-  if args.config:
-    args.config_path = args.config
-  else:
-    args.config_path = f'./configfiles/{args.split}/{args.model}_{exp_no}.ini'
-  
-  # Load config
-  arg_dict = vars(args)
   config = load_config(arg_dict, verbose=True)
   
-  # Create tags for wandb
-  tags = [
-    args.split,
-    args.model,
-    f"exp-{exp_no}"
-  ]
-  
-  if args.recover:
-    tags.append("recovered")
-  
   print_config(config)
-  
-  
+
   proceed = input("Confirm: y/n: ")
   if proceed.lower() == 'y':
+    admin = config['admin']
+    model_specifcs = model_info[admin['model']]
+    
     run = wandb.init(
       entity='ljgoodall2001-rhodes-university',
       project='WLASL-SLR',
-      name=f"{args.model}_{args.split}_exp{exp_no}",
+      name=f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}",
       tags=tags,
       config=config      
     )
       
     # Start training
-    train_model(run, recover=args.recover)
+    os.makedirs(output, exist_ok=True)
+    os.makedirs(save_path, exist_ok=True)
+    train_loop(model_specifcs, run, recover=admin['recover'])
   else:
     print("Training cancelled")
     # os.removedirs(output,)
-    shutil.rmtree(output)
-    
+    # shutil.rmtree(output)
+  
 if __name__ == '__main__':
-  configure_run()
+  main()
