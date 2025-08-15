@@ -65,7 +65,6 @@ def train(wandb_run, load=None, save_every=5, recover=False, seed=None):
 def main():
   model = 'Swin3D_B'
   splits_available = ['asl100', 'asl300']
-  model = 'MViT_V2_S'
   
   parser = argparse.ArgumentParser(description='Train a mvit model')
   
@@ -111,7 +110,7 @@ def main():
   
   # Load config
   arg_dict = vars(args)
-  config = load_config(arg_dict)
+  config = load_config(arg_dict, verbose=True)
   
   # Create tags for wandb
   tags = [

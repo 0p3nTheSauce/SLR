@@ -289,7 +289,7 @@ def configure_run():
   parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
   parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
   parser.add_argument('-c' , '--config', help='path to config .ini file')
-  
+  #TODO: maybe add tags for wandb as parameters
   #model
   parser.add_argument('-m', '--model', type=str,
                       help=f'One of the implemented models: {models_available}', required=True)
