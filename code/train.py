@@ -314,7 +314,7 @@ def main():
   available_splits = info['splits']
   model_info = info['models']
   
-  arg_dict, tags, output, save_path = take_args(available_splits, model_info.keys())
+  arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys())
   
   config = load_config(arg_dict, verbose=True)
   
@@ -327,7 +327,7 @@ def main():
     
     run = wandb.init(
       entity='ljgoodall2001-rhodes-university',
-      project='WLASL-SLR',
+      project=project,
       name=f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}",
       tags=tags,
       config=config      

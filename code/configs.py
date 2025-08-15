@@ -130,25 +130,26 @@ def print_config(config_dict):
 def take_args(splits_available, models_available, make=False):
 	parser = argparse.ArgumentParser(description='Train a swin3d model')
 	
-	#runs
+	#admin
 	parser.add_argument('-e', '--exp_no',type=int, help='Experiment number (e.g. 10)', required=True)
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
-	parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
-	parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
-	parser.add_argument('-c' , '--config_path', help='path to config .ini file')
-
+	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
+	parser.add_argument('-p', '--project', type=str, default='WLASL-SLR', help='wandb project name')
+	parser.add_argument('-s', '--split',type=str, help='The class split (e.g. asl100)', required=True)
 	#TODO: maybe add tags for wandb as parameters
-	#model
-	parser.add_argument('-m', '--model', type=str,
-											help=f'One of the implemented models: {models_available}', required=True)
-	
-	#data
-	parser.add_argument('-s', '--split',type=str, help='the class split (e.g. asl100)', required=True)
+	parser.add_argument('-t', '--tags', nargs='+', type=str,help='Additional wandb tags')
+
+
+	#overides
+	parser.add_argument('-c' , '--config_path', help='path to config .ini file')	
 	parser.add_argument('-nf','--num_frames', type=int, help='video length')
 	parser.add_argument('-fs', '--frame_size', type=int, help='width, height')
 	parser.add_argument('-bs', '--batch_size', type=int,help='data_loader')
 	parser.add_argument('-us', '--update_per_step', type=int, help='gradient accumulation')
+	parser.add_argument('-ms', '--max_steps', type=int,help='gradient accumulation')
+	parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
 	
+ 
 	args = parser.parse_args()
 	
 	if args.split not in splits_available:
@@ -181,6 +182,8 @@ def take_args(splits_available, models_available, make=False):
 	arg_dict = vars(args)
 	clean_dict = {}
 	for key, value in arg_dict.items():
+		if key == 'project' or key == 'tags': #I don't wandb redundant
+			continue
 		if value is not None:
 			clean_dict[key] = value
 	 
@@ -189,8 +192,9 @@ def take_args(splits_available, models_available, make=False):
 		args.model,
 		f"exp-{exp_no}"
 	]
+	tags.extend(args.tags)
  
-	return clean_dict, tags, output, save_path
+	return clean_dict, tags, output, save_path, args.project
 
 def print_dict(dict):
 	print(string_nested_dict(dict))
@@ -206,7 +210,7 @@ def string_nested_dict(dict):
 		ans += str(dict)
 	return ans
 
-def print_wandb_config(config):
+# def print_wandb_config(config):
   
   
 	
@@ -232,7 +236,9 @@ if __name__ == '__main__':
 	}
 	available_model = model_info.keys()
 	available_splits = ['asl100', 'asl300']
-	arg_dict, tags, output, save_path = take_args(available_splits, available_model, make=False)
+	arg_dict, tags, output, save_path, project = take_args(available_splits, available_model, make=False)
+	print(f'project selected: {project}')
+ 
 	print_dict(arg_dict)
 	print()
 	config = load_config(arg_dict, verbose=True)
@@ -240,13 +246,13 @@ if __name__ == '__main__':
 	print()
 	print_config(config)
 
-	run = wandb.init(
-		entity='ljgoodall2001-rhodes-university',
-		project='Testing-configs',
-		name=f"{config['admin']['model']}_{config['admin']['split']}_exp{config['admin']['split']}",
-		tags=tags,
-		config=config      
-	)
-	wconf = run.config
-	print(type(wconf))
+	# run = wandb.init(
+	# 	entity='ljgoodall2001-rhodes-university',
+	# 	project='Testing-configs',
+	# 	name=f"{config['admin']['model']}_{config['admin']['split']}_exp{config['admin']['split']}",
+	# 	tags=tags,
+	# 	config=config      
+	# )
+	# wconf = run.config
+	# print(type(wconf))
  
