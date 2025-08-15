@@ -63,6 +63,7 @@ def post_process(conf):
 	#remove unused keys
 	to_remove = [
 		'experiment',
+		'config', #use config path
 		'recover'
 	]
 	for key in to_remove:
