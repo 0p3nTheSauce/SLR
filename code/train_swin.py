@@ -10,7 +10,7 @@ from utils import enum_dir
 from configs import print_config, load_config
 import wandb
 
-def train(wandb_run, load=None, save_every=5, recover=False, seed=None):
+def train_swin(wandb_run, load=None, save_every=5, recover=False, seed=None):
   config = wandb_run.config
 
   #swin specific mean and std from pytorch
@@ -136,7 +136,7 @@ def main():
     )
       
     # Start training
-    train(run, recover=args.recover)
+    train_swin(run, recover=args.recover)
   else:
     print("Training cancelled")
 

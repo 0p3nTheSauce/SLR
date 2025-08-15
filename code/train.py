@@ -23,6 +23,19 @@ from configs import load_config, print_config
 from models.pytorch_mvit import MViTv2S_basic 
 from models.pytorch_swin3d import Swin3DBig_basic
 
+available_models = {
+  "MViT_V2_S" : {
+    "class" : MViTv2S_basic,
+    "mean" : [0.45, 0.45, 0.45],
+    "std" : [0.225, 0.225, 0.225]
+  },
+  "Swin3D_B" : {
+    "class" : Swin3DBig_basic,
+    "mean" : [0.485, 0.456, 0.406],
+    "std" : [0.229, 0.224, 0.225],
+  }
+}
+
 def set_seed(seed=42):
   torch.manual_seed(seed)
   torch.cuda.manual_seed_all(seed)
@@ -69,21 +82,6 @@ def setup_data(mean, std, config):
   return dataloaders, num_classes
 
 def get_model(name):
-
-  available_models = {
-    "MViT_V2_S" : {
-      "class" : MViTv2S_basic,
-      "mean" : [0.45, 0.45, 0.45],
-      "std" : [0.225, 0.225, 0.225]
-    },
-    "Swin3D_B" : {
-      "class" : Swin3DBig_basic,
-      "mean" : [0.485, 0.456, 0.406],
-      "std" : [0.229, 0.224, 0.225],
-    }
-  }
-  if name == '':
-    return available_models.keys()
   return available_models[name]
   
   
@@ -279,7 +277,7 @@ def train_model(wandb_run, recover=False):
 
 def configure_run():
   splits_available = ['asl100', 'asl300']
-  models_available = get_model('')
+  models_available = available_models.keys()
 
   parser = argparse.ArgumentParser(description='Train a swin3d model')
   
