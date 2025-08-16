@@ -21,6 +21,7 @@ from video_dataset import VideoDataset
 from configs import load_config, print_config, take_args
 from models.pytorch_mvit import MViTv2S_basic
 from models.pytorch_swin3d import Swin3DBig_basic
+from models.pytorch_r3d import Resnet2_plus1D_18_basic
 from stopping import EarlyStopper
 
 def set_seed(seed=42):
@@ -118,6 +119,9 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   elif model_info['idx'] == 1:
     model = Swin3DBig_basic(num_classes, config.model_params['drop_p'])
     print(f'Successfully using model Swin3DBig_basic')
+  elif model_info['idx'] == 2:
+    model = Resnet2_plus1D_18_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model Resnet2_plus1D_basic')
   else:
     raise ValueError(f'something went wrong when trying to load: {model_info} \n\
       probably need to add an if statement to train.py')
@@ -267,6 +271,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
               wandb_run.log({
                 'Loss/Train_Step': avg_acc_loss,
                 'Accuracy/Train_Step': current_acc,
+                'Step': steps
               })
             
             # Reset accumulation
@@ -290,6 +295,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       wandb_run.log({
         f'Loss/{phase.capitalize()}': epoch_loss,
         f'Accuracy/{phase.capitalize()}': epoch_acc,
+        'Epoch': epoch
       })
       
       # Validation specific logic
