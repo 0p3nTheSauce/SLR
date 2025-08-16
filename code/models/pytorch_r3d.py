@@ -4,9 +4,10 @@ import torchvision.models.video as video_models
 from torchvision.models.video.resnet import BasicBlock, Bottleneck, Conv3DSimple,\
   Conv3DNoTemporal, Conv2Plus1D, VideoResNet, WeightsEnum, _ovewrite_named_param
 from typing import Union, Callable, Sequence, Optional, Any
-from  torchvision.models.video.resnet import r3d_18, R3D_18_Weights
+from  torchvision.models.video.resnet import r3d_18, r2plus1d_18, R3D_18_Weights, R2Plus1D_18_Weights
 from torchvision.transforms import v2
 from .classifiers import AttentionClassifier
+from typing import Union, Callable, Sequence, Optional, Any
 #for reference, the r3d18 wrapper class from pytorch essentially does the following:
     # return _video_resnet(
     #     BasicBlock,
@@ -27,6 +28,61 @@ from .classifiers import AttentionClassifier
 
         # self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         # self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+
+
+class Resnet2_plus1D_18_basic(nn.Module):
+  def __init__(self, num_classes=100, drop_p=0.5,
+               weights_path=None):
+    super().__init__()
+    self.num_classes = num_classes
+    self.drop_p = drop_p
+    
+    r2plus1d18 = r2plus1d_18(weights=R2Plus1D_18_Weights.KINETICS400_V1)
+    
+    self.backbone = nn.ModuleList([
+      r2plus1d18.stem,
+      r2plus1d18.layer1,
+      r2plus1d18.layer2,
+      r2plus1d18.layer3,
+      r2plus1d18.layer4,
+      r2plus1d18.avgpool
+    ])
+    
+    self.stem = self.backbone[0]
+    self.layer1 = self.backbone[1]
+    self.layer2 = self.backbone[2]
+    self.layer3 = self.backbone[3]
+    self.layer4 = self.backbone[4]
+    self.avgpool = self.backbone[5]
+    
+    in_features = r2plus1d18.fc.in_features
+    self.classifier = nn.Sequential(
+      nn.Dropout(drop_p, inplace=True),
+      nn.Linear(in_features, num_classes),
+    )
+    
+    if weights_path:
+      checkpoint = torch.load(weights_path, map_location='cpu')
+      self.load_state_dict(checkpoint)
+      print(f"Loaded pretrained weights from {weights_path}")
+    
+  def forward(self, x: torch.Tensor) -> torch.Tensor:
+    #taken from pytorch video resnet
+    x = self.stem(x)
+
+    x = self.layer1(x)
+    x = self.layer2(x)
+    x = self.layer3(x)
+    x = self.layer4(x)
+
+    x = self.avgpool(x)
+    # Flatten the layer to fc
+    x = x.flatten(1)
+    x = self.classifier(x)
+    return x
+    
+
 
 def get_bas_r3d18_partlyfrozen(num_classes=300):
   model = video_models.r3d_18(pretrained=True) #weights=R3D_18_Weights.KINETICS400_V1d

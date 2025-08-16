@@ -11,7 +11,7 @@ def _unsqueeze(x: torch.Tensor, target_dim: int, expand_dim: int) -> tuple[torch
       raise ValueError(f"Unsupported input dimension {x.shape}")
   return x, tensor_dim
 
-
+ 
 class MViTv2S_basic(nn.Module):
   def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
     super().__init__()
@@ -45,7 +45,7 @@ class MViTv2S_basic(nn.Module):
       self.load_state_dict(checkpoint)
       print(f"Loaded pretrained weights from {weights_path}")
     else:
-      self._initialize_classifier()
+      self._initialize_classifier() #mvitspecific initialization
       
       
   def _initialize_classifier(self):
@@ -68,7 +68,7 @@ class MViTv2S_basic(nn.Module):
 
     # pass patches through the encoder
     thw = (self.pos_encoding.temporal_size,) + self.pos_encoding.spatial_size
-    for block in self.blocks:
+    for block in self.blocks: #type: ignore
       x, thw = block(x, thw)
     x = self.norm(x)
 
