@@ -54,6 +54,9 @@ class EarlyStopper:
       print("Early stopping is switched off")
       return
     
+    if isinstance(metric, list):
+      metric = tuple(metric)
+    
     if metric not in self.available_metrics:
       raise ValueError(f"Invalid metric: {metric}. Available metrics: {self.available_metrics}")
     if mode not in self.available_modes:
@@ -110,7 +113,7 @@ class EarlyStopper:
       for key in EarlyStopper.required_keys:
         if key not in es_info:
           raise ValueError(f"Missing required key: {key} in early stopping config")
-    
+      
       if es_info['metric'] not in EarlyStopper.available_metrics:
         raise ValueError(f"Invalid metric: {es_info['metric']}. Available metrics: {EarlyStopper.available_metrics}")
       if es_info['mode'] not in EarlyStopper.available_modes:
