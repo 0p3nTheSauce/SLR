@@ -267,7 +267,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
               wandb_run.log({
                 'Loss/Train_Step': avg_acc_loss,
                 'Accuracy/Train_Step': current_acc,
-              }, step=steps)
+              })
             
             # Reset accumulation
             accumulated_loss = 0.0
@@ -290,7 +290,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       wandb_run.log({
         f'Loss/{phase.capitalize()}': epoch_loss,
         f'Accuracy/{phase.capitalize()}': epoch_acc,
-      }, step=epoch)
+      })
       
       # Validation specific logic
       if phase == 'val':
