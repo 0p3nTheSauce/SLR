@@ -245,7 +245,7 @@ if __name__ == '__main__':
 	# print_dict(config)
 	print()
 	print_config(config)
-
+	print(tags)
 	# run = wandb.init(
 	# 	entity='ljgoodall2001-rhodes-university',
 	# 	project='Testing-configs',
