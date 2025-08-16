@@ -8,6 +8,11 @@ import matplotlib.pyplot as plt
 import gzip
 # from torchcodec.decoders import VideoDecoder
 import re
+
+
+
+
+
 ################# Loading #####################
 
   
@@ -99,11 +104,11 @@ def watch_video(frames=None, path='',wait=33, title='Video'):
     if not (type(frames) is torch.Tensor or type(frames) is np.ndarray):
       raise ValueError('frames must be torch.Tensor or np.ndarray')
     if frames.dtype == torch.uint8:
-      frames = torch_to_cv(frames)
+      frames = torch_to_cv(frames) #type: ignore
     elif frames.dtype != np.uint8:
       raise ValueError('frames must be torch.uint8 (T C H W) RGB OR np.uint8 (T H W C) BGR')
     for img in frames:
-      cv2.imshow(f'{title} from tensor', img)
+      cv2.imshow(f'{title} from tensor', img) #type: ignore
       key = cv2.waitKey(wait) & 0xFF
       if key == ord('q') or key == 27:
         break
@@ -408,7 +413,7 @@ def test_save2():
  
   print(frames.shape)
   print(frames.dtype)
-  cv_frames = torch_to_cv(frames)
+  cv_frames = torch_to_cv(frames) #type: ignore
   save_video(cv_frames, vid, fps=24)
 
 

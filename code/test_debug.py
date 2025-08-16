@@ -1,4 +1,4 @@
-from train import EarlyStopping
+from stopping import EarlyStopper
 import wandb
 import matplotlib.pyplot as plt
 # import pytest
@@ -41,26 +41,37 @@ def sim_acc(x):
 
 def test_early_stopping(mode='min'):
   # test with wandb run
-  metric = 'val_loss'
+  metric = ('val','loss')
   # mode = 'min'
   patience = 20
   min_delta = 0.01 #for fictional data, this is a large value
-  run = wandb.init(
-    entity='ljgoodall2001-rhodes-university',
-    project='Debugging',
-    name=f"test_early_stopping",
-    config={
-      'metric': metric,
-      'mode': mode,
-      'patience': patience,
-      'min_delta': min_delta
-    }
-  )
-  stopper = EarlyStopping(metric=metric,
-                          mode=mode,
-                          patience=patience,
-                          min_delta=min_delta,
-                          wandb_run=run)
+  # run = wandb.init(
+  #   entity='ljgoodall2001-rhodes-university',
+  #   project='Debugging',
+  #   name=f"test_early_stopping",
+  #   config={
+  #     'metric': metric,
+  #     'mode': mode,
+  #     'patience': patience,
+  #     'min_delta': min_delta
+  #   }
+  # )
+  arg_dict = {
+    'metric': metric,
+    'mode': mode,
+    'patience': patience,
+    'min_delta': min_delta
+  }
+    
+  
+  # stopper = EarlyStopper(metric=metric,
+  #                         mode=mode,
+  #                         patience=patience,
+  #                         min_delta=min_delta,
+  #                         wandb_run=None)
+  
+  stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None)
+  
   #simulate training
   # x_range = range(10)
   # x_range = [x*0.1 for x in x_range][1:]
@@ -89,6 +100,6 @@ def test_early_stopping(mode='min'):
     
   
 if __name__ == "__main__":
-  test_early_stopping(mode='max')
+  test_early_stopping(mode='min')
   # pytest.main([__file__])
   
