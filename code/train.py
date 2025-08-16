@@ -129,8 +129,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   
   steps = 0
   epoch = 0 
-  best_val_score=0
-  
+  best_val_score=0.0 
   
   param_groups = [
     {
@@ -188,15 +187,19 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       epoch = 0
       steps = 0
   
+  #store the current best for early stopping
   stopping_metrics = {
-    'epoch_loss': 0.0,
-    'epoch_acc': 0.0,
-    'best_val_score': best_val_score
+    'train': {
+      'loss': 0.0,
+      'acc': 0.0
+    },
+    'val': {
+      'loss': 0.0,
+      'acc': 0.0
+    },
+    'count': 0,
   }
-  #check if early_stopping is set in config.training
-  # if 'early_stopping' in config.training:
     
-  
   #train it
   while epoch < config.training['max_epoch']:
     print(f"Step {steps}/{config.training['max_steps']}")
@@ -318,6 +321,46 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   print('Finished training successfully')
   wandb_run.finish()
 
+class EarlyStopping:
+  def __init__(self, metric='val_loss', mode='min', patience=20, min_delta=0.01, wandb_run=None):
+    self.metric = metric
+    self.mode = mode
+    self.patience = patience
+    self.min_delta = min_delta
+    self.curr_epoch = 0
+    self.best_score = None
+    self.best_epoch = 0
+    self.counter = 0
+    self.wandb_run = wandb_run
+    self.stop = False
+    
+  def step(self, score):
+    if self.best_score is None:
+      self.best_score = score
+    if self.mode == 'min':
+      if score < self.best_score - self.min_delta:
+        self.best_score = score
+        self.best_epoch = self.curr_epoch
+        self.counter = 0
+      else:
+        self.counter += 1
+    else:  # 'max'
+      if score > self.best_score + self.min_delta:
+        self.best_score = score
+        self.best_epoch = self.curr_epoch
+        self.counter = 0
+      else:
+        self.counter += 1
+    
+    if self.counter >= self.patience:
+      print(f'Early stopping triggered after {self.patience} epochs')
+      self.stop = True
+    
+    if self.wandb_run:
+      self.wandb_run.log({f'Patience count': self.counter})
+    self.curr_epoch += 1
+    
+    
 
 def main():
   with open('./wlasl_implemented_info.json') as f:
