@@ -131,6 +131,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   epoch = 0 
   best_val_score=0
   
+  
   param_groups = [
     {
       'params': model.backbone.parameters(),
@@ -187,8 +188,17 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       epoch = 0
       steps = 0
   
+  stopping_metrics = {
+    'epoch_loss': 0.0,
+    'epoch_acc': 0.0,
+    'best_val_score': best_val_score
+  }
+  #check if early_stopping is set in config.training
+  # if 'early_stopping' in config.training:
+    
+  
   #train it
-  while steps < config.training['max_steps'] and epoch < config.training['max_epoch']:
+  while epoch < config.training['max_epoch']:
     print(f"Step {steps}/{config.training['max_steps']}")
     print('-'*10)
     
@@ -261,6 +271,8 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       #calculate  epoch metrics
       epoch_loss = running_loss / total_samples # Average loss per sample
       epoch_acc = 100.0 * running_corrects / total_samples
+      stopping_metrics['epoch_loss'] = epoch_loss
+      stopping_metrics['epoch_acc'] = epoch_acc      
       
       print(f'{phase.upper()} - Epoch {epoch}:')
       print(f'  Loss: {epoch_loss:.4f}')
@@ -287,8 +299,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
         print(f'Best validation accuracy so far: {best_val_score:.2f}%')
       
     # Save checkpoint
-    if epoch % save_every == 0 or not (steps < config.training['max_steps'] 
-                                       and epoch < config.training['max_epoch']):
+    if epoch % save_every == 0 or not epoch < config.training['max_epoch'] :
         checkpoint_data = {
           'epoch': epoch,
           'steps': steps,
