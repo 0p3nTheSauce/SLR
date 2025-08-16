@@ -1,27 +1,20 @@
-import argparse
 import torch # type: ignore
 import os
-import shutil
-import tqdm   # type: ignore
-from torch.utils.tensorboard import SummaryWriter # type: ignore
 import json
-import utils
-from utils import enum_dir
 from torchvision.transforms import v2
-from  torchvision.models.video.resnet import  R3D_18_Weights #, r3d_18
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
-import models.pytorch_r3d as resnet_3d
 #local imports
 import numpy as np
 import random
 import wandb
 from video_dataset import VideoDataset
 from configs import load_config, print_config, take_args
-from models.pytorch_mvit import MViTv2S_basic
-from models.pytorch_swin3d import Swin3DBig_basic
-from models.pytorch_r3d import Resnet2_plus1D_18_basic
+from models.pytorch_mvit import MViTv2S_basic, MViTv1B_basic
+from models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
+from models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
+from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
 
 def set_seed(seed=42):
@@ -114,14 +107,29 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   
   #model, metrics, optimizer, schedular, loss
   if model_info['idx'] == 0:
-    model = MViTv2S_basic(num_classes, config.model_params['drop_p'])
+    model = MViTv1B_basic(num_classes, config.model_params['drop_p'])
     print(f'Successfully using model MViTv2S_basic')
   elif model_info['idx'] == 1:
+    model = MViTv2S_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model MViTv2S_basic')
+  elif model_info['idx'] == 2:
     model = Swin3DBig_basic(num_classes, config.model_params['drop_p'])
     print(f'Successfully using model Swin3DBig_basic')
-  elif model_info['idx'] == 2:
-    model = Resnet2_plus1D_18_basic(num_classes, config.model_params['drop_p'])
-    print(f'Successfully using model Resnet2_plus1D_basic')
+  elif model_info['idx'] == 3:
+    model = Swin3DSmall_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model Swin3DSmall_basic')
+  elif model_info['idx'] == 4:
+    model = Swin3DTiny_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model Swin3DTiny_basic')
+  elif model_info['idx'] == 5:
+    model = Resnet2_plus1D_18_basic(num_classes) # no drop_p in this model
+    print(f'Successfully using model Resnet2_plus1D_18_basic')
+  elif model_info['idx'] == 6:
+    model = Resnet3D_18_basic(num_classes)  # no drop_p in this model
+    print(f'Successfully using model Resnet3D_18_basic')
+  elif model_info['idx'] == 7:
+    model = S3D_basic(num_classes, config.model_params['drop_p'])
+    print(f'Successfully using model S3D_basic')
   else:
     raise ValueError(f'something went wrong when trying to load: {model_info} \n\
       probably need to add an if statement to train.py')
