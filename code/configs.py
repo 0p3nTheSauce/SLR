@@ -6,6 +6,7 @@ from typing import Dict, Any
 
 from utils import enum_dir
 import wandb
+from stopping import EarlyStopper
 
 def load_config(arg_dict, verbose=False):
 	"""Load config from flat file and merge with command line args"""
@@ -40,6 +41,9 @@ def load_config(arg_dict, verbose=False):
 	config['admin'] = admin
 	if verbose:	
 		print()
+	
+	config = EarlyStopper.config_precheck(config)
+		
 	# return post_process(config, verbose)
 	return config
 
@@ -192,7 +196,8 @@ def take_args(splits_available, models_available, make=False):
 		args.model,
 		f"exp-{exp_no}"
 	]
-	tags.extend(args.tags)
+	if args.tags is not None:
+		tags.extend(args.tags)
  
 	return clean_dict, tags, output, save_path, args.project
 
@@ -211,8 +216,8 @@ def string_nested_dict(dict):
 	return ans
 
 # def print_wandb_config(config):
-  
-  
+	
+	
 	
 if __name__ == '__main__':
 	from models.pytorch_mvit import MViTv2S_basic 

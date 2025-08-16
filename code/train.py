@@ -21,7 +21,7 @@ from video_dataset import VideoDataset
 from configs import load_config, print_config, take_args
 from models.pytorch_mvit import MViTv2S_basic
 from models.pytorch_swin3d import Swin3DBig_basic
-
+from stopping import EarlyStopper
 
 def set_seed(seed=42):
   torch.manual_seed(seed)
@@ -122,8 +122,6 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
     raise ValueError(f'something went wrong when trying to load: {model_info} \n\
       probably need to add an if statement to train.py')
   
-  
-  
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
   model.to(device)
   
@@ -188,20 +186,24 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       steps = 0
   
   #store the current best for early stopping
+  es_info = config.training['early_stopping']
   stopping_metrics = {
-    'train': {
+    'val' : {
       'loss': 0.0,
       'acc': 0.0
     },
-    'val': {
+    'train' : {
       'loss': 0.0,
       'acc': 0.0
-    },
-    'count': 0,
+    }
   }
-    
+  stopper = EarlyStopper(
+    arg_dict=es_info,
+    wandb_run=wandb_run
+  )
+  
   #train it
-  while epoch < config.training['max_epoch']:
+  while epoch < config.training['max_epoch'] and not stopper.stop:
     print(f"Step {steps}/{config.training['max_steps']}")
     print('-'*10)
     
@@ -274,8 +276,11 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       #calculate  epoch metrics
       epoch_loss = running_loss / total_samples # Average loss per sample
       epoch_acc = 100.0 * running_corrects / total_samples
-      stopping_metrics['epoch_loss'] = epoch_loss
-      stopping_metrics['epoch_acc'] = epoch_acc      
+      
+      #early stopping logic
+      stopping_metrics[phase]['loss'] = epoch_loss
+      stopping_metrics[phase]['acc'] = epoch_acc
+      stopper.step(stopping_metrics[stopper.phase][stopper.metric])
       
       print(f'{phase.upper()} - Epoch {epoch}:')
       print(f'  Loss: {epoch_loss:.4f}')
@@ -302,7 +307,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
         print(f'Best validation accuracy so far: {best_val_score:.2f}%')
       
     # Save checkpoint
-    if epoch % save_every == 0 or not epoch < config.training['max_epoch'] :
+    if epoch % save_every == 0 or not epoch < config.training['max_epoch'] or stopper.stop:
         checkpoint_data = {
           'epoch': epoch,
           'steps': steps,
@@ -321,46 +326,6 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   print('Finished training successfully')
   wandb_run.finish()
 
-class EarlyStopping:
-  def __init__(self, metric='val_loss', mode='min', patience=20, min_delta=0.01, wandb_run=None):
-    self.metric = metric
-    self.mode = mode
-    self.patience = patience
-    self.min_delta = min_delta
-    self.curr_epoch = 0
-    self.best_score = None
-    self.best_epoch = 0
-    self.counter = 0
-    self.wandb_run = wandb_run
-    self.stop = False
-    
-  def step(self, score):
-    if self.best_score is None:
-      self.best_score = score
-    if self.mode == 'min':
-      if score < self.best_score - self.min_delta:
-        self.best_score = score
-        self.best_epoch = self.curr_epoch
-        self.counter = 0
-      else:
-        self.counter += 1
-    else:  # 'max'
-      if score > self.best_score + self.min_delta:
-        self.best_score = score
-        self.best_epoch = self.curr_epoch
-        self.counter = 0
-      else:
-        self.counter += 1
-    
-    if self.counter >= self.patience:
-      print(f'Early stopping triggered after {self.patience} epochs')
-      self.stop = True
-    
-    if self.wandb_run:
-      self.wandb_run.log({f'Patience count': self.counter})
-    self.curr_epoch += 1
-    
-    
 
 def main():
   with open('./wlasl_implemented_info.json') as f:
