@@ -281,7 +281,8 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       #early stopping logic
       stopping_metrics[phase]['loss'] = epoch_loss
       stopping_metrics[phase]['acc'] = epoch_acc
-      stopper.step(stopping_metrics[stopper.phase][stopper.metric])
+      if phase == stopper.phase:
+        stopper.step(stopping_metrics[phase][stopper.metric])
       
       print(f'{phase.upper()} - Epoch {epoch}:')
       print(f'  Loss: {epoch_loss:.4f}')
