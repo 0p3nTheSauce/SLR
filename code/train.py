@@ -204,7 +204,8 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   
   #train it
   while epoch < config.training['max_epoch'] and not stopper.stop:
-    print(f"Step {steps}/{config.training['max_steps']}")
+    # print(f"Step {steps}/{config.training['max_steps']}")
+    print(f"Epoch {epoch}/{config.training['max_epoch']}")
     print('-'*10)
     
     epoch += 1
