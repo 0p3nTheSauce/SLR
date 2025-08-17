@@ -9,7 +9,21 @@ import gzip
 # from torchcodec.decoders import VideoDecoder
 import re
 
+############# pretty printing ##############
 
+def print_dict(dict):
+	print(string_nested_dict(dict))
+	
+def string_nested_dict(dict):
+	ans = ""
+	if type(dict) == type({}):
+		ans += "{\n"
+		for key, value in dict.items():
+			ans += f'{key} : {string_nested_dict(value)}\n'
+		ans += "}\n"
+	else:
+		ans += str(dict)
+	return ans
 
 
 

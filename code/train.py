@@ -16,6 +16,10 @@ from models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny
 from models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
+import time
+
+ENTITY= 'ljgoodall2001-rhodes-university'
+PROJECT = 'WLASL-SLR'
 
 def set_seed(seed=42):
   torch.manual_seed(seed)
@@ -341,13 +345,69 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   wandb_run.finish()
 
 
+def wait_for_run_completion(entity, project, check_interval=600):
+  api = wandb.Api()
+  # if last:
+  #   run_id
+  runs = api.runs(f"{entity}/{project}")
+  if not runs:
+    print("No runs found.")
+    return
+  
+  # Get the most recent run
+  run = runs[-1]  # Assuming the last run is the one we want to monitor
+  run_info = {
+    'id': run.id,
+    'name': run.name,
+    'state': run.state,
+    'created_at': run.created_at,
+  }
+  
+  if run.state in ["finished", "crashed", "failed"]:
+    return run_info
+  
+  print(f"Monitoring run: {run.name} (ID: {run.id})")
+  
+  # Wait for the run to finish
+  
+  run = api.run(f"{entity}/{project}/{run.id}")
+  try:
+    while run.state not in ["finished", "crashed", "failed"]:
+      print(f"Run state: {run.state}")
+      time.sleep(check_interval)
+      run.load()  # Refresh the run data
+  except wandb.Error as e:
+    print(f"Error while waiting for run completion: {e}")
+    return None
+  except KeyboardInterrupt:
+    print()
+    print("Monitoring interrupted by user.")
+    run_info['state'] = 'exit_without_training'
+  
+  return run_info
+
+def list_runs():
+  # import wandb
+
+  api = wandb.Api()
+  runs = api.runs(f"{ENTITY}/{PROJECT}")
+
+  for run in runs:
+      print(f"Run ID: {run.id}")
+      print(f"Run name: {run.name}")
+      print(f"State: {run.state}")
+      print(f"Created: {run.created_at}")
+      print("---")
+
+
 def main():
   with open('./wlasl_implemented_info.json') as f:
     info = json.load(f)
   available_splits = info['splits']
   model_info = info['models']
   
-  arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys())
+  arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys(),
+                                                         default_project=PROJECT)
   
   config = load_config(arg_dict, verbose=True)
   
@@ -358,14 +418,42 @@ def main():
     admin = config['admin']
     model_specifcs = model_info[admin['model']]
     
+    run_info = wait_for_run_completion(ENTITY, project)
+    state = run_info['state'] if run_info else None
+    if state is None:
+      pass # No previous run found, proceed with new run
+    elif state == "finished":
+      print("Last run completed successfully. Proceeding with new run.")
+    elif state in ["crashed", "failed"]:
+      ans = input(f"Last run did not complete successfully. Proceed? [y/n]: ")
+      if ans.lower() != 'y':
+        print("Exiting without training.")
+        return
+    elif state == 'running':
+      ans = input(f"Last run is still busy. Proceed anyway? [y/n]: ")
+      if ans.lower() == 'y':
+        print("Proceeding with new run.")
+      else:
+        print("Exiting without training.")
+        return
+    elif state == 'exit_without_training':
+      print("Exiting without training.")
+      return
+    else:
+      print(f"Unknown state: {state}. Proceeding with new run.")
+      
+    
     run = wandb.init(
-      entity='ljgoodall2001-rhodes-university',
+      entity=ENTITY,
       project=project,
       name=f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}",
       tags=tags,
       config=config      
     )
-      
+    print(f"Run ID: {run.id}")
+    print(f"Run name: {run.name}")  # Human-readable name
+    print(f"Run path: {run.path}")  # entity/project/run_id format
+    
     # Start training
     os.makedirs(output, exist_ok=True)
     os.makedirs(save_path, exist_ok=True)
@@ -377,3 +465,4 @@ def main():
   
 if __name__ == '__main__':
   main()
+  # list_runs()

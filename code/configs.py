@@ -4,7 +4,7 @@ import importlib
 import ast
 from typing import Dict, Any
 
-from utils import enum_dir
+from utils import enum_dir, print_dict
 import wandb
 from stopping import EarlyStopper
 
@@ -131,14 +131,14 @@ def print_config(config_dict):
 			print(f"    {key:<{max_key_len}} : {value}")
 		print()
 
-def take_args(splits_available, models_available, make=False):
+def take_args(splits_available, models_available, make=False, default_project='WLASL-SLR'):
 	parser = argparse.ArgumentParser(description='Train a swin3d model')
 	
 	#admin
 	parser.add_argument('-e', '--exp_no',type=int, help='Experiment number (e.g. 10)', required=True)
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
 	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
-	parser.add_argument('-p', '--project', type=str, default='WLASL-SLR', help='wandb project name')
+	parser.add_argument('-p', '--project', type=str, default=default_project, help='wandb project name')
 	parser.add_argument('-s', '--split',type=str, help='The class split (e.g. asl100)', required=True)
 	#TODO: maybe add tags for wandb as parameters
 	parser.add_argument('-t', '--tags', nargs='+', type=str,help='Additional wandb tags')
@@ -201,19 +201,6 @@ def take_args(splits_available, models_available, make=False):
  
 	return clean_dict, tags, output, save_path, args.project
 
-def print_dict(dict):
-	print(string_nested_dict(dict))
-	
-def string_nested_dict(dict):
-	ans = ""
-	if type(dict) == type({}):
-		ans += "{\n"
-		for key, value in dict.items():
-			ans += f'{key} : {string_nested_dict(value)}\n'
-		ans += "}\n"
-	else:
-		ans += str(dict)
-	return ans
 
 # def print_wandb_config(config):
 	
