@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import random
 # @pytest.fixture
 
+from train import wait_for_run_completion
+from utils import print_dict
+
 def plot_simulated_training(x_range, f):
   x = x_range
   y = [f(i) for i in x]
@@ -98,8 +101,21 @@ def test_early_stopping(mode='min'):
   plot_simulated_training(x_range, f)
   wandb.finish()
     
+def test_wait_for_run_completion():
+  # Test the wait_for_run_completion function
+  # This is a mock test, as we cannot run actual wandb runs here
+  entity = 'ljgoodall2001-rhodes-university'
+  project = 'WLASL-SLR'
+  run_info = wait_for_run_completion(entity, project, check_interval=5)
+  if run_info is None:
+    print("No run found or run is still in progress.")
+    return
+  print("Run information:")
+  print_dict(run_info)
   
+
 if __name__ == "__main__":
-  test_early_stopping(mode='min')
+  # test_early_stopping(mode='min')
+  test_wait_for_run_completion()
   # pytest.main([__file__])
   
