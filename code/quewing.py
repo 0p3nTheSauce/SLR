@@ -8,7 +8,9 @@ import wandb
 import time
 
 #local imports
-from train import PROJECT, ENTITY
+# from train import PROJECT, ENTITY
+ENTITY= 'ljgoodall2001-rhodes-university'
+PROJECT = 'WLASL-SLR'
 from configs import load_config, print_config, take_args
 
 #constants
@@ -239,11 +241,17 @@ def daemon():
 		if next_run is None:
 			print("No more runs to execute.")
 			break
-		
+		else:
+			#store the next run to temp folder
+			with open(TEMP_PATH, 'w') as f:
+				json.dump(next_run, f, indent=2)
+   		#stash run info in temp
+
+  
 		start('train')
 	
 		retries = 0
-print("Closing quewing daemon")
+	print("Closing quewing daemon")
 			
 def create_run(verbose=True):
 	with open('./wlasl_implemented_info.json') as f:
@@ -259,7 +267,7 @@ def create_run(verbose=True):
 	print_config(config)
 
 	proceed = input("Confirm: y/n: ")
-	if proceed.lower() != 'y':
+	if proceed.lower() == 'y':
 		if verbose:
 			print("Saving run info ")
 		info = {
@@ -271,9 +279,9 @@ def create_run(verbose=True):
 			'output': output,
 			'save_path': save_path
 		}
-		add_new_run(TEMP_PATH, info, verbose=verbose)
+		add_new_run(RUNS_PATH, info, verbose=verbose)
 		if verbose:
-			print(f"Run info saved to {TEMP_PATH}")
+			print(f"Run info saved to {RUNS_PATH}")
 		# Start training
 		os.makedirs(output, exist_ok=True)
 		os.makedirs(save_path, exist_ok=True)
@@ -288,9 +296,14 @@ def main():
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
 	
 	args, other = parser.parse_known_args()
-	
+ 
 	if args.add:
-		create_run()
+		create_run(verbose=True)
+		print("run added successfully")
 	
 	if args.daemon:
 		start('daemon')
+		print("daemon started successfully")
+  
+if __name__ == '__main__':
+  main()
