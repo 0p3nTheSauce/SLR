@@ -16,7 +16,7 @@ from models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny
 from models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
-import time
+from quewing import get_run_id
 
 ENTITY= 'ljgoodall2001-rhodes-university'
 PROJECT = 'WLASL-SLR'
@@ -347,99 +347,6 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
   wandb_run.finish()
 
 
-def wait_for_run_completion(entity, project, check_interval=300):
-  api = wandb.Api()
-  # if last:
-  #   run_id
-  no_runs_dict = {
-    'id': None,
-    'name': None,
-    'state': 'no_runs',
-    'created_at': None
-  }
-  
-  runs = api.runs(f"{entity}/{project}")
-  if not runs:
-    print("No runs found.")
-    return no_runs_dict
-  
-  # Get the most recent run
-  run = runs[-1]  # Assuming the last run is the one we want to monitor
-  run_info = {
-    'id': run.id,
-    'name': run.name,
-    'state': run.state,
-    'created_at': run.created_at,
-  }
-  
-  if run.state in ["finished", "crashed", "failed"]:
-    return run_info
-  
-  print(f"Monitoring run: {run.name} (ID: {run.id})")
-  
-  # Wait for the run to finish
-  
-  run = api.run(f"{entity}/{project}/{run.id}")
-  try:
-    while run.state not in ["finished", "crashed", "failed"]:
-      print(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-      time.sleep(check_interval)
-      run.load()  # Refresh the run data
-  except wandb.Error as e:
-    print(f"Error while waiting for run completion: {e}")
-    run_info['state'] = 'wandb_error'
-    run_info['wandb_error'] = str(e)
-    return run_info
-  except KeyboardInterrupt:
-    print()
-    print("Monitoring interrupted by user.")
-    run_info['state'] = 'exit_without_training'
-  
-  return run_info
-
-def get_run_id(run_name, entity, project):
-  api = wandb.Api()
-  runs = api.runs(f"{entity}/{project}")
-  ids = []
-  for run in runs:
-    if run.name == run_name:
-      ids.append(run.id)
-      
-  if len(ids) == 0:
-    print(f"No runs found with name: {run_name}")
-    return None
-  elif len(ids) > 1:
-    print(f"Multiple runs found with name: {run_name}")
-    for idx, run_id in enumerate(ids):
-      print(f"{idx}: {run_id}")
-    choice = input("Select run idx to use: ")
-    try:
-      choice = int(choice)
-      if 0 <= choice < len(ids):
-        return ids[choice]
-      else:
-        print("Invalid choice, returning None")
-        return None
-    except ValueError:
-      print("Invalid input, returning None")
-  else:
-    return ids[0]
-  
-
-def list_runs():
-  # import wandb
-
-  api = wandb.Api()
-  runs = api.runs(f"{ENTITY}/{PROJECT}")
-
-  for run in runs:
-      print(f"Run ID: {run.id}")
-      print(f"Run name: {run.name}")
-      print(f"State: {run.state}")
-      print(f"Created: {run.created_at}")
-      print("---")
-
-
 def main():
   with open('./wlasl_implemented_info.json') as f:
     info = json.load(f)
@@ -458,47 +365,11 @@ def main():
     admin = config['admin']
     model_specifcs = model_info[admin['model']]
     run_id = None #only used if we are recovering a run
-    
-    #run queue
-    run_info = wait_for_run_completion(ENTITY, project)
-    state = run_info['state']
-    if state == 'no_runs':
-      pass # No previous run found, proceed with new run
-    elif state == "finished":
-      print("Last run completed successfully. Proceeding with new run.")
-    elif state in ["crashed", "failed"]:
-      if admin['recover']:
-        print(f'Successfully found run: {run_info["name"]} with id: {run_info["id"]}')    
-        run_id = run_info['id']
-      else:
-        ans = input(f"Last run did not complete successfully. Proceed? [y/n]: ")
-        if ans.lower() != 'y':
-          print("Exiting without training.")
-          return
-    elif state == 'running':
-      ans = input(f"Last run is still busy. Proceed anyway? [y/n]: ")
-      if ans.lower() == 'y':
-        print("Proceeding with new run.")
-      else:
-        print("Exiting without training.")
-        return
-    elif state == 'wandb_error':
-      print(f"error with wandb: {run_info.get('wandb_error', 'Unknown error')}")
-      ans = input(f"Proceed with new run? [y/n]: ")
-      if ans.lower() != 'y':
-        print("Exiting without training.")
-        return
-      print("Proceeding with new run.")
-    elif state == 'exit_without_training':
-      print("Exiting without training.")
-      return
-    else:
-      print(f"Unknown state: {state}. Proceeding with new run.")
       
     #setup wandb run
     run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
     if admin['recover']:
-      if run_id is None: #we are resuming a run that was finished successfully
+      if run_id is None: 
         run_id = get_run_id(run_name, ENTITY, project)
       if run_id is None:
         run_id = ("No run found automatically. Enter run ID, or leave blank to cancel: ")
