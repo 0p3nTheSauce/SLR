@@ -132,8 +132,8 @@ def print_config(config_dict):
 		print()
 
 def take_args(splits_available, models_available, make=False, default_project='WLASL-SLR'):
-	parser = argparse.ArgumentParser(description='Train a swin3d model')
-	
+	parser = argparse.ArgumentParser(description='Train a model')
+ 
 	#admin
 	parser.add_argument('-e', '--exp_no',type=int, help='Experiment number (e.g. 10)', required=True)
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
@@ -142,7 +142,6 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	parser.add_argument('-s', '--split',type=str, help='The class split (e.g. asl100)', required=True)
 	#TODO: maybe add tags for wandb as parameters
 	parser.add_argument('-t', '--tags', nargs='+', type=str,help='Additional wandb tags')
-
 
 	#overides
 	parser.add_argument('-c' , '--config_path', help='path to config .ini file')	
@@ -154,7 +153,7 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	parser.add_argument('-me', '--max_epoch', type=int,help='mixumum training epoch')
 	
  
-	args = parser.parse_args()
+	args, _ = parser.parse_known_args()
 	
 	if args.split not in splits_available:
 		raise ValueError(f"Sorry {args.split} not processed yet.\n\
