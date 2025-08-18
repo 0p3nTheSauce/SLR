@@ -181,27 +181,8 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
         #setup recovery
     
     load = os.path.join(config.admin['save_path'], fname)
-    
-  if load:
-    if os.path.exists(load):
-      checkpoint = torch.load(load, map_location=device, weights_only=True)
-      model.load_state_dict(checkpoint['model_state_dict'])
-      optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-      scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-      epoch = checkpoint['epoch'] + 1
-      steps = checkpoint['steps']
-      if 'best_val_score' in checkpoint:
-        best_val_score = checkpoint['best_val_score']
-      print(f"Resuming from epoch {epoch}, steps {steps}")
-      print(f"Loaded model from {load}")
-    else:
-      cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
-      if cont.lower() != 'y':
-        return
-      epoch = 0
-      steps = 0
   
-  #store the current best for early stopping
+  #early stopping setup
   es_info = config.training['early_stopping']
   stopping_metrics = {
     'val' : {
@@ -217,6 +198,26 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
     arg_dict=es_info,
     wandb_run=wandb_run
   )
+  
+  if load:
+    if os.path.exists(load):
+      checkpoint = torch.load(load, map_location=device, weights_only=True)
+      model.load_state_dict(checkpoint['model_state_dict'])
+      optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+      scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+      stopper.load_state_dict(checkpoint['stopper_state_dict'])
+      epoch = checkpoint['epoch'] + 1
+      steps = checkpoint['steps']
+      best_val_score = checkpoint['best_val_score']
+      
+      print(f"Resuming from epoch {epoch}, steps {steps}")
+      print(f"Loaded model from {load}")
+    else:
+      cont = input(f"Checkpoint {load} does not exist, starting from scratch? [y]")
+      if cont.lower() != 'y':
+        return
+      epoch = 0
+      steps = 0
   
   #train it
   while epoch < config.training['max_epoch'] and not stopper.stop:
@@ -332,7 +333,8 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
           'model_state_dict': model.state_dict(),
           'optimizer_state_dict': optimizer.state_dict(),
           'scheduler_state_dict': scheduler.state_dict(),
-          'best_val_score': best_val_score
+          'best_val_score': best_val_score,
+          'stopper_state_dict': stopper.state_dict() 
         }
         checkpoint_path = os.path.join(config.admin['save_path'], f'checkpoint_{str(epoch).zfill(3)}.pth')
         
