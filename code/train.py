@@ -344,7 +344,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
         print(f'Checkpoint saved: {checkpoint_path}')
         
   print('Finished training successfully')
-  wandb_run.finish()
+  # wandb_run.finish()
 
 
 def main():
