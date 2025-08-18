@@ -172,11 +172,13 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	output = f'runs/{args.split}/{args.model}_exp{exp_no}'
 	
 	if not args.recover: #fresh run
-		output = enum_dir(output, make)  
-	
+		output = enum_dir(output, make)  	
+ 
 	save_path = f'{output}/checkpoints'
 	if not args.recover:
 		args.save_path = enum_dir(save_path, make) 
+	else:
+		args.save_path = save_path
 	
 	# Set config path
 	if args.config_path is None:
