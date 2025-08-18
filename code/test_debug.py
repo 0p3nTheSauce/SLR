@@ -99,7 +99,9 @@ def test_early_stopping(mode='min'):
   print(f"Best score: {stopper.best_score}, Best epoch: {stopper.best_epoch}")
     
   plot_simulated_training(x_range, f)
-  wandb.finish()
+  
+  test_stopper_save_and_load(stopper, arg_dict)
+  # wandb.finish()
     
 def test_wait_for_run_completion():
   # Test the wait_for_run_completion function
@@ -113,9 +115,26 @@ def test_wait_for_run_completion():
   print("Run information:")
   print_dict(run_info)
   
+def test_stopper_save_and_load(stopper, arg_dict):
+  # Test the EarlyStopper save and load functionality
+  
+  # stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None)
+    
+  # Save the stopper state
+  stopper_dict = stopper.state_dict()
+  stopper = None
+  stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None)
+  # Load the stopper state
+  stopper.load_state_dict(stopper_dict)
+  
+  # Check if the state is restored correctly
+  assert stopper.best_score is not None, "Best score should not be None after loading state"
+  print(f"Restored best score: {stopper.best_score}, Best epoch: {stopper.best_epoch}, Counter: {stopper.counter}")
+
 
 if __name__ == "__main__":
-  # test_early_stopping(mode='min')
-  test_wait_for_run_completion()
+  test_early_stopping(mode='min')
+  # test_wait_for_run_completion()
   # pytest.main([__file__])
+  # test_stopper_save_and_load()
   

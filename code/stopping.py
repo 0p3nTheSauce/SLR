@@ -125,3 +125,23 @@ class EarlyStopper:
         raise ValueError(f"Min delta must be non-negative, got {es_info['min_delta']}")
       
     return config
+  
+  def state_dict(self):
+    return {
+      'on': self.on,
+      'phase': self.phase,
+      'metric': self.metric,
+      'mode': self.mode,
+      'patience': self.patience,
+      'min_delta': self.min_delta,
+      'curr_epoch': self.curr_epoch,
+      'best_score': self.best_score,
+      'best_epoch': self.best_epoch,
+      'counter': self.counter,
+      'wandb_run': self.wandb_run,
+      'stop': self.stop
+    }
+  
+  def load_state_dict(self, state_dict):
+    for key, value in state_dict.items():
+      setattr(self, key, value)
