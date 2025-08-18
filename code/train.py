@@ -382,7 +382,7 @@ def wait_for_run_completion(entity, project, check_interval=300):
   run = api.run(f"{entity}/{project}/{run.id}")
   try:
     while run.state not in ["finished", "crashed", "failed"]:
-      print(f"Run state: {run.state}")
+      print(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
       time.sleep(check_interval)
       run.load()  # Refresh the run data
   except wandb.Error as e:
