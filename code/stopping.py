@@ -10,6 +10,7 @@ class EarlyStopper:
     patience (int): Number of epochs to wait for improvement before stopping.
     min_delta (float): Minimum change in the monitored metric to qualify as an improvement.
     wandb_run: Optional wandb run object for logging.
+    on (bool): Whether early stopping is enabled. Defaults to True.
   
   Attributes:
     on (bool): Whether early stopping is enabled.
@@ -38,7 +39,7 @@ class EarlyStopper:
   required_keys = ['metric', 'mode', 'patience', 'min_delta']
   
   def __init__(self,arg_dict=None,  
-               metric=('val','loss'), mode='min', patience=20, min_delta=0.01,
+               metric=('val','loss'), mode='min', patience=20, min_delta=0.01,on=True,
                wandb_run=None):
     
     if arg_dict: #coming straight from configs.py
@@ -48,11 +49,11 @@ class EarlyStopper:
       patience = arg_dict.get('patience', patience)
       min_delta = arg_dict.get('min_delta', min_delta)
     else:
-      self.on = True
+      self.on = on
     
-    if not self.on:
-      print("Early stopping is switched off")
-      return
+    # if not self.on:
+    #   print("Early stopping is switched off")
+    #   return
     
     if isinstance(metric, list):
       metric = tuple(metric)
