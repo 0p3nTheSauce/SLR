@@ -1,6 +1,5 @@
 {
-  "old_runs": [],
-  "to_run": [
+  "old_runs": [
     {
       "model_info": {
         "MViT_V1_B": {
@@ -146,7 +145,7 @@
           "config_path": "./configfiles/asl100/Resnet3D_18_003.ini",
           "root": "../data/WLASL/WLASL2000",
           "labels": "./preprocessed/labels/asl100",
-          "save_path": "runs/asl100/Resnet3D_18_exp004/checkpoints"
+          "save_path": "runs/asl100/Resnet3D_18_exp003/checkpoints"
         }
       },
       "entity": "ljgoodall2001-rhodes-university",
@@ -156,8 +155,9 @@
         "Resnet3D_18",
         "exp-003"
       ],
-      "output": "runs/asl100/Resnet3D_18_exp004",
-      "save_path": "runs/asl100/Resnet3D_18_exp004/checkpoints"
+      "output": "runs/asl100/Resnet3D_18_exp003",
+      "save_path": "runs/asl100/Resnet3D_18_exp003/checkpoints"
     }
-  ]
+  ],
+  "to_run": []
 }

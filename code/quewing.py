@@ -202,7 +202,8 @@ def start(proc_type, session_name='training', script_path=SCRIPT_PATH):
 		"-n", f"que_{proc_type}",
 		script_path, proc_type 
 	]
-	subprocess.run(tmux_cmd)
+	result = subprocess.run(tmux_cmd, capture_output=True, text=True)
+	return result
 
 def daemon():
 	runs_path = RUNS_PATH
@@ -213,7 +214,6 @@ def daemon():
 		run_info = wait_for_run_completion(ENTITY, PROJECT, check_interval=300)
 		if run_info['state'] == 'finished':
 			print(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.")
-			remove_old_run(runs_path, verbose=True)
 		elif run_info['state'] == 'wandb_error':
 			print(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}")
 			print("Retrying...")
@@ -231,9 +231,6 @@ def daemon():
 			print(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}")
 			proceed = input("Do you want to proceed with the next run? (y/n): ")
 			if proceed.lower() != 'y':
-				print('removing failed run')
-				remove_old_run(runs_path, verbose=True)
-			else:
 				print("Exiting without further action.")
 				break
 		
@@ -245,10 +242,11 @@ def daemon():
 			#store the next run to temp folder
 			with open(TEMP_PATH, 'w') as f:
 				json.dump(next_run, f, indent=2)
-   		#stash run info in temp
+			remove_old_run(runs_path, verbose=True)
+	 		#stash run info in temp
 
-  
-		start('train')
+	
+		result = start('train')
 	
 		retries = 0
 	print("Closing quewing daemon")
@@ -290,11 +288,32 @@ def create_run(verbose=True):
 			print("Training cancelled by user.")
 		return
 
+def clear_runs(runs_path, verbose=True, past_only=False):
+	all_runs = {
+		'old_runs': [],
+		'to_run': []
+	}
+	if not os.path.exists(runs_path):
+		raise ValueError(f'could not find runs file: {runs_path}')
+	
+	if past_only:
+		with open(runs_path, 'w') as f:
+			all_runs = json.load(f)
+		all_runs['old_runs'] = []
+	
+	with open(runs_path, 'w') as f:
+		json.dump(all_runs, f, indent=2)
+	
+	if verbose:
+		print(f'Succesfully cleared {runs_path}')
+	
+
 def main():
 	parser = argparse.ArgumentParser(description="Queuing training runs")
 	parser.add_argument('-a', '--add', action='store_true', help='add new training command')
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
-	
+	parser.add_argument('-cl', '--clear', action='store_true', help='clear the runs file')	
+ 
 	args, other = parser.parse_known_args()
  
 	if args.add:
@@ -304,6 +323,9 @@ def main():
 	if args.daemon:
 		start('daemon')
 		print("daemon started successfully")
-  
+	
+	if args.clear:
+		clear_runs(RUNS_PATH, verbose=True)
+	
 if __name__ == '__main__':
-  main()
+	main()
