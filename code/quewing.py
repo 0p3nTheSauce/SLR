@@ -209,6 +209,7 @@ def daemon():
 	runs_path = RUNS_PATH
 	retries = 0
 	max_retries = 5
+	outcomes = ['success', 'failure']
 	while True:
 
 		run_info = wait_for_run_completion(ENTITY, PROJECT, check_interval=300)
@@ -245,8 +246,10 @@ def daemon():
 			remove_old_run(runs_path, verbose=True)
 	 		#stash run info in temp
 
-	
 		result = start('train')
+		print()
+		print(f'result of training script: {outcomes[result.returncode]}')
+		print(f'Script output: \n {result.stdout}')
 	
 		retries = 0
 	print("Closing quewing daemon")
@@ -313,7 +316,7 @@ def main():
 	parser.add_argument('-a', '--add', action='store_true', help='add new training command')
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
 	parser.add_argument('-cl', '--clear', action='store_true', help='clear the runs file')	
- 
+	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')	
 	args, other = parser.parse_known_args()
  
 	if args.add:
@@ -326,6 +329,8 @@ def main():
 	
 	if args.clear:
 		clear_runs(RUNS_PATH, verbose=True)
+	elif args.clear_old:
+		clear_runs(RUNS_PATH, verbose=True, past_only=True)
 	
 if __name__ == '__main__':
 	main()
