@@ -134,7 +134,7 @@ def add_new_run(runs_path, info, verbose=False):
 	'''Adds a new entry to the runs.json file
 
 		by adding info at the end of the  "to_run" list
-  
+	
 		Returns all_runs
 	'''
 	all_runs = {
@@ -196,7 +196,7 @@ def remove_old_run(runs_path, verbose=False):
 
 		by moving the first entry of the "to_run" list,
 		to the last entry of the "old_runs" list
-  
+	
 		Returns None if error, else old_run info
 	'''
 	all_runs = {
@@ -226,6 +226,12 @@ def remove_old_run(runs_path, verbose=False):
 	print_v(json.dumps(old_run, indent=2), verbose)
 			
 	return old_run
+
+def store_Temp(temp_path, next_run):
+	''''Stores the next run in the temp file for retrieval'''
+	with open(temp_path, 'w') as f:
+		json.dump(next_run, f, indent=2)
+
 
 def start(proc_type, session_name='training', script_path=SCRIPT_PATH):
 	'''proc_type can be "train" or "daemon'''
@@ -298,7 +304,7 @@ def handle_already_running(entity, project, check_interval=300, verbose=False, m
 		
 
 def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
-	
+	# with open()
 	runs_path = RUNS_PATH
 	proceed = False
 	outcomes = ['success', 'failure']
@@ -318,27 +324,26 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 			print_v("No more runs to execute.", verbose)
 			break
 		else:
-			#store the next run to temp folder
-			with open(TEMP_PATH, 'w') as f:
-				json.dump(next_run, f, indent=2)
+			#stash run for quefeather to find
+			store_Temp(TEMP_PATH, next_run)
 			
-			#clean up runs file
+			#move the next_run from "to_run" to "old_runs" 
 			remove_old_run(runs_path, verbose=True)
-	 		
-			
-	 
-	 
-	 
-		result = start('train') #this is actually blocking
-		#remember to clean up the temp folder when finished
+	 	
+		#start a training process in a detached tmux window. 
+  	#session: training, name: que_train [num] 	
+		#if que_train exists, increments num  
+		result = start('train') #this is blocking
+		
+  	#remember to clean up the temp folder when finished
 		clean_Temp(TEMP_PATH, verbose=True)
 	
-		print()
-		print(f'result of training script: {outcomes[result.returncode]}')
-		print(f'Script output: \n {result.stdout}')
+		#output from training session
+		print_v('', verbose)
+		print_v(f'result of training script: {outcomes[result.returncode]}', verbose)
+		print_v(f'Script output: \n {result.stdout}', verbose)
 	
-		retries = 0
-	print("Closing quewing daemon")
+	print_v("Closing quewing daemon", verbose)
 			
 def create_run(verbose=True):
 	with open('./wlasl_implemented_info.json') as f:

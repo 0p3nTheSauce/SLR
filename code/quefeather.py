@@ -1,5 +1,8 @@
 #!/home/luke/miniconda3/envs/wlasl/bin/python
 
+#NOTE might not need shebang, as apparently spawned processes
+#inherit the environment of their parents
+
 import json
 import wandb
 import os
