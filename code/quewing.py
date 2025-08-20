@@ -19,6 +19,10 @@ RUNS_PATH = './queRuns.json'
 SCRIPT_PATH = './quefeather.py'
 RETRY_WAIT_TIME = 300 # 5 minutes
 
+def print_v(item : str, verbose : bool) -> None:
+  if verbose:
+    print(item)
+
 def get_run_id(run_name, entity, project):
 	api = wandb.Api()
 	runs = api.runs(f"{entity}/{project}")
@@ -137,16 +141,14 @@ def get_next_run(runs_path, verbose=False):
 		'to_run': []
 	}
 	if not os.path.exists(runs_path):
-		if verbose:
-			print(f"No runs file found at {runs_path}. Returning None.")
+		print_v(f"No runs file found at {runs_path}. Returning None.", verbose)
 		return None
 	
 	with open(runs_path, 'r') as f:
 		all_runs = json.load(f)
 		
 	if not all_runs['to_run']:
-		if verbose:
-			print(f"No runs to run in {runs_path}. Returning None.")
+		print_v(f"No runs to run in {runs_path}. Returning None.", verbose)
 		return None
 	
 	# next_run = all_runs['to_run'].pop(0)
@@ -157,9 +159,9 @@ def get_next_run(runs_path, verbose=False):
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
 		
-	if verbose:
-		print(f"Next run to run from {runs_path}:")
-		print(json.dumps(next_run, indent=2))
+	
+	print_v(f"Next run to run from {runs_path}:", verbose)
+	print_v(json.dumps(next_run, indent=2), verbose)
 			
 	return next_run
 	
@@ -169,16 +171,14 @@ def remove_old_run(runs_path, verbose=False):
 		'to_run': []
 	}
 	if not os.path.exists(runs_path):
-		if verbose:
-			print(f"No runs file found at {runs_path}.")
+		print_v(f"No runs file found at {runs_path}.", verbose)
 		return None
 	
 	with open(runs_path, 'r') as f:
 		all_runs = json.load(f)
 		
 	if not all_runs['to_run']:
-		if verbose:
-			print(f"No runs to run in {runs_path}. Returning None.")
+		print_v(f"No runs to run in {runs_path}. Returning None.", verbose)
 		return None
 	
 	old_run = all_runs['to_run'].pop(0)
@@ -188,9 +188,9 @@ def remove_old_run(runs_path, verbose=False):
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
 		
-	if verbose:
-		print(f"Next run to run from {runs_path}:")
-		print(json.dumps(old_run, indent=2))
+	
+	print_v(f"Next run to run from {runs_path}:", verbose)
+	print_v(json.dumps(old_run, indent=2), verbose)
 			
 	return old_run
 
@@ -205,7 +205,13 @@ def start(proc_type, session_name='training', script_path=SCRIPT_PATH):
 	result = subprocess.run(tmux_cmd, capture_output=True, text=True)
 	return result
 
-def daemon():
+def clean_Temp(temp_path, verbose=False):
+  cleaned = {}
+  with open(temp_path, 'w') as f:
+    json.dump(cleaned, f)
+  print_v('Cleaned temp fil', verbose)
+
+def daemon(verbose=True):
 	runs_path = RUNS_PATH
 	retries = 0
 	max_retries = 5
@@ -214,22 +220,22 @@ def daemon():
 
 		run_info = wait_for_run_completion(ENTITY, PROJECT, check_interval=300)
 		if run_info['state'] == 'finished':
-			print(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.")
+			print_v(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.", verbose)
 		elif run_info['state'] == 'wandb_error':
-			print(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}")
-			print("Retrying...")
+			print_v(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}", verbose)
+			print_v("Retrying...", verbose)
 			time.sleep(RETRY_WAIT_TIME)
 			retries += 1
 			if retries >= max_retries:
-				print("Max retries reached. Exiting.")
+				print_v("Max retries reached. Exiting.", verbose)
 				break
 			continue
 		elif run_info['state'] == 'key_board_interrupt':
-			print(f'Monitoring interrupted by user for run {run_info["name"]} (ID: {run_info["id"]})')
-			print("Exiting without further action.")
+			print_v(f'Monitoring interrupted by user for run {run_info["name"]} (ID: {run_info["id"]})', verbose)
+			print_v("Exiting without further action.", verbose)
 			break
 		else: #killed, crashed or failed
-			print(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}")
+			print_v(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}", verbose)
 			proceed = input("Do you want to proceed with the next run? (y/n): ")
 			if proceed.lower() != 'y':
 				print("Exiting without further action.")
@@ -247,6 +253,9 @@ def daemon():
 	 		#stash run info in temp
 
 		result = start('train')
+		#remember to clean up the temp folder when finished
+		clean_Temp(TEMP_PATH, verbose=True)
+  
 		print()
 		print(f'result of training script: {outcomes[result.returncode]}')
 		print(f'Script output: \n {result.stdout}')
