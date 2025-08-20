@@ -221,10 +221,18 @@ def test_stopper_save_and_load(stopper, arg_dict):
   assert stopper.best_score is not None, "Best score should not be None after loading state"
   print(f"Restored best score: {stopper.best_score}, Best epoch: {stopper.best_epoch}, Counter: {stopper.counter}")
 
+def tmux_session():
+  from quewing import setup_tmux_session, check_tmux_session, separate
+  result = check_tmux_session('test', 'd', 'w', True)
+  if result != 'ok':
+    setup_tmux_session('test', 'd', 'w', True)
+  print(separate('d', 'test', './quefeather.py','Testing', True)  )
+
 
 if __name__ == "__main__":
   # test_early_stopping(mode='min')
-  test_wait_for_run_completion()
+  # test_wait_for_run_completion()
   # pytest.main([__file__])
   # test_stopper_save_and_load()
+  tmux_session()
   
