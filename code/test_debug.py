@@ -223,8 +223,10 @@ def test_stopper_save_and_load(stopper, arg_dict):
 
 def tmux_session():
   from quewing import setup_tmux_session, check_tmux_session, separate
-  result = check_tmux_session('test', 'd', 'w', True)
-  if result != 'ok':
+  # result = check_tmux_session('test', 'd', 'w', True)
+  # if result != 'ok':
+  #   setup_tmux_session('test', 'd', 'w', True)
+  try:
     setup_tmux_session('test', 'd', 'w', True)
   print(separate('d', 'test', './quefeather.py','Testing', True)  )
 
