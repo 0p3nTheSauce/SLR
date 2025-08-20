@@ -1,16 +1,14 @@
 #!/home/luke/miniconda3/envs/wlasl/bin/python
 
-#NOTE might not need shebang, as apparently spawned processes
-#inherit the environment of their parents
-
 import json
 import wandb
 import os
 import sys
 from train import train_loop
-from quewing import get_run_id, daemon, TEMP_PATH
+from quewing import get_run_id, daemon, TEMP_PATH, print_v
+import argparse
 
-def run_train():
+def run_train(verbose=False):
   '''An easy to execute script for quewing'''
   with open(TEMP_PATH) as f:
     info = json.load(f)
@@ -34,11 +32,11 @@ def run_train():
     if run_id is None: 
       run_id = get_run_id(run_name, entity, project)
     if run_id is None:
-      run_id = ("No run found automatically. Enter run ID, or leave blank to cancel: ")
+      run_id = input("No run found automatically. Enter run ID, or leave blank to cancel: ")
       if run_id == '':
         print("Training cancelled")
         return
-    print(f"Resuming run with ID: {run_id}")
+    print_v(f"Resuming run with ID: {run_id}", verbose)
     run = wandb.init(
       entity=entity,
       project=project,
@@ -49,7 +47,7 @@ def run_train():
       config=config      
     )
   else:
-    print(f"Starting new run with name: {run_name}")
+    print_v(f"Starting new run with name: {run_name}", verbose)
     run = wandb.init(
       entity=entity,
       project=project,
@@ -57,9 +55,9 @@ def run_train():
       tags=tags,
       config=config      
     )
-  print(f"Run ID: {run.id}")
-  print(f"Run name: {run.name}")  # Human-readable name
-  print(f"Run path: {run.path}")  # entity/project/run_id format
+  print_v(f"Run ID: {run.id}", verbose)
+  print_v(f"Run name: {run.name}", verbose)  # Human-readable name
+  print_v(f"Run path: {run.path}", verbose)  # entity/project/run_id format
   
   # Start training
   os.makedirs(output, exist_ok=True)
@@ -67,23 +65,63 @@ def run_train():
   train_loop(model_specifcs, run, recover=admin['recover'])
   run.finish()
 
-
+def print_seperator(title='', verbose=True):
+  '''This prints out a seperator between training runs
+  
+    Dual use to check if the tmux session is working,
+    as a kind of dummy command 
+  '''
+  #i see this function possibly being used to probe tmux sessions, hence verbose option
+  #is this the best way to do things? idk. Change it if you want, make title optional, idgaf
+  if verbose:
+    print("\n"*2,"-"*10,"\n")
+    print(f"{title:^10}")
+    print("\n","-"*10,"\n"*2)
+  else:
+    print() #just send smt to the terminal
 
 if __name__ == '__main__':
-  if len(sys.argv) == 2:
-    if sys.argv[1] == 'daemon':
-      daemon()
-    elif sys.argv[1] == 'train':
-      run_train()
-    else:
-      print("Usage: python quefeather.py [daemon|train]")
-      print("  daemon: Run the queuing daemon")
-      print("  train: Start a training run")
-      sys.exit(1)
+  # if len(sys.argv) == 2:
+  #   if sys.argv[1] == 'daemon':
+  #     daemon()
+  #   elif sys.argv[1] == 'train':
+  #     run_train()
+  #   else:
+  #     print("Usage: python quefeather.py <daemon|train>")
+  #     print("  daemon: Run the queuing daemon")
+  #     print("  train: Start a training run")
+  #     sys.exit(1)
+  # else:
+  #   print("Usage: python quefeather.py [daemon|train]")
+  #   print("  daemon: Run the queuing daemon")
+  #   print("  train: Start a training run")
+  #   sys.exit(1)
+  parser = argparse.ArgumentParser(prog='quefeather.py')
+  subparsers = parser.add_subparsers(dest='mode', help='Operation mode', required=True)
+
+  # Daemon subcommand
+  daemon_parser = subparsers.add_parser('daemon', help='Run as daemon')
+
+  # Worker subcommand  
+  worker_parser = subparsers.add_parser('worker', help='Run as worker')
+
+  # Separator subcommand (optional title)
+  separator_parser = subparsers.add_parser('separator', help='Run as separator')
+  separator_parser.add_argument('-t', '--title',type=str, help='Title for separator', default='')
+
+  parser.add_argument('-s', '--silent', action='store_true', help='Turn off verbose output')
+  args = parser.parse_args()
+    
+  verbosity = not args.silent
+
+  if args.mode == 'daemon':
+    daemon(verbosity)
+  elif args.mode == 'worker':
+    run_train(verbosity)
+  elif args.mode == 'separator':
+    print_seperator(args.title, verbosity)
   else:
-    print("Usage: python quefeather.py [daemon|train]")
-    print("  daemon: Run the queuing daemon")
-    print("  train: Start a training run")
-    sys.exit(1)
+    print('htf did you get here?')
+    
   sys.exit(0)
   

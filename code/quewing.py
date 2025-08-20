@@ -14,10 +14,11 @@ PROJECT = 'WLASL-SLR'
 from configs import load_config, print_config, take_args
 
 #constants
-TEMP_PATH = './queTemp.json'
-RUNS_PATH = './queRuns.json'
-SCRIPT_PATH = './quefeather.py'
-RETRY_WAIT_TIME = 300 # 5 minutes
+TEMP_PATH = './queTemp.json' #used by the worker process to get info on the next run
+CODE_PATH = './code' #directory where other PATH files are stored
+RUNS_PATH = './queRuns.json' #used by the daemon process to store future and past que
+SCRIPT_PATH = './quefeather.py' #the script to run worker processes
+RETRY_WAIT_TIME = 300 # 5 minutes, use for checking wandb status
 
 def print_v(item : str, verbose : bool) -> None:
 	if verbose:
@@ -233,7 +234,7 @@ def store_Temp(temp_path, next_run):
 		json.dump(next_run, f, indent=2)
 
 
-def start(proc_type, session_name='training', script_path=SCRIPT_PATH):
+def start(proc_type, session_name='quewing', script_path=SCRIPT_PATH):
 	'''proc_type can be "train" or "daemon'''
 	tmux_cmd = [
 		"tmux", "new-window",
@@ -303,6 +304,49 @@ def handle_already_running(entity, project, check_interval=300, verbose=False, m
 		return False
 		
 
+def setup_tmux_session(sesh_name='training',
+											 dWndw_name='que_daemon', #for compat with start
+											 wWndw_name='que_train',
+											 code_path=CODE_PATH,
+											 verbose=False):
+	'''Initialises a tmux session with a window for the daemon and worker processes
+
+		Returns True if successful, else False
+	'''
+	print_v("Setting up tmux environments", verbose)
+ 
+	create_sesh_cmd = [
+		'tmux', 'new-session', '-d', '-s', sesh_name, ';', # -d for detach 
+		'send-keys', f'cd {code_path}', 'Enter' #otherwise need to call scripts with ./code/*.py
+ 	]
+	create_dWndw_cmd = [
+		'tmux', 'new-window', '-t', sesh_name, '-n', dWndw_name, 'bash' #bash to make persistant
+	]
+	create_wWndw_cmd = [
+		'tmux', 'new-window', '-t', sesh_name, '-n', wWndw_name, 'bash' #bash to make persistant
+	]
+	sesh_res = subprocess.run(create_sesh_cmd, check=True) #we want errors if this fails
+	dWndw_res = subprocess.run(create_dWndw_cmd, check=True) 
+	wWndw_res = subprocess.run(create_wWndw_cmd, check=True)
+	
+	results = [sesh_res, dWndw_res, wWndw_res]
+	for res in results:
+		print_v(f'Command: {res.args} completed successfully', verbose)
+	
+	if all([res.returncode == 0 for res in results]):
+		print_v("setup complete with no errors", verbose)
+		return True
+	else:
+		print_v("Errors when creating tmux environment", verbose)
+		return False
+	 
+def check_tmux_session(sesh_name='training',
+											 dWndw_name='que_daemon', #for compat with start
+											 wWndw_name='que_train',
+											 verbose=False):
+  '''Verify that the tmux training session is set up'''
+  
+
 def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 	# with open()
 	runs_path = RUNS_PATH
@@ -331,11 +375,11 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 			remove_old_run(runs_path, verbose=True)
 	 	
 		#start a training process in a detached tmux window. 
-  	#session: training, name: que_train [num] 	
+		#session: training, name: que_train [num] 	
 		#if que_train exists, increments num  
 		result = start('train') #this is blocking
 		
-  	#remember to clean up the temp folder when finished
+		#remember to clean up the temp folder when finished
 		clean_Temp(TEMP_PATH, verbose=True)
 	
 		#output from training session
