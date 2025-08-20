@@ -81,21 +81,7 @@ def print_seperator(title='', verbose=True):
     print() #just send smt to the terminal
 
 if __name__ == '__main__':
-  # if len(sys.argv) == 2:
-  #   if sys.argv[1] == 'daemon':
-  #     daemon()
-  #   elif sys.argv[1] == 'train':
-  #     run_train()
-  #   else:
-  #     print("Usage: python quefeather.py <daemon|train>")
-  #     print("  daemon: Run the queuing daemon")
-  #     print("  train: Start a training run")
-  #     sys.exit(1)
-  # else:
-  #   print("Usage: python quefeather.py [daemon|train]")
-  #   print("  daemon: Run the queuing daemon")
-  #   print("  train: Start a training run")
-  #   sys.exit(1)
+
   parser = argparse.ArgumentParser(prog='quefeather.py')
   subparsers = parser.add_subparsers(dest='mode', help='Operation mode', required=True)
 
@@ -122,6 +108,5 @@ if __name__ == '__main__':
     print_seperator(args.title, verbosity)
   else:
     print('htf did you get here?')
-    
-  sys.exit(0)
+
   

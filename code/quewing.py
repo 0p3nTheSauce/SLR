@@ -19,6 +19,9 @@ CODE_PATH = './code' #directory where other PATH files are stored
 RUNS_PATH = './queRuns.json' #used by the daemon process to store future and past que
 SCRIPT_PATH = './quefeather.py' #the script to run worker processes
 RETRY_WAIT_TIME = 300 # 5 minutes, use for checking wandb status
+SESSION = 'que_training'
+DAEMON = 'daemon'
+WORKER = 'worker' 
 
 def print_v(item : str, verbose : bool) -> None:
 	if verbose:
@@ -234,18 +237,30 @@ def store_Temp(temp_path, next_run):
 		json.dump(next_run, f, indent=2)
 
 
-def start(proc_type, session_name='quewing', script_path=SCRIPT_PATH):
-	'''proc_type can be "train" or "daemon'''
+def start(mode : str, sesh_name : str, script_path : str) \
+	-> subprocess.CompletedProcess[bytes]:
+	'''Starts a quefeather subprocess
+ 
+		Args:
+			mode:  				can be "worker" or "daemon"
+			sesh_name: 		tmux session name
+			script_path: 	path to worker script (quefeather) 
+		Returns:
+			result: 			from subprocess.run
+		Raises:
+			subprocess.CalledProcessError
+	'''
 	tmux_cmd = [
 		"tmux", "new-window",
-		"-t", session_name,
-		"-n", f"que_{proc_type}",
-		script_path, proc_type 
+		"-t", sesh_name,
+		"-n", f"{mode}",
+		script_path, mode 
 	]
-	result = subprocess.run(tmux_cmd, capture_output=True, text=True)
+	result = subprocess.run(tmux_cmd, check=True)
 	return result
 
 def clean_Temp(temp_path, verbose=False):
+	'''cleans the temp file after run'''
 	cleaned = {}
 	with open(temp_path, 'w') as f:
 		json.dump(cleaned, f)
@@ -304,10 +319,7 @@ def handle_already_running(entity, project, check_interval=300, verbose=False, m
 		return False
 		
 
-def setup_tmux_session(sesh_name='training',
-											 dWndw_name='que_daemon', #for compat with start
-											 wWndw_name='que_train',
-											 code_path=CODE_PATH,
+def setup_tmux_session(sesh_name,dWndw_name, wWndw_name,code_path,
 											 verbose=False):
 	'''Initialises a tmux session with a window for the daemon and worker processes
 
@@ -345,6 +357,8 @@ def check_tmux_session(sesh_name='training',
 											 wWndw_name='que_train',
 											 verbose=False):
   '''Verify that the tmux training session is set up'''
+  #use the print_seperator function of quefeather
+  
   
 
 def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
@@ -374,10 +388,10 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 			#move the next_run from "to_run" to "old_runs" 
 			remove_old_run(runs_path, verbose=True)
 	 	
-		#start a training process in a detached tmux window. 
-		#session: training, name: que_train [num] 	
-		#if que_train exists, increments num  
-		result = start('train') #this is blocking
+		#start a process in a detached tmux window. 
+		#session: que_worker, name: [num] worker  	
+		#if worker exists, increments num  
+		result = start('train', SESSION, script_path=SCRIPT_PATH) #this is blocking
 		
 		#remember to clean up the temp folder when finished
 		clean_Temp(TEMP_PATH, verbose=True)
@@ -459,7 +473,7 @@ def main():
 		print("run added successfully")
 	
 	if args.daemon:
-		start('daemon')
+		start('daemon',SESSION,SCRIPT_PATH)
 		print("daemon started successfully")
 	
 	if args.clear:
