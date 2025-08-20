@@ -296,7 +296,8 @@ def clean_Temp(temp_path, verbose=False):
 	print_v('Cleaned temp fil', verbose)
 
 def start(mode : str, sesh_name : str, script_path : str, 
-					verbose : bool = False):
+					verbose : bool = False) \
+       -> subprocess.CompletedProcess[bytes]:
 	'''Starts a quefeather worker or daemon subprocess 
  
 		Args:
@@ -321,18 +322,12 @@ def start(mode : str, sesh_name : str, script_path : str,
 		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
 		feather_cmd, 'Enter'
 	]
-	try:
-		subprocess.run(tmux_cmd, check=True)
-		print_v(f'{mode} started successfully', verbose)
-	except subprocess.CalledProcessError as e:
-		print(f"ran into an error when spawning the {mode} process: ")
-		return e.stderr
-	
-	return 'ok'
+	return subprocess.run(tmux_cmd, check=True)
+
 
 def separate(mode: str, sesh_name : str, script_path : str,
-					title : str = '',verbose : bool = False):
-	# -> subprocess.CompletedProcess[bytes]:
+					title : str = '',verbose : bool = False) \
+	-> subprocess.CompletedProcess[bytes]:
 	'''Prints a seperator in the teminal
  
 		Args:
@@ -354,17 +349,26 @@ def separate(mode: str, sesh_name : str, script_path : str,
 		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
 		feather_cmd, 'Enter'
 	]
-	result = subprocess.run(tmux_cmd, check=True)
 	
-	return result
+	return subprocess.run(tmux_cmd, check=True)
 
 
-def setup_tmux_session(sesh_name,dWndw_name, wWndw_name,
-											 verbose=False):
+def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str,
+											 verbose : bool =False) \
+	-> list[subprocess.CompletedProcess[bytes]]:
 	'''Initialises a tmux session with a window for the daemon and worker processes
 
-		Returns ok if successful, else error
+		Args:
+			sesh_name: 		tmux session name
+			dWndw_name:   daemon window name
+			wWndw_name:   worker window name
+			verbose: 			verbose output 
+		Returns:
+			result: 			list outputs from subprocess.run
+		Raises:
+			subprocess.CalledProcessError
 	'''
+ 
 	print_v("Setting up tmux environments", verbose)
  
 	create_sesh_cmd = [
@@ -374,40 +378,51 @@ def setup_tmux_session(sesh_name,dWndw_name, wWndw_name,
 	create_wWndw_cmd = [ #daemon window created in first command
 		'tmux', 'new-window', '-t', sesh_name, '-n', wWndw_name 
 	]
-	try:
-		subprocess.run(create_sesh_cmd, check=True) #we want errors if this fails
-		print_v('daemon session created successfully', verbose)	
-	except subprocess.CalledProcessError as e:
-		print('Failed to create daemon session', verbose)
-		return e.stderr
+ 
+	return [subprocess.run(create_sesh_cmd, check=True),
+         subprocess.run(create_wWndw_cmd, check=True)]
+ 
+	# try:
+	# 	 #we want errors if this fails
+  #    subprocess.run(create_sesh_cmd, check=True)
+	# 	print_v('daemon session created successfully', verbose)	
+	# except subprocess.CalledProcessError as e:
+	# 	print('Failed to create daemon session', verbose)
+	# 	return e.stderr
 	
-	try:
-		subprocess.run(create_wWndw_cmd, check=True)
-		print_v('worker session created successfully', verbose)	
-	except subprocess.CalledProcessError as e:
-		print('Failed to create daemon session', verbose)
-		return e.stderr #otherwise difficult to view errors
+	# try:
+	# 	subprocess.run(create_wWndw_cmd, check=True)
+	# 	print_v('worker session created successfully', verbose)	
+	# except subprocess.CalledProcessError as e:
+	# 	print('Failed to create daemon session', verbose)
+	# 	return e.stderr #otherwise difficult to view errors
 
-	return 'ok'
+	# return 'ok'
 
-	
 
 	 
 def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str,
 											 verbose=False):
-	'''Verify that the tmux training session is set up'''
+	'''Verify that the tmux training session is set up
+
+		Args:
+			sesh_name: 		tmux session name
+			dWndw_name:   daemon window name
+			wWndw_name:   worker window name
+			verbose: 			verbose output 
+		Returns:
+			result: 			list outputs from subprocess.run
+		Raises:
+			subprocess.CalledProcessError
+ 	'''
 	#one of the only ways to get an error code out of tmux is to attatch to 
  	#something that doesnt exist.
 	window_names = [dWndw_name, wWndw_name]
-
+	results = []
 	for win_name in window_names:
 		tmux_cmd = ['tmux', 'has-session', '-t', f'{sesh_name}:{win_name}']
-		try:
-			subprocess.run(tmux_cmd, check=True, capture_output=verbose, text=verbose)
-		except subprocess.CalledProcessError as e:
-			return e.stderr
-	
-	return 'ok'
+		results.append(subprocess.run(tmux_cmd, check=True, capture_output=verbose, text=verbose))
+	return results
 
 def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 	# with open()
@@ -440,7 +455,7 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 		#session: que_worker, name: [num] worker  	
 		#if worker exists, increments num 
 		try:
-			result = 
+			result = start('worker', SESSION, SCRIPT_PATH, verbose)
 			print_v('worker started successfully', verbose)
 		except subprocess.CalledProcessError as e:
 			print("Daemon ran into an error when spawning the worker process: ")
