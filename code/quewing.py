@@ -20,8 +20,8 @@ SCRIPT_PATH = './quefeather.py'
 RETRY_WAIT_TIME = 300 # 5 minutes
 
 def print_v(item : str, verbose : bool) -> None:
-  if verbose:
-    print(item)
+	if verbose:
+		print(item)
 
 def get_run_id(run_name, entity, project):
 	api = wandb.Api()
@@ -64,7 +64,21 @@ def list_runs(entity, project):
 			print(f"Created: {run.created_at}")
 			print("---")
 
-def wait_for_run_completion(entity, project, check_interval=300):
+def wait_for_run_completion(entity, project, check_interval=300, verbose=False):
+	'''Uses wandb Api to check and wait if the last run is still busy
+		Returns a dictionary with keys:
+			id : run id 
+			name : run name
+			state : different values:
+							- if all was successful, the final state of the run after
+			 					completion (finished, crashed, failed, killed)
+							- otherwise, error codes based on what happened (
+								no_runs -> no wandb runs found,
+								wandb_error -> something went wrong with the api,
+								keyboard_interrupt -> user intervention interupted monitoring
+			created_at : time run was created at
+ 	'''
+ 
 	api = wandb.Api()
 	# if last:
 	#   run_id
@@ -77,7 +91,7 @@ def wait_for_run_completion(entity, project, check_interval=300):
 	
 	runs = api.runs(f"{entity}/{project}")
 	if not runs:
-		print("No runs found.")
+		print_v("No runs found.", verbose)
 		return no_runs_dict
 	
 	# Get the most recent run
@@ -92,31 +106,37 @@ def wait_for_run_completion(entity, project, check_interval=300):
 	if run.state in ["finished", "crashed", "failed"]:
 		return run_info
 	
-	print(f"Monitoring run: {run.name} (ID: {run.id})")
+	print_v(f"Monitoring run: {run.name} (ID: {run.id})", verbose)
 	
 	# Wait for the run to finish
 	
 	run = api.run(f"{entity}/{project}/{run.id}")
 	try:
 		while run.state == 'running':
-			print(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+			print_v(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}", verbose)
 			time.sleep(check_interval)
 			api = wandb.Api()  # Refresh API to get the latest state
 			run = api.run(f"{entity}/{project}/{run.id}")
 		run_info['state'] = run.state
 	except wandb.Error as e:
-		print(f"Error while waiting for run completion: {e}")
+		print_v(f"Error while waiting for run completion: {e}", verbose)
 		run_info['state'] = 'wandb_error'
 		run_info['wandb_error'] = str(e)
 		return run_info
 	except KeyboardInterrupt:
-		print()
-		print("Monitoring interrupted by user.")
-		run_info['state'] = 'key_board_interrupt'
+		print_v('', verbose)
+		print_v("Monitoring interrupted by user.", verbose)
+		run_info['state'] = 'keyboard_interrupt'
 	
 	return run_info
 
 def add_new_run(runs_path, info, verbose=False):
+	'''Adds a new entry to the runs.json file
+
+		by adding info at the end of the  "to_run" list
+  
+		Returns all_runs
+	'''
 	all_runs = {
 		'old_runs': [],
 		'to_run': []
@@ -129,13 +149,19 @@ def add_new_run(runs_path, info, verbose=False):
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
 		
-	if verbose:
-		print(f"Added new run to {runs_path}:")
-		print(json.dumps(info, indent=2))
+	print_v(f"Added new run to {runs_path}:", verbose)
+	print_v(json.dumps(info, indent=2), verbose)
 	
 	return all_runs
 
 def get_next_run(runs_path, verbose=False):
+	'''gets the next entry next in line (FIFO)
+ 
+		by taking the first entry of the "to_run" list
+
+		Returns None if error, else next_run info
+	'''
+
 	all_runs = {
 		'old_runs': [],
 		'to_run': []
@@ -166,6 +192,13 @@ def get_next_run(runs_path, verbose=False):
 	return next_run
 	
 def remove_old_run(runs_path, verbose=False):
+	'''clean up after get_next_run
+
+		by moving the first entry of the "to_run" list,
+		to the last entry of the "old_runs" list
+  
+		Returns None if error, else old_run info
+	'''
 	all_runs = {
 		'old_runs': [],
 		'to_run': []
@@ -189,7 +222,7 @@ def remove_old_run(runs_path, verbose=False):
 		json.dump(all_runs, f, indent=2)
 		
 	
-	print_v(f"Next run to run from {runs_path}:", verbose)
+	print_v(f"Successfully move old run to  {runs_path}:", verbose)
 	print_v(json.dumps(old_run, indent=2), verbose)
 			
 	return old_run
@@ -206,56 +239,100 @@ def start(proc_type, session_name='training', script_path=SCRIPT_PATH):
 	return result
 
 def clean_Temp(temp_path, verbose=False):
-  cleaned = {}
-  with open(temp_path, 'w') as f:
-    json.dump(cleaned, f)
-  print_v('Cleaned temp fil', verbose)
+	cleaned = {}
+	with open(temp_path, 'w') as f:
+		json.dump(cleaned, f)
+	print_v('Cleaned temp fil', verbose)
 
-def daemon(verbose=True):
+
+def handle_already_running(entity, project, check_interval=300, verbose=False, max_retries=5):
+	'''make sure the program does not start training when there is already a run going.
+	
+		- Uses wandb api to achieve this. Waits for run to complete
+	
+		- Because subprocess.run is blocking, in theory we only need to do
+			this if we already had something running
+		
+		Returns bool (shoud daemon continue):
+			true : continue 
+			false : break
+	'''
+	#NOTE this function might be better off just checking available GPU memory in future
+	run_info = wait_for_run_completion(entity, project, check_interval, verbose)
+	
+	#check for wandb error first so that if it resolves itself, we drop into the rest of 
+	#the conditions
+	retry = 0
+	while run_info['state'] == 'wandb_error' and retry < max_retries:
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}", verbose)
+		print_v(f"Retrying... ({retry}/{max_retries})", verbose)
+		time.sleep(check_interval) #give it a quick break
+		run_info = wait_for_run_completion(entity, project, check_interval, verbose)
+		retry += 1
+	
+	if run_info['state'] == 'wandb_error':
+		#max_retries exceeded, break
+		print_v("Max retries reached. Exiting.", verbose)
+		return False 
+ 
+	elif run_info['state'] == 'finished':
+		#ideal state, continue
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.", verbose)
+		return True
+
+	elif run_info['state'] == 'keyboard_interrupt':
+		#user wants to close program, break
+		print_v(f'Monitoring interrupted by user for run {run_info["name"]} (ID: {run_info["id"]})', verbose)
+		print_v("Exiting without further action.", verbose)
+		return False
+	
+	elif run_info['state'] in ['killed', 'crashed', 'failed']:
+		#previous run didn't complete, could be an error, break
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}", verbose)
+		return False
+
+	else:
+		#likely a wandb state i wasn't aware of but safety first, break.
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) has an unknown state. State: {run_info['state']}", verbose)
+		return False
+		
+
+def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
+	
 	runs_path = RUNS_PATH
-	retries = 0
-	max_retries = 5
+	proceed = False
 	outcomes = ['success', 'failure']
-	while True:
-
-		run_info = wait_for_run_completion(ENTITY, PROJECT, check_interval=300)
-		if run_info['state'] == 'finished':
-			print_v(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.", verbose)
-		elif run_info['state'] == 'wandb_error':
-			print_v(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}", verbose)
-			print_v("Retrying...", verbose)
-			time.sleep(RETRY_WAIT_TIME)
-			retries += 1
-			if retries >= max_retries:
-				print_v("Max retries reached. Exiting.", verbose)
-				break
-			continue
-		elif run_info['state'] == 'key_board_interrupt':
-			print_v(f'Monitoring interrupted by user for run {run_info["name"]} (ID: {run_info["id"]})', verbose)
-			print_v("Exiting without further action.", verbose)
-			break
-		else: #killed, crashed or failed
-			print_v(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}", verbose)
-			proceed = input("Do you want to proceed with the next run? (y/n): ")
-			if proceed.lower() != 'y':
-				print("Exiting without further action.")
-				break
+	advice = handle_already_running(ENTITY,
+																 PROJECT,
+																 check_interval = RETRY_WAIT_TIME,
+																 verbose=verbose,
+																 max_retries=max_retries)
+	proceed = advice or proceed_after_fail
+	if not advice and proceed_after_fail:
+		print_v('Continuing despite errors with previous runs', verbose)
+	
+	while proceed:
 		
 		next_run = get_next_run(runs_path, verbose=True)
 		if next_run is None:
-			print("No more runs to execute.")
+			print_v("No more runs to execute.", verbose)
 			break
 		else:
 			#store the next run to temp folder
 			with open(TEMP_PATH, 'w') as f:
 				json.dump(next_run, f, indent=2)
+			
+			#clean up runs file
 			remove_old_run(runs_path, verbose=True)
-	 		#stash run info in temp
-
-		result = start('train')
+	 		
+			
+	 
+	 
+	 
+		result = start('train') #this is actually blocking
 		#remember to clean up the temp folder when finished
 		clean_Temp(TEMP_PATH, verbose=True)
-  
+	
 		print()
 		print(f'result of training script: {outcomes[result.returncode]}')
 		print(f'Script output: \n {result.stdout}')
