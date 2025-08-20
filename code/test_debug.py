@@ -227,8 +227,11 @@ def tmux_session():
   # if result != 'ok':
   #   setup_tmux_session('test', 'd', 'w', True)
   try:
-    setup_tmux_session('test', 'd', 'w', True)
-  print(separate('d', 'test', './quefeather.py','Testing', True)  )
+    result = check_tmux_session('test', 'd', 'w', True)
+  except subprocess.CalledProcessError as e:
+    print(e.stderr)
+    # setup_tmux_session('test', 'd', 'w', True)
+  # print(separate('d', 'test', './quefeather.py','Testing', True)  )
 
 
 if __name__ == "__main__":

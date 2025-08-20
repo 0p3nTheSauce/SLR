@@ -342,7 +342,7 @@ def separate(mode: str, sesh_name : str, script_path : str,
 	'''
 	feather_cmd = f'{script_path} separator'
 	if title:
-		feather_cmd += f'-t {title}'
+		feather_cmd += f' -t {title}'
 	if verbose:
 		feather_cmd += ' --verbose'
 	tmux_cmd = [ 
