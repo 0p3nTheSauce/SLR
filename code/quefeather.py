@@ -11,7 +11,9 @@ def run_train():
   '''An easy to execute script for quewing'''
   with open(TEMP_PATH) as f:
     info = json.load(f)
-  model_info = info['model_info']
+  model_info = info['model_info'] #TODO: this takes up space
+  #can probably do:
+  #model_specifics = info['model_specifics']
   config = info['config']
   entity = info['entity']
   project = info['project']

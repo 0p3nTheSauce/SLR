@@ -107,7 +107,7 @@
   },
   "config": {
     "training": {
-      "batch_size": 4,
+      "batch_size": 8,
       "update_per_step": 8,
       "max_epoch": 200,
       "early_stopping": {
@@ -121,38 +121,41 @@
       }
     },
     "optimizer": {
-      "eps": 0.001,
+      "eps": 1e-08,
       "backbone_init_lr": 1e-05,
       "backbone_weight_decay": 0.0001,
       "classifier_init_lr": 0.001,
       "classifier_weight_decay": 0.0001
     },
+    "model_params": {
+      "drop_p": 0.5
+    },
     "scheduler": {
       "tmax": 100,
-      "eta_min": 1e-06
+      "eta_min": 0
     },
     "data": {
       "num_frames": 32,
       "frame_size": 224
     },
     "admin": {
-      "exp_no": "003",
+      "exp_no": "004",
       "recover": false,
-      "model": "Resnet3D_18",
+      "model": "S3D",
       "split": "asl100",
-      "config_path": "./configfiles/asl100/Resnet3D_18_003.ini",
+      "config_path": "./configfiles/asl100/S3D_004.ini",
       "root": "../data/WLASL/WLASL2000",
       "labels": "./preprocessed/labels/asl100",
-      "save_path": "runs/asl100/Resnet3D_18_exp003/checkpoints"
+      "save_path": "runs/asl100/S3D_exp004/checkpoints"
     }
   },
   "entity": "ljgoodall2001-rhodes-university",
   "project": "WLASL-SLR",
   "tags": [
     "asl100",
-    "Resnet3D_18",
-    "exp-003"
+    "S3D",
+    "exp-004"
   ],
-  "output": "runs/asl100/Resnet3D_18_exp003",
-  "save_path": "runs/asl100/Resnet3D_18_exp003/checkpoints"
+  "output": "runs/asl100/S3D_exp004",
+  "save_path": "runs/asl100/S3D_exp004/checkpoints"
 }
