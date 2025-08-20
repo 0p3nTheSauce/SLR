@@ -55,6 +55,58 @@ def get_run_id(run_name, entity, project):
 	else:
 		return ids[0]
 
+
+def handle_already_running(entity, project, check_interval=300, verbose=False, max_retries=5):
+	'''make sure the program does not start training when there is already a run going.
+	
+		- Uses wandb api to achieve this. Waits for run to complete
+	
+		- Because subprocess.run is blocking, in theory we only need to do
+			this if we already had something running
+		
+		Returns bool (shoud daemon continue):
+			true : continue 
+			false : break
+	'''
+	#NOTE this function might be better off just checking available GPU memory in future
+	run_info = wait_for_run_completion(entity, project, check_interval, verbose)
+	
+	#check for wandb error first so that if it resolves itself, we drop into the rest of 
+	#the conditions
+	retry = 0
+	while run_info['state'] == 'wandb_error' and retry < max_retries:
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}", verbose)
+		print_v(f"Retrying... ({retry}/{max_retries})", verbose)
+		time.sleep(check_interval) #give it a quick break
+		run_info = wait_for_run_completion(entity, project, check_interval, verbose)
+		retry += 1
+	
+	if run_info['state'] == 'wandb_error':
+		#max_retries exceeded, break
+		print_v("Max retries reached. Exiting.", verbose)
+		return False 
+ 
+	elif run_info['state'] == 'finished':
+		#ideal state, continue
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.", verbose)
+		return True
+
+	elif run_info['state'] == 'keyboard_interrupt':
+		#user wants to close program, break
+		print_v(f'Monitoring interrupted by user for run {run_info["name"]} (ID: {run_info["id"]})', verbose)
+		print_v("Exiting without further action.", verbose)
+		return False
+	
+	elif run_info['state'] in ['killed', 'crashed', 'failed']:
+		#previous run didn't complete, could be an error, break
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}", verbose)
+		return False
+
+	else:
+		#likely a wandb state i wasn't aware of but safety first, break.
+		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) has an unknown state. State: {run_info['state']}", verbose)
+		return False
+
 def list_runs(entity, project):
 	# import wandb
 
@@ -236,29 +288,6 @@ def store_Temp(temp_path, next_run):
 	with open(temp_path, 'w') as f:
 		json.dump(next_run, f, indent=2)
 
-
-def start(mode : str, sesh_name : str, script_path : str) \
-	-> subprocess.CompletedProcess[bytes]:
-	'''Starts a quefeather subprocess
- 
-		Args:
-			mode:  				can be "worker" or "daemon"
-			sesh_name: 		tmux session name
-			script_path: 	path to worker script (quefeather) 
-		Returns:
-			result: 			from subprocess.run
-		Raises:
-			subprocess.CalledProcessError
-	'''
-	tmux_cmd = [
-		"tmux", "new-window",
-		"-t", sesh_name,
-		"-n", f"{mode}",
-		script_path, mode 
-	]
-	result = subprocess.run(tmux_cmd, check=True)
-	return result
-
 def clean_Temp(temp_path, verbose=False):
 	'''cleans the temp file after run'''
 	cleaned = {}
@@ -266,100 +295,119 @@ def clean_Temp(temp_path, verbose=False):
 		json.dump(cleaned, f)
 	print_v('Cleaned temp fil', verbose)
 
-
-def handle_already_running(entity, project, check_interval=300, verbose=False, max_retries=5):
-	'''make sure the program does not start training when there is already a run going.
-	
-		- Uses wandb api to achieve this. Waits for run to complete
-	
-		- Because subprocess.run is blocking, in theory we only need to do
-			this if we already had something running
-		
-		Returns bool (shoud daemon continue):
-			true : continue 
-			false : break
-	'''
-	#NOTE this function might be better off just checking available GPU memory in future
-	run_info = wait_for_run_completion(entity, project, check_interval, verbose)
-	
-	#check for wandb error first so that if it resolves itself, we drop into the rest of 
-	#the conditions
-	retry = 0
-	while run_info['state'] == 'wandb_error' and retry < max_retries:
-		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) encountered a WandB error: {run_info.get('wandb_error', 'Unknown error')}", verbose)
-		print_v(f"Retrying... ({retry}/{max_retries})", verbose)
-		time.sleep(check_interval) #give it a quick break
-		run_info = wait_for_run_completion(entity, project, check_interval, verbose)
-		retry += 1
-	
-	if run_info['state'] == 'wandb_error':
-		#max_retries exceeded, break
-		print_v("Max retries reached. Exiting.", verbose)
-		return False 
+def start(mode : str, sesh_name : str, script_path : str, 
+					verbose : bool = False):
+	'''Starts a quefeather worker or daemon subprocess 
  
-	elif run_info['state'] == 'finished':
-		#ideal state, continue
-		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) completed successfully.", verbose)
-		return True
-
-	elif run_info['state'] == 'keyboard_interrupt':
-		#user wants to close program, break
-		print_v(f'Monitoring interrupted by user for run {run_info["name"]} (ID: {run_info["id"]})', verbose)
-		print_v("Exiting without further action.", verbose)
-		return False
+		Args:
+			mode:  				worker or daemon
+			sesh_name: 		tmux session name
+			script_path: 	path to worker script (quefeather)
+			verbose: 			verbose output from task
+		Returns:
+			result: 			from subprocess.run
+		Raises:
+			subprocess.CalledProcessError
+	'''
+	available_modes = ['daemon', 'worker']
+	if mode not in available_modes:
+		raise ValueError(f'{mode} not one of available modes: {available_modes}')
+ 
+	feather_cmd = f'{script_path} {mode}' #./quefeather.py mode
+	if verbose:
+		feather_cmd += ' --verbose'
+ 
+	tmux_cmd = [ 
+		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
+		feather_cmd, 'Enter'
+	]
+	try:
+		subprocess.run(tmux_cmd, check=True)
+		print_v(f'{mode} started successfully', verbose)
+	except subprocess.CalledProcessError as e:
+		print(f"ran into an error when spawning the {mode} process: ")
+		return e.stderr
 	
-	elif run_info['state'] in ['killed', 'crashed', 'failed']:
-		#previous run didn't complete, could be an error, break
-		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) did not complete successfully. State: {run_info['state']}", verbose)
-		return False
+	return 'ok'
 
-	else:
-		#likely a wandb state i wasn't aware of but safety first, break.
-		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) has an unknown state. State: {run_info['state']}", verbose)
-		return False
-		
+def separate(mode: str, sesh_name : str, script_path : str,
+					title : str = '',verbose : bool = False):
+	# -> subprocess.CompletedProcess[bytes]:
+	'''Prints a seperator in the teminal
+ 
+		Args:
+			mode:  				worker or daemon
+			sesh_name: 		tmux session name
+			script_path: 	path to worker script (quefeather)
+			verbose: 			verbose output from task
+		Returns:
+			result: 			from subprocess.run
+		Raises:
+			subprocess.CalledProcessError
+	'''
+	feather_cmd = f'{script_path} separator'
+	if title:
+		feather_cmd += f'-t {title}'
+	if verbose:
+		feather_cmd += ' --verbose'
+	tmux_cmd = [ 
+		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
+		feather_cmd, 'Enter'
+	]
+	result = subprocess.run(tmux_cmd, check=True)
+	
+	return result
 
-def setup_tmux_session(sesh_name,dWndw_name, wWndw_name,code_path,
+
+def setup_tmux_session(sesh_name,dWndw_name, wWndw_name,
 											 verbose=False):
 	'''Initialises a tmux session with a window for the daemon and worker processes
 
-		Returns True if successful, else False
+		Returns ok if successful, else error
 	'''
 	print_v("Setting up tmux environments", verbose)
  
 	create_sesh_cmd = [
-		'tmux', 'new-session', '-d', '-s', sesh_name, ';', # -d for detach 
-		'send-keys', f'cd {code_path}', 'Enter' #otherwise need to call scripts with ./code/*.py
+		'tmux', 'new-session', '-d', '-s', sesh_name, # -d for detach 
+		'-n', f'{dWndw_name}'
  	]
-	create_dWndw_cmd = [
-		'tmux', 'new-window', '-t', sesh_name, '-n', dWndw_name, 'bash' #bash to make persistant
+	create_wWndw_cmd = [ #daemon window created in first command
+		'tmux', 'new-window', '-t', sesh_name, '-n', wWndw_name 
 	]
-	create_wWndw_cmd = [
-		'tmux', 'new-window', '-t', sesh_name, '-n', wWndw_name, 'bash' #bash to make persistant
-	]
-	sesh_res = subprocess.run(create_sesh_cmd, check=True) #we want errors if this fails
-	dWndw_res = subprocess.run(create_dWndw_cmd, check=True) 
-	wWndw_res = subprocess.run(create_wWndw_cmd, check=True)
+	try:
+		subprocess.run(create_sesh_cmd, check=True) #we want errors if this fails
+		print_v('daemon session created successfully', verbose)	
+	except subprocess.CalledProcessError as e:
+		print('Failed to create daemon session', verbose)
+		return e.stderr
 	
-	results = [sesh_res, dWndw_res, wWndw_res]
-	for res in results:
-		print_v(f'Command: {res.args} completed successfully', verbose)
+	try:
+		subprocess.run(create_wWndw_cmd, check=True)
+		print_v('worker session created successfully', verbose)	
+	except subprocess.CalledProcessError as e:
+		print('Failed to create daemon session', verbose)
+		return e.stderr #otherwise difficult to view errors
+
+	return 'ok'
+
 	
-	if all([res.returncode == 0 for res in results]):
-		print_v("setup complete with no errors", verbose)
-		return True
-	else:
-		print_v("Errors when creating tmux environment", verbose)
-		return False
+
 	 
-def check_tmux_session(sesh_name='training',
-											 dWndw_name='que_daemon', #for compat with start
-											 wWndw_name='que_train',
+def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str,
 											 verbose=False):
-  '''Verify that the tmux training session is set up'''
-  #use the print_seperator function of quefeather
-  
-  
+	'''Verify that the tmux training session is set up'''
+	#one of the only ways to get an error code out of tmux is to attatch to 
+ 	#something that doesnt exist.
+	window_names = [dWndw_name, wWndw_name]
+
+	for win_name in window_names:
+		tmux_cmd = ['tmux', 'has-session', '-t', f'{sesh_name}:{win_name}']
+		try:
+			subprocess.run(tmux_cmd, check=True, capture_output=verbose, text=verbose)
+		except subprocess.CalledProcessError as e:
+			return e.stderr
+	
+	return 'ok'
 
 def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 	# with open()
@@ -390,17 +438,19 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 	 	
 		#start a process in a detached tmux window. 
 		#session: que_worker, name: [num] worker  	
-		#if worker exists, increments num  
-		result = start('train', SESSION, script_path=SCRIPT_PATH) #this is blocking
-		
+		#if worker exists, increments num 
+		try:
+			result = 
+			print_v('worker started successfully', verbose)
+		except subprocess.CalledProcessError as e:
+			print("Daemon ran into an error when spawning the worker process: ")
+			print(e.stderr)
+			break
+	 
 		#remember to clean up the temp folder when finished
 		clean_Temp(TEMP_PATH, verbose=True)
 	
-		#output from training session
-		print_v('', verbose)
-		print_v(f'result of training script: {outcomes[result.returncode]}', verbose)
-		print_v(f'Script output: \n {result.stdout}', verbose)
-	
+		
 	print_v("Closing quewing daemon", verbose)
 			
 def create_run(verbose=True):

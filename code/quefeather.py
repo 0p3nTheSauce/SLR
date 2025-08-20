@@ -78,7 +78,8 @@ def print_seperator(title='', verbose=True):
     print(f"{title:^10}")
     print("\n","-"*10,"\n"*2)
   else:
-    print() #just send smt to the terminal
+    # print() #just send smt to the terminal
+    pass
 
 if __name__ == '__main__':
 
@@ -95,17 +96,16 @@ if __name__ == '__main__':
   separator_parser = subparsers.add_parser('separator', help='Run as separator')
   separator_parser.add_argument('-t', '--title',type=str, help='Title for separator', default='')
 
-  parser.add_argument('-s', '--silent', action='store_true', help='Turn off verbose output')
+  parser.add_argument('-v', '--verbose', action='store_true', help='Turn on verbose output')
   args = parser.parse_args()
     
-  verbosity = not args.silent
 
   if args.mode == 'daemon':
-    daemon(verbosity)
+    daemon(args.verbose)
   elif args.mode == 'worker':
-    run_train(verbosity)
+    run_train(args.verbose)
   elif args.mode == 'separator':
-    print_seperator(args.title, verbosity)
+    print_seperator(args.title, args.verbose)
   else:
     print('htf did you get here?')
 
