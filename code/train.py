@@ -372,7 +372,7 @@ def main():
       if run_id is None: 
         run_id = get_run_id(run_name, ENTITY, project)
       if run_id is None:
-        run_id = ("No run found automatically. Enter run ID, or leave blank to cancel: ")
+        run_id = input("No run found automatically. Enter run ID, or leave blank to cancel: ")
         if run_id == '':
           print("Training cancelled")
           return
