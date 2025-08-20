@@ -230,8 +230,8 @@ def tmux_session():
     result = check_tmux_session('test', 'd', 'w', True)
   except subprocess.CalledProcessError as e:
     print(e.stderr)
-    # setup_tmux_session('test', 'd', 'w', True)
-  # print(separate('d', 'test', './quefeather.py','Testing', True)  )
+    setup_tmux_session('test', 'd', 'w', True)
+  print(separate('d', 'test', './quefeather.py','Testing', True)  )
 
 
 if __name__ == "__main__":

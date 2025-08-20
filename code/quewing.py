@@ -69,6 +69,7 @@ def handle_already_running(entity, project, check_interval=300, verbose=False, m
 			false : break
 	'''
 	#NOTE this function might be better off just checking available GPU memory in future
+	#NOTE I want to remove the retry functionality
 	run_info = wait_for_run_completion(entity, project, check_interval, verbose)
 	
 	#check for wandb error first so that if it resolves itself, we drop into the rest of 
@@ -297,7 +298,7 @@ def clean_Temp(temp_path, verbose=False):
 
 def start(mode : str, sesh_name : str, script_path : str, 
 					verbose : bool = False) \
-       -> subprocess.CompletedProcess[bytes]:
+			 -> subprocess.CompletedProcess[bytes]:
 	'''Starts a quefeather worker or daemon subprocess 
  
 		Args:
@@ -380,26 +381,7 @@ def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str,
 	]
  
 	return [subprocess.run(create_sesh_cmd, check=True),
-         subprocess.run(create_wWndw_cmd, check=True)]
- 
-	# try:
-	# 	 #we want errors if this fails
-  #    subprocess.run(create_sesh_cmd, check=True)
-	# 	print_v('daemon session created successfully', verbose)	
-	# except subprocess.CalledProcessError as e:
-	# 	print('Failed to create daemon session', verbose)
-	# 	return e.stderr
-	
-	# try:
-	# 	subprocess.run(create_wWndw_cmd, check=True)
-	# 	print_v('worker session created successfully', verbose)	
-	# except subprocess.CalledProcessError as e:
-	# 	print('Failed to create daemon session', verbose)
-	# 	return e.stderr #otherwise difficult to view errors
-
-	# return 'ok'
-
-
+				 subprocess.run(create_wWndw_cmd, check=True)]
 	 
 def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str,
 											 verbose=False):
@@ -424,13 +406,21 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str,
 		results.append(subprocess.run(tmux_cmd, check=True, capture_output=verbose, text=verbose))
 	return results
 
-def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
-	# with open()
+def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=5) \
+	-> None:
+	'''Function for the queue daemon process. The function works in a fetch execute repeat
+	cycle. The function reads runs from the queRuns.json file, then writes them to the
+	queTemp.json file for the worker process to find. The daemon spawns the worker, then 
+	waits for it to complete before proceeding
+	
+	Args:
+		verbose: verbose output
+		proceed_after_fail: proceed after a failed run or wandb error?
+		max_retries: when getting a wandb api error  
+	'''
 	runs_path = RUNS_PATH
 	proceed = False
-	outcomes = ['success', 'failure']
-	advice = handle_already_running(ENTITY,
-																 PROJECT,
+	advice = handle_already_running(ENTITY, PROJECT,
 																 check_interval = RETRY_WAIT_TIME,
 																 verbose=verbose,
 																 max_retries=max_retries)
@@ -455,7 +445,7 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 		#session: que_worker, name: [num] worker  	
 		#if worker exists, increments num 
 		try:
-			result = start('worker', SESSION, SCRIPT_PATH, verbose)
+			result = start('worker', SESSION, SCRIPT_PATH, verbose) #this is blocking
 			print_v('worker started successfully', verbose)
 		except subprocess.CalledProcessError as e:
 			print("Daemon ran into an error when spawning the worker process: ")
@@ -464,7 +454,15 @@ def daemon(verbose=True, proceed_after_fail=False, max_retries=5):
 	 
 		#remember to clean up the temp folder when finished
 		clean_Temp(TEMP_PATH, verbose=True)
-	
+
+		#print a seperator to the output to seperate runs
+		try:
+			title = 'Starting new worker process'
+			result = separate('worker', SESSION, SCRIPT_PATH, title, verbose)
+		except subprocess.CalledProcessError as e:
+			print("Daemon ran into an error when writing the separator: ")
+			print(e.stderr)
+			break
 		
 	print_v("Closing quewing daemon", verbose)
 			
