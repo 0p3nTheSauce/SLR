@@ -227,10 +227,14 @@ def tmux_session():
   # if result != 'ok':
   #   setup_tmux_session('test', 'd', 'w', True)
   try:
-    result = check_tmux_session('test', 'd', 'w', True)
+    result = check_tmux_session('test', 'd', 'w')
   except subprocess.CalledProcessError as e:
-    print(e.stderr)
-    setup_tmux_session('test', 'd', 'w', True)
+    # print(e.stderr)
+    if e.stderr.strip() != "can't find session: test":
+      print("'",e.stderr,"'")
+    else:
+      print("check completed successfully")
+    setup_tmux_session('test', 'd', 'w')
   print(separate('d', 'test', './quefeather.py','Testing', True)  )
 
 
