@@ -289,12 +289,12 @@ def store_Temp(temp_path, next_run):
 	with open(temp_path, 'w') as f:
 		json.dump(next_run, f, indent=2)
 
-def clean_Temp(temp_path, verbose=False):
+def clean_Temp(temp_path: str, verbose: bool=False) -> None:
 	'''cleans the temp file after run'''
 	cleaned = {}
 	with open(temp_path, 'w') as f:
 		json.dump(cleaned, f)
-	print_v('Cleaned temp fil', verbose)
+	print_v('Cleaned temp file', verbose)
 
 def start(mode : str, sesh_name : str, script_path : str, 
 					verbose : bool = False) \
@@ -543,8 +543,9 @@ def main():
 	parser = argparse.ArgumentParser(description="quewing.py")
 	parser.add_argument('-a', '--add', action='store_true', help='add new training command')
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
-	parser.add_argument('-cl', '--clear', action='store_true', help='clear the runs file')	
+	parser.add_argument('-cr', '--clear', action='store_true', help='clear the runs file')	
 	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')
+	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
 	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
 	args, other = parser.parse_known_args()
 
@@ -595,5 +596,8 @@ def main():
 	elif args.clear_old:
 		clear_runs(RUNS_PATH, verbose=True, past_only=True)
 	
+	if args.clear_temp:
+		clean_Temp(TEMP_PATH, verbose)
+
 if __name__ == '__main__':
 	main()
