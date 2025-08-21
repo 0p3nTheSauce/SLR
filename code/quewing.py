@@ -315,9 +315,10 @@ def start(mode : str, sesh_name : str, script_path : str,
 	if mode not in available_modes:
 		raise ValueError(f'{mode} not one of available modes: {available_modes}')
  
-	feather_cmd = f'{script_path} {mode}' #./quefeather.py mode
+	feather_cmd = f'{script_path}' #./quefeather.py mode
 	if verbose:
-		feather_cmd += ' --verbose'
+		feather_cmd += ' -v'
+	feather_cmd += f' {mode}'
  
 	tmux_cmd = [ 
 		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
@@ -528,6 +529,14 @@ def clear_runs(runs_path, verbose=True, past_only=False):
 		print(f'Succesfully cleared {runs_path}')
 
 
+def check_err(err, session):
+	against = f"can't find session: {session}".strip().split()
+	for i,c in enumerate(err.strip().split()):
+		if against[i] != c:
+			print(f"against: {against[i]}, err: {c}")
+			return False
+	return True
+
 def main():
 	#NOTE chose to make verbose true by default when running this script
 	#NOTE these arguments have to be compatible with take_args if creating run
@@ -553,7 +562,8 @@ def main():
 			results = check_tmux_session(SESSION, DAEMON, WORKER)
 			print_v('Tmux session validated', verbose)
 		except subprocess.CalledProcessError as e:
-			if e.stderr.strip() != f"can't find session: {SESSION}":
+			# if e.stderr.strip() != f"can't find session: {SESSION}":
+			if check_err(e.stderr, SESSION):
 				#hasn't been created yet
 				print_v("Setting up tmux environments", verbose)
 				create = True
@@ -573,7 +583,7 @@ def main():
 
 		#run the daemon
 		try:
-			result = start('daemon', SESSION, SCRIPT_PATH)
+			result = start('daemon', SESSION, SCRIPT_PATH, verbose)
 			print_v("daemon started successfully", verbose)
 		except subprocess.CalledProcessError as e:
 			print("Ran into an unexpected issue when starting the daemon process: ")
