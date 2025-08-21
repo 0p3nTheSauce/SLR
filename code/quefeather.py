@@ -12,7 +12,7 @@ def run_train(verbose=False):
   '''An easy to execute script for quewing'''
   with open(TEMP_PATH) as f:
     info = json.load(f)
-  model_info = info['model_info'] #TODO: this takes up space
+  model_specifcs = info['model_info']
   #can probably do:
   #model_specifics = info['model_specifics']
   config = info['config']
@@ -23,38 +23,23 @@ def run_train(verbose=False):
   save_path = info['save_path']
 
   admin = config['admin']
-  model_specifcs = model_info[admin['model']]
   run_id = None #only used if we are recovering a run
     
   #setup wandb run
   run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
+
+  #NOTE does recovery logic not implemented
   if admin['recover']:
-    if run_id is None: 
-      run_id = get_run_id(run_name, entity, project)
-    if run_id is None:
-      run_id = input("No run found automatically. Enter run ID, or leave blank to cancel: ")
-      if run_id == '':
-        print("Training cancelled")
-        return
-    print_v(f"Resuming run with ID: {run_id}", verbose)
-    run = wandb.init(
-      entity=entity,
-      project=project,
-      id=run_id,
-      resume='must',
-      name=run_name,
-      tags=tags,
-      config=config      
-    )
-  else:
-    print_v(f"Starting new run with name: {run_name}", verbose)
-    run = wandb.init(
-      entity=entity,
-      project=project,
-      name=run_name,
-      tags=tags,
-      config=config      
-    )
+    print('Warning: recovery not implemented in quefeather yet')
+  
+  print_v(f"Starting new run with name: {run_name}", verbose)
+  run = wandb.init(
+    entity=entity,
+    project=project,
+    name=run_name,
+    tags=tags,
+    config=config      
+  )
   print_v(f"Run ID: {run.id}", verbose)
   print_v(f"Run name: {run.name}", verbose)  # Human-readable name
   print_v(f"Run path: {run.path}", verbose)  # entity/project/run_id format

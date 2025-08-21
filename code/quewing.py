@@ -341,11 +341,16 @@ def separate(mode: str, sesh_name : str, script_path : str,
 		Raises:
 			subprocess.CalledProcessError
 	'''
-	feather_cmd = f'{script_path} separator'
+	feather_cmd = f'{script_path}'
+ 
+	if verbose:
+		feather_cmd += ' -v'
+	
+	feather_cmd += ' separator'
+ 
 	if title:
 		feather_cmd += f' -t {title}'
-	if verbose:
-		feather_cmd += ' --verbose'
+	
 	tmux_cmd = [ 
 		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
 		feather_cmd, 'Enter'
@@ -354,8 +359,7 @@ def separate(mode: str, sesh_name : str, script_path : str,
 	return subprocess.run(tmux_cmd, check=True)
 
 
-def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str,
-											 verbose : bool =False) \
+def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str) \
 	-> list[subprocess.CompletedProcess[bytes]]:
 	'''Initialises a tmux session with a window for the daemon and worker processes
 
@@ -370,8 +374,6 @@ def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str,
 			subprocess.CalledProcessError
 	'''
  
-	print_v("Setting up tmux environments", verbose)
- 
 	create_sesh_cmd = [
 		'tmux', 'new-session', '-d', '-s', sesh_name, # -d for detach 
 		'-n', f'{dWndw_name}'
@@ -383,8 +385,7 @@ def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str,
 	return [subprocess.run(create_sesh_cmd, check=True),
 				 subprocess.run(create_wWndw_cmd, check=True)]
 	 
-def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str,
-											 verbose=False):
+def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str):
 	'''Verify that the tmux training session is set up
 
 		Args:
@@ -403,7 +404,7 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str,
 	results = []
 	for win_name in window_names:
 		tmux_cmd = ['tmux', 'has-session', '-t', f'{sesh_name}:{win_name}']
-		results.append(subprocess.run(tmux_cmd, check=True, capture_output=verbose, text=verbose))
+		results.append(subprocess.run(tmux_cmd, check=True))
 	return results
 
 def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=5) \
@@ -467,6 +468,7 @@ def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=
 	print_v("Closing quewing daemon", verbose)
 			
 def create_run(verbose=True):
+	'''Add an entry to the runs file'''
 	with open('./wlasl_implemented_info.json') as f:
 		info = json.load(f)
 	available_splits = info['splits']
@@ -479,12 +481,14 @@ def create_run(verbose=True):
 	
 	print_config(config)
 
+	model_specifics = model_info[config['admin']['model']]
+ 
 	proceed = input("Confirm: y/n: ")
 	if proceed.lower() == 'y':
 		if verbose:
 			print("Saving run info ")
 		info = {
-			'model_info': model_info,
+			'model_info': model_specifics,
 			'config': config,
 			'entity': ENTITY,
 			'project': project,
@@ -504,6 +508,7 @@ def create_run(verbose=True):
 		return
 
 def clear_runs(runs_path, verbose=True, past_only=False):
+	'''reset the runs file'''
 	all_runs = {
 		'old_runs': [],
 		'to_run': []
@@ -521,23 +526,59 @@ def clear_runs(runs_path, verbose=True, past_only=False):
 	
 	if verbose:
 		print(f'Succesfully cleared {runs_path}')
-	
+
 
 def main():
-	parser = argparse.ArgumentParser(description="Queuing training runs")
+	#NOTE chose to make verbose true by default when running this script
+	#NOTE these arguments have to be compatible with take_args if creating run
+	parser = argparse.ArgumentParser(description="quewing.py")
 	parser.add_argument('-a', '--add', action='store_true', help='add new training command')
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
 	parser.add_argument('-cl', '--clear', action='store_true', help='clear the runs file')	
-	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')	
+	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')
+	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
 	args, other = parser.parse_known_args()
+
+	#invert
+	verbose = not args.silent
  
 	if args.add:
-		create_run(verbose=True)
+		create_run(verbose=verbose)
 		print("run added successfully")
 	
 	if args.daemon:
-		start('daemon',SESSION,SCRIPT_PATH)
-		print("daemon started successfully")
+		create = False
+		#first check that the tmux session is set up
+		try:
+			results = check_tmux_session(SESSION, DAEMON, WORKER)
+			print_v('Tmux session validated', verbose)
+		except subprocess.CalledProcessError as e:
+			if e.stderr.strip() != f"can't find session: {SESSION}":
+				#hasn't been created yet
+				print_v("Setting up tmux environments", verbose)
+				create = True
+			else:
+				print("Ran into an unexpected issue when checking tmux sessions: ")
+				print(e.stderr)
+				return
+		
+		#first time use, or after restart
+		if create:
+			try:
+				result = setup_tmux_session(SESSION, DAEMON, WORKER)
+			except subprocess.CalledProcessError as e:
+				print("Ran into an unexpected issue when creating tmux sessions: ")
+				print(e.stderr)
+				return
+
+		#run the daemon
+		try:
+			result = start('daemon', SESSION, SCRIPT_PATH)
+			print_v("daemon started successfully", verbose)
+		except subprocess.CalledProcessError as e:
+			print("Ran into an unexpected issue when starting the daemon process: ")
+			print(e.stderr)
+			return
 	
 	if args.clear:
 		clear_runs(RUNS_PATH, verbose=True)
