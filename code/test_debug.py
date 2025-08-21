@@ -226,11 +226,12 @@ def tmux_session():
   # result = check_tmux_session('test', 'd', 'w', True)
   # if result != 'ok':
   #   setup_tmux_session('test', 'd', 'w', True)
+  session = 'test'
   try:
     result = check_tmux_session('test', 'd', 'w')
   except subprocess.CalledProcessError as e:
     # print(e.stderr)
-    if e.stderr.strip() != "can't find session: test":
+    if e.stderr.strip() != f"can't find session: {session}":
       print("'",e.stderr,"'")
     else:
       print("check completed successfully")
