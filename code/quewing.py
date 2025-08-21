@@ -381,7 +381,7 @@ def setup_tmux_session(sesh_name : str, dWndw_name : str, wWndw_name : str) \
 	create_wWndw_cmd = [ #daemon window created in first command
 		'tmux', 'new-window', '-t', sesh_name, '-n', wWndw_name 
 	]
- 
+	#NOTE may need to  add capture_output=True, and Text=True
 	return [subprocess.run(create_sesh_cmd, check=True),
 				 subprocess.run(create_wWndw_cmd, check=True)]
 	 
@@ -404,7 +404,7 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str):
 	results = []
 	for win_name in window_names:
 		tmux_cmd = ['tmux', 'has-session', '-t', f'{sesh_name}:{win_name}']
-		results.append(subprocess.run(tmux_cmd, check=True))
+		results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
 	return results
 
 def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=5) \
