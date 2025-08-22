@@ -207,7 +207,7 @@ def add_new_run(runs_path, info, verbose=False):
 		json.dump(all_runs, f, indent=2)
 		
 	print_v(f"Added new run to {runs_path}:", verbose)
-	print_v(json.dumps(info, indent=2), verbose)
+	# print_v(json.dumps(info, indent=2), verbose) too verbosed
 	
 	return all_runs
 
