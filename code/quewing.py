@@ -350,7 +350,7 @@ def separate(mode: str, sesh_name : str, script_path : str,
 	feather_cmd += ' separator'
  
 	if title:
-		feather_cmd += f' -t {title}'
+		feather_cmd += f' -t "{title}"'
 	
 	tmux_cmd = [ 
 		'tmux', 'send-keys', '-t', f'{sesh_name}:{mode}', 
