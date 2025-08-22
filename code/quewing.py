@@ -518,16 +518,42 @@ def clear_runs(runs_path, verbose=True, past_only=False):
 		raise ValueError(f'could not find runs file: {runs_path}')
 	
 	if past_only:
-		with open(runs_path, 'w') as f:
+		with open(runs_path, 'r') as f:
 			all_runs = json.load(f)
 		all_runs['old_runs'] = []
 	
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
 	
-	if verbose:
-		print(f'Succesfully cleared {runs_path}')
+	print_v(f'Succesfully cleared {runs_path}', verbose)
 
+def return_old(runs_path: str, verbose: bool=False) -> None:
+	'''Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
+	 
+			Args:
+				runs_path: path to runs file
+				verbose: verbose output
+	'''
+	all_runs = {
+		'old_runs': [],
+		'to_run': []
+	}
+	
+	with open(runs_path, 'r') as f:
+		all_runs = json.load(f)
+	
+	curr_to_run = all_runs['to_run'] if all_runs['to_run'] else [] 
+	curr_old_run = all_runs['old_runs'] if all_runs['old_runs'] else [] 
+	
+	curr_to_run.extend(curr_old_run)
+	all_runs['to_run'] = curr_to_run
+	all_runs['old_runs'] = []
+
+	with open(runs_path, 'w') as f:
+		json.dump(all_runs, f, indent=2)
+ 
+	print_v(f'Successfully moved old_runs to to_run', verbose)
+	
 
 def check_err(err, session):
 	against = f"can't find session: {session}".strip().split()
@@ -549,6 +575,7 @@ def main():
 	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
 	parser.add_argument('-sm', '--separate_mode', type=str, help='Send a seperator to the "mode" process')
 	parser.add_argument('-ti', '--title', type=str, help="title for seperate_mode used", default="Calling next process")
+	parser.add_argument('-ro', '--return_old', action='store_true', help='return old runs to new')
 	args, other = parser.parse_known_args()
 
 	#invert
@@ -601,6 +628,9 @@ def main():
 	if args.clear_temp:
 		clean_Temp(TEMP_PATH, verbose)
 	
+	if args.return_old:
+		return_old(RUNS_PATH, verbose)
+ 	
 	if args.separate_mode:
 		try:
 			result = separate(args.separate_mode, SESSION, SCRIPT_PATH, args.title, verbose)
@@ -609,7 +639,8 @@ def main():
 			print(f"Ran into an unexpected issue when sending separator: {args.title} to {args.separate_mode}")
 			print(e.stderr)
 			return
-		
+	
+
 
 if __name__ == '__main__':
 	main()
