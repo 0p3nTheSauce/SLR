@@ -547,6 +547,8 @@ def main():
 	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')
 	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
 	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
+	parser.add_argument('-sm', '--separate_mode', type=str, help='Send a seperator to the "mode" process')
+	parser.add_argument('-ti', '--title', type=str, help="title for seperate_mode used", default="Calling next process")
 	args, other = parser.parse_known_args()
 
 	#invert
@@ -598,6 +600,16 @@ def main():
 	
 	if args.clear_temp:
 		clean_Temp(TEMP_PATH, verbose)
+	
+	if args.separate_mode:
+		try:
+			result = separate(args.separate_mode, SESSION, SCRIPT_PATH, args.title, verbose)
+			print_v(f'Separator: "{args.title}" sent to {args.separate_mode}', verbose)
+		except subprocess.CalledProcessError as e:
+			print(f"Ran into an unexpected issue when sending separator: {args.title} to {args.separate_mode}")
+			print(e.stderr)
+			return
+		
 
 if __name__ == '__main__':
 	main()
