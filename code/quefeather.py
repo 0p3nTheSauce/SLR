@@ -5,22 +5,19 @@ import wandb
 import os
 import sys
 from train import train_loop
-from quewing import daemon, TEMP_PATH, print_v, clean_Temp
+from quewing import daemon, TEMP_PATH, print_v, clean_Temp, store_Temp, retrieve_Temp
 import argparse
 import time
 
 def run_train(verbose=False):
   '''An easy to execute script for quewing'''
-  with open(TEMP_PATH) as f:
-    info = json.load(f)
+  info = retrieve_Temp(TEMP_PATH)
   
-  if not info:
+  if not info or 'run_id' in info.keys():
     #empty temp file
     raise ValueError(f'Tried to read next run from {TEMP_PATH} but it was empty')
     
   model_specifcs = info['model_info']
-  #can probably do:
-  #model_specifics = info['model_specifics']
   config = info['config']
   entity = info['entity']
   project = info['project']
@@ -29,7 +26,6 @@ def run_train(verbose=False):
   save_path = info['save_path']
 
   admin = config['admin']
-  run_id = None #only used if we are recovering a run
     
   #setup wandb run
   run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
@@ -53,12 +49,15 @@ def run_train(verbose=False):
   # Start training
   os.makedirs(output, exist_ok=True)
   os.makedirs(save_path, exist_ok=True)
+  
+  #write run id to temp, so that daemon waits for it
+  run_info = {'run_id': run.id, 'run_name': run.name}
+  print_v("writing my id to temp file", verbose)
+  store_Temp(TEMP_PATH, run_info)
+  
   train_loop(model_specifcs, run, recover=admin['recover'])
   run.finish()
   
-  #clean up after
-  clean_Temp(TEMP_PATH, verbose)
-
 def print_seperator(title='', verbose=True):
   '''This prints out a seperator between training runs
   
