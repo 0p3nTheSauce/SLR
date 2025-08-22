@@ -1,5 +1,6 @@
 {
-  "old_runs": [
+  "old_runs": [],
+  "to_run": [
     {
       "model_info": {
         "idx": 7,
@@ -408,6 +409,5 @@
       "output": "runs/asl100/S3D_exp007",
       "save_path": "runs/asl100/S3D_exp007/checkpoints"
     }
-  ],
-  "to_run": []
+  ]
 }
