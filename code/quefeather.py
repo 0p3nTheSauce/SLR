@@ -112,8 +112,8 @@ def main():
     print('htf did you get here?')
     
 if __name__ == '__main__':
-  # main()
-  idle()
+  main()
+  # idle()
   
 
   
