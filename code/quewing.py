@@ -244,7 +244,7 @@ def get_next_run(runs_path, verbose=False):
 		
 	
 	print_v(f"Next run to run from {runs_path}:", verbose)
-	print_v(json.dumps(next_run, indent=2), verbose)
+	# print_v(json.dumps(next_run, indent=2), verbose) 				hella verbose
 			
 	return next_run
 	
@@ -280,7 +280,7 @@ def remove_old_run(runs_path, verbose=False):
 		
 	
 	print_v(f"Successfully move old run to  {runs_path}:", verbose)
-	print_v(json.dumps(old_run, indent=2), verbose)
+	# print_v(json.dumps(old_run, indent=2), verbose)									hella verbose
 			
 	return old_run
 
