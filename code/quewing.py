@@ -408,27 +408,22 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str):
 		results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
 	return results
 
-def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=5) \
+def daemon(verbose: bool=True, max_retries: int=5) \
 	-> None:
 	'''Function for the queue daemon process. The function works in a fetch execute repeat
 	cycle. The function reads runs from the queRuns.json file, then writes them to the
 	queTemp.json file for the worker process to find. The daemon spawns the worker, then 
-	waits for it to complete before proceeding
+	waits for it to complete before proceeding. It waits for completed by checking the status of the wandb API.
 	
 	Args:
 		verbose: verbose output
-		proceed_after_fail: proceed after a failed run or wandb error?
 		max_retries: when getting a wandb api error  
 	'''
 	runs_path = RUNS_PATH
-	proceed = False
-	advice = handle_already_running(ENTITY, PROJECT,
+	proceed = handle_already_running(ENTITY, PROJECT,
 																 check_interval = RETRY_WAIT_TIME,
 																 verbose=verbose,
 																 max_retries=max_retries)
-	proceed = advice or proceed_after_fail
-	if not advice and proceed_after_fail:
-		print_v('Continuing despite errors with previous runs', verbose)
 	
 	while proceed:
 		
@@ -440,7 +435,6 @@ def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=
 			#stash run for quefeather to find
 			store_Temp(TEMP_PATH, next_run) #worker cleans
 
-   
 			#move the next_run from "to_run" to "old_runs" 
 			remove_old_run(runs_path, verbose=True)
 	 	
@@ -453,6 +447,18 @@ def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=
 		except subprocess.CalledProcessError as e:
 			print("Daemon ran into an error when spawning the worker process: ")
 			print(e.stderr)
+			break
+		
+		print_v("Waiting for run completion: \n", verbose)
+		#because start is non blocking, we need to wait for the run to finish
+		proceed = handle_already_running(ENTITY, PROJECT,
+																 check_interval = RETRY_WAIT_TIME,
+																 verbose=verbose,
+																 max_retries=max_retries)
+		if proceed:
+			print_v("Run completed successfully: \n", verbose)
+		else:
+			print_v("Ran into an error waiting for run to complete, exiting", verbose)
 			break
 
 		#print a seperator to the output to seperate runs

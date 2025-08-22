@@ -241,7 +241,11 @@ def tmux_session():
 def test_blocking():
   #have a feeling the run.subprocess is 'blocking' in the sences
   print(f'Starting at {time.strftime("%Y-%m-%d %H:%M:%S")}')
-  subprocess.run(['tmux', 'send-keys', '-t', 'test:q', './quefeather.py', 'Enter'], check=True)
+  # subprocess.run(['tmux', 'send-keys', '-t', 'test:q', './quefeather.py', 'Enter'], check=True) #non-blocking
+  try:
+    subprocess.run(['tmux', 'respawn-window', '-t', 'test:q', '-k', './quefeather.py', 'Enter'], check=True) #non-blocking
+  except subprocess.CalledProcessError as e:
+    print(e.stderr)
   print(f'Finishign at {time.strftime("%Y-%m-%d %H:%M:%S")}')
 
 if __name__ == "__main__":
