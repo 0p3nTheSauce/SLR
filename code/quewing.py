@@ -438,8 +438,9 @@ def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=
 			break
 		else:
 			#stash run for quefeather to find
-			store_Temp(TEMP_PATH, next_run)
-			
+			store_Temp(TEMP_PATH, next_run) #worker cleans
+
+   
 			#move the next_run from "to_run" to "old_runs" 
 			remove_old_run(runs_path, verbose=True)
 	 	
@@ -447,15 +448,12 @@ def daemon(verbose: bool=True, proceed_after_fail: bool=False, max_retries: int=
 		#session: que_worker, name: [num] worker  	
 		#if worker exists, increments num 
 		try:
-			result = start('worker', SESSION, SCRIPT_PATH, verbose) #this is blocking
+			result = start('worker', SESSION, SCRIPT_PATH, verbose) #this actually not blocking 
 			print_v('worker started successfully', verbose)
 		except subprocess.CalledProcessError as e:
 			print("Daemon ran into an error when spawning the worker process: ")
 			print(e.stderr)
 			break
-	 
-		#remember to clean up the temp folder when finished
-		clean_Temp(TEMP_PATH, verbose=True)
 
 		#print a seperator to the output to seperate runs
 		try:

@@ -5,13 +5,19 @@ import wandb
 import os
 import sys
 from train import train_loop
-from quewing import get_run_id, daemon, TEMP_PATH, print_v
+from quewing import daemon, TEMP_PATH, print_v, clean_Temp
 import argparse
+import time
 
 def run_train(verbose=False):
   '''An easy to execute script for quewing'''
   with open(TEMP_PATH) as f:
     info = json.load(f)
+  
+  if not info:
+    #empty temp file
+    raise ValueError(f'Tried to read next run from {TEMP_PATH} but it was empty')
+    
   model_specifcs = info['model_info']
   #can probably do:
   #model_specifics = info['model_specifics']
@@ -49,6 +55,9 @@ def run_train(verbose=False):
   os.makedirs(save_path, exist_ok=True)
   train_loop(model_specifcs, run, recover=admin['recover'])
   run.finish()
+  
+  #clean up after
+  clean_Temp(TEMP_PATH, verbose)
 
 def print_seperator(title='', verbose=True):
   '''This prints out a seperator between training runs
@@ -66,8 +75,16 @@ def print_seperator(title='', verbose=True):
     # print() #just send smt to the terminal
     pass
 
-if __name__ == '__main__':
+def idle():
+  #testing if blocking
+  print(f'Starting at {time.strftime("%Y-%m-%d %H:%M:%S")}')
+  for i in range(10):
+    print(f'Idling: {i}')
+    time.sleep(10)
+  print(f'Finishign at {time.strftime("%Y-%m-%d %H:%M:%S")}')
 
+
+def main():
   parser = argparse.ArgumentParser(prog='quefeather.py')
   subparsers = parser.add_subparsers(dest='mode', help='Operation mode', required=True)
 
@@ -93,5 +110,10 @@ if __name__ == '__main__':
     print_seperator(args.title, args.verbose)
   else:
     print('htf did you get here?')
+    
+if __name__ == '__main__':
+  # main()
+  idle()
+  
 
   
