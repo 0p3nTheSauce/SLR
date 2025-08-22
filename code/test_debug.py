@@ -238,11 +238,17 @@ def tmux_session():
     setup_tmux_session('test', 'd', 'w')
   print(separate('d', 'test', './quefeather.py','Testing', True)  )
 
+def test_blocking():
+  #have a feeling the run.subprocess is 'blocking' in the sences
+  print(f'Starting at {time.strftime("%Y-%m-%d %H:%M:%S")}')
+  subprocess.run(['tmux', 'send-keys', '-t', 'test:q', './quefeather.py', 'Enter'], check=True)
+  print(f'Finishign at {time.strftime("%Y-%m-%d %H:%M:%S")}')
 
 if __name__ == "__main__":
   # test_early_stopping(mode='min')
   # test_wait_for_run_completion()
   # pytest.main([__file__])
   # test_stopper_save_and_load()
-  tmux_session()
+  # tmux_session()
+  test_blocking()
   
