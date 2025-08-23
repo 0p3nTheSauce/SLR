@@ -19,7 +19,7 @@ from stopping import EarlyStopper
 from quewing import get_run_id
 
 ENTITY= 'ljgoodall2001-rhodes-university'
-PROJECT = 'WLASL-SLR'
+PROJECT = 'WLASL - SLR'
 
 def set_seed(seed=42):
   torch.manual_seed(seed)

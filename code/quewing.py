@@ -10,7 +10,7 @@ import time
 #local imports
 # from train import PROJECT, ENTITY
 ENTITY= 'ljgoodall2001-rhodes-university'
-PROJECT = 'WLASL-SLR'
+PROJECT = 'WLASL - SLR'
 from configs import load_config, print_config, take_args
 
 #constants
