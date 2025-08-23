@@ -135,9 +135,7 @@
       ],
       "output": "runs/asl100/S3D_exp005",
       "save_path": "runs/asl100/S3D_exp005/checkpoints"
-    }
-  ],
-  "to_run": [
+    },
     {
       "model_info": {
         "idx": 7,
@@ -205,6 +203,142 @@
       ],
       "output": "runs/asl100/S3D_exp006",
       "save_path": "runs/asl100/S3D_exp006/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 7,
+        "mean": [
+          0.43216,
+          0.394666,
+          0.37645
+        ],
+        "std": [
+          0.22803,
+          0.22145,
+          0.216989
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 8,
+          "update_per_step": 8,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 50,
+            "min_delta": 0.01
+          }
+        },
+        "optimizer": {
+          "eps": 1e-08,
+          "backbone_init_lr": 1e-05,
+          "backbone_weight_decay": 0.0001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 0.0001
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 32,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "006",
+          "recover": false,
+          "model": "S3D",
+          "split": "asl100",
+          "config_path": "./configfiles/asl100/S3D_006.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/S3D_exp006/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "WLASL-SLR",
+      "tags": [
+        "asl100",
+        "S3D",
+        "exp-006"
+      ],
+      "output": "runs/asl100/S3D_exp006",
+      "save_path": "runs/asl100/S3D_exp006/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 7,
+        "mean": [
+          0.43216,
+          0.394666,
+          0.37645
+        ],
+        "std": [
+          0.22803,
+          0.22145,
+          0.216989
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 8,
+          "update_per_step": 8,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 50,
+            "min_delta": 0.01
+          }
+        },
+        "optimizer": {
+          "eps": 0.001,
+          "backbone_init_lr": 1e-05,
+          "backbone_weight_decay": 0.0001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 1e-07
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 32,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "007",
+          "recover": false,
+          "model": "S3D",
+          "split": "asl100",
+          "config_path": "./configfiles/asl100/S3D_007.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/S3D_exp007/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "WLASL-SLR",
+      "tags": [
+        "asl100",
+        "S3D",
+        "exp-007"
+      ],
+      "output": "runs/asl100/S3D_exp007",
+      "save_path": "runs/asl100/S3D_exp007/checkpoints"
     },
     {
       "model_info": {
@@ -344,6 +478,142 @@
     },
     {
       "model_info": {
+        "idx": 3,
+        "mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "std": [
+          0.229,
+          0.224,
+          0.225
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 2,
+          "update_per_step": 4,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 30,
+            "min_delta": 0.01
+          }
+        },
+        "optimizer": {
+          "eps": 0.001,
+          "backbone_init_lr": 1e-05,
+          "backbone_weight_decay": 0.0001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 0.0001
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 16,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "000",
+          "recover": false,
+          "model": "Swin3D_S",
+          "split": "asl100",
+          "config_path": "./configfiles/asl100/Swin3D_S_000.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/Swin3D_S_exp000/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "WLASL-SLR",
+      "tags": [
+        "asl100",
+        "Swin3D_S",
+        "exp-000"
+      ],
+      "output": "runs/asl100/Swin3D_S_exp000",
+      "save_path": "runs/asl100/Swin3D_S_exp000/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 4,
+        "mean": [
+          0.485,
+          0.456,
+          0.406
+        ],
+        "std": [
+          0.229,
+          0.224,
+          0.225
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 2,
+          "update_per_step": 4,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 30,
+            "min_delta": 0.01
+          }
+        },
+        "optimizer": {
+          "eps": 0.001,
+          "backbone_init_lr": 1e-05,
+          "backbone_weight_decay": 0.0001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 0.0001
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 16,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "000",
+          "recover": false,
+          "model": "Swin3D_T",
+          "split": "asl100",
+          "config_path": "./configfiles/asl100/Swin3D_T_000.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/Swin3D_T_exp000/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "WLASL-SLR",
+      "tags": [
+        "asl100",
+        "Swin3D_T",
+        "exp-000"
+      ],
+      "output": "runs/asl100/Swin3D_T_exp000",
+      "save_path": "runs/asl100/Swin3D_T_exp000/checkpoints"
+    },
+    {
+      "model_info": {
         "idx": 4,
         "mean": [
           0.485,
@@ -479,6 +749,77 @@
       ],
       "output": "runs/asl100/MViT_V1_B_exp000",
       "save_path": "runs/asl100/MViT_V1_B_exp000/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 0,
+        "mean": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "std": [
+          0.225,
+          0.225,
+          0.225
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 4,
+          "update_per_step": 2,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 50,
+            "min_delta": 0.01
+          }
+        },
+        "optimizer": {
+          "lr": 0.001,
+          "eps": 0.001,
+          "weight_decay": 1e-07,
+          "backbone_init_lr": 1e-05,
+          "backbone_weight_decay": 0.0001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 1e-07
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 16,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "000",
+          "recover": false,
+          "model": "MViT_V1_B",
+          "split": "asl100",
+          "config_path": "./configfiles/asl100/MViT_V1_B_000.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/MViT_V1_B_exp000/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "WLASL-SLR",
+      "tags": [
+        "asl100",
+        "MViT_V1_B",
+        "exp-000"
+      ],
+      "output": "runs/asl100/MViT_V1_B_exp000",
+      "save_path": "runs/asl100/MViT_V1_B_exp000/checkpoints"
     }
-  ]
+  ],
+  "to_run": []
 }
