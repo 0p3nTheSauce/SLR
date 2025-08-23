@@ -42,6 +42,9 @@ def load_config(arg_dict, verbose=False):
 	if verbose:	
 		print()
 	
+	#want to add equivalent batch size
+	config['training']['batch_size_equivalent'] = config['training']['batch_size'] * config['training']['update_per_step']
+ 
 	config = EarlyStopper.config_precheck(config)
 		
 	# return post_process(config, verbose)
