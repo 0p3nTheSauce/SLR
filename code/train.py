@@ -314,16 +314,16 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
       # Validation specific logic
       if phase == 'val':
         # Save best model
-        if epoch_acc > best_val_score:
-          best_val_score = epoch_acc
+        if epoch_loss < best_val_score:
+          best_val_score = epoch_loss
           model_name = os.path.join(config.admin['save_path'], f'best.pth') 
           torch.save(model.state_dict(), model_name)
-          print(f'New best model saved: {model_name} (Acc: {epoch_acc:.2f}%)')
+          print(f'New best model saved: {model_name} (Loss: {epoch_loss:.2f}%)')
       
         # Step scheduler with validation loss
         scheduler.step() 
         
-        print(f'Best validation accuracy so far: {best_val_score:.2f}%')
+        print(f'Best validation loss so far: {best_val_score:.2f}%')
       
     # Save checkpoint
     if epoch % save_every == 0 or not epoch < config.training['max_epoch'] or stopper.stop:
