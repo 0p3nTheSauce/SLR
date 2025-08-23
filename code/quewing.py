@@ -632,9 +632,13 @@ def list_configs(runs_path:str):
 		all_runs = json.load(f)
 	
 	if all_runs:
+		if len(all_runs['to_run']) == 0:
+			print("runs are finished")
 		for run in all_runs['to_run']:
 			admin = run['config']['admin']
 			print(admin['config_path'])
+	else:
+		print("no runs available")
 
 def main():
 	#NOTE chose to make verbose true by default when running this script
