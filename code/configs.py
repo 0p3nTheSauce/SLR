@@ -142,7 +142,7 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
 	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
 	parser.add_argument('-p', '--project', type=str, default=default_project, help='wandb project name')
-	parser.add_argument('-s', '--split',type=str, help='The class split (e.g. asl100)', required=True)
+	parser.add_argument('-sp', '--split',type=str, help='The class split (e.g. asl100)', required=True)
 	#TODO: maybe add tags for wandb as parameters
 	parser.add_argument('-t', '--tags', nargs='+', type=str,help='Additional wandb tags')
 
