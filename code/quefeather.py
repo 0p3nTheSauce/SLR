@@ -71,8 +71,7 @@ def print_seperator(title='', verbose=True):
     print(f"{title:^10}")
     print("\n","-"*10,"\n"*2)
   else:
-    # print() #just send smt to the terminal
-    pass
+    print(title) #just send smt to the terminal
 
 def idle():
   #testing if blocking
@@ -95,7 +94,7 @@ def main():
 
   # Separator subcommand (optional title)
   separator_parser = subparsers.add_parser('separator', help='Run as separator')
-  separator_parser.add_argument('-t', '--title',type=str, help='Title for separator', default='')
+  separator_parser.add_argument('-t', '--title',type=str, nergs='?', help='Title for separator',const='',  default=None)
 
   parser.add_argument('-v', '--verbose', action='store_true', help='Turn on verbose output')
   args = parser.parse_args()

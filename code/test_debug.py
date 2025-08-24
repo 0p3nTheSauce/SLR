@@ -248,11 +248,25 @@ def test_blocking():
     print(e.stderr)
   print(f'Finishign at {time.strftime("%Y-%m-%d %H:%M:%S")}')
 
+def test_dict_mod():
+  dic = {"a":[1,2],"b":[2,3,4]}
+  rem = dic["b"].pop(2)  
+  print(rem)
+  print_dict(dic)
+
+def test_arg_defaults():
+  parser = argparse.ArgumentParser(description='test_debug.py')
+  parser.add_argument('-rr', '--remove_run',nargs='?', type=str,const='ask_me', default=None,  help='remove a run from to_run')
+  args, other = parser.parse_known_args()
+  print(args.remove_run)
+
 if __name__ == "__main__":
   # test_early_stopping(mode='min')
   # test_wait_for_run_completion()
   # pytest.main([__file__])
   # test_stopper_save_and_load()
   # tmux_session()
-  test_blocking()
+  # test_blocking()
+  # test_dict_mod()
+  test_arg_defaults()
   
