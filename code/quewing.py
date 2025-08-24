@@ -586,6 +586,8 @@ def remove_run(runs_path:str, verbose:bool=False, idx:Optional[int]=None) -> dic
 		except IndexError:
 			print(f"Index: {idx} out of range for to run of length {len(all_runs['to_run'])}")
 			return {}	
+ 
+ 
 
 	with open(runs_path, 'r') as f:
 		all_runs = json.load(f)
