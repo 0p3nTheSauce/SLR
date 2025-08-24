@@ -1,76 +1,22 @@
 import torch # type: ignore
 import os
-import json
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
 #local imports
-import numpy as np
-import random
-import wandb
+
 from video_dataset import VideoDataset
-from configs import load_config, print_config, take_args
 from models.pytorch_mvit import MViTv2S_basic, MViTv1B_basic
 from models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
 from models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
-from quewing import get_run_id
 
-ENTITY= 'ljgoodall2001-rhodes-university'
-PROJECT = 'WLASL - SLR'
-
-def set_seed(seed=42):
-  torch.manual_seed(seed)
-  torch.cuda.manual_seed_all(seed)
-  np.random.seed(seed)
-  random.seed(seed)
-  torch.backends.cudnn.deterministic = True
-  torch.backends.cudnn.benchmark = False
-
-def setup_data(mean, std, config):
-  
-  final_transform =  v2.Compose([
-    v2.Lambda(lambda x: x.float() / 255.0),
-    v2.Normalize(mean=mean, std=std),
-    v2.Lambda(lambda x: x.permute(1,0,2,3)) 
-  ])
-  
-  #setup dataset
-  train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
-                                 v2.RandomHorizontalFlip(),
-                                 final_transform])
-  test_transforms = v2.Compose([v2.CenterCrop(config.data['frame_size']),
-                                final_transform])
-  
-  train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
-  val_instances = os.path.join(config.admin['labels'],'val_instances_fixed_frange_bboxes_len.json' )
-  train_classes = os.path.join(config.admin['labels'], 'train_classes_fixed_frange_bboxes_len.json')
-  val_classes = os.path.join(config.admin['labels'],'val_classes_fixed_frange_bboxes_len.json' )
-  
-  dataset = VideoDataset(config.admin['root'],train_instances, train_classes,
-    transforms=train_transforms, num_frames=config.data['num_frames'])
-  dataloader = DataLoader(dataset, batch_size=config.training['batch_size'],
-    shuffle=True, num_workers=2,pin_memory=True)
-  num_classes = len(set(dataset.classes))
-  
-  val_dataset = VideoDataset(config.admin['root'], val_instances, val_classes,
-    transforms=test_transforms, num_frames=config.data['num_frames'])
-  val_dataloader = DataLoader(val_dataset,
-    batch_size=config.training['batch_size'], shuffle=True, num_workers=2,pin_memory=False)
-  val_classes = len(set(val_dataset.classes))
-  assert num_classes == val_classes
-  
-  dataloaders = {'train': dataloader, 'val': val_dataloader}
-  
-  return dataloaders, num_classes
-  
+from train import set_seed
 
 
-
-
-def train_loop(model_info, wandb_run, load=None, save_every=5,
+def distil_loop(teacher_info, learner_info, wandb_run, load=None, save_every=5,
                  recover=False, seed=None):
   
   if seed is not None:
@@ -78,12 +24,15 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 
   config = wandb_run.config
   
+  
   #setup transforms
-  final_transform = v2.Compose([
+  teacher_final_transform = v2.Compose([
     v2.Lambda(lambda x: x.float() / 255.0),
     v2.Normalize(mean=model_info['mean'], std=model_info['mean']),
     v2.Lambda(lambda x: x.permute(1,0,2,3)) 
   ])
+  
+  
   
   train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
                                  v2.RandomHorizontalFlip(),
@@ -348,69 +297,3 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
         
   print('Finished training successfully')
   # wandb_run.finish()
-
-
-def main():
-  with open('./wlasl_implemented_info.json') as f:
-    info = json.load(f)
-  available_splits = info['splits']
-  model_info = info['models']
-  
-  arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys(),
-                                                         default_project=PROJECT)
-  
-  config = load_config(arg_dict, verbose=True)
-  
-  print_config(config)
-
-  proceed = input("Confirm: y/n: ")
-  if proceed.lower() == 'y':
-    admin = config['admin']
-    model_specifcs = model_info[admin['model']]
-    run_id = None #only used if we are recovering a run
-      
-    #setup wandb run
-    run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
-    if admin['recover']:
-      if run_id is None: 
-        run_id = get_run_id(run_name, ENTITY, project)
-      if run_id is None:
-        run_id = input("No run found automatically. Enter run ID, or leave blank to cancel: ")
-        if run_id == '':
-          print("Training cancelled")
-          return
-      print(f"Resuming run with ID: {run_id}")
-      run = wandb.init(
-        entity=ENTITY,
-        project=project,
-        id=run_id,
-        resume='must',
-        name=run_name,
-        tags=tags,
-        config=config      
-      )
-    else:
-      print(f"Starting new run with name: {run_name}")
-      run = wandb.init(
-        entity=ENTITY,
-        project=project,
-        name=run_name,
-        tags=tags,
-        config=config      
-      )
-    print(f"Run ID: {run.id}")
-    print(f"Run name: {run.name}")  # Human-readable name
-    print(f"Run path: {run.path}")  # entity/project/run_id format
-    
-    # Start training
-    os.makedirs(output, exist_ok=True)
-    os.makedirs(save_path, exist_ok=True)
-    train_loop(model_specifcs, run, recover=admin['recover'])
-  else:
-    print("Training cancelled")
-    # os.removedirs(output,)
-    # shutil.rmtree(output)
-  
-if __name__ == '__main__':
-  main()
-  # list_runs()
