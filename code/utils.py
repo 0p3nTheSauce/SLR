@@ -371,7 +371,8 @@ def clean_runs(path, ask=False, rem_empty=False):
     raise FileNotFoundError(f'Runs directory: {path} was not found')
   sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
   
-  return clean_experiments(sub_paths, ask, rem_empty)
+  for p in sub_paths:
+    clean_experiments(p, ask, rem_empty)
   
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
