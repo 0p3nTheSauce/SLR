@@ -25,7 +25,7 @@ from  torchvision.models.video.resnet import r3d_18, r2plus1d_18, R3D_18_Weights
 
 
 class Resnet3D_18_basic(nn.Module): #These did not have drop
-  def __init__(self, num_classes=100, weights_path=None):
+  def __init__(self, num_classes=100, weights_path=None, drop_p=0.5):
     super().__init__()
     self.num_classes = num_classes
     
@@ -48,7 +48,7 @@ class Resnet3D_18_basic(nn.Module): #These did not have drop
     self.avgpool = self.backbone[5]
     in_features = r3d18.fc.in_features
     self.classifier = nn.Sequential(
-      # nn.Dropout(drop_p, inplace=True),
+      nn.Dropout(drop_p, inplace=True),
       nn.Linear(in_features, num_classes),
     )
     
@@ -72,7 +72,7 @@ class Resnet3D_18_basic(nn.Module): #These did not have drop
     return x
   
 class Resnet2_plus1D_18_basic(nn.Module):
-  def __init__(self, num_classes=100, weights_path=None):
+  def __init__(self, num_classes=100, weights_path=None, drop_p=0.5):
     super().__init__()
     self.num_classes = num_classes
     
@@ -96,7 +96,7 @@ class Resnet2_plus1D_18_basic(nn.Module):
     
     in_features = r2plus1d18.fc.in_features
     self.classifier = nn.Sequential(
-      # nn.Dropout(drop_p, inplace=True),
+      nn.Dropout(drop_p, inplace=True),
       nn.Linear(in_features, num_classes),
     )
     
