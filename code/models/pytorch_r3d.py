@@ -48,7 +48,7 @@ class Resnet3D_18_basic(nn.Module): #These did not have drop
     self.avgpool = self.backbone[5]
     in_features = r3d18.fc.in_features
     self.classifier = nn.Sequential(
-      nn.Dropout(drop_p, inplace=True),
+      nn.Dropout(drop_p),
       nn.Linear(in_features, num_classes),
     )
     
@@ -96,7 +96,7 @@ class Resnet2_plus1D_18_basic(nn.Module):
     
     in_features = r2plus1d18.fc.in_features
     self.classifier = nn.Sequential(
-      nn.Dropout(drop_p, inplace=True),
+      nn.Dropout(drop_p),
       nn.Linear(in_features, num_classes),
     )
     
