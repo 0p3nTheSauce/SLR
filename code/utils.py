@@ -3,11 +3,11 @@ import torch.nn.functional as F
 import cv2
 import numpy as np
 import json
-import os
 import matplotlib.pyplot as plt
 import gzip
 # from torchcodec.decoders import VideoDecoder
 import re
+from pathlib import Path
 
 ############# pretty printing ##############
 
@@ -164,8 +164,7 @@ def cv_display_or_save(frames,output=None):
       cv2.waitKey(100)  # Wait for a key press to close the window
     cv2.destroyAllWindows()
   else:
-    if not os.path.exists(output):
-      os.makedirs(output)
+    Path(output).mkdir(parents=True, exist_ok=True)
     for i, img in enumerate(frames):
       cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
     print(f"Cropped frames saved to {output}.")
@@ -298,21 +297,31 @@ def extract_num(fname):
    
 
 
-def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3):
+def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=False):
   for path in paths:
-    check_point_dirs = []
-    for dir_name in os.listdir(path):
-      if 'checkpoint' in dir_name: #ignore logs
-        check_point_dirs.append(dir_name)
+    path_obj = Path(path)
+        
+    # Find checkpoint directories
+    check_point_dirs = [item.name for item in path_obj.iterdir() 
+                        if item.is_dir() and 'checkpoint' in item.name]
     
     if len(check_point_dirs) == 0:
-      print(f'Warning, no checkpoints found in {path}') 
+      if rem_empty:
+        try:
+          path_obj.rmdir()
+        except OSError as e:
+          print(f"Ran into an error when removing {path}")
+          print(e)
+          continue
+      else:
+        print(f'Warning, no checkpoints found in {path}') 
       continue
     
+    
     for check in check_point_dirs:
-      to_empty = os.path.join(path, check)
+      to_empty = path_obj / check
       
-      dirty = sorted(os.listdir(to_empty))
+      dirty = sorted([item.name for item in to_empty.iterdir() if item.is_file()])
       files = [file for file in dirty 
                if file.endswith('.pth')
                and 'best' not in file]
@@ -324,6 +333,7 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3):
           
       if len(files) <= 2:
         continue 
+      
       #leave best.pth and the last checkpoint
       to_remove = files[:-1]  # not great safety wise, assumes files sort correctly
       if ask:
@@ -336,24 +346,32 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3):
           continue
 
       for file in to_remove:
-        name = os.path.join(to_empty, file)
-        os.remove(name)
+        file_path = to_empty / file
+        file_path.unlink()
         print(f'removed {file} in {to_empty}')
 
+def is_empty(path):
+  return not any(Path(path).iterdir())
 
-def clean_experiments(path, ask=False):
-  if not os.path.exists(path):
-    raise FileNotFoundError(f'Experiments path: {path} was not found')
-  sub_paths = os.listdir(path)
-  return clean_checkpoints([os.path.join(path, sub_path) \
-    for sub_path in sub_paths], ask)
     
-def clean_runs(path, ask=False):
-  if not os.path.exists(path):
+def clean_experiments(path, ask=False, rem_empty=False):
+  path_obj = Path(path)
+  
+  if not path_obj.exists():
+    raise FileNotFoundError(f'Experiments path: {path} was not found')
+  
+  sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
+  
+  return clean_checkpoints(sub_paths, ask=ask,rem_empty=rem_empty)
+    
+def clean_runs(path, ask=False, rem_empty=False):
+  path_obj = Path(path)
+  
+  if not path_obj.exists():
     raise FileNotFoundError(f'Runs directory: {path} was not found')
-  sub_paths = os.listdir(path)
-  for sub_path in sub_paths:
-    clean_experiments(os.path.join(path, sub_path), ask)
+  sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
+  
+  return clean_experiments(sub_paths, ask, rem_empty)
   
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
@@ -371,6 +389,7 @@ def crop_frames(frames, bbox):
 #     os.makedirs(path, exist_ok=True)
 #   return path
 
+import os
 def enum_dir(path, make=False, decimals=3):
   '''Enumerate filenames'''
   if os.path.exists(path):
