@@ -7,6 +7,7 @@ import argparse
 import wandb
 import time
 
+from typing import Union, Optional, Any
 #local imports
 # from train import PROJECT, ENTITY
 ENTITY= 'ljgoodall2001-rhodes-university'
@@ -571,7 +572,53 @@ def create_run(verbose=True):
 			print("Training cancelled by user.")
 		return
 
-def clear_runs(runs_path, verbose=True, past_only=False):
+def remove_run(runs_path:str, verbose:bool=False, idx:Optional[int]=None) -> dict[str,Any]:
+	'''remove a run from rus'''
+	all_runs = {
+		'old_runs': [],
+		'to_run': []
+	}
+
+	def _rem(all_runs, idx):
+		try:
+			rem = all_runs['to_run'].pop(idx)
+			return rem
+		except IndexError:
+			print(f"Index: {idx} out of range for to run of length {len(all_runs['to_run'])}")
+			return {}	
+
+	with open(runs_path, 'r') as f:
+		all_runs = json.load(f)
+	
+	rem = {}
+ 
+	if not all_runs:
+		print("no runs available")
+		return rem
+
+	if idx is not None:
+		rem = _rem(all_runs, idx)
+
+	if not rem:
+		for i, run in enumerate(all_runs['to_run']):
+			admin = run['config']['admin']
+			print(f"{admin['config_path']} : {i}")
+		if len(all_runs['to_run']) == 0:
+			print("runs are finished")
+		else:
+			idx = int(input("select index: "))
+			rem = _rem(all_runs, idx)
+	
+	if rem:
+		with open(runs_path, 'w') as f:
+			json.dump(all_runs, f, indent=2)
+		print_v(f"run removed: {rem['config']['admin']['config_path']}", verbose)
+	else:
+		print_v(f"no run removed", verbose)
+	
+	return rem
+
+def clear_runs(runs_path, verbose=True, past_only=False, future_only=False):
 	'''reset the runs file'''
 	all_runs = {
 		'old_runs': [],
@@ -581,9 +628,16 @@ def clear_runs(runs_path, verbose=True, past_only=False):
 		raise ValueError(f'could not find runs file: {runs_path}')
 	
 	if past_only:
+		print_v("only clearing old runs", verbose)
 		with open(runs_path, 'r') as f:
 			all_runs = json.load(f)
 		all_runs['old_runs'] = []
+	
+	if future_only:
+		print_v("only clearing new runs", verbose)
+		with open(runs_path, 'r') as f:
+			all_runs = json.load(f)
+		all_runs['to_run'] = []
 	
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
@@ -626,8 +680,9 @@ def check_err(err, session):
 			return False
 	return True
 
-def list_configs(runs_path:str):
+def list_configs(runs_path:str) -> list[str]:
 	
+	conf_list = []
 	with open(runs_path, 'r') as f:
 		all_runs = json.load(f)
 	
@@ -637,8 +692,11 @@ def list_configs(runs_path:str):
 		for run in all_runs['to_run']:
 			admin = run['config']['admin']
 			print(admin['config_path'])
+			conf_list.append(admin['config_path'])
 	else:
 		print("no runs available")
+	
+	return conf_list
 
 def main():
 	#NOTE chose to make verbose true by default when running this script
@@ -648,10 +706,12 @@ def main():
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
 	parser.add_argument('-cr', '--clear', action='store_true', help='clear the runs file')	
 	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')
+	parser.add_argument('-cn', '--clear_new', action='store_true', help='clear the new runs only')
 	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
+	parser.add_argument('-rr', '--remove_run', nargs='?',type=str, help='remove a run from to_run', const='ask_me', default=None)
 	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
 	parser.add_argument('-sm', '--separate_mode', type=str, help='Send a seperator to the "mode" process')
-	parser.add_argument('-ti', '--title', type=str, help="title for seperate_mode used", default="Calling next process")
+	parser.add_argument('-ti', '--title', type=str, nargs='?', help="title for seperate_mode used", const="Calling next process", default=None)
 	parser.add_argument('-ro', '--return_old', action='store_true', help='return old runs to new')
 	parser.add_argument('-lc', '--list_configs', action='store_true', help='list the config files used in runs file')
 	args, other = parser.parse_known_args()
@@ -702,6 +762,8 @@ def main():
 		clear_runs(RUNS_PATH, verbose=True)
 	elif args.clear_old:
 		clear_runs(RUNS_PATH, verbose=True, past_only=True)
+	elif args.clear_new:
+		clear_runs(RUNS_PATH, verbose=True, future_only=True)
 	
 	if args.clear_temp:
 		clean_Temp(TEMP_PATH, verbose)
@@ -721,6 +783,11 @@ def main():
 			print(e.stderr)
 			return
 	
+	if args.remove_run:
+		if args.remove_run == 'ask_me':
+			remove_run(RUNS_PATH,verbose)
+		else:
+			remove_run(RUNS_PATH,verbose, int(args.remove_run))
 
 
 if __name__ == '__main__':
