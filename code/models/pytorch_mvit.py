@@ -35,7 +35,7 @@ class MViTv2S_basic(nn.Module):
     in_features = original_linear.in_features
     
     self.classifier = nn.Sequential(
-      nn.Dropout(drop_p, inplace=True),
+      nn.Dropout(drop_p),
       nn.Linear(in_features, num_classes),
     )
     
@@ -101,7 +101,7 @@ class MViTv1B_basic(nn.Module):
     in_features = original_linear.in_features
     
     self.classifier = nn.Sequential(
-      nn.Dropout(drop_p, inplace=True),
+      nn.Dropout(drop_p),
       nn.Linear(in_features, num_classes),
     )
     
