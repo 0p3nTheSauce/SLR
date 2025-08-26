@@ -97,11 +97,12 @@ def main():
   separator_parser.add_argument('-t', '--title',type=str, nargs='?', help='Title for separator',const='',  default=None)
 
   parser.add_argument('-v', '--verbose', action='store_true', help='Turn on verbose output')
+  parser.add_argument('-poff', '--proceed_onFF', action='store_true', help='proceed on first fail')
   args = parser.parse_args()
     
 
   if args.mode == 'daemon':
-    daemon(args.verbose)
+    daemon(args.verbose, proceed_onFF=args.proceed_onFF)
   elif args.mode == 'worker':
     run_train(args.verbose)
   elif args.mode == 'separator':
