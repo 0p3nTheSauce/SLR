@@ -205,23 +205,6 @@ def wait_for_run_completion(entity, project, check_interval=300, verbose=False, 
 	
 	# Wait for the run to finish
 	
-	try:
-		while run.state == 'running':
-			print_v(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}", verbose)
-			time.sleep(check_interval)
-			api = wandb.Api()  # Refresh API to get the latest state
-			run = api.run(f"{entity}/{project}/{run.id}")
-		run_info['state'] = run.state
-	except wandb.Error as e:
-		print_v(f"Wandb Error while waiting for run completion: {e}", verbose)
-		run_info['state'] = 'wandb_error'
-		run_info['wandb_error'] = str(e)
-		return run_info
-	except KeyboardInterrupt:
-		print_v('', verbose)
-		print_v(f"Monitoring of run: {run.name} (ID: {run.id}) interrupted by user.", verbose)
-		run_info['state'] = 'keyboard_interrupt'
-	
 	retries = 0
 	
 	while (run.state == 'running' or run.state == 'wandb_error') and retries < max_retries:
@@ -241,8 +224,8 @@ def wait_for_run_completion(entity, project, check_interval=300, verbose=False, 
 			print_v('', verbose)
 			print_v(f"Monitoring of run: {run.name} (ID: {run.id}) interrupted by user.", verbose)
 			run_info['state'] = 'keyboard_interrupt'
-   
-   
+	 
+	 
 	return run_info
 
 def add_new_run(runs_path, info, verbose=False):
@@ -361,7 +344,7 @@ def clean_Temp(temp_path: str, verbose: bool=False) -> None:
 	print_v('Cleaned temp file', verbose)
 
 def start(mode : str, sesh_name : str, script_path : str, 
-					verbose : bool = False) \
+					verbose : bool = False, proceed_onFF:bool = False) \
 			 -> subprocess.CompletedProcess[bytes]:
 	'''Starts a quefeather worker or daemon subprocess 
  
@@ -370,6 +353,7 @@ def start(mode : str, sesh_name : str, script_path : str,
 			sesh_name: 		tmux session name
 			script_path: 	path to worker script (quefeather)
 			verbose: 			verbose output from task
+			proceed_onFF: proceed on first fail
 		Returns:
 			result: 			from subprocess.run
 		Raises:
@@ -378,10 +362,16 @@ def start(mode : str, sesh_name : str, script_path : str,
 	available_modes = ['daemon', 'worker']
 	if mode not in available_modes:
 		raise ValueError(f'{mode} not one of available modes: {available_modes}')
- 
-	feather_cmd = f'{script_path}' #./quefeather.py mode
+
+	#./quefeather.py
+	feather_cmd = f'{script_path}' 
+	
+	#optional args
 	if verbose:
 		feather_cmd += ' -v'
+	if proceed_onFF:
+		feather_cmd += f' -poff'
+   
 	feather_cmd += f' {mode}'
  
 	tmux_cmd = [ 
@@ -472,7 +462,7 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str):
 		results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
 	return results
 
-def daemon(verbose: bool=True, max_retries: int=5) \
+def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False) \
 	-> None:
 	'''Function for the queue daemon process. The function works in a fetch execute repeat
 	cycle. The function reads runs from the queRuns.json file, then writes them to the
@@ -482,13 +472,15 @@ def daemon(verbose: bool=True, max_retries: int=5) \
 	Args:
 		verbose: verbose output
 		max_retries: when getting a wandb api error  
+		proceed_onFF: if the first run checked was bad, proceed
 	'''
 	runs_path = RUNS_PATH
-	proceed = handle_already_running(ENTITY, PROJECT,
+	advice = handle_already_running(ENTITY, PROJECT,
 																 check_interval = RETRY_WAIT_TIME,
 																 verbose=verbose,
 																 max_retries=max_retries)
-	
+	proceed = advice or proceed_onFF	
+ 
 	while proceed:
 		
 		next_run = get_next_run(runs_path, verbose=True)
@@ -728,6 +720,7 @@ def main():
 	parser.add_argument('-ti', '--title', type=str, nargs='?', help="title for seperate_mode used", const="Calling next process", default=None)
 	parser.add_argument('-ro', '--return_old', action='store_true', help='return old runs to new')
 	parser.add_argument('-lc', '--list_configs', action='store_true', help='list the config files used in runs file')
+	parser.add_argument('-poff', '--proceed_onFF', action='store_true', help='proceed on first fail')
 	args, other = parser.parse_known_args()
 
 	#invert
@@ -765,8 +758,9 @@ def main():
 
 		#run the daemon
 		try:
-			result = start('daemon', SESSION, SCRIPT_PATH, verbose)
+			result = start('daemon', SESSION, SCRIPT_PATH, verbose, args.proceed_onFF)
 			print_v("daemon started successfully", verbose)
+			print_v("proceeding on first fail", verbose and args.proceed_onFF)
 		except subprocess.CalledProcessError as e:
 			print("Ran into an unexpected issue when starting the daemon process: ")
 			print(e.stderr)
