@@ -76,16 +76,7 @@ def handle_already_running(entity, project, check_interval=300,
 	'''
 	#NOTE this function might be better off just checking available GPU memory in future
 	#NOTE I want to remove the retry functionality
-	run_info = wait_for_run_completion(entity, project, check_interval, verbose, run_id)
-	
-	#check for wandb error first so that if it resolves itself, we drop into the rest of 
-	#the conditions
-	retry = 0
-	while run_info['state'] == 'wandb_error' and retry < max_retries:
-		print_v(f"Retrying... ({retry}/{max_retries})", verbose)
-		time.sleep(check_interval) #give it a quick break
-		run_info = wait_for_run_completion(entity, project, check_interval, verbose, run_id)
-		retry += 1
+	run_info = wait_for_run_completion(entity, project, check_interval, verbose, run_id, max_retries)
 	
 	#check for the run not found error next, as there is a chance it needs a second for the wandb api to load
 	retry = 0
@@ -150,7 +141,7 @@ def run_present(run_id, runs):
 			return True
 	return False
 
-def wait_for_run_completion(entity, project, check_interval=300, verbose=False, run_id=None):
+def wait_for_run_completion(entity, project, check_interval=300, verbose=False, run_id=None, max_retries=5):
 	'''Uses wandb Api to check and wait if the last run is still busy. Checks last available run if id not specified.
 		
 		Args:
@@ -231,6 +222,27 @@ def wait_for_run_completion(entity, project, check_interval=300, verbose=False, 
 		print_v(f"Monitoring of run: {run.name} (ID: {run.id}) interrupted by user.", verbose)
 		run_info['state'] = 'keyboard_interrupt'
 	
+	retries = 0
+	
+	while (run.state == 'running' or run.state == 'wandb_error') and retries < max_retries:
+		print_v(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}", verbose)
+		try:
+			time.sleep(check_interval)
+			api = wandb.Api()  # Refresh API to get the latest state
+			run = api.run(f"{entity}/{project}/{run.id}")
+			run_info['state'] = run.state
+			retries = 0
+		except wandb.Error as e:
+			print_v(f"Wandb Error while waiting for run completion: {e}", verbose)
+			run_info['state'] = 'wandb_error'
+			run_info['wandb_error'] = str(e)
+			retries += 1
+		except KeyboardInterrupt:
+			print_v('', verbose)
+			print_v(f"Monitoring of run: {run.name} (ID: {run.id}) interrupted by user.", verbose)
+			run_info['state'] = 'keyboard_interrupt'
+   
+   
 	return run_info
 
 def add_new_run(runs_path, info, verbose=False):
