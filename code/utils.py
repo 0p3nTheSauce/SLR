@@ -8,6 +8,7 @@ import gzip
 # from torchcodec.decoders import VideoDecoder
 import re
 from pathlib import Path
+import shutil
 
 ############# pretty printing ##############
 
@@ -300,22 +301,53 @@ def extract_num(fname):
 def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=False):
   for path in paths:
     path_obj = Path(path)
-        
+    # print(path_obj.name)
     # Find checkpoint directories
     check_point_dirs = [item.name for item in path_obj.iterdir() 
                         if item.is_dir() and 'checkpoint' in item.name]
     
-    if len(check_point_dirs) == 0:
+      
+    
+    if len(check_point_dirs) == 0 or all([is_empty(path_obj / d) for d in check_point_dirs]):
+      
+      if ask and rem_empty:
+        print(f'No checkpoints found in {path}') 
+        ans = 'none'
+        while ans != 'y' and ans != '' and ans != 'n':
+          ans = input('Delete [y]/n: ')
+        
+        if ans == 'n':
+          rem_empty = False
+      else:
+        print(f"Warning, no checkpoints found in {path}")
+              
       if rem_empty:
+        
+        # if len(check_point_dirs) > 0:
+        #   try:
+        #     shutil.rmtree(path)
+        #     print(f"Removed directory and all contents: {path}")
+        #   except OSError as e:
+        #     print(f"Error removing {path}: {e}")
+        # else:
+        #   try:
+        #     path_obj.rmdir()
+        #     print(f'{path_obj.name} removed')
+        #   except OSError as e:
+        #     print(f"Ran into an error when removing {path}")
+        #     print(e)
+        #     continue
         try:
-          path_obj.rmdir()
+          shutil.rmtree(path)
+          print(f"Removed directory and all contents: {path}")
         except OSError as e:
-          print(f"Ran into an error when removing {path}")
-          print(e)
-          continue
+          print(f"Error removing {path}: {e}")
       else:
         print(f'Warning, no checkpoints found in {path}') 
       continue
+    # else:
+      # print("not emtpy")
+      # print(path_obj.name)
     
     
     for check in check_point_dirs:
@@ -391,6 +423,7 @@ def crop_frames(frames, bbox):
 #   return path
 
 import os
+
 def enum_dir(path, make=False, decimals=3):
   '''Enumerate filenames'''
   if os.path.exists(path):
@@ -465,7 +498,7 @@ def main():
   # rename_scalars_in_eventfile('./runs/asl100/r3d18_exp004/logs',
   #                             './runs/asl100/r3d18_exp004/logs_fixed',
   #                             name_mapping)
-  clean_runs('runs', ask=True)
+  clean_runs('runs', ask=True, rem_empty=True)
   # test_vid = '../data/WLASL2000/07393.mp4'
   # torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
   # print(torch_frames.shape)
