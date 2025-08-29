@@ -140,6 +140,7 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	#admin
 	parser.add_argument('-e', '--exp_no',type=int, help='Experiment number (e.g. 10)', required=True)
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
+	parser.add_argument('-ri', '--run_id', type=str, default=None, help=f'The run id to use (especially when also usign recover)')
 	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
 	parser.add_argument('-p', '--project', type=str, default=default_project, help='wandb project name')
 	parser.add_argument('-sp', '--split',type=str, help='The class split (e.g. asl100)', required=True)

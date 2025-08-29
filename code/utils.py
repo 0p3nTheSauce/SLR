@@ -486,6 +486,7 @@ def test_save2():
 
 
 def main():
+  #TODO: the output for empty runs has an issue
   # test_save()
   # test_save2()
   #  torch_to_mediapipe()

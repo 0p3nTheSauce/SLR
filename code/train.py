@@ -367,18 +367,19 @@ def main():
   if proceed.lower() == 'y':
     admin = config['admin']
     model_specifcs = model_info[admin['model']]
-    run_id = None #only used if we are recovering a run
+    run_id = config['admin']['run_id'] if 'run_id' in config['admin'] else None
       
     #setup wandb run
     run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
     if admin['recover']:
-      if run_id is None: 
+      if 'run_id' in config['admin']:
+        run_id = config['admin']['run_id']
+      else: 
         run_id = get_run_id(run_name, ENTITY, project)
       if run_id is None:
-        run_id = input("No run found automatically. Enter run ID, or leave blank to cancel: ")
-        if run_id == '':
-          print("Training cancelled")
-          return
+        print("Run id nto found automatically, pass as arg instead")
+        return
+        
       print(f"Resuming run with ID: {run_id}")
       run = wandb.init(
         entity=ENTITY,

@@ -11,7 +11,9 @@ from typing import Union, Optional, Any
 #local imports
 # from train import PROJECT, ENTITY
 ENTITY= 'ljgoodall2001-rhodes-university'
-PROJECT = 'WLASL - SLR'
+# PROJECT = 'WLASL - SLR'
+PROJECT = 'asl300'
+
 from configs import load_config, print_config, take_args
 
 #constants
@@ -27,6 +29,9 @@ WORKER = 'worker'
 def print_v(item : str, verbose : bool) -> None:
 	if verbose:
 		print(item)
+
+################################ Wandb functions #####################################
+
 
 def get_run_id(run_name, entity, project):
 	api = wandb.Api()
@@ -122,25 +127,6 @@ def handle_already_running(entity, project, check_interval=300,
 		print_v(f"Run {run_info['name']} (ID: {run_info['id']}) has an unknown state. State: {run_info['state']}", verbose)
 		return False
 
-def list_runs(entity, project):
-	# import wandb
-
-	api = wandb.Api()
-	runs = api.runs(f"{entity}/{project}")
-
-	for run in runs:
-		print(f"Run ID: {run.id}")
-		print(f"Run name: {run.name}")
-		print(f"State: {run.state}")
-		print(f"Created: {run.created_at}")
-		print("---")
-
-def run_present(run_id, runs):
-	for run in runs:
-		if run.id == run_id:
-			return True
-	return False
-
 def wait_for_run_completion(entity, project, check_interval=300, verbose=False, run_id=None, max_retries=5):
 	'''Uses wandb Api to check and wait if the last run is still busy. Checks last available run if id not specified.
 		
@@ -207,7 +193,7 @@ def wait_for_run_completion(entity, project, check_interval=300, verbose=False, 
 	
 	retries = 0
 	
-	while (run.state == 'running' or run.state == 'wandb_error') and retries < max_retries:
+	while (run_info['state'] == 'running' or run_info['state'] == 'wandb_error') and retries < max_retries:
 		print_v(f"Run state: {run.state}, Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}", verbose)
 		try:
 			time.sleep(check_interval)
@@ -228,6 +214,33 @@ def wait_for_run_completion(entity, project, check_interval=300, verbose=False, 
 	 
 	return run_info
 
+def list_runs(entity, project, verbose=False):
+	# import wandb
+
+	api = wandb.Api()
+	runs = api.runs(f"{entity}/{project}")
+
+	if verbose:
+		for run in runs:
+			print(f"Run ID: {run.id}")
+			print(f"Run name: {run.name}")
+			print(f"State: {run.state}")
+			print(f"Created: {run.created_at}")
+			print("---")
+		
+	return runs
+
+def run_present(run_id, runs):
+	for run in runs:
+		if run.id == run_id:
+			return True
+	return False
+
+def validate_runId(run_id, entity, project, verbose=False):
+	return run_present(run_id, list_runs(entity, project, verbose))
+
+#################################  Config manipulation functions ###############################
+
 def add_new_run(runs_path, info, verbose=False):
 	'''Adds a new entry to the runs.json file
 
@@ -242,7 +255,10 @@ def add_new_run(runs_path, info, verbose=False):
 	if os.path.exists(runs_path):
 		with open(runs_path, 'r') as f:
 			all_runs = json.load(f)
-	all_runs['to_run'].append(info)
+	if all_runs['to_run'] is None:
+		all_runs['to_run'] = [info]
+	else:
+		all_runs['to_run'].append(info)
 	
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
@@ -326,6 +342,7 @@ def remove_old_run(runs_path, verbose=False):
 	return old_run
 
 def store_Temp(temp_path, next_run):
+	#TODO: change name, as is quite a useful function for modifying runs_path
 	''''Stores dictionary in the temp file for retrieval'''
 	with open(temp_path, 'w') as f:
 		json.dump(next_run, f, indent=2)
@@ -343,8 +360,215 @@ def clean_Temp(temp_path: str, verbose: bool=False) -> None:
 		json.dump(cleaned, f)
 	print_v('Cleaned temp file', verbose)
 
+def create_run(verbose:bool=True) -> None:
+	'''Add an entry to the runs file'''
+	with open('./wlasl_implemented_info.json') as f:
+		info = json.load(f)
+	available_splits = info['splits']
+	model_info = info['models']
+	
+	arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys(),
+																												 default_project=PROJECT)
+	
+	config = load_config(arg_dict, verbose=True)
+	
+	print_config(config)
+
+	model_specifics = model_info[config['admin']['model']]
+ 
+	proceed = input("Confirm: y/n: ")
+	if proceed.lower() == 'y':
+		if verbose:
+			print("Saving run info ")
+		info = {
+			'model_info': model_specifics,
+			'config': config,
+			'entity': ENTITY,
+			'project': project,
+			'tags': tags,
+			'output': output,
+			'save_path': save_path
+		}
+			
+		add_new_run(RUNS_PATH, info, verbose=verbose)
+		if verbose:
+			print(f"Run info saved to {RUNS_PATH}")
+		# Start training
+		os.makedirs(output, exist_ok=True)
+		os.makedirs(save_path, exist_ok=True)
+	else:
+		if verbose:
+			print("Training cancelled by user.")
+		return
+
+def remove_run(runs_path:str, verbose:bool=False, idx:Optional[int]=None) -> dict[str,Any]:
+	'''remove a run from rus'''
+	all_runs = {
+		'old_runs': [],
+		'to_run': []
+	}
+
+	def _rem(all_runs, idx):
+		try:
+			rem = all_runs['to_run'].pop(idx)
+			return rem
+		except IndexError:
+			print(f"Index: {idx} out of range for to run of length {len(all_runs['to_run'])}")
+			return {}	
+
+	with open(runs_path, 'r') as f:
+		all_runs = json.load(f)
+	
+	rem = {}
+ 
+	if not all_runs:
+		print("no runs available")
+		return rem
+
+	if idx is not None:
+		rem = _rem(all_runs, idx)
+
+	if not rem:
+		for i, run in enumerate(all_runs['to_run']):
+			admin = run['config']['admin']
+			print(f"{admin['config_path']} : {i}")
+		if len(all_runs['to_run']) == 0:
+			print("runs are finished")
+		else:
+			idx = int(input("select index: "))
+			rem = _rem(all_runs, idx)
+	
+	if rem:
+		with open(runs_path, 'w') as f:
+			json.dump(all_runs, f, indent=2)
+		print_v(f"run removed: {rem['config']['admin']['config_path']}", verbose)
+	else:
+		print_v(f"no run removed", verbose)
+	
+	return rem
+
+def clear_runs(runs_path, verbose=True, past_only=False, future_only=False):
+	'''reset the runs file'''
+	all_runs = {
+		'old_runs': [],
+		'to_run': []
+	}
+	if not os.path.exists(runs_path):
+		raise ValueError(f'could not find runs file: {runs_path}')
+	
+	if past_only:
+		print_v("only clearing old runs", verbose)
+		with open(runs_path, 'r') as f:
+			all_runs = json.load(f)
+		all_runs['old_runs'] = []
+	
+	if future_only:
+		print_v("only clearing new runs", verbose)
+		with open(runs_path, 'r') as f:
+			all_runs = json.load(f)
+		all_runs['to_run'] = []
+	
+	with open(runs_path, 'w') as f:
+		json.dump(all_runs, f, indent=2)
+	
+	print_v(f'Succesfully cleared {runs_path}', verbose)
+
+def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=None) -> None:
+	'''Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
+	 
+			Args:
+				runs_path: path to runs file
+				verbose: verbose output
+				num_from_end: the number of old runs (from the end) to return to new runs 
+	'''
+	all_runs = {
+		'old_runs': [],
+		'to_run': []
+	}
+	
+	with open(runs_path, 'r') as f:
+		all_runs = json.load(f)
+	
+	curr_to_run = all_runs['to_run'] if all_runs['to_run'] else [] 
+	curr_old_run = all_runs['old_runs'] if all_runs['old_runs'] else [] 
+	
+	if num_from_end is None:
+		curr_to_run.extend(curr_old_run)
+		all_runs['to_run'] = curr_to_run
+		all_runs['old_runs'] = []
+	else:
+		for _ in range(num_from_end):
+			curr_to_run.append(curr_old_run.pop(-1))
+		all_runs['to_run'] = curr_to_run
+		all_runs['old_runs'] = curr_old_run
+
+	with open(runs_path, 'w') as f:
+		json.dump(all_runs, f, indent=2)
+ 
+	print_v(f'Successfully moved old_runs to to_run', verbose)
+
+def check_err(err, session):
+	against = f"can't find session: {session}".strip().split()
+	for i,c in enumerate(err.strip().split()):
+		if against[i] != c:
+			print(f"against: {against[i]}, err: {c}")
+			return False
+	return True
+
+def list_configs(runs_path:str) -> list[str]:
+	
+	conf_list = []
+	with open(runs_path, 'r') as f:
+		all_runs = json.load(f)
+	
+	if all_runs:
+		if len(all_runs['to_run']) == 0:
+			print("runs are finished")
+		for run in all_runs['to_run']:
+			admin = run['config']['admin']
+			print(admin['config_path'])
+			conf_list.append(admin['config_path'])
+	else:
+		print("no runs available")
+	
+	return conf_list
+
+def recover_last(runs_path: str, temp_path:str, run_id:Optional[str]=None, verbose:bool=False) -> None:
+	#run id is probably stored in temp_path
+	if run_id is None:
+		lrunInfo = retrieve_Temp(temp_path)
+		if 'run_id' in lrunInfo:
+			run_id = lrunInfo['run_id']
+		else:
+			print('run id was not found in tempfile, pass as arg instead')
+			return
+	all_runs = retrieve_Temp(runs_path) #TODO at this point consider renaming retrieve_Temp
+	#get last run out of old runs
+	lrunData = all_runs['old_runs'].pop(-1)
+	#modify this runs recover, and add add run_id
+	lrunData['config']['admin']['recover'] = True
+	lrunData['run_id'] = run_id
+	#save to the Runs file in the beggining
+	curr_to_run = all_runs['to_run']
+	all_runs['to_run'] = lrunData + curr_to_run
+ 
+	store_Temp(runs_path,all_runs)
+
+	print_v('Successfully moved recovered run to the next run position in runs file', verbose)
+
+def return_from_temp(runs_path:str, temp_path:str, verbose:bool=True)->None:
+	data = retrieve_Temp(temp_path)
+	all_runs = retrieve_Temp(runs_path)
+	curr_to_run = all_runs['to_run']
+	all_runs['to_run'] = [data] + curr_to_run
+	store_Temp(runs_path, all_runs)
+	print_v("last run successfully moved back to to_run", verbose)
+
+################################ Process functions ##############################
+
 def start(mode : str, sesh_name : str, script_path : str, 
-					verbose : bool = False, proceed_onFF:bool = False) \
+					verbose : bool = False, proceed_onFF:bool = False,
+		 			project:Optional[str]=None) \
 			 -> subprocess.CompletedProcess[bytes]:
 	'''Starts a quefeather worker or daemon subprocess 
  
@@ -370,8 +594,10 @@ def start(mode : str, sesh_name : str, script_path : str,
 	if verbose:
 		feather_cmd += ' -v'
 	if proceed_onFF:
-		feather_cmd += f' -poff'
-   
+		feather_cmd += ' -poff'
+	if project:
+		feather_cmd += f' -dp {project}'
+
 	feather_cmd += f' {mode}'
  
 	tmux_cmd = [ 
@@ -462,7 +688,7 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str):
 		results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
 	return results
 
-def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False) \
+def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False, project:Optional[str]=None) \
 	-> None:
 	'''Function for the queue daemon process. The function works in a fetch execute repeat
 	cycle. The function reads runs from the queRuns.json file, then writes them to the
@@ -475,7 +701,10 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False) \
 		proceed_onFF: if the first run checked was bad, proceed
 	'''
 	runs_path = RUNS_PATH
-	advice = handle_already_running(ENTITY, PROJECT,
+	if project is None:
+		project = PROJECT
+		
+	advice = handle_already_running(ENTITY, project,
 																 check_interval = RETRY_WAIT_TIME,
 																 verbose=verbose,
 																 max_retries=max_retries)
@@ -511,7 +740,7 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False) \
 		if 'run_id' in run_info.keys():
 			print_v("Waiting for run completion: \n", verbose)
 			#because start is non blocking, we need to wait for the run to finish
-			proceed = handle_already_running(ENTITY, PROJECT,
+			proceed = handle_already_running(ENTITY, project,
 																	check_interval = RETRY_WAIT_TIME,
 																	verbose=verbose,
 																	max_retries=max_retries,
@@ -536,200 +765,83 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False) \
 		
 	print_v("Closing quewing daemon", verbose)
 			
-def create_run(verbose=True):
-	'''Add an entry to the runs file'''
-	with open('./wlasl_implemented_info.json') as f:
-		info = json.load(f)
-	available_splits = info['splits']
-	model_info = info['models']
-	
-	arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys(),
-																												 default_project=PROJECT)
-	
-	config = load_config(arg_dict, verbose=True)
-	
-	print_config(config)
-
-	model_specifics = model_info[config['admin']['model']]
- 
-	proceed = input("Confirm: y/n: ")
-	if proceed.lower() == 'y':
-		if verbose:
-			print("Saving run info ")
-		info = {
-			'model_info': model_specifics,
-			'config': config,
-			'entity': ENTITY,
-			'project': project,
-			'tags': tags,
-			'output': output,
-			'save_path': save_path
-		}
-		add_new_run(RUNS_PATH, info, verbose=verbose)
-		if verbose:
-			print(f"Run info saved to {RUNS_PATH}")
-		# Start training
-		os.makedirs(output, exist_ok=True)
-		os.makedirs(save_path, exist_ok=True)
-	else:
-		if verbose:
-			print("Training cancelled by user.")
-		return
-
-def remove_run(runs_path:str, verbose:bool=False, idx:Optional[int]=None) -> dict[str,Any]:
-	'''remove a run from rus'''
-	all_runs = {
-		'old_runs': [],
-		'to_run': []
-	}
-
-	def _rem(all_runs, idx):
-		try:
-			rem = all_runs['to_run'].pop(idx)
-			return rem
-		except IndexError:
-			print(f"Index: {idx} out of range for to run of length {len(all_runs['to_run'])}")
-			return {}	
- 
- 
-
-	with open(runs_path, 'r') as f:
-		all_runs = json.load(f)
-	
-	rem = {}
- 
-	if not all_runs:
-		print("no runs available")
-		return rem
-
-	if idx is not None:
-		rem = _rem(all_runs, idx)
-
-	if not rem:
-		for i, run in enumerate(all_runs['to_run']):
-			admin = run['config']['admin']
-			print(f"{admin['config_path']} : {i}")
-		if len(all_runs['to_run']) == 0:
-			print("runs are finished")
-		else:
-			idx = int(input("select index: "))
-			rem = _rem(all_runs, idx)
-	
-	if rem:
-		with open(runs_path, 'w') as f:
-			json.dump(all_runs, f, indent=2)
-		print_v(f"run removed: {rem['config']['admin']['config_path']}", verbose)
-	else:
-		print_v(f"no run removed", verbose)
-	
-	return rem
-
-def clear_runs(runs_path, verbose=True, past_only=False, future_only=False):
-	'''reset the runs file'''
-	all_runs = {
-		'old_runs': [],
-		'to_run': []
-	}
-	if not os.path.exists(runs_path):
-		raise ValueError(f'could not find runs file: {runs_path}')
-	
-	if past_only:
-		print_v("only clearing old runs", verbose)
-		with open(runs_path, 'r') as f:
-			all_runs = json.load(f)
-		all_runs['old_runs'] = []
-	
-	if future_only:
-		print_v("only clearing new runs", verbose)
-		with open(runs_path, 'r') as f:
-			all_runs = json.load(f)
-		all_runs['to_run'] = []
-	
-	with open(runs_path, 'w') as f:
-		json.dump(all_runs, f, indent=2)
-	
-	print_v(f'Succesfully cleared {runs_path}', verbose)
-
-def return_old(runs_path: str, verbose: bool=False) -> None:
-	'''Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
-	 
-			Args:
-				runs_path: path to runs file
-				verbose: verbose output
-	'''
-	all_runs = {
-		'old_runs': [],
-		'to_run': []
-	}
-	
-	with open(runs_path, 'r') as f:
-		all_runs = json.load(f)
-	
-	curr_to_run = all_runs['to_run'] if all_runs['to_run'] else [] 
-	curr_old_run = all_runs['old_runs'] if all_runs['old_runs'] else [] 
-	
-	curr_to_run.extend(curr_old_run)
-	all_runs['to_run'] = curr_to_run
-	all_runs['old_runs'] = []
-
-	with open(runs_path, 'w') as f:
-		json.dump(all_runs, f, indent=2)
- 
-	print_v(f'Successfully moved old_runs to to_run', verbose)
-	
-
-def check_err(err, session):
-	against = f"can't find session: {session}".strip().split()
-	for i,c in enumerate(err.strip().split()):
-		if against[i] != c:
-			print(f"against: {against[i]}, err: {c}")
-			return False
-	return True
-
-def list_configs(runs_path:str) -> list[str]:
-	
-	conf_list = []
-	with open(runs_path, 'r') as f:
-		all_runs = json.load(f)
-	
-	if all_runs:
-		if len(all_runs['to_run']) == 0:
-			print("runs are finished")
-		for run in all_runs['to_run']:
-			admin = run['config']['admin']
-			print(admin['config_path'])
-			conf_list.append(admin['config_path'])
-	else:
-		print("no runs available")
-	
-	return conf_list
-
 def main():
 	#NOTE chose to make verbose true by default when running this script
 	#NOTE these arguments have to be compatible with take_args if creating run
 	parser = argparse.ArgumentParser(description="quewing.py")
+	#config parameters
 	parser.add_argument('-a', '--add', action='store_true', help='add new training command')
-	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
+	parser.add_argument('-rl', '--recover_last', nargs='?',type=str,const='last', default=None, help='recover premature run termination. Optionally include the run_id, otherwise takes last')
 	parser.add_argument('-cr', '--clear', action='store_true', help='clear the runs file')	
 	parser.add_argument('-co', '--clear_old', action='store_true', help='clear the old runs only')
 	parser.add_argument('-cn', '--clear_new', action='store_true', help='clear the new runs only')
 	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
-	parser.add_argument('-rr', '--remove_run', nargs='?',type=str, help='remove a run from to_run', const='ask_me', default=None)
-	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
-	parser.add_argument('-sm', '--separate_mode', type=str, help='Send a seperator to the "mode" process')
-	parser.add_argument('-ti', '--title', type=str, nargs='?', help="title for seperate_mode used", const="Calling next process", default=None)
-	parser.add_argument('-ro', '--return_old', action='store_true', help='return old runs to new')
+	parser.add_argument('-rr', '--remove_run', nargs='?',type=str, const='ask_me', default=None, help='remove a run from to_run. Optionally include the idx, otherwise with prompt for it')
+	parser.add_argument('-ro', '--return_old', nargs='?', const='all', default=None , help='return old runs to new. optionally provide the number of runs (from the end)')
 	parser.add_argument('-lc', '--list_configs', action='store_true', help='list the config files used in runs file')
+	parser.add_argument('-rft', '--return_from_temp', action='store_true', help='return run in temp to new.')
+	#process & misc parameters
+	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
+	parser.add_argument('-dp', '--daemon_project', type=str, help=f'Overide the default project: {PROJECT}')
 	parser.add_argument('-poff', '--proceed_onFF', action='store_true', help='proceed on first fail')
+	#TODO: could combine sperate_mode and title flags into one arg
+	parser.add_argument('-sm', '--separate_mode', type=str, help='Send a seperator to the "mode" process')
+	parser.add_argument('-ti', '--title', type=str, nargs='?', const="Calling next process", default=None, help="title for seperate_mode used. o")
+	parser.add_argument('-sh', '--silent', action='store_true', help='Turn off verbose output')
+
 	args, other = parser.parse_known_args()
 
 	#invert
 	verbose = not args.silent
  
+	#config parameters
+ 
 	if args.add:
 		create_run(verbose=verbose)
 		print("run added successfully")
 	
+	if args.recover_last:
+		if args.recover_last == 'last':
+			recover_last(RUNS_PATH, TEMP_PATH, verbose=verbose)
+		else:
+			recover_last(RUNS_PATH, TEMP_PATH,run_id=args.recover_last, verbose=verbose)
+	 
+	if args.clear:
+		clear_runs(RUNS_PATH, verbose=True)
+	elif args.clear_old:
+		clear_runs(RUNS_PATH, verbose=True, past_only=True)
+	elif args.clear_new:
+		clear_runs(RUNS_PATH, verbose=True, future_only=True)
+	
+	if args.clear_temp:
+		clean_Temp(TEMP_PATH, verbose)
+	
+	if args.return_old:
+		return_old(RUNS_PATH, verbose, num_from_end=args.return_old)
+	
+	if args.list_configs:
+		list_configs(RUNS_PATH)
+	
+	if args.return_from_temp:
+		return_from_temp(RUNS_PATH, TEMP_PATH, verbose)
+ 
+	if args.remove_run:
+		if args.remove_run == 'ask_me':
+			remove_run(RUNS_PATH,verbose)
+		else:
+			remove_run(RUNS_PATH,verbose, int(args.remove_run))
+ 
+	#process starting parameters
+ 
+	if args.separate_mode:
+		try:
+			result = separate(args.separate_mode, SESSION, SCRIPT_PATH, args.title, verbose)
+			print_v(f'Separator: "{args.title}" sent to {args.separate_mode}', verbose)
+		except subprocess.CalledProcessError as e:
+			print(f"Ran into an unexpected issue when sending separator: {args.title} to {args.separate_mode}")
+			print(e.stderr)
+			return
+
 	if args.daemon:
 		create = False
 		#first check that the tmux session is set up
@@ -758,45 +870,15 @@ def main():
 
 		#run the daemon
 		try:
-			result = start('daemon', SESSION, SCRIPT_PATH, verbose, args.proceed_onFF)
+			result = start('daemon', SESSION, SCRIPT_PATH, verbose, args.proceed_onFF, args.daemon_project)
 			print_v("daemon started successfully", verbose)
 			print_v("proceeding on first fail", verbose and args.proceed_onFF)
+			print_v(f"using project: {args.daemon_project}", verbose and args.daemon_project is not None)
 		except subprocess.CalledProcessError as e:
 			print("Ran into an unexpected issue when starting the daemon process: ")
 			print(e.stderr)
 			return
-	
-	if args.clear:
-		clear_runs(RUNS_PATH, verbose=True)
-	elif args.clear_old:
-		clear_runs(RUNS_PATH, verbose=True, past_only=True)
-	elif args.clear_new:
-		clear_runs(RUNS_PATH, verbose=True, future_only=True)
-	
-	if args.clear_temp:
-		clean_Temp(TEMP_PATH, verbose)
-	
-	if args.return_old:
-		return_old(RUNS_PATH, verbose)
-	
-	if args.list_configs:
-		list_configs(RUNS_PATH)
-	
-	if args.separate_mode:
-		try:
-			result = separate(args.separate_mode, SESSION, SCRIPT_PATH, args.title, verbose)
-			print_v(f'Separator: "{args.title}" sent to {args.separate_mode}', verbose)
-		except subprocess.CalledProcessError as e:
-			print(f"Ran into an unexpected issue when sending separator: {args.title} to {args.separate_mode}")
-			print(e.stderr)
-			return
-	
-	if args.remove_run:
-		if args.remove_run == 'ask_me':
-			remove_run(RUNS_PATH,verbose)
-		else:
-			remove_run(RUNS_PATH,verbose, int(args.remove_run))
-
+ 
 
 if __name__ == '__main__':
 	main()
