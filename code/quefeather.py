@@ -5,7 +5,7 @@ import wandb
 import os
 import sys
 from train import train_loop
-from quewing import daemon, TEMP_PATH, print_v, clean_Temp, store_Temp, retrieve_Temp
+from quewing import daemon, TEMP_PATH, print_v, clean_Temp, store_Temp, retrieve_Temp, get_run_id
 import argparse
 import time
 
@@ -30,18 +30,35 @@ def run_train(verbose=False):
   #setup wandb run
   run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
 
-  #NOTE does recovery logic not implemented
   if admin['recover']:
-    print('Warning: recovery not implemented in quefeather yet')
-  
-  print_v(f"Starting new run with name: {run_name}", verbose)
-  run = wandb.init(
-    entity=entity,
-    project=project,
-    name=run_name,
-    tags=tags,
-    config=config      
-  )
+    if 'run_id' in config['admin']:
+      run_id = config['admin']['run_id']
+    else: 
+      run_id = get_run_id(run_name, entity, project)
+    print_v(f"Resuming run with ID: {run_id}", verbose)
+    run = wandb.init(
+      entity=entity,
+      project=project,
+      id=run_id,
+      resume='must',
+      name=run_name,
+      tags=tags,
+      config=config      
+    )
+  else:
+    print_v(f"Starting new run with name: {run_name}", verbose)
+    run = wandb.init(
+      entity=entity,
+      project=project,
+      name=run_name,
+      tags=tags,
+      config=config      
+    )
+    #write run id to temp, so that daemon waits for it
+    run_info = {'run_id': run.id, 'run_name': run.name}
+    print_v("writing my id to temp file", verbose)
+    store_Temp(TEMP_PATH, run_info)
+    
   print_v(f"Run ID: {run.id}", verbose)
   print_v(f"Run name: {run.name}", verbose)  # Human-readable name
   print_v(f"Run path: {run.path}", verbose)  # entity/project/run_id format
@@ -49,11 +66,6 @@ def run_train(verbose=False):
   # Start training
   os.makedirs(output, exist_ok=True)
   os.makedirs(save_path, exist_ok=True)
-  
-  #write run id to temp, so that daemon waits for it
-  run_info = {'run_id': run.id, 'run_name': run.name}
-  print_v("writing my id to temp file", verbose)
-  store_Temp(TEMP_PATH, run_info)
   
   train_loop(model_specifcs, run, recover=admin['recover'])
   run.finish()
@@ -98,11 +110,12 @@ def main():
 
   parser.add_argument('-v', '--verbose', action='store_true', help='Turn on verbose output')
   parser.add_argument('-poff', '--proceed_onFF', action='store_true', help='proceed on first fail')
+  parser.add_argument('-dp', '--daemon_project', type=str, help='overide default project')
   args = parser.parse_args()
     
 
   if args.mode == 'daemon':
-    daemon(args.verbose, proceed_onFF=args.proceed_onFF)
+    daemon(args.verbose, proceed_onFF=args.proceed_onFF, project=args.daemon_project)
   elif args.mode == 'worker':
     run_train(args.verbose)
   elif args.mode == 'separator':

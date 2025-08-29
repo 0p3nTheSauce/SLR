@@ -257,8 +257,10 @@ def test_dict_mod():
 def test_arg_defaults():
   parser = argparse.ArgumentParser(description='test_debug.py')
   parser.add_argument('-rr', '--remove_run',nargs='?', type=str,const='ask_me', default=None,  help='remove a run from to_run')
+  parser.add_argument('-rl', '--recover_last', nargs='?',type=str,const='last', default=None, help='recover premature run termination')
   args, other = parser.parse_known_args()
   print(args.remove_run)
+  print(args.recover_last)
 
 if __name__ == "__main__":
   # test_early_stopping(mode='min')
