@@ -1,12 +1,13 @@
 import json
-import os
+# import os
 import torch
 import tqdm
 from ultralytics import YOLO # type: ignore (have a feeling this will bork the system)
 # from torchcodec.decoders import VideoDecoder #this thing causes too many problems
 import cv2
 
-
+from argparse import ArgumentParser
+from pathlib import Path
 #local imports
 from utils import load_rgb_frames_from_video 
 
@@ -40,16 +41,17 @@ def get_split(lst_gloss_dicts, split):
   return mod_instances, class_names
 
 def preprocess_info(json_path, split, output_path):
+  json_path = Path(json_path)
+  output_path = Path(output_path)
   with open(json_path, 'r') as f:
     asl_num = json.load(f)
     instances, classes = get_split(asl_num, split)
-  base_name = os.path.basename(json_path).replace('.json', '')
-  output_path = os.path.join(output_path, base_name.replace('.json', ''))
-  if not os.path.exists(output_path):
-    os.makedirs(output_path)
-  with open(os.path.join(output_path, f'{split}_instances.json'), 'w') as f:
+  base_name = json_path.name.replace('.json','')
+  output_path = output_path / base_name
+  output_path.mkdir(parents=True, exist_ok=True)
+  with open(output_path / f'{split}_instances.json', 'w') as f:
     json.dump(instances, f, indent=4)
-  with open(os.path.join(output_path, f'{split}_classes.json'), 'w') as f:
+  with open(output_path / f'{split}_classes.json', 'w') as f:
     json.dump(classes, f, indent=4)
   return instances, classes
     
@@ -57,35 +59,38 @@ def prep_train():
   json_path = '../data/splits/asl100.json'
   split = 'train'
   output_root = './preprocessed_labels/'
-  if not os.path.exists(output_root):
-    os.makedirs(output_root)
+  output_root = Path(output_root)
+  output_root.mkdir(parents=True, exist_ok=True)
   preprocess_info(json_path, split, output_root)
   
 def prep_test():
   json_path = '../data/splits/asl100.json'
   split = 'test'
   output_root = './preprocessed_labels/'
-  if not os.path.exists(output_root):
-    os.makedirs(output_root)
+  output_root = Path(output_root)
+  output_root.mkdir(parents=True, exist_ok=True)
   preprocess_info(json_path, split, output_root)
   
 def prep_val():
   json_path = '../data/splits/asl100.json'
   split = 'val'
   output_root = './preprocessed_labels/'
-  if not os.path.exists(output_root):
-    os.makedirs(output_root)
+  output_root = Path(output_root)
+  output_root.mkdir(parents=True, exist_ok=True)
   preprocess_info(json_path, split, output_root)
   
-def fix_bad_frame_range(instance_path, raw_path, log='./output',
+def fix_bad_frame_range(instance_path, raw_path, log,
                         instances=None, output=None):
   # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+  instance_path = Path(instance_path)
+  raw_path = Path(raw_path)
+  log = Path(log)
   bad_frames = []
   if instances is None:
     with open(instance_path, 'r') as f:
       instances = json.load(f)
   for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
-    vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
+    vid_path = raw_path / instance['video_id'] + '.mp4'
     # decoder = VideoDecoder(vid_path)
     
     num_frames = 0
@@ -114,7 +119,7 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output',
     instance['frame_start'] = start
     instance['frame_end'] = end
   
-  log_path = os.path.join(log, 'bad_frame_ranges.txt')
+  log_path = log / 'bad_frame_ranges.txt'
   if bad_frames:
     with open(log_path, 'a') as log_file:
       log_file.write('\n New bad frames \n ')
@@ -125,9 +130,9 @@ def fix_bad_frame_range(instance_path, raw_path, log='./output',
     print("No bad frame ranges found")
   
   if output is not None:
-    os.makedirs(output, exist_ok=True)
-    base_name = os.path.basename(instance_path).replace('.json', '')
-    fname = os.path.join(output, f'{base_name}_frange.json' )
+    output.mkdir(parents=True, exist_ok=True)
+    base_name = instance_path.name.replace('.json', '')
+    fname = output / f'{base_name}_frange.json' 
     with open(fname, 'w') as f:
       json.dump(instances, f, indent=4)  
     print(f'fixed frame ranges saved to {fname}')
@@ -150,8 +155,11 @@ def get_largest_bbox(bboxes):
       y_max = y2
   return [x_min, y_min, x_max, y_max]
 
-def fix_bad_bboxes(instance_path, raw_path, log='./output',
+def fix_bad_bboxes(instance_path, raw_path, log,
                    instances=None, output=None):
+  instance_path = Path(instance_path)
+  raw_path = Path(raw_path)
+  log = Path(log)
   # TODO: could be a bit faster
   model = YOLO('yolov8n.pt')  # Load a pre-trained YOLO model
   device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -163,7 +171,7 @@ def fix_bad_bboxes(instance_path, raw_path, log='./output',
     with open(instance_path, 'r') as f:
       instances = json.load(f)
   for instance in tqdm.tqdm(instances, desc='Fixing bounding boxes'):
-    vid_path = os.path.join(raw_path, instance['video_id'] + '.mp4')
+    vid_path = raw_path / instance['video_id'] + '.mp4'
     frames = load_rgb_frames_from_video(vid_path, instance['frame_start'], instance['frame_end'], all=True)
     # frames = load_rgb_frames_from_video_ioversion(vid_path, instance['frame_start'], instance['frame_end'], all=True)
     frames = frames.float() / 255.0  # Convert to float and normalize to [0, 1] range
@@ -189,7 +197,7 @@ def fix_bad_bboxes(instance_path, raw_path, log='./output',
       'bbox': largest_bbox
     })
   
-  log_path = os.path.join(log, 'bad_bboxes.txt')
+  log_path = log / 'bad_bboxes.txt'
   
   if bad_bboxes:
     with open(log_path, 'a') as log_file:
@@ -201,9 +209,9 @@ def fix_bad_bboxes(instance_path, raw_path, log='./output',
     print("No bad bounding boxes")
     
   if output is not None:
-    os.makedirs(output, exist_ok=True)
-    base_name = os.path.basename(instance_path).replace('.json', '')
-    fname = os.path.join(output, f'{base_name}_bboxes.json' )
+    output.mkdir(parents=True, exist_ok=True)
+    base_name = instance_path.name.replace('.json', '')
+    fname = output / f'{base_name}_bboxes.json' 
     with open(fname, 'w') as f:
       json.dump(new_instances, f, indent=4)  
     print(f'fixed bboxes saved to {fname}')
@@ -211,8 +219,11 @@ def fix_bad_bboxes(instance_path, raw_path, log='./output',
   return new_instances
     
 def remove_short_samples(instances_path, classes_path,
-                         cutoff = 9, log='./output',
+                          log,cutoff = 9,
                          instances=None, classes=None, output=None):
+  instance_path = Path(instances_path)
+  classes_path = Path(classes_path)
+  log = Path(log)
   '''Preprocessing function which removes data with num frames less 
   than provided integer from the instances path. Assums the instances 
   have already been modified by preprocess_info, fix_bad_bboxes, and 
@@ -235,7 +246,7 @@ def remove_short_samples(instances_path, classes_path,
       short_samples.append(
         f"bad number of frames {num_frame} for video {inst['video_id']}, removing.")
       
-  log_path = os.path.join(log, 'removed_short_samples.txt')
+  log_path = log / 'removed_short_samples.txt'
   
   if short_samples:
     with open(log_path, 'a') as log_file:
@@ -247,26 +258,25 @@ def remove_short_samples(instances_path, classes_path,
     print("no short samples")
     
   if output is not None:
-    os.makedirs(output, exist_ok=True)
-    base_name = os.path.basename(instances_path).replace('.json', '')
-    fname = os.path.join(output, f'{base_name}_grtr{cutoff}.json' )
+    output.mkdir(parents=True, exist_ok=True)
+    base_name = instances_path.name.replace('.json', '')
+    fname = output / f'{base_name}_grtr{cutoff}.json' 
     with open(fname, 'w') as f:
       json.dump(instances, f, indent=4)  
     print(f'fixed short samples saved to {fname}')
     
   return mod_instances, mod_classes
     
-def preprocess_split(split_path, raw_path='../data/WLASL2000', output_path='preprocessed/labels'):
+def preprocess_split(split_path:Path, raw_path:Path, output_base:Path, verbose:bool=False) -> None:
   
-  try:
-    with open(split_path, 'r') as f:
-      asl_num = json.load(f)
-  except FileNotFoundError:
-    print(f'Split file: {split_path} not found, stopping')
+  if not check_paths(split_path, raw_path, output_base, verbose):
     return
   
-  if not os.path.exists(raw_path):
-    print(f"raw folder {raw_path} not found, stopping")
+  with open(split_path, 'r') as f:
+    asl_num = json.load(f)
+  
+  if not asl_num:
+    print(f'no data found in {split_path}')
     return
   
   #create train, test, val splits
@@ -275,32 +285,37 @@ def preprocess_split(split_path, raw_path='../data/WLASL2000', output_path='prep
   val_instances, val_classes = get_split(asl_num, 'val')
   
   #setup storage
-  base_name = os.path.basename(split_path).replace('.json', '')
-  output_path = os.path.join(output_path, base_name)
-  os.makedirs(output_path, exist_ok=True)
+  # base_name = os.path.basename(split_path).replace('.json', '')
+  # output_path = os.path.join(output_path, base_name)
+  base_name = split_path.name.replace('.json', '')
+  output_dir = output_base / base_name
+  # os.makedirs(output_path, exist_ok=True)
+  output_dir.mkdir(parents=True, exist_ok=True)
   f_exstension = '_fixed_frange_bboxes_len.json'
   
-  print(f"Processing {base_name}")
+  print_v(f"Processing {base_name}", verbose)
   for split, instances, classes in [('train', train_instances, train_classes),
                                     ('test', test_instances, test_classes),
                                     ('val', val_instances, val_classes)]:
-    print(f'For split: {split}')
+    print_v(f'For split: {split}', verbose)
     #fix badly labeled frame ranges
-    print('Fixing frame ranges')
-    instances = fix_bad_frame_range('', raw_path, instances=instances, log=output_path)
+    print_v(f'Fixing frame ranges', verbose)
+    instances = fix_bad_frame_range('', raw_path, instances=instances, log=output_dir)
     
     #fix badly labeled bounding boxes
-    print('Fixing bounding boxes')
-    instances = fix_bad_bboxes('', raw_path, instances=instances, log=output_path)
+    print_v('Fixing bounding boxes', verbose)
+    instances = fix_bad_bboxes('', raw_path, instances=instances, log=output_dir)
     
     #finally, remove short samples
-    print('Removing small samples')
-    instances, classes = remove_short_samples('', '', instances=instances, classes=classes, log=output_path)
+    print_v('Removing small samples', verbose)
+    instances, classes = remove_short_samples('', '', instances=instances, classes=classes, log=output_dir)
    
     #save 
-    print('Saving results')
-    inst_path = os.path.join(output_path, f'{split}_instances{f_exstension}')
-    clss_path = os.path.join(output_path, f'{split}_classes{f_exstension}')
+    print_v('Saving results', verbose)
+    # inst_path = os.path.join(output_dir, f'{split}_instances{f_exstension}')
+    inst_path = output_dir / f'{split}_instances{f_exstension}'
+    # clss_path = os.path.join(output_path, f'{split}_classes{f_exstension}')
+    clss_path = output_dir / f'{split}_classes{f_exstension}'
     with open(inst_path, 'w') as f:
       json.dump(instances, f, indent=2)
     with open(clss_path, 'w') as f:
@@ -311,6 +326,50 @@ def preprocess_split(split_path, raw_path='../data/WLASL2000', output_path='prep
   print("------------------------- finished preprocessing ---------------")
   print()
   
+def print_v(s:str, y:bool)->None:
+  if y:
+    print(s)
+
+def check_paths(split_path:Path, raw_path:Path, output_path:Path, verbose:bool)->bool:
+  if split_path.exists() and split_path.is_file():
+    print_v(f'split path: {split_path}, found', verbose) 
+  else:
+    print(f'split path: {split_path}, not found')
+    return False
+  if raw_path.exists() and raw_path.is_dir():
+    print_v(f'raw path: {raw_path}, found', verbose)
+  else:
+    print(f'raw path: {raw_path}, not found')    
+    return False
+  if output_path.exists() and output_path.is_dir():
+    print_v(f'output path: {output_path}, found', verbose)    
+  else:
+    print(f'output path: {output_path}, not found')    
+    return False
+  return True
+  
 if __name__ == '__main__':
-  split = '../data/splits/asl100.json'
-  preprocess_split(split)
+  def_root = '../data/WLASL'
+  def_split_dir = 'splits'
+  def_raw_dir = 'WLASL2000'
+  def_output_dir = 'preprocessed/labels'
+  parser = ArgumentParser(description='preprocess.py')
+  parser.add_argument('-as', '--asl_split', type=str, required=True, 
+                      help='<asl100|asl300|asl1000|asl2000')
+  parser.add_argument('-rt', '--root',type=str,
+                      help=f'WLASL root if not {def_root}', default=def_root)
+  parser.add_argument('-sd', '--split_dir', type=str,
+                      help=f'Split directory if not {def_split_dir}', default=def_split_dir)  
+  parser.add_argument('-rd', '--raw_dir', type=str,
+                      help=f'Video directory if not {def_raw_dir}', default=def_raw_dir)
+  parser.add_argument('-od', '--output_dir', type=str,
+                      help=f'Output directory if not {def_output_dir}', default=def_output_dir)
+  parser.add_argument('-ve', '--verbose', action='store_true', help='verbose output')
+  args = parser.parse_args()
+  
+  root = Path(args.root)
+  split_path = root / args.split_dir / f'{args.asl_split}.json'
+  raw_dir = root / args.raw_dir
+  output_dir = Path(args.output_dir)
+  
+  
