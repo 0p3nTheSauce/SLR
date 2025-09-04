@@ -269,6 +269,7 @@ def add_new_run(runs_path, info, verbose=False):
 	return all_runs
 
 def get_next_run(runs_path, verbose=False):
+  #TODO: add some saftey so it checks temp before overwriting
 	'''gets the next entry next in line (FIFO)
  
 		by taking the first entry of the "to_run" list
@@ -741,6 +742,9 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False, proj
 		while 'run_id' not in run_info.keys() and retries < max_retries:
 			run_info = retrieve_Temp(TEMP_PATH)
 			retries += 1
+			time.sleep(10*retries)
+			print_v(f"Retrying: {retries} / {max_retries}", verbose)
+			print_v(f"Sleeping for: {10*retries}", verbose)
 		print_v("Max retries exceeded", verbose and retries == max_retries)
 		retries = 0
   
