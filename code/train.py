@@ -23,7 +23,8 @@ from quewing import get_run_id
 
 
 ENTITY= 'ljgoodall2001-rhodes-university'
-PROJECT = 'WLASL - SLR'
+# PROJECT = 'WLASL - SLR'
+PROJECT = 'asl300'
 
 def set_seed(seed=42):
 	torch.manual_seed(seed)
@@ -233,7 +234,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 	if load:
 		load_path = Path(load)
 		if load_path.exists():
-			checkpoint = torch.load(load, map_location=device, weights_only=True)
+			checkpoint = torch.load(load, map_location=device)
 			model.load_state_dict(checkpoint['model_state_dict'])
 			optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 			scheduler.load_state_dict(checkpoint['scheduler_state_dict'])

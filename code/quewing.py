@@ -10,6 +10,9 @@ import time
 from typing import Union, Optional, Any
 #local imports
 # from train import PROJECT, ENTITY
+# ENTITY= 'ljgoodall2001-rhodes-university'
+# PROJECT = 'WLASL - SLR'
+# PROJECT = 'asl300'
 ENTITY= 'ljgoodall2001-rhodes-university'
 # PROJECT = 'WLASL - SLR'
 PROJECT = 'asl300'
