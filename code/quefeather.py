@@ -64,8 +64,8 @@ def run_train(verbose=False):
   print_v(f"Run path: {run.path}", verbose)  # entity/project/run_id format
   
   # Start training
-  os.makedirs(output, exist_ok=True)
-  os.makedirs(save_path, exist_ok=True)
+  # os.makedirs(output, exist_ok=True)
+  # os.makedirs(save_path, exist_ok=True)
   
   train_loop(model_specifcs, run, recover=admin['recover'])
   run.finish()
