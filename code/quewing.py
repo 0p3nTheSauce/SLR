@@ -7,6 +7,8 @@ import argparse
 import wandb
 import time
 
+from pathlib import Path
+
 from typing import Union, Optional, Any
 #local imports
 # from train import PROJECT, ENTITY
@@ -272,7 +274,7 @@ def add_new_run(runs_path, info, verbose=False):
 	return all_runs
 
 def get_next_run(runs_path, verbose=False):
-  #TODO: add some saftey so it checks temp before overwriting
+	#TODO: add some saftey so it checks temp before overwriting
 	'''gets the next entry next in line (FIFO)
  
 		by taking the first entry of the "to_run" list
@@ -479,6 +481,8 @@ def clear_runs(runs_path, verbose=True, past_only=False, future_only=False):
 
 def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=None) -> None:
 	'''Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
+		Default behavior moves all the old runs, otherwise moves multiple 
+		runs from the end specified by the num_from_end.
 	 
 			Args:
 				runs_path: path to runs file
@@ -501,9 +505,10 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
 		all_runs['to_run'] = curr_to_run
 		all_runs['old_runs'] = []
 	else:
+		old2mv = [] #return runs to the begining of to_run
 		for _ in range(num_from_end):
-			curr_to_run.append(curr_old_run.pop(-1))
-		all_runs['to_run'] = curr_to_run
+			old2mv.append(curr_old_run.pop(-1))
+		all_runs['to_run'] = old2mv + curr_to_run
 		all_runs['old_runs'] = curr_old_run
 
 	with open(runs_path, 'w') as f:
@@ -511,6 +516,43 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
  
 	print_v(f'Successfully moved old_runs to to_run', verbose)
 
+def shuffle_configs(runs_path:Path|str, verbose:bool=False) -> None:
+
+	with open(runs_path, 'r') as f:
+		all_runs = json.load(f)
+
+	if not all_runs:
+		print(f'Warning: {runs_path} is empty')
+		return
+	
+	curr_to_run = all_runs['to_run']
+	if not curr_to_run:
+		print(f'Warning: to_runs is empty')
+		return
+
+	for i, run in enumerate(curr_to_run):
+			admin = run['config']['admin']
+			print(f"{admin['config_path']} : {i}")
+	
+	idx = int(input("select index: "))
+	newpos = int(input("select  new position: "))
+	srun = curr_to_run.pop(idx)
+	if not srun:
+		print(f"Invalid idx for list of configs len: {len(curr_to_run)}")
+	curr_to_run.insert(newpos, srun)
+
+	all_runs['to_run'] = curr_to_run
+ 
+	with open(runs_path, 'w') as f:
+		json.dump(all_runs, f, indent=2)
+	
+	print_v(f"Run: {srun['config']['admin']['config_path']} \
+		successfully moved to position: {newpos}", verbose)
+
+ 
+
+
+	
 def check_err(err, session):
 	against = f"can't find session: {session}".strip().split()
 	for i,c in enumerate(err.strip().split()):
@@ -519,8 +561,8 @@ def check_err(err, session):
 			return False
 	return True
 
-def list_configs(runs_path:str) -> list[str]:
-	
+def list_configs(runs_path:Path|str) -> list[str]:
+ 
 	conf_list = []
 	with open(runs_path, 'r') as f:
 		all_runs = json.load(f)
@@ -750,7 +792,7 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False, proj
 			print_v(f"Sleeping for: {10*retries}", verbose)
 		print_v("Max retries exceeded", verbose and retries == max_retries)
 		retries = 0
-  
+	
 		if 'run_id' in run_info.keys():
 			print_v("Waiting for run completion: \n", verbose)
 			#because start is non blocking, we need to wait for the run to finish
@@ -791,8 +833,10 @@ def main():
 	parser.add_argument('-cn', '--clear_new', action='store_true', help='clear the new runs only')
 	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
 	parser.add_argument('-rr', '--remove_run', nargs='?',type=str, const='ask_me', default=None, help='remove a run from to_run. Optionally include the idx, otherwise with prompt for it')
-	parser.add_argument('-ro', '--return_old', nargs='?', const='all', default=None , help='return old runs to new. optionally provide the number of runs (from the end)')
+	parser.add_argument('-ro', '--return_old', nargs='?', const='all', default=None , help='Default behavior moves all the old runs, otherwise moves multiple \
+																																												runs from the end, the number of old runs specified by optional int')
 	parser.add_argument('-lc', '--list_configs', action='store_true', help='list the config files used in runs file')
+	parser.add_argument('-sc', '--shuffle_configs', action='store_true', help='rearrange configs in to_run')
 	parser.add_argument('-rft', '--return_from_temp', action='store_true', help='return run in temp to new.')
 	#process & misc parameters
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
@@ -831,10 +875,16 @@ def main():
 		clean_Temp(TEMP_PATH, verbose)
 	
 	if args.return_old:
-		return_old(RUNS_PATH, verbose, num_from_end=args.return_old)
+		if args.return_old is not None:
+			return_old(RUNS_PATH, verbose, num_from_end=int(args.return_old))
+		else:
+			return_old(RUNS_PATH, verbose, num_from_end=args.return_old)
 	
 	if args.list_configs:
 		list_configs(RUNS_PATH)
+	
+	if args.shuffle_configs:
+		shuffle_configs(RUNS_PATH, verbose)
 	
 	if args.return_from_temp:
 		return_from_temp(RUNS_PATH, TEMP_PATH, verbose)
