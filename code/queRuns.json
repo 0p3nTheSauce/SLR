@@ -2408,6 +2408,211 @@
       ],
       "output": "runs/asl100/S3D_exp011",
       "save_path": "runs/asl100/S3D_exp011/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 5,
+        "mean": [
+          0.43216,
+          0.394666,
+          0.37645
+        ],
+        "std": [
+          0.22803,
+          0.22145,
+          0.216989
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 2,
+          "update_per_step": 4,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 50,
+            "min_delta": 0.01
+          },
+          "batch_size_equivalent": 8
+        },
+        "optimizer": {
+          "eps": 0.001,
+          "backbone_init_lr": 2e-05,
+          "backbone_weight_decay": 0.001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 0.001
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 32,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "005",
+          "recover": false,
+          "model": "Resnet2D_1D_18",
+          "split": "asl100",
+          "enum_dir": false,
+          "config_path": "./configfiles/asl100/Resnet2D_1D_18_005.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/Resnet2D_1D_18_exp005/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "asl100",
+      "tags": [
+        "asl100",
+        "Resnet2D_1D_18",
+        "exp-005"
+      ],
+      "output": "runs/asl100/Resnet2D_1D_18_exp005",
+      "save_path": "runs/asl100/Resnet2D_1D_18_exp005/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 6,
+        "mean": [
+          0.43216,
+          0.394666,
+          0.37645
+        ],
+        "std": [
+          0.22803,
+          0.22145,
+          0.216989
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 2,
+          "update_per_step": 4,
+          "max_epoch": 200,
+          "early_stopping": {
+            "metric": [
+              "val",
+              "loss"
+            ],
+            "mode": "min",
+            "patience": 50,
+            "min_delta": 0.01
+          },
+          "batch_size_equivalent": 8
+        },
+        "optimizer": {
+          "eps": 0.001,
+          "backbone_init_lr": 2e-05,
+          "backbone_weight_decay": 0.001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 0.001
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 32,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "005",
+          "recover": false,
+          "model": "Resnet3D_18",
+          "split": "asl100",
+          "enum_dir": false,
+          "config_path": "./configfiles/asl100/Resnet3D_18_005.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/Resnet3D_18_exp005/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "asl100",
+      "tags": [
+        "asl100",
+        "Resnet3D_18",
+        "exp-005"
+      ],
+      "output": "runs/asl100/Resnet3D_18_exp005",
+      "save_path": "runs/asl100/Resnet3D_18_exp005/checkpoints"
+    },
+    {
+      "model_info": {
+        "idx": 1,
+        "mean": [
+          0.45,
+          0.45,
+          0.45
+        ],
+        "std": [
+          0.225,
+          0.225,
+          0.225
+        ]
+      },
+      "config": {
+        "training": {
+          "batch_size": 4,
+          "update_per_step": 2,
+          "max_steps": 64000,
+          "max_epoch": 200,
+          "batch_size_equivalent": 8,
+          "early_stopping": {
+            "on": false
+          }
+        },
+        "optimizer": {
+          "eps": 0.001,
+          "backbone_init_lr": 2e-05,
+          "backbone_weight_decay": 0.001,
+          "classifier_init_lr": 0.001,
+          "classifier_weight_decay": 0.001
+        },
+        "model_params": {
+          "drop_p": 0.5
+        },
+        "scheduler": {
+          "tmax": 100,
+          "eta_min": 1e-05
+        },
+        "data": {
+          "num_frames": 16,
+          "frame_size": 224
+        },
+        "admin": {
+          "exp_no": "003",
+          "recover": false,
+          "model": "MViT_V2_S",
+          "split": "asl100",
+          "enum_dir": false,
+          "config_path": "./configfiles/asl100/MViT_V2_S_003.ini",
+          "root": "../data/WLASL/WLASL2000",
+          "labels": "./preprocessed/labels/asl100",
+          "save_path": "runs/asl100/MViT_V2_S_exp003/checkpoints"
+        }
+      },
+      "entity": "ljgoodall2001-rhodes-university",
+      "project": "asl100",
+      "tags": [
+        "asl100",
+        "MViT_V2_S",
+        "exp-003"
+      ],
+      "output": "runs/asl100/MViT_V2_S_exp003",
+      "save_path": "runs/asl100/MViT_V2_S_exp003/checkpoints"
     }
   ]
 }

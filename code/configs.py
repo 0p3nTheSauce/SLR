@@ -7,13 +7,19 @@ from typing import Dict, Any
 from utils import enum_dir, print_dict
 import wandb
 from stopping import EarlyStopper
+from pathlib import Path
 
 def load_config(arg_dict, verbose=False):
 	"""Load config from flat file and merge with command line args"""
+	conf_path = Path(arg_dict['config_path'])
+	if not conf_path.exists():
+		raise ValueError(f'{conf_path} not found')
 	config = parse_ini_config(arg_dict['config_path'])
 	
 	finished_keys = []
 	
+
+ 
 	if verbose:
 		print()
 	#update existing sections
@@ -43,8 +49,14 @@ def load_config(arg_dict, verbose=False):
 		print()
 	
 	#want to add equivalent batch size
-	config['training']['batch_size_equivalent'] = config['training']['batch_size'] * config['training']['update_per_step']
- 
+	try:
+		config['training']['batch_size_equivalent'] = config['training']['batch_size'] * config['training']['update_per_step']
+	except KeyError as e:
+		print(f"Warning: issue with config: {e}")
+		print('available keys: ')
+		for k in config.keys():
+			print(k)
+		raise e
 	config = EarlyStopper.config_precheck(config)
 		
 	# return post_process(config, verbose)
@@ -57,7 +69,7 @@ def _convert_type(value: str) -> Any:
 	except (ValueError, SyntaxError):
 	 	return value
  
-def parse_ini_config(ini_file: str) -> Dict[str, Any]:
+def parse_ini_config(ini_file: str|Path) -> Dict[str, Any]:
 	"""Parse .ini file for wandb config """
 	config = configparser.ConfigParser()
 	config.read(ini_file)
