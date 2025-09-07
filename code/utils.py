@@ -300,6 +300,7 @@ def extract_num(fname):
 
 def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=False):
   for path in paths:
+    remove = rem_empty
     path_obj = Path(path)
     # print(path_obj.name)
     # Find checkpoint directories
@@ -317,26 +318,12 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
           ans = input('Delete [y]/n: ')
         
         if ans == 'n':
-          rem_empty = False
+          remove = False
       else:
         print(f"Warning, no checkpoints found in {path}")
               
       if rem_empty:
-        
-        # if len(check_point_dirs) > 0:
-        #   try:
-        #     shutil.rmtree(path)
-        #     print(f"Removed directory and all contents: {path}")
-        #   except OSError as e:
-        #     print(f"Error removing {path}: {e}")
-        # else:
-        #   try:
-        #     path_obj.rmdir()
-        #     print(f'{path_obj.name} removed')
-        #   except OSError as e:
-        #     print(f"Ran into an error when removing {path}")
-        #     print(e)
-        #     continue
+      
         try:
           shutil.rmtree(path)
           print(f"Removed directory and all contents: {path}")
@@ -372,7 +359,7 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
         ans = 'none'
         while ans != 'y' and ans != '' and ans != 'n':
           print(f'Only keep checkpoint {files[-1]} in {to_empty} (excluding best.pth and non pth files)?')
-          ans = input('[y]/n: ')
+          ans = input(f'Delete up to {files[-2]}[y]/n: ')
         
         if ans == 'n':
           continue

@@ -55,7 +55,7 @@ def run_train(verbose=False):
       config=config      
     )
     #write run id to temp, so that daemon waits for it
-    run_info = {'run_id': run.id, 'run_name': run.name}
+    run_info = {'run_id': run.id, 'run_name': run.name, 'run_project': project}
     print_v("writing my id to temp file", verbose)
     store_Temp(TEMP_PATH, run_info)
     

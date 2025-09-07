@@ -796,7 +796,7 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False, proj
 		if 'run_id' in run_info.keys():
 			print_v("Waiting for run completion: \n", verbose)
 			#because start is non blocking, we need to wait for the run to finish
-			proceed = handle_already_running(ENTITY, project,
+			proceed = handle_already_running(ENTITY, run_info['run_project'],
 																	check_interval = RETRY_WAIT_TIME,
 																	verbose=verbose,
 																	max_retries=max_retries,
