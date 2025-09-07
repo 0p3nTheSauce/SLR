@@ -497,13 +497,47 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
 	with open(runs_path, 'r') as f:
 		all_runs = json.load(f)
 	
+	if not all_runs:
+		print(f'Warning: {runs_path} is empty')
+		return
+	
 	curr_to_run = all_runs['to_run'] if all_runs['to_run'] else [] 
 	curr_old_run = all_runs['old_runs'] if all_runs['old_runs'] else [] 
 	
+	if not curr_old_run:
+		print(f'Warning: old_runs is empty')
+		return
+ 
+	#def behavior to ask
 	if num_from_end is None:
-		curr_to_run.extend(curr_old_run)
-		all_runs['to_run'] = curr_to_run
-		all_runs['old_runs'] = []
+
+		for i, run in enumerate(curr_old_run):
+			admin = run['config']['admin']
+			print(f"{admin['config_path']} : {i}")
+	 
+		to_move = []
+		inp = 'go'
+		print('press q to quit')
+		while True:
+			inp = input("select index: ")
+			if inp.isdigit():
+				srun = curr_old_run.pop(int(inp))
+				if not srun:
+					print(f"Invalid idx for list of configs len: {len(curr_to_run)}")
+				else:
+					admin = srun['config']['admin']
+					print_v(f"Moving: {admin['config_path']}, to to_run", verbose)
+					to_move.append(srun)
+			elif inp == 'q':
+				break
+			else:
+				print(f'Invalid: {inp} (press q to quit)')
+				continue
+		
+		all_runs['to_run'] = to_move + curr_to_run
+   
+		print_v(f'No runs moved', verbose and not to_move)
+	
 	else:
 		old2mv = [] #return runs to the begining of to_run
 		for _ in range(num_from_end):
@@ -548,9 +582,6 @@ def shuffle_configs(runs_path:Path|str, verbose:bool=False) -> None:
 	
 	print_v(f"Run: {srun['config']['admin']['config_path']} \
 		successfully moved to position: {newpos}", verbose)
-
- 
-
 
 	
 def check_err(err, session):
@@ -833,7 +864,7 @@ def main():
 	parser.add_argument('-cn', '--clear_new', action='store_true', help='clear the new runs only')
 	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
 	parser.add_argument('-rr', '--remove_run', nargs='?',type=str, const='ask_me', default=None, help='remove a run from to_run. Optionally include the idx, otherwise with prompt for it')
-	parser.add_argument('-ro', '--return_old', nargs='?', const='all', default=None , help='Default behavior moves all the old runs, otherwise moves multiple \
+	parser.add_argument('-ro', '--return_old', nargs='?', const='ask', default=None , help='Default behavior moves all the old runs, otherwise moves multiple \
 																																												runs from the end, the number of old runs specified by optional int')
 	parser.add_argument('-lc', '--list_configs', action='store_true', help='list the config files used in runs file')
 	parser.add_argument('-sc', '--shuffle_configs', action='store_true', help='rearrange configs in to_run')
@@ -875,10 +906,10 @@ def main():
 		clean_Temp(TEMP_PATH, verbose)
 	
 	if args.return_old:
-		if args.return_old is not None:
-			return_old(RUNS_PATH, verbose, num_from_end=int(args.return_old))
+		if args.return_old == 'ask':
+			return_old(RUNS_PATH, verbose)
 		else:
-			return_old(RUNS_PATH, verbose, num_from_end=args.return_old)
+			return_old(RUNS_PATH, verbose, num_from_end=int(args.return_old))
 	
 	if args.list_configs:
 		list_configs(RUNS_PATH)
