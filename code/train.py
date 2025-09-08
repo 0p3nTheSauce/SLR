@@ -145,10 +145,10 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 		model = Swin3DTiny_basic(num_classes, config.model_params['drop_p'])
 		print(f'Successfully using model Swin3DTiny_basic')
 	elif model_info['idx'] == 5:
-		model = Resnet2_plus1D_18_basic(num_classes) # no drop_p in this model
+		model = Resnet2_plus1D_18_basic(num_classes, config.model_params['drop_p']) # no drop_p in this model
 		print(f'Successfully using model Resnet2_plus1D_18_basic')
 	elif model_info['idx'] == 6:
-		model = Resnet3D_18_basic(num_classes)  # no drop_p in this model
+		model = Resnet3D_18_basic(num_classes, config.model_params['drop_p'])  # no drop_p in this model
 		print(f'Successfully using model Resnet3D_18_basic')
 	elif model_info['idx'] == 7:
 		model = S3D_basic(num_classes, config.model_params['drop_p'])
