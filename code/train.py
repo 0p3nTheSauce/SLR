@@ -107,11 +107,6 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 	#setup data
 	label_path = Path(config.admin['labels'])
  
-	# train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
-	# val_instances = os.path.join(config.admin['labels'],'val_instances_fixed_frange_bboxes_len.json' )
-	# train_classes = os.path.join(config.admin['labels'], 'train_classes_fixed_frange_bboxes_len.json')
-	# val_classes = os.path.join(config.admin['labels'],'val_classes_fixed_frange_bboxes_len.json' )
-	
 	train_instances = label_path / 'train_instances_fixed_frange_bboxes_len.json'
 	val_instances = label_path / 'val_instances_fixed_frange_bboxes_len.json'
 	train_classes = label_path / 'train_classes_fixed_frange_bboxes_len.json'
@@ -133,6 +128,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 	dataloaders = {'train': dataloader, 'val': val_dataloader}
 	
 	#model, metrics, optimizer, schedular, loss
+	#TODO: put this in a seperate function
 	if model_info['idx'] == 0:
 		model = MViTv1B_basic(num_classes, config.model_params['drop_p'])
 		print(f'Successfully using model MViTv2S_basic')
@@ -166,7 +162,8 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 	
 	steps = 0
 	epoch = 0 
-	best_val_score=0.0 
+	# best_val_score=0.0
+	best_val_score=float('inf')
 	
 	param_groups = [
 		{
