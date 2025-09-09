@@ -20,6 +20,8 @@ from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
 from quewing import get_run_id
 
+from typing import Optional
+
 
 
 ENTITY= 'ljgoodall2001-rhodes-university'
@@ -80,9 +82,39 @@ def setup_data(mean, std, config):
 	return dataloaders, num_classes
 	
 
-
-
-
+def get_model(model_idx, num_classes, drop_p:Optional[float]=None):
+	model_constructors = {
+				0: MViTv1B_basic,
+				1: MViTv2S_basic,
+				2: Swin3DBig_basic,
+				3: Swin3DSmall_basic,
+				4: Swin3DTiny_basic,
+				5: Resnet2_plus1D_18_basic,
+				6: Resnet3D_18_basic,
+				7: S3D_basic,
+		}
+	#TODO: the is definitely a cleaner way to do this
+	model_names = {
+				0: "MViTv1B_basic",
+				1: "MViTv2S_basic",
+				2: "Swin3DBig_basic",
+				3: "Swin3DSmall_basic",
+				4: "Swin3DTiny_basic",
+				5: "Resnet2_plus1D_18_basic",
+				6: "Resnet3D_18_basic",
+				7: "S3D_basic",
+		}
+	if model_idx not in model_constructors:
+		raise ValueError(f"Unknown model_idx: {model_idx}")
+	if drop_p is not None:
+		model = model_constructors[model_idx](num_classes, drop_p)
+	else:
+		model = model_constructors[model_idx](num_classes)
+	print(f"Successfully using model {model_names[model_idx]}")
+ 
+	return model	
+ 
+ 
 def train_loop(model_info, wandb_run, load=None, save_every=5,
 								 recover=False, seed=None):
 	
