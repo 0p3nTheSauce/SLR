@@ -17,7 +17,8 @@ from typing import Union, Optional, Any
 # PROJECT = 'asl300'
 ENTITY= 'ljgoodall2001-rhodes-university'
 # PROJECT = 'WLASL - SLR'
-PROJECT = 'asl300'
+# PROJECT = 'asl300'
+PROJECT = 'WLASL-100'
 
 from configs import load_config, print_config, take_args
 

@@ -1,0 +1,454 @@
+{
+  "asl100": {
+    "MViT_V1_B": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.7110000000000002,
+          "top5": 0.905,
+          "top10": 0.9541666666666667
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.7071005917159763,
+          "top5": 0.9023668639053254,
+          "top10": 0.9526627218934911
+        },
+        "path": "runs/asl100/MViT_V1_B_exp000/checkpoint_108_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6851666666666668,
+          "top5": 0.905,
+          "top10": 0.945
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6782945736434108,
+          "top5": 0.8992248062015504,
+          "top10": 0.9418604651162791
+        },
+        "path": "runs/asl100/MViT_V1_B_exp000/best_test-top-k.json"
+      }
+    },
+    "MViT_V2_S": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.733,
+          "top5": 0.9250000000000002,
+          "top10": 0.9525
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.7307692307692307,
+          "top5": 0.9230769230769231,
+          "top10": 0.9526627218934911
+        },
+        "path": "runs/asl100/MViT_V2_S_exp002/best_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6963333333333332,
+          "top5": 0.91,
+          "top10": 0.9516666666666665
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.689922480620155,
+          "top5": 0.9069767441860465,
+          "top10": 0.9496124031007752
+        },
+        "path": "runs/asl100/MViT_V2_S_exp002/checkpoint_200_test-top-k.json"
+      }
+    },
+    "Swin3D_B": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6598333333333334,
+          "top5": 0.8905000000000001,
+          "top10": 0.9508333333333334
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6568047337278107,
+          "top5": 0.8875739644970414,
+          "top10": 0.9497041420118343
+        },
+        "path": "runs/asl100/Swin3D_B_exp000/best_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6281666666666667,
+          "top5": 0.866,
+          "top10": 0.9283333333333332
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.627906976744186,
+          "top5": 0.8604651162790697,
+          "top10": 0.9263565891472868
+        },
+        "path": "runs/asl100/Swin3D_B_exp000/checkpoint_200_test-top-k.json"
+      }
+    },
+    "Swin3D_S": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6551666666666666,
+          "top5": 0.8796666666666667,
+          "top10": 0.9441666666666666
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.650887573964497,
+          "top5": 0.8757396449704142,
+          "top10": 0.9437869822485208
+        },
+        "path": "runs/asl100/Swin3D_S_exp000/best_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6023333333333334,
+          "top5": 0.905,
+          "top10": 0.9408333333333334
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5968992248062015,
+          "top5": 0.9031007751937985,
+          "top10": 0.9418604651162791
+        },
+        "path": "runs/asl100/Swin3D_S_exp000/best_test-top-k.json"
+      }
+    },
+    "Swin3D_T": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6108333333333333,
+          "top5": 0.8691666666666665,
+          "top10": 0.9183333333333334
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6005917159763313,
+          "top5": 0.8698224852071006,
+          "top10": 0.9201183431952663
+        },
+        "path": "runs/asl100/Swin3D_T_exp000/checkpoint_045_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5565,
+          "top5": 0.8521666666666667,
+          "top10": 0.9088333333333333
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5503875968992248,
+          "top5": 0.8527131782945736,
+          "top10": 0.9069767441860465
+        },
+        "path": "runs/asl100/Swin3D_T_exp000/checkpoint_045_test-top-k.json"
+      }
+    },
+    "Resnet2D_1D_18": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5948333333333333,
+          "top5": 0.8521666666666667,
+          "top10": 0.9105
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5857988165680473,
+          "top5": 0.849112426035503,
+          "top10": 0.908284023668639
+        },
+        "path": "runs/asl100/Resnet2D_1D_18_exp003/checkpoint_175_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5361666666666666,
+          "top5": 0.8038333333333333,
+          "top10": 0.8846666666666667
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5271317829457365,
+          "top5": 0.7945736434108527,
+          "top10": 0.875968992248062
+        },
+        "path": "runs/asl100/Resnet2D_1D_18_exp003/checkpoint_175_test-top-k.json"
+      }
+    },
+    "Resnet3D_18": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6285,
+          "top5": 0.8563333333333333,
+          "top10": 0.9041666666666667
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6242603550295858,
+          "top5": 0.8550295857988166,
+          "top10": 0.9053254437869822
+        },
+        "path": "runs/asl100/Resnet3D_18_exp004/checkpoint_117_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5526666666666666,
+          "top5": 0.8438333333333332,
+          "top10": 0.8991666666666666
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5542635658914729,
+          "top5": 0.8410852713178295,
+          "top10": 0.8992248062015504
+        },
+        "path": "runs/asl100/Resnet3D_18_exp004/checkpoint_117_test-top-k.json"
+      }
+    },
+    "S3D": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.47966666666666663,
+          "top5": 0.7471666666666669,
+          "top10": 0.8413333333333334
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.47928994082840237,
+          "top5": 0.7455621301775148,
+          "top10": 0.8402366863905325
+        },
+        "path": "runs/asl100/S3D_exp010/checkpoint_071_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.3841666666666667,
+          "top5": 0.6824999999999999,
+          "top10": 0.8125
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.3875968992248062,
+          "top5": 0.6821705426356589,
+          "top10": 0.8178294573643411
+        },
+        "path": "runs/asl100/S3D_exp009/checkpoint_162_test-top-k.json"
+      }
+    }
+  },
+  "asl300": {
+    "MViT_V1_B": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6500555555555555,
+          "top5": 0.8801666666666667,
+          "top10": 0.9305555555555556
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6459489456159823,
+          "top5": 0.8779134295227525,
+          "top10": 0.9289678135405105
+        },
+        "path": "runs/asl300/MViT_V1_B_exp000/checkpoint_065_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.609111111111111,
+          "top5": 0.8512777777777778,
+          "top10": 0.9140555555555556
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6032934131736527,
+          "top5": 0.8473053892215568,
+          "top10": 0.9101796407185628
+        },
+        "path": "runs/asl300/MViT_V1_B_exp000/checkpoint_065_test-top-k.json"
+      }
+    },
+    "MViT_V2_S": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.6769999999999999,
+          "top5": 0.8952777777777777,
+          "top10": 0.9372222222222223
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6725860155382908,
+          "top5": 0.8934517203107658,
+          "top10": 0.9345172031076582
+        },
+        "path": "runs/asl300/MViT_V2_S_exp000/checkpoint_112_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.628,
+          "top5": 0.8648888888888888,
+          "top10": 0.9162777777777777
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.6212574850299402,
+          "top5": 0.8577844311377245,
+          "top10": 0.9131736526946108
+        },
+        "path": "runs/asl300/MViT_V2_S_exp000/checkpoint_112_test-top-k.json"
+      }
+    },
+    "Swin3D_B": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.4957777777777778,
+          "top5": 0.7642222222222222,
+          "top10": 0.8635000000000003
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.4983351831298557,
+          "top5": 0.7680355160932297,
+          "top10": 0.8645948945615982
+        },
+        "path": "runs/asl300/Swin3D_B_exp000/checkpoint_025_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.45605555555555555,
+          "top5": 0.7518333333333334,
+          "top10": 0.8482222222222221
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.4565868263473054,
+          "top5": 0.7514970059880239,
+          "top10": 0.8473053892215568
+        },
+        "path": "runs/asl300/Swin3D_B_exp000/checkpoint_025_test-top-k.json"
+      }
+    },
+    "Swin3D_S": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5426111111111112,
+          "top5": 0.8048888888888888,
+          "top10": 0.8721111111111111
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5427302996670367,
+          "top5": 0.8057713651498335,
+          "top10": 0.8734739178690344
+        },
+        "path": "runs/asl300/Swin3D_S_exp000/checkpoint_037_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.4863333333333333,
+          "top5": 0.7868333333333333,
+          "top10": 0.8562777777777778
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.48952095808383234,
+          "top5": 0.7859281437125748,
+          "top10": 0.8562874251497006
+        },
+        "path": "runs/asl300/Swin3D_S_exp000/checkpoint_037_test-top-k.json"
+      }
+    },
+    "Swin3D_T": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5087222222222223,
+          "top5": 0.7749444444444444,
+          "top10": 0.8675555555555557
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5072142064372919,
+          "top5": 0.7758046614872364,
+          "top10": 0.8679245283018868
+        },
+        "path": "runs/asl300/Swin3D_T_exp000/checkpoint_037_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.44133333333333324,
+          "top5": 0.7490555555555556,
+          "top10": 0.8248888888888888
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.437125748502994,
+          "top5": 0.7440119760479041,
+          "top10": 0.8218562874251497
+        },
+        "path": "runs/asl300/Swin3D_T_exp000/checkpoint_037_test-top-k.json"
+      }
+    },
+    "Resnet2D_1D_18": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.4754999999999999,
+          "top5": 0.7195,
+          "top10": 0.8165555555555556
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.47613762486126526,
+          "top5": 0.7203107658157603,
+          "top10": 0.8146503884572697
+        },
+        "path": "runs/asl300/Resnet2D_1D_18_exp000/checkpoint_174_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.3856666666666666,
+          "top5": 0.6686666666666666,
+          "top10": 0.7535
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.38772455089820357,
+          "top5": 0.6736526946107785,
+          "top10": 0.7604790419161677
+        },
+        "path": "runs/asl300/Resnet2D_1D_18_exp000/checkpoint_174_test-top-k.json"
+      }
+    },
+    "Resnet3D_18": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.5296666666666666,
+          "top5": 0.7907777777777778,
+          "top10": 0.8514444444444444
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.5283018867924528,
+          "top5": 0.7880133185349611,
+          "top10": 0.8512763596004439
+        },
+        "path": "runs/asl300/Resnet3D_18_exp001/checkpoint_152_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.4642777777777778,
+          "top5": 0.7398888888888888,
+          "top10": 0.8337777777777777
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.4655688622754491,
+          "top5": 0.7410179640718563,
+          "top10": 0.8323353293413174
+        },
+        "path": "runs/asl300/Resnet3D_18_exp001/checkpoint_152_test-top-k.json"
+      }
+    },
+    "S3D": {
+      "best_val": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.45366666666666666,
+          "top5": 0.7071111111111111,
+          "top10": 0.8069444444444444
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.44617092119866814,
+          "top5": 0.7014428412874584,
+          "top10": 0.804661487236404
+        },
+        "path": "runs/asl300/S3D_exp001/checkpoint_069_val-top-k.json"
+      },
+      "best_test": {
+        "top_k_average_per_class_acc": {
+          "top1": 0.38799999999999996,
+          "top5": 0.6321111111111111,
+          "top10": 0.7437777777777778
+        },
+        "top_k_per_instance_acc": {
+          "top1": 0.38323353293413176,
+          "top5": 0.6287425149700598,
+          "top10": 0.7395209580838323
+        },
+        "path": "runs/asl300/S3D_exp001/checkpoint_069_test-top-k.json"
+      }
+    }
+  }
+}
