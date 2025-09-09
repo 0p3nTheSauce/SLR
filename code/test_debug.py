@@ -261,7 +261,19 @@ def test_arg_defaults():
   args, other = parser.parse_known_args()
   print(args.remove_run)
   print(args.recover_last)
-
+  
+def test_basename_extraction():
+  from pathlib import Path
+  r = Path('./')
+  fs = sorted([x for x in r.iterdir() if x.is_file()])
+  ns = []
+  for f in fs:
+    if f.name.endswith('.json'):
+      ns.append(f.name.replace('.json', ''))
+    elif f.name.endswith('.py'):
+      ns.append(f.name.replace('.py', ''))
+  print(ns)
+  
 if __name__ == "__main__":
   # test_early_stopping(mode='min')
   # test_wait_for_run_completion()
@@ -270,5 +282,6 @@ if __name__ == "__main__":
   # tmux_session()
   # test_blocking()
   # test_dict_mod()
-  test_arg_defaults()
+  # test_arg_defaults()
+  test_basename_extraction()
   

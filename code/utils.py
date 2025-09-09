@@ -9,7 +9,7 @@ import gzip
 import re
 from pathlib import Path
 import shutil
-
+from argparse import ArgumentParser
 ############# pretty printing ##############
 
 def print_dict(dict):
@@ -295,10 +295,16 @@ def extract_num(fname):
   else:
     return num_substrs[0]
      
-   
+def is_removable(f:Path,rem_files:list[str]) -> bool:
+  if not f.is_file():
+    return False
+  for r in rem_files:
+    if f.name.endswith(r):
+      return True
+  return False 
 
 
-def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=False):
+def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=False, rem_files= []):
   for path in paths:
     remove = rem_empty
     path_obj = Path(path)
@@ -307,8 +313,22 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
     check_point_dirs = [item.name for item in path_obj.iterdir() 
                         if item.is_dir() and 'checkpoint' in item.name]
     
-      
-    
+    if rem_files:
+      to_rem = [p for p in path_obj.iterdir() if is_removable(p, rem_files)]
+      for f in to_rem:
+        remove = True
+        if ask:
+          ans = 'none'
+          ans = print(f'{f} is set to be removed')
+          while ans != 'y' and ans != '' and ans != 'n':
+            ans = input('Delete [y]/n: ')
+          remove = ans != 'n'
+        if remove:
+          print(f'Deleting {f}')
+          f.unlink()
+        else:
+          print(f'Skipping {f}')
+            
     if len(check_point_dirs) == 0 or all([is_empty(path_obj / d) for d in check_point_dirs]):
       
       if ask and rem_empty:
@@ -373,7 +393,7 @@ def is_empty(path):
   return not any(Path(path).iterdir())
 
     
-def clean_experiments(path, ask=False, rem_empty=False):
+def clean_experiments(path, ask=False, rem_empty=False, rem_files=[]):
   path_obj = Path(path)
   
   if not path_obj.exists():
@@ -381,9 +401,9 @@ def clean_experiments(path, ask=False, rem_empty=False):
   
   sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
   
-  return clean_checkpoints(sub_paths, ask=ask,rem_empty=rem_empty)
+  return clean_checkpoints(sub_paths, ask=ask,rem_empty=rem_empty, rem_files=rem_files)
     
-def clean_runs(path, ask=False, rem_empty=False):
+def clean_runs(path, ask=False, rem_empty=False, rem_files=[]):
   path_obj = Path(path)
   
   if not path_obj.exists():
@@ -391,7 +411,7 @@ def clean_runs(path, ask=False, rem_empty=False):
   sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
   
   for p in sub_paths:
-    clean_experiments(p, ask, rem_empty)
+    clean_experiments(p, ask, rem_empty, rem_files)
   
 def crop_frames(frames, bbox):
   #frames hase shape (num_frames, channels, height, width)
@@ -474,22 +494,22 @@ def test_save2():
 
 def main():
   #TODO: the output for empty runs has an issue
-  # test_save()
-  # test_save2()
-  #  torch_to_mediapipe()
-  # watch_video(path='69241.mp4')
-  # name_mapping = {'Loss/Train_Epoch': 'Loss/Train',
-  #                 'Loss/Test_Epoch' : 'Loss/Val',
-  #                 'Accuracy/Train_Epoch' : 'Accuracy/Train',
-  #                 'Accuracy/Test_Epoch' : 'Accuracy/Val'}
+  parser = ArgumentParser(description='utils.py')
+  parser.add_argument('-da', '--dont_ask', action='store_true', help='Clean files and directories without confirming first')
+  parser.add_argument('-re', '--remove_empty', action='store_true', help='Remove empty directories')
+  parser.add_argument('-rf', '--remove_files', nargs='+', type=str, help='Remove files with provided suffixes (e.g. .png .txt) ' )
+  args = parser.parse_args()
+  print(args.dont_ask)
+  print(args.remove_empty)
+  print(args.remove_files)
   
-  # rename_scalars_in_eventfile('./runs/asl100/r3d18_exp004/logs',
-  #                             './runs/asl100/r3d18_exp004/logs_fixed',
-  #                             name_mapping)
-  clean_runs('runs', ask=True, rem_empty=True)
-  # test_vid = '../data/WLASL2000/07393.mp4'
-  # torch_frames = load_rgb_frames_from_video(test_vid, 0, 10, True)
-  # print(torch_frames.shape)
+  
+  
+  clean_runs(path='runs',
+             ask=not args.dont_ask,
+             rem_empty=args.remove_empty,
+             rem_files=args.remove_files)
+ 
 
 if __name__ == '__main__':
   main()

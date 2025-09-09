@@ -20,6 +20,8 @@ import random
 import configs
 import utils
 import gc
+
+from typing import Optional
 #################################### Testing #################################
 
 def cleanup_memory():
@@ -69,14 +71,15 @@ def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json', runs_path:
 		runs_dict[split] = split_dict
 	
 	return runs_dict
-			
-			
-	
 
-def test_all(runs_dict, imp_path:str|Path='wlasl_implemented_info.json',
+# def summarise_results(runs_dict):
+
+			
+def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
 						 classes_path:str|Path='wlasl_class_list.json',
 							root_path:str|Path='../data/WLASL/WLASL2000',
-						 test_last:bool=False, top_k:bool=True, plot:bool=False,disp:bool=False):
+						 test_last:bool=False, top_k:bool=True, plot:bool=False,disp:bool=False,
+			 			output:Optional[str|Path] = 'wlasl_runs_results.json') -> dict:
 	
 	with open(imp_path, 'r') as f:
 		imp_info = json.load(f)
@@ -101,7 +104,7 @@ def test_all(runs_dict, imp_path:str|Path='wlasl_implemented_info.json',
 			
 			print(f'With architecture: {arch}')
 			
-			for exp_no in runs_dict[split][arch]: #e.g. 001
+			for i, exp_no in enumerate(runs_dict[split][arch]): #e.g. 001
 				print(f'Experiment no: {exp_no}')
 
 				cleanup_memory()
@@ -160,6 +163,10 @@ def test_all(runs_dict, imp_path:str|Path='wlasl_implemented_info.json',
 				
 				if test_last: #some of these may have valid best.pth, others not
 					checkpoint_paths = [x for x in save_path.iterdir() if x.name.endswith('.pth')]
+					if len(checkpoint_paths) > 2:
+						#contains more than just best and last
+						s = sorted(checkpoint_paths)
+						checkpoint_paths = [checkpoint_paths[0]] + [checkpoint_paths[-1]]
 				else:
 					checkpoint_paths = [save_path / 'best.pth']
 				
@@ -188,20 +195,24 @@ def test_all(runs_dict, imp_path:str|Path='wlasl_implemented_info.json',
 					
 					if top_k:
 						print('Val')
-						test_top_k(
+						val_res = test_top_k(
 							model=model,
 							test_loader=val_loader,
-							save_dir=save_path,
-							name='val-top-k.txt'
+							save_path=output / check_path.name.replace('.pth', '_val-top-k.txt')
 						)
 						print('Test')
-						test_top_k(
+						test_res = test_top_k(
 							model=model,
 							test_loader=test_loader,
-							save_dir=save_path,
-							name='test-top-k.txt'
+							save_path=output / check_path.name.replace('.pth', '_test-top-k.txt')
 						)
-					
+						experiment = {
+							"checkpoint" 	: check_path.name.replace('.pth', ''),
+							"val set" 		: val_res,
+							"test set"		: test_res 
+						}
+						runs_dict[split][arch][i] = experiment #update runs_dict as we go
+			
 					if plot:
 						accuracy, class_report, all_preds, all_targets = test_model(model, test_loader)
 						# print(f'Test accuracy: {accuracy}')
@@ -209,14 +220,14 @@ def test_all(runs_dict, imp_path:str|Path='wlasl_implemented_info.json',
 							report=class_report,
 							classes_path=classes_path,
 							title='Test set Classification Report',
-							save_path=save_path,
+							save_path=output / check_path.name.replace('.pth', '_test-heatmap.png'),
 							disp=disp
 						)
 						plot_bar_graph(
 							report=class_report,
 							classes_path=classes_path,
 							title='Test set Classification Report',
-							save_path=save_path,
+							save_path=output / check_path.name.replace('.pth', '_test-bargraph.png'),
 							disp=disp
 						)
 						plot_confusion_matrix(
@@ -225,13 +236,17 @@ def test_all(runs_dict, imp_path:str|Path='wlasl_implemented_info.json',
 							classes_path=classes_path,
 							size=(15,15),
 							title='Test set Classification Report',
-							save_path=save_path,
+							save_path=output / check_path.name.replace('.pth', '_test-confmat.png'),
 							disp=disp
 						)
-						
-						
-				
-				
+	
+	#save modified runs_dict
+	if output is not None:
+		with open(output, 'r') as f:
+			json.dump(runs_dict, f, indent=2)
+	return runs_dict
+	
+	
 def test_model(model, test_loader):
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model.to(device)
@@ -253,7 +268,7 @@ def test_model(model, test_loader):
 	
 	return accuracy, report, all_preds, all_targets
 
-def test_top_k(model, test_loader, seed=None, verbose=False, save_dir=None, name='top_k.txt'):
+def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 	
 	if seed is not None:
 		set_seed(0)
@@ -311,24 +326,22 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_dir=None, name
 	top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
 	top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
 	top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
-	overall_top1 = correct / len(test_loader)
+	top1_per_instance = correct / len(test_loader)
+	top5_per_instance = correct_5 / len(test_loader)
+	top10_per_instance = correct_10 / len(test_loader)
 	fstr = 'top-k average per class acc: {}, {}, {}'.format(top1_per_class, top5_per_class, top10_per_class)
-	
+	fstr2 = 'top-k per instance acc: {}, {}, {}'.format(top1_per_instance, top5_per_instance, top10_per_instance)
 	print(fstr)
-	print(f'Overall top1 (sklearn style) {overall_top1}')
-	if save_dir is not None:
-		save_path = Path(save_dir)
-		while not save_path.exists():
-			print(f'Warning: {save_path} not found')
-			save_dir = input("Enter alternative path (or nothing to exit): ")
-			if save_dir == '':
-				return 
-			else:
-				save_path = Path(save_dir)
-		save_path = save_path / name
+	print(fstr2)
+	if save_path is not None:
 		with open(save_path, 'w') as f:
 			f.write(fstr)
-
+			f.write(fstr2)
+	 
+	return {
+		'per_class': [top1_per_class,top5_per_class,top10_per_class],
+		'per_instance': [top1_per_instance, top5_per_instance, top10_per_instance]
+	}
 
 			
 ###############################  Plottting #############################################################
@@ -347,9 +360,9 @@ def plot_heatmap(report, classes_path, title='Classification Report Heatmap', sa
 	plt.title(title)
 	plt.tight_layout()
 	if save_path:
-		plt.savefig(save_path)
+		plt.savefig(save_path, )
 	if disp:
-	    plt.show()
+		plt.show()
 
 def plot_heatmap_reports_metric(reports, classes_path, metric, names):
 	with open(classes_path, 'r') as f:
@@ -494,7 +507,7 @@ def plot_confusion_matrix(y_true, y_pred, classes_path=None, num_classes=100,
 		cmap='Blues',
 		linewidths=0.5,      # Add gridlines between cells
 		linecolor='gray'     # Gridline color (e.g., gray, white, black)
-    )
+		)
 	plt.title(title)
 	plt.xticks(ticks=np.arange(len(class_names)), labels=class_names, rotation=90, fontsize=8) #type: ignore
 	plt.yticks(ticks=np.arange(len(class_names)), labels=class_names, rotation=0, fontsize=8) #type: ignore
@@ -517,6 +530,6 @@ if __name__ == '__main__':
 
 	
 	runs_dict = create_runs_dict()
-	test_all(runs_dict, test_last=True, top_k=True, plot=True)
-	
+	result_dict = test_all(runs_dict, test_last=True, top_k=True, plot=True)
+	utils.print_dict(result_dict)
 	
