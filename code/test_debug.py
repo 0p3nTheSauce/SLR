@@ -10,6 +10,10 @@ from utils import print_dict
 import time
 import subprocess
 import argparse
+from pathlib import Path
+import re  
+import json
+
 
 def plot_simulated_training(x_range, f):
   x = x_range
@@ -263,7 +267,7 @@ def test_arg_defaults():
   print(args.recover_last)
   
 def test_basename_extraction():
-  from pathlib import Path
+
   r = Path('./')
   fs = sorted([x for x in r.iterdir() if x.is_file()])
   ns = []
@@ -273,7 +277,56 @@ def test_basename_extraction():
     elif f.name.endswith('.py'):
       ns.append(f.name.replace('.py', ''))
   print(ns)
-  
+
+def parse_run_info_to_json(txt_file_path):
+    """
+    Parse a text file containing run info and save it as a JSON file.
+    
+    Args:
+        txt_file_path (str): Path to the input .txt file
+    
+    Returns:
+        dict: The parsed data dictionary
+    """
+    # Read the text file
+    with open(txt_file_path, 'r') as f:
+      content = f.read()
+    
+    # Extract numbers using regex
+    numbers = re.findall(r'(\d+\.\d+)', content)
+    
+    if len(numbers) != 6:
+        raise ValueError(f"Expected 6 numbers, found {len(numbers)}")
+    
+    # Create the dictionary
+    data = {
+        "top_k_average_per_class_acc": {
+            "top1": float(numbers[0]),
+            "top5": float(numbers[1]),
+            "top10": float(numbers[2])
+        },
+        "top_k_per_instance_acc": {
+            "top1": float(numbers[3]),
+            "top5": float(numbers[4]),
+            "top10": float(numbers[5])
+        }
+    }
+    
+    # Create output JSON file path (same name, different extension)
+    txt_path = Path(txt_file_path)
+    json_path = txt_path.with_suffix('.json')
+    
+    # Save as JSON
+    with open(json_path, 'w') as f:
+        json.dump(data, f, indent=2)
+        
+    #remove old
+    txt_path.unlink()
+    
+    print(f"Saved to: {json_path}")
+    return data
+
+
 if __name__ == "__main__":
   # test_early_stopping(mode='min')
   # test_wait_for_run_completion()
@@ -283,5 +336,6 @@ if __name__ == "__main__":
   # test_blocking()
   # test_dict_mod()
   # test_arg_defaults()
-  test_basename_extraction()
+  # test_basename_extraction()
+  parse_run_info_to_json('/home/luke/ExtraStorage/SLR/code/best_val-top-k.txt')
   

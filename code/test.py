@@ -72,7 +72,12 @@ def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json', runs_path:
 	
 	return runs_dict
 
-# def summarise_results(runs_dict):
+def summarise_results(runs_dict):
+  for split in runs_dict.keys():
+    for arch in runs_dict[split].keys():
+      for i, exp_no in enumerate([split][arch]):
+        output = Path(f'runs/{split}/{arch}_exp{exp_no}')
+    
 
 			
 def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
@@ -91,16 +96,10 @@ def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
 	
 	for split in runs_dict.keys(): #e.g. asl100
 		
-		if split not in imp_info['splits']:
-			raise ValueError(f'Split not implemented: {split}')
-		
 		labels = Path(f'./preprocessed/labels/{split}')
 		print(f'Processing split: {split}')
 		
 		for arch in runs_dict[split].keys(): #e.g. S3D
-			
-			if arch not in imp_info['models']:
-				raise ValueError(f'Architecture not implemented: {arch}')
 			
 			print(f'With architecture: {arch}')
 			
@@ -333,15 +332,15 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 	fstr2 = 'top-k per instance acc: {}, {}, {}'.format(top1_per_instance, top5_per_instance, top10_per_instance)
 	print(fstr)
 	print(fstr2)
-	if save_path is not None:
-		with open(save_path, 'w') as f:
-			f.write(fstr)
-			f.write(fstr2)
-	 
-	return {
+	result = {
 		'per_class': [top1_per_class,top5_per_class,top10_per_class],
 		'per_instance': [top1_per_instance, top5_per_instance, top10_per_instance]
 	}
+	if save_path is not None:
+		with open(save_path, 'w') as f:
+			json.dump(result, f, indent=2)
+	 
+	return result
 
 			
 ###############################  Plottting #############################################################
