@@ -10,6 +10,31 @@ import re
 from pathlib import Path
 import shutil
 from argparse import ArgumentParser
+
+
+
+from typing import Callable
+
+
+############### Input ##################
+
+def ask_nicely(message: str, requirment: Callable[[str], bool], error: str) -> str:
+	passed=False
+	ans = 'none'
+	while not passed:
+		passed=True
+		ans = input(message)
+		try:
+			if not requirment(ans):
+				print(error)
+				passed=False
+		except Exception as e:
+			print(e)
+			passed=False
+	return ans
+
+
+
 ############# pretty printing ##############
 
 def print_dict(dict):
