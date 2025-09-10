@@ -56,13 +56,29 @@ def get_best_ckpnt(dir_path: Path) -> dict:
 		with open(p, 'r') as f:
 			res = json.load(f)
 		if 'val' in p.name:
-			if res['top_k_per_instance_acc']['top1'] > best_val['top_k_per_instance_acc']['top1']:
-				best_val = res
-				best_val['path'] = str(p)
+			try:
+				if res['top_k_per_instance_acc']['top1'] > best_val['top_k_per_instance_acc']['top1']:
+					best_val = res
+					best_val['path'] = str(p)
+			except Exception as e:
+				print(dir_path)
+				print()
+				print(res)
+				print()
+				print(best_test)
+				raise e
 		elif 'test' in p.name:
-			if res['top_k_per_instance_acc']['top1'] > best_test['top_k_per_instance_acc']['top1']:
-				best_test = res
-				best_test['path'] = str(p)
+			try:
+				if res['top_k_per_instance_acc']['top1'] > best_test['top_k_per_instance_acc']['top1']:
+					best_test = res
+					best_test['path'] = str(p)
+			except Exception as e:
+				print(dir_path)
+				print()
+				print(res)
+				print()
+				print(best_test)
+				raise e
 		else:
 			continue
 	return {'best_val': best_val,
@@ -75,13 +91,39 @@ def get_best_exp(exps):
 			best = exp
 	return best
 
+
+# def collect_results(mayb_runs:Optional[dict]=None,
+# 										runs_done:str|Path='wlasl_runs_done.json',
+# 										runs_dir:str|Path='runs',
+# 										results_path:str|Path='wlasl_results.json',
+#           					test_last:bool=False):
+# 	if mayb_runs is None:
+# 		with open(runs_done, 'r') as f:
+# 			runs_dict = json.load(f)
+# 	else:
+# 		runs_dict = mayb_runs
+# 	runs = Path(runs_dir)
+ 
+# 	for split in runs_dict.keys(): #e.g. asl100
+# 		for arch in runs_dict[split].keys(): #e.g. S3D
+# 			for i, exp_no in enumerate(runs_dict[split][arch]): #e.g. 001
+# 				output = runs / f'{split}/{arch}_exp{exp_no}'
+# 				# save_path = output / 'checkpoints'
+# 				info_paths = [x for x in output.iterdir() if x.name.endswith('.json')]
+# 				val_paths = [x for x in info_paths if 'val' in x.name]
+# 				test_paths = [x for x in info_paths if'test' in x.name]
+
+				
+					
+
 def summarize_results(runs_dict:Optional[dict]=None,
 											runs_path:str|Path='runs',
-			 								runs_done_path:str|Path='wlasl_runs_done.json',
-											sum_output:Optional[str|Path]=None) -> dict:
+			 								runs_done:str|Path='wlasl_runs_done.json',
+											sum_output:Optional[str|Path]=None
+					 						) -> dict:
 	
 	if runs_dict is None:
-		with open(runs_done_path, 'r') as f:
+		with open(runs_done, 'r') as f:
 			runs_dict = json.load(f)
 	
 	if not runs_dict:
@@ -131,7 +173,7 @@ def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json',
 				continue
 			arch, exp_no = sep_arch_exp(path)
 			if arch not in available_models:
-				continue
+				raise ValueError(f'{path} name does not fit convention')
 			split_dict[arch].append(exp_no)
 	 
 		runs_dict[split] = split_dict
@@ -257,15 +299,21 @@ def is_done(dir_path:str|Path) -> bool:
 			return True
 	return False
 
-def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
-						 classes_path:str|Path='wlasl_class_list.json',
-							runs_dir:str|Path='./runs',
-							labels_dir:str|Path='./preprocessed/labels',
-							configs_dir:str|Path='./configfiles',
-							root_dir:str|Path='../data/WLASL/WLASL2000',
-						 test_last:bool=False, top_k:bool=True, plot:bool=False,disp:bool=False,
-			 			res_output:Optional[str|Path] = None,
-			 			skip_done:bool=True) -> tuple[dict, list]:
+
+
+
+def test_all(runs_dict:dict,
+						test_last:bool=False, top_k:bool=True, plot:bool=False,disp:bool=False,
+						res_output:Optional[str|Path] = None,
+			 			skip_done:bool=True,
+						test_val:bool=False,
+			 			flip:bool=False,
+			 			imp_path:str|Path='wlasl_implemented_info.json',
+						classes_path:str|Path='wlasl_class_list.json',
+						runs_dir:str|Path='./runs',
+						labels_dir:str|Path='./preprocessed/labels',
+						configs_dir:str|Path='./configfiles',
+						root_dir:str|Path='../data/WLASL/WLASL2000') -> tuple[dict, list]:
 	
 	problem_runs = []
  
@@ -364,7 +412,9 @@ def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
 				if len(checkpoint_paths) == 0:
 					print(f'Warning: no weights found for {save_path}')
 					continue
-
+				
+				chk_pnt_dict = {}
+    
 				for check_path in checkpoint_paths:
 					
 					print(f'Checkpoint: {check_path}')
@@ -387,23 +437,32 @@ def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
 					#test it
 					
 					if top_k:
-						print('Val')
-						val_res = test_top_k(
-							model=model,
-							test_loader=val_loader,
-							save_path=output / check_path.name.replace('.pth', '_val-top-k.json')
-						)
+						
+						if test_val:
+							print('Val')
+							val_res = test_top_k(
+								model=model,
+								test_loader=val_loader,
+								save_path=output / check_path.name.replace('.pth', '_val-top-k.json'),
+								flip=flip
+							)
+						else:
+							val_res = {}
+			
 						print('Test')
 						test_res = test_top_k(
 							model=model,
 							test_loader=test_loader,
-							save_path=output / check_path.name.replace('.pth', '_test-top-k.json')
+							save_path=output / check_path.name.replace('.pth', '_test-top-k.json'),
+			 				flip=flip
 						)
 						experiment = {
 							"checkpoint" 	: check_path.name.replace('.pth', ''),
-							"val set" 		: val_res,
 							"test set"		: test_res 
 						}
+			
+						if test_val:
+							experiment["val set"]= val_res
 						runs_dict[split][arch][i] = experiment #update runs_dict as we go
 			
 					if plot:
@@ -435,7 +494,7 @@ def test_all(runs_dict:dict, imp_path:str|Path='wlasl_implemented_info.json',
 	
 	#save modified runs_dict
 	if res_output:
-		with open(res_output, 'r') as f:
+		with open(res_output, 'w') as f:
 			json.dump(runs_dict, f, indent=2)
 	
 	with open('test_erros.json', 'w') as f:
@@ -465,7 +524,7 @@ def test_model(model, test_loader):
 	
 	return accuracy, report, all_preds, all_targets
 
-def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
+def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None, flip=False):
 	
 	if seed is not None:
 		set_seed(0)
@@ -493,6 +552,9 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 		data, target = item['frames'], item['label_num'] 
 		data, target = data.to(device), target.to(device)
 		
+		if flip:
+			data = data.flip(dims=[1])
+	
 		predictions = model(data)
 
 		out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
@@ -530,9 +592,21 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 	fstr2 = 'top-k per instance acc: {}, {}, {}'.format(top1_per_instance, top5_per_instance, top10_per_instance)
 	print(fstr)
 	print(fstr2)
+	# result = {
+	# 	'per_class': [top1_per_class,top5_per_class,top10_per_class],
+	# 	'per_instance': [top1_per_instance, top5_per_instance, top10_per_instance]
+	# }
 	result = {
-		'per_class': [top1_per_class,top5_per_class,top10_per_class],
-		'per_instance': [top1_per_instance, top5_per_instance, top10_per_instance]
+		"top_k_average_per_class_acc": {
+				"top1": top1_per_class,
+				"top5": top5_per_class,
+				"top10": top10_per_class
+		},
+		"top_k_per_instance_acc": {
+				"top1": top1_per_instance,
+				"top5": top5_per_instance,
+				"top10": top10_per_instance
+		}
 	}
 	if save_path is not None:
 		with open(save_path, 'w') as f:
@@ -718,21 +792,53 @@ def plot_confusion_matrix(y_true, y_pred, classes_path=None, num_classes=100,
 
 ########################### Other testing functions #############
 
-# def 
+def on_the_fly():
+	with open('wlasl_runs_done.json', 'r') as f:
+		runs_dict = json.load(f)
+	result_dict, _ = test_all(
+		runs_dict=runs_dict,
+		test_last=True, 
+		res_output='wlasl_runs_results_flipped.json',
+		flip=True
+	)
+	utils.print_dict(result_dict)
+	sum_results = summarize_results(
+		runs_dict=result_dict,
+		sum_output='wlasl_runs_flipped_summary.json'
+	 )
+	utils.print_dict(sum_results)
+	
 
+
+	
+	
 if __name__ == '__main__':
 	# config_path = './configfiles/asl100.ini'
 	# configs = Config(config_path)
 	# run_test_r3d18_1( output='runs/asl100/r3d18_exp5')
 
 	
-	# runs_dict = create_runs_dict()
-	with open('wlasl_runs_done.json', 'r') as f:
-		runs_dict = json.load(f)
+	runs_dict = create_runs_dict(output='wlasl_runs_done.json')
+	# with open('wlasl_runs_done.json', 'r') as f:
+	# 	runs_dict = json.load(f)
 	
-	result_dict, _ = test_all(runs_dict, test_last=True, top_k=True, plot=True)
-	utils.print_dict(result_dict)
+	result_dict, _ = test_all(runs_dict, test_last=True, top_k=True, plot=True,
+													 test_val=True)
+	# utils.print_dict(result_dict)
 	sum_results = summarize_results(sum_output='wlasl_runs_summary.json')
-	utils.print_dict(sum_results)
+	# utils.print_dict(sum_results)
+ 
 	# test_runs()
 
+	# result_dict, _ = test_all(
+	# 	runs_dict=runs_dict,
+	# 	test_last=True, 
+	# 	res_output='wlasl_runs_results_flipped.json',
+	# 	flip=True
+	# )
+	# utils.print_dict(result_dict)
+	# sum_results = summarize_results(
+	# 	runs_dict=result_dict,
+	# 	sum_output='wlasl_runs_flipped_summary.json'
+	#  )
+	# utils.print_dict(sum_results)

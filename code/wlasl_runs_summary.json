@@ -199,29 +199,29 @@
     "S3D": {
       "best_val": {
         "top_k_average_per_class_acc": {
-          "top1": 0.47966666666666663,
-          "top5": 0.7471666666666669,
-          "top10": 0.8413333333333334
+          "top1": 0.5193333333333334,
+          "top5": 0.7983333333333335,
+          "top10": 0.8775
         },
         "top_k_per_instance_acc": {
-          "top1": 0.47928994082840237,
-          "top5": 0.7455621301775148,
-          "top10": 0.8402366863905325
+          "top1": 0.5088757396449705,
+          "top5": 0.7958579881656804,
+          "top10": 0.878698224852071
         },
-        "path": "runs/asl100/S3D_exp010/checkpoint_071_val-top-k.json"
+        "path": "runs/asl100/S3D_exp011/checkpoint_067_val-top-k.json"
       },
       "best_test": {
         "top_k_average_per_class_acc": {
-          "top1": 0.3841666666666667,
-          "top5": 0.6824999999999999,
-          "top10": 0.8125
+          "top1": 0.4046666666666666,
+          "top5": 0.6958333333333333,
+          "top10": 0.8316666666666667
         },
         "top_k_per_instance_acc": {
-          "top1": 0.3875968992248062,
-          "top5": 0.6821705426356589,
-          "top10": 0.8178294573643411
+          "top1": 0.4108527131782946,
+          "top5": 0.6976744186046512,
+          "top10": 0.8294573643410853
         },
-        "path": "runs/asl100/S3D_exp009/checkpoint_162_test-top-k.json"
+        "path": "runs/asl100/S3D_exp011/checkpoint_067_test-top-k.json"
       }
     }
   },
