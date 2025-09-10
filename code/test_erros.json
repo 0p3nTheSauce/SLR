@@ -1,18 +1,1 @@
-[
-  "runs/asl100/MViT_V2_S_exp000/checkpoints/best.pth",
-  "runs/asl100/MViT_V2_S_exp000/checkpoints/checkpoint_200.pth",
-  "runs/asl100/MViT_V2_S_exp001/checkpoints/best.pth",
-  "runs/asl100/MViT_V2_S_exp001/checkpoints/checkpoint_200.pth",
-  "runs/asl100/Resnet2D_1D_18_exp000/checkpoints/best.pth",
-  "runs/asl100/Resnet2D_1D_18_exp000/checkpoints/checkpoint_137.pth",
-  "runs/asl100/Resnet2D_1D_18_exp001/checkpoints/best.pth",
-  "runs/asl100/Resnet2D_1D_18_exp001/checkpoints/checkpoint_200.pth",
-  "runs/asl100/Resnet3D_18_exp002/checkpoints/best.pth",
-  "runs/asl100/Resnet3D_18_exp002/checkpoints/checkpoint_192.pth",
-  "runs/asl100/Resnet3D_18_exp003/checkpoints/best.pth",
-  "runs/asl100/Resnet3D_18_exp003/checkpoints/checkpoint_200.pth",
-  "runs/asl100/Resnet3D_18_exp000/checkpoints/best.pth",
-  "runs/asl100/Resnet3D_18_exp000/checkpoints/checkpoint_139.pth",
-  "runs/asl100/Resnet3D_18_exp001/checkpoints/best.pth",
-  "runs/asl100/Resnet3D_18_exp001/checkpoints/checkpoint_163.pth"
-]
+[]
