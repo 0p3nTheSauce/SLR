@@ -9,6 +9,9 @@ from quewing import daemon, TEMP_PATH, print_v, clean_Temp, store_Temp, retrieve
 import argparse
 import time
 
+#TODO: would be great to be able to run scheduled tests as well
+# from test import on_the_fly
+
 def run_train(verbose=False):
   '''An easy to execute script for quewing'''
   info = retrieve_Temp(TEMP_PATH)

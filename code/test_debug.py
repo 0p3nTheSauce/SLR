@@ -303,7 +303,72 @@ def ask_nicely(message, requirment, error):
 			print(error)
 			passed=False
 	return ans
-		 
+
+
+def get_gloss_stats(instances):
+	train_stats = {'examples': 0, 'seen_signers': {}}
+	val_stats, test_stats = train_stats, train_stats
+	stats_managers = {
+		"train": train_stats,
+		"val": val_stats,
+		"test": test_stats
+	}
+	for inst in instances:
+		sid = inst['signer_id']
+		stat_man = stats_managers[inst['split']] 
+		stat_man['examples'] += 1
+		if sid in stat_man['seen_signers']:
+			stat_man['seen_signers'][sid] += 1
+		else:
+			stat_man['seen_signers'][sid] = 1
+		stats_managers[inst['split']]  = stat_man
+	return stats_managers
+			
+
+def get_stats(split_path, output):
+	stats = {}
+	with open(split_path, 'r') as f:
+		data = json.load(f)
+	for entry in data:
+		instances = entry['instances']
+		stats[entry['gloss']] = get_gloss_stats(instances)
+	with open(output, 'w') as f:
+		json.dump(stats, f, indent=2)
+	return stats
+
+def refine_stats(stat_path, output):
+	with open(stat_path, 'r') as f:
+		stats = json.load(f)
+	train_stats = {'accum_num_ex': 0, 'accum_diff_signers': 0}
+	val_stats, test_stats = train_stats, train_stats
+	stats_manager = {
+		'train': train_stats,
+		'val': val_stats,
+		'test': test_stats
+	}
+	num_classes = len(stats)
+	for g in stats.keys():
+		for split in ['train', 'val', 'test']:
+			stats_manager[split]['accum_num_ex'] += stats[g][split]['examples']
+			stats_manager[split]['accum_diff_signers'] += len(stats[g][split]['seen_signers'])
+	 
+	final = {
+		'mean_num_ex': {
+			'train': round(stats_manager['train']['accum_num_ex'] / num_classes, 2),
+			'val': round(stats_manager['val']['accum_num_ex'] / num_classes, 2),
+			'test': round(stats_manager['test']['accum_num_ex'] / num_classes, 2)
+		},
+		'mean_num_signers': {
+			'train': round(stats_manager['train']['accum_diff_signers'] / num_classes, 2),
+			'val': round(stats_manager['val']['accum_diff_signers'] / num_classes, 2),
+			'test': round(stats_manager['test']['accum_diff_signers'] / num_classes, 2)
+		}
+	}
+	with open(output, 'w') as f:
+		json.dump(final, f, indent=2)
+	return final
+ 
+
 
 if __name__ == "__main__":
 	# test_early_stopping(mode='min')
@@ -318,7 +383,13 @@ if __name__ == "__main__":
 	# parse_run_info_to_json('/home/luke/ExtraStorage/SLR/code/best_val-top-k.txt')
 	# with open('./wlasl_runs_done.json', 'r') as f:
 	#   reformat_results(json.load(f))
-	messages = ['enter split: ', 'split not found']
-	requirements = [lambda x: x in ['asl100', 'asl300']]
-	ask_nicely(messages, requirements, 'error')
-	
+	# messages = ['enter split: ', 'split not found']
+	# requirements = [lambda x: x in ['asl100', 'asl300']]
+	# ask_nicely(messages, requirements, 'error')
+	# get_stats(
+	#  '/home/luke/ExtraStorage/SLR/data/WLASL/splits/asl300.json',
+	#  '/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json')
+	refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json',
+              '/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_ref.json')
+	refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json',
+              '/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_ref.json')
