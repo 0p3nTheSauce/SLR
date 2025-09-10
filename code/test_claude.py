@@ -317,10 +317,13 @@ def compare_splits_latex_table(wlasl_100_data, wlasl_300_data):
     return latex_code
 
 # Example usage
-def run_visualizations(filepath: str = 'results.json'):
+def run_visualizations(filepath: str = 'results.json',formatter=None):
     """Run all visualizations."""
     # Load results
     results = load_results(filepath)
+    
+    if formatter:
+        results = formatter(results)
     
     # Extract to DataFrame
     df = extract_metrics_df(results)

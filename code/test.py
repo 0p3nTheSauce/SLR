@@ -47,9 +47,10 @@ def sep_arch_exp(path:str|Path):
 	arch = path_obj.name[:-7]
 	return arch, exp_no 
 
-def get_best_ckpnt(dir_path: Path) -> dict:
-	best_val, best_test = {'top_k_per_instance_acc':{'top1': 0}}, {}
-	best_test = best_val
+def get_best_ckpnt_dir(dir_path: Path) -> dict:
+	best_val= {'top_k_per_instance_acc':{'top1': 0}}
+	best_test = {'top_k_per_instance_acc':{'top1': 0}}
+	print(dir_path)
 	for p in dir_path.iterdir():
 		if not p.name.endswith('json'):
 			continue
@@ -92,36 +93,61 @@ def get_best_exp(exps):
 	return best
 
 
-# def collect_results(mayb_runs:Optional[dict]=None,
-# 										runs_done:str|Path='wlasl_runs_done.json',
-# 										runs_dir:str|Path='runs',
-# 										results_path:str|Path='wlasl_results.json',
-#           					test_last:bool=False):
-# 	if mayb_runs is None:
-# 		with open(runs_done, 'r') as f:
-# 			runs_dict = json.load(f)
-# 	else:
-# 		runs_dict = mayb_runs
-# 	runs = Path(runs_dir)
- 
-# 	for split in runs_dict.keys(): #e.g. asl100
-# 		for arch in runs_dict[split].keys(): #e.g. S3D
-# 			for i, exp_no in enumerate(runs_dict[split][arch]): #e.g. 001
-# 				output = runs / f'{split}/{arch}_exp{exp_no}'
-# 				# save_path = output / 'checkpoints'
-# 				info_paths = [x for x in output.iterdir() if x.name.endswith('.json')]
-# 				val_paths = [x for x in info_paths if 'val' in x.name]
-# 				test_paths = [x for x in info_paths if'test' in x.name]
+def get_best_chck_info(n_dict):
+	dic_lst = [y for _, y in n_dict.items()]
+	curr_best = dic_lst[0]
+	if len(dic_lst) == 1:
+		return curr_best
+	for ops in dic_lst[1:]:
+		# print(ops.keys())
+		if ops['test set']['top_k_average_per_class_acc']['top1'] > \
+			curr_best['test set']['top_k_average_per_class_acc']['top1']:
+				curr_best = ops
+	return curr_best
+			
+def summarize_results_file(runs_dict:Optional[dict]=None,
+													result_path:str|Path='wlasl_results.json',
+             							sum_output:str|Path='wlasl_sum_results_.json'):
 
-				
-					
+	if runs_dict is None:
 
-def summarize_results(runs_dict:Optional[dict]=None,
+		with open(result_path, 'r') as f:
+			runs_dict = json.load(f)
+
+	if not runs_dict:
+		raise ValueError('No data provided')
+
+	sum_res = {}
+
+	for split in runs_dict.keys(): #e.g. asl100
+		sum_res[split] = {}
+		for arch in runs_dict[split].keys(): #e.g. S3D
+			tests = []
+			n_dict = runs_dict[split][arch][0] #unpack my shitty storage 
+			res = get_best_chck_info(n_dict)
+			#this checkpoint has multiple entries for differen
+		
+			sum_res[split][arch] = res
+			
+	 
+	if sum_output:
+		with open(sum_output, 'w') as f:
+			json.dump(sum_res, f, indent=2)
+	
+	return sum_res
+
+
+def summarize_results_dirs(runs_dict:Optional[dict]=None,
 											runs_path:str|Path='runs',
 			 								runs_done:str|Path='wlasl_runs_done.json',
 											sum_output:Optional[str|Path]=None
 					 						) -> dict:
-	
+	'''Args:
+ 		runs_dict is the output from create_runs_dict, this function will not work
+	 on the results of test_all. This function looks through directories to collect 
+	 results'''	
+ 
+ 
 	if runs_dict is None:
 		with open(runs_done, 'r') as f:
 			runs_dict = json.load(f)
@@ -130,25 +156,29 @@ def summarize_results(runs_dict:Optional[dict]=None,
 		raise ValueError('No runs provided')
 
 	runs = Path(runs_path)	
- 
+
+	sum_res = {}
+
 	for split in runs_dict.keys(): #e.g. asl100
+		sum_res[split] = {}
 		for arch in runs_dict[split].keys(): #e.g. S3D
 			vals, tests = [], []
 			for exp_no in runs_dict[split][arch]:
 				res_dir = runs / f'{split}/{arch}_exp{exp_no}'
-				res = get_best_ckpnt(res_dir)
+				res = get_best_ckpnt_dir(res_dir)
 				vals.append(res['best_val'])
 				tests.append(res['best_test'])
-			runs_dict[split][arch] = {
+		
+			sum_res[split][arch] = {
 				'best_val': get_best_exp(vals),
 				'best_test': get_best_exp(tests)
 			}
 	 
 	if sum_output:
 		with open(sum_output, 'w') as f:
-			json.dump(runs_dict, f, indent=2)
+			json.dump(sum_res, f, indent=2)
 	
-	return runs_dict
+	return sum_res
 
 def extract_exp_number(path):
 		match = re.search(r'_exp(\d+)/', path)
@@ -162,7 +192,7 @@ def gen_run_dict(summary_path,take='best_test', out=None):
 	for split in results.keys():
 		best_done[split] = {}
 		for arch in results[split].keys():
-			p = results[split][arch][take]
+			p = results[split][arch][take]['path']
 			exp = extract_exp_number(p)
 			best_done[split][arch] = [exp]
 	
@@ -488,7 +518,7 @@ def test_all(runs_dict:dict,
 			 				flip=flip
 						)
 						experiment = {
-							"checkpoint" 	: check_path.name.replace('.pth', ''),
+							"exp_no" 	: exp_no,
 							"test set"		: test_res 
 						}
 			
@@ -499,27 +529,31 @@ def test_all(runs_dict:dict,
 					if plot:
 						accuracy, class_report, all_preds, all_targets = test_model(model, test_loader)
 						# print(f'Test accuracy: {accuracy}')
+						fname = check_path.name.replace('.pth', '_test-heatmap.png')
 						plot_heatmap(
 							report=class_report,
 							classes_path=classes_path,
 							title='Test set Classification Report',
-							save_path=output / check_path.name.replace('.pth', '_test-heatmap.png'),
+							save_path=output / fname,
 							disp=disp
 						)
+
+						fname = check_path.name.replace('.pth', '_test-bargraph.png')
 						plot_bar_graph(
 							report=class_report,
 							classes_path=classes_path,
 							title='Test set Classification Report',
-							save_path=output / check_path.name.replace('.pth', '_test-bargraph.png'),
+							save_path=output / fname,
 							disp=disp
 						)
+						fname = check_path.name.replace('.pth', '_test-confmat.png')
 						plot_confusion_matrix(
 							y_true=all_targets,
 							y_pred=all_preds,
 							classes_path=classes_path,
 							size=(15,15),
 							title='Test set Classification Report',
-							save_path=output / check_path.name.replace('.pth', '_test-confmat.png'),
+							save_path=output / fname,
 							disp=disp
 						)
 	
@@ -824,22 +858,7 @@ def plot_confusion_matrix(y_true, y_pred, classes_path=None, num_classes=100,
 
 ########################### Other testing functions #############
 
-def on_the_fly():
-	with open('wlasl_runs_done.json', 'r') as f:
-		runs_dict = json.load(f)
-	result_dict, _ = test_all(
-		runs_dict=runs_dict,
-		test_last=True, 
-		res_output='wlasl_runs_results_flipped.json',
-		flip=True
-	)
-	utils.print_dict(result_dict)
-	sum_results = summarize_results(
-		runs_dict=result_dict,
-		sum_output='wlasl_runs_flipped_summary.json'
-	 )
-	utils.print_dict(sum_results)
-	
+
 
 
 	
@@ -876,8 +895,12 @@ if __name__ == '__main__':
 	# utils.print_dict(sum_results)
 
 
-	best_done = gen_run_dict('wlasl_runs_summary.json', out='wlasl_runs_best.json')
+	# best_done = gen_run_dict('wlasl_runs_summary.json', out='wlasl_runs_best.json')
 	
-	result_dict, _ = test_all(best_done, test_last=True, top_k=True, plot=True,
-													 test_val=False, res_output='wlasl_results_flipped.json',
-              						skip_done=False, flip=True)
+	# result_dict, _ = test_all(best_done, test_last=True, top_k=True, plot=False,
+	# 												 test_val=False, res_output='wlasl_results_flipped.json',
+	#             						skip_done=False, flip=True)
+	with open('wlasl_results_flipped.json', 'r') as f:
+		result_dict = json.load(f)
+	sum_results = summarize_results_file(result_dict,
+                                      sum_output='wlasl_flipped_summary.json')
