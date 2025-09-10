@@ -1,0 +1,1438 @@
+{
+  "asl100": {
+    "MViT_V1_B": [
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6851666666666668,
+              "top5": 0.905,
+              "top10": 0.945
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6782945736434108,
+              "top5": 0.8992248062015504,
+              "top10": 0.9418604651162791
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.7051666666666668,
+              "top5": 0.8996666666666668,
+              "top10": 0.9475000000000001
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.7011834319526628,
+              "top5": 0.8964497041420119,
+              "top10": 0.9467455621301775
+            }
+          }
+        },
+        "checkpoint_108": {
+          "checkpoint": "checkpoint_108",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6755000000000001,
+              "top5": 0.8883333333333333,
+              "top10": 0.9483333333333335
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6705426356589147,
+              "top5": 0.8837209302325582,
+              "top10": 0.9457364341085271
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.7110000000000002,
+              "top5": 0.905,
+              "top10": 0.9541666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.7071005917159763,
+              "top5": 0.9023668639053254,
+              "top10": 0.9526627218934911
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_200": {
+          "checkpoint": "checkpoint_200",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6301666666666667,
+              "top5": 0.8875,
+              "top10": 0.95
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.624031007751938,
+              "top5": 0.8875968992248062,
+              "top10": 0.9496124031007752
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6851666666666668,
+              "top5": 0.8963333333333334,
+              "top10": 0.9591666666666666
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6804733727810651,
+              "top5": 0.8905325443786982,
+              "top10": 0.9585798816568047
+            }
+          }
+        }
+      },
+      "002"
+    ],
+    "MViT_V2_S": [
+      {},
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.056666666666666664,
+              "top5": 0.17616666666666667,
+              "top10": 0.2395
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.06976744186046512,
+              "top5": 0.18992248062015504,
+              "top10": 0.25193798449612403
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.135,
+              "top5": 0.25116666666666665,
+              "top10": 0.342
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.14201183431952663,
+              "top5": 0.257396449704142,
+              "top10": 0.34615384615384615
+            }
+          }
+        },
+        "checkpoint_200": {
+          "checkpoint": "checkpoint_200",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.07249999999999998,
+              "top5": 0.20499999999999996,
+              "top10": 0.295
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.08139534883720931,
+              "top5": 0.20930232558139536,
+              "top10": 0.3023255813953488
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.12500000000000003,
+              "top5": 0.2758333333333333,
+              "top10": 0.38166666666666665
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.1301775147928994,
+              "top5": 0.27514792899408286,
+              "top10": 0.3816568047337278
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6868333333333334,
+              "top5": 0.9021666666666667,
+              "top10": 0.945
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6821705426356589,
+              "top5": 0.8992248062015504,
+              "top10": 0.9457364341085271
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.733,
+              "top5": 0.9250000000000002,
+              "top10": 0.9525
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.7307692307692307,
+              "top5": 0.9230769230769231,
+              "top10": 0.9526627218934911
+            }
+          }
+        },
+        "checkpoint_200": {
+          "checkpoint": "checkpoint_200",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6963333333333332,
+              "top5": 0.91,
+              "top10": 0.9516666666666665
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.689922480620155,
+              "top5": 0.9069767441860465,
+              "top10": 0.9496124031007752
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.7151666666666668,
+              "top5": 0.9141666666666669,
+              "top10": 0.9408333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.7130177514792899,
+              "top5": 0.9142011834319527,
+              "top10": 0.9408284023668639
+            }
+          }
+        }
+      },
+      {}
+    ],
+    "Swin3D_B": [
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6198333333333333,
+              "top5": 0.8985,
+              "top10": 0.9355
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6162790697674418,
+              "top5": 0.8953488372093024,
+              "top10": 0.9341085271317829
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6598333333333334,
+              "top5": 0.8905000000000001,
+              "top10": 0.9508333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6568047337278107,
+              "top5": 0.8875739644970414,
+              "top10": 0.9497041420118343
+            }
+          }
+        },
+        "checkpoint_200": {
+          "checkpoint": "checkpoint_200",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6281666666666667,
+              "top5": 0.866,
+              "top10": 0.9283333333333332
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.627906976744186,
+              "top5": 0.8604651162790697,
+              "top10": 0.9263565891472868
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6485,
+              "top5": 0.8880000000000001,
+              "top10": 0.9438333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6449704142011834,
+              "top5": 0.8846153846153846,
+              "top10": 0.9437869822485208
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5611666666666667,
+              "top5": 0.8693333333333334,
+              "top10": 0.9268333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5581395348837209,
+              "top5": 0.8604651162790697,
+              "top10": 0.9224806201550387
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6473333333333333,
+              "top5": 0.8721666666666666,
+              "top10": 0.9363333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6449704142011834,
+              "top5": 0.8698224852071006,
+              "top10": 0.9349112426035503
+            }
+          }
+        },
+        "checkpoint_026": {
+          "checkpoint": "checkpoint_026",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5486666666666666,
+              "top5": 0.8623333333333332,
+              "top10": 0.9263333333333332
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5426356589147286,
+              "top5": 0.8565891472868217,
+              "top10": 0.9263565891472868
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6465,
+              "top5": 0.8696666666666667,
+              "top10": 0.9321666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6449704142011834,
+              "top5": 0.863905325443787,
+              "top10": 0.9319526627218935
+            }
+          }
+        }
+      }
+    ],
+    "Swin3D_S": [
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6023333333333334,
+              "top5": 0.905,
+              "top10": 0.9408333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5968992248062015,
+              "top5": 0.9031007751937985,
+              "top10": 0.9418604651162791
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6551666666666666,
+              "top5": 0.8796666666666667,
+              "top10": 0.9441666666666666
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.650887573964497,
+              "top5": 0.8757396449704142,
+              "top10": 0.9437869822485208
+            }
+          }
+        },
+        "checkpoint_036": {
+          "checkpoint": "checkpoint_036",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5703333333333332,
+              "top5": 0.8863333333333333,
+              "top10": 0.9366666666666665
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.562015503875969,
+              "top5": 0.8837209302325582,
+              "top10": 0.937984496124031
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6318333333333332,
+              "top5": 0.8896666666666667,
+              "top10": 0.9471666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6242603550295858,
+              "top5": 0.8846153846153846,
+              "top10": 0.9437869822485208
+            }
+          }
+        }
+      },
+      "001"
+    ],
+    "Swin3D_T": [
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5478333333333334,
+              "top5": 0.816,
+              "top10": 0.8968333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5387596899224806,
+              "top5": 0.813953488372093,
+              "top10": 0.8914728682170543
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6108333333333333,
+              "top5": 0.8680000000000001,
+              "top10": 0.9258333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6005917159763313,
+              "top5": 0.8668639053254438,
+              "top10": 0.9260355029585798
+            }
+          }
+        },
+        "checkpoint_045": {
+          "checkpoint": "checkpoint_045",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5565,
+              "top5": 0.8521666666666667,
+              "top10": 0.9088333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5503875968992248,
+              "top5": 0.8527131782945736,
+              "top10": 0.9069767441860465
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6108333333333333,
+              "top5": 0.8691666666666665,
+              "top10": 0.9183333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6005917159763313,
+              "top5": 0.8698224852071006,
+              "top10": 0.9201183431952663
+            }
+          }
+        }
+      },
+      "001"
+    ],
+    "Resnet2D_1D_18": [
+      {
+        "checkpoint_175": {
+          "checkpoint": "checkpoint_175",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5361666666666666,
+              "top5": 0.8038333333333333,
+              "top10": 0.8846666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5271317829457365,
+              "top5": 0.7945736434108527,
+              "top10": 0.875968992248062
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5948333333333333,
+              "top5": 0.8521666666666667,
+              "top10": 0.9105
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5857988165680473,
+              "top5": 0.849112426035503,
+              "top10": 0.908284023668639
+            }
+          }
+        }
+      },
+      {},
+      {
+        "checkpoint_095": {
+          "checkpoint": "checkpoint_095",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.45116666666666666,
+              "top5": 0.7401666666666666,
+              "top10": 0.8468333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4418604651162791,
+              "top5": 0.7325581395348837,
+              "top10": 0.8410852713178295
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5095000000000001,
+              "top5": 0.7868333333333335,
+              "top10": 0.8826666666666669
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5029585798816568,
+              "top5": 0.7781065088757396,
+              "top10": 0.878698224852071
+            }
+          }
+        }
+      },
+      {}
+    ],
+    "Resnet3D_18": [
+      {},
+      {},
+      {
+        "checkpoint_117": {
+          "checkpoint": "checkpoint_117",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5526666666666666,
+              "top5": 0.8438333333333332,
+              "top10": 0.8991666666666666
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5542635658914729,
+              "top5": 0.8410852713178295,
+              "top10": 0.8992248062015504
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6285,
+              "top5": 0.8563333333333333,
+              "top10": 0.9041666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6242603550295858,
+              "top5": 0.8550295857988166,
+              "top10": 0.9053254437869822
+            }
+          }
+        }
+      },
+      {},
+      {}
+    ],
+    "S3D": [
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3236666666666666,
+              "top5": 0.6323333333333333,
+              "top10": 0.7916666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.313953488372093,
+              "top5": 0.6317829457364341,
+              "top10": 0.7945736434108527
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.36533333333333323,
+              "top5": 0.6820000000000002,
+              "top10": 0.8085000000000001
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3609467455621302,
+              "top5": 0.6715976331360947,
+              "top10": 0.8047337278106509
+            }
+          }
+        },
+        "checkpoint_052": {
+          "checkpoint": "checkpoint_052",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3211666666666666,
+              "top5": 0.649,
+              "top10": 0.7855
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.31007751937984496,
+              "top5": 0.6434108527131783,
+              "top10": 0.7868217054263565
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.40199999999999997,
+              "top5": 0.7011666666666667,
+              "top10": 0.8165
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.39644970414201186,
+              "top5": 0.6952662721893491,
+              "top10": 0.8136094674556213
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.28683333333333333,
+              "top5": 0.606,
+              "top10": 0.7333333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.29457364341085274,
+              "top5": 0.6046511627906976,
+              "top10": 0.7364341085271318
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.349,
+              "top5": 0.6151666666666666,
+              "top10": 0.7571666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3520710059171598,
+              "top5": 0.6183431952662722,
+              "top10": 0.757396449704142
+            }
+          }
+        },
+        "checkpoint_175": {
+          "checkpoint": "checkpoint_175",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.2798333333333333,
+              "top5": 0.6143333333333333,
+              "top10": 0.7349999999999999
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.2868217054263566,
+              "top5": 0.6085271317829457,
+              "top10": 0.7364341085271318
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.349,
+              "top5": 0.613,
+              "top10": 0.7658333333333335
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3520710059171598,
+              "top5": 0.6183431952662722,
+              "top10": 0.7662721893491125
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_119": {
+          "checkpoint": "checkpoint_119",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.35083333333333333,
+              "top5": 0.665,
+              "top10": 0.7900000000000001
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.35271317829457366,
+              "top5": 0.6627906976744186,
+              "top10": 0.7829457364341085
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.40516666666666673,
+              "top5": 0.6946666666666667,
+              "top10": 0.8121666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.40532544378698226,
+              "top5": 0.6923076923076923,
+              "top10": 0.8106508875739645
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3471666666666667,
+              "top5": 0.6658333333333333,
+              "top10": 0.8099999999999998
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3488372093023256,
+              "top5": 0.6627906976744186,
+              "top10": 0.813953488372093
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4168333333333333,
+              "top5": 0.7046666666666667,
+              "top10": 0.8205
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4171597633136095,
+              "top5": 0.7071005917159763,
+              "top10": 0.8195266272189349
+            }
+          }
+        },
+        "checkpoint_172": {
+          "checkpoint": "checkpoint_172",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3521666666666667,
+              "top5": 0.6625,
+              "top10": 0.7841666666666666
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.35271317829457366,
+              "top5": 0.6589147286821705,
+              "top10": 0.7906976744186046
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.40850000000000003,
+              "top5": 0.7038333333333333,
+              "top10": 0.8255
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.40828402366863903,
+              "top5": 0.7071005917159763,
+              "top10": 0.8254437869822485
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.36583333333333334,
+              "top5": 0.6875000000000001,
+              "top10": 0.8116666666666668
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3682170542635659,
+              "top5": 0.686046511627907,
+              "top10": 0.810077519379845
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4168333333333334,
+              "top5": 0.7155000000000001,
+              "top10": 0.8196666666666669
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4171597633136095,
+              "top5": 0.7159763313609467,
+              "top10": 0.8195266272189349
+            }
+          }
+        },
+        "checkpoint_173": {
+          "checkpoint": "checkpoint_173",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3671666666666667,
+              "top5": 0.6916666666666668,
+              "top10": 0.8033333333333335
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3643410852713178,
+              "top5": 0.686046511627907,
+              "top10": 0.8023255813953488
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4206666666666667,
+              "top5": 0.6938333333333334,
+              "top10": 0.8163333333333336
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.42011834319526625,
+              "top5": 0.6952662721893491,
+              "top10": 0.8165680473372781
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3443333333333333,
+              "top5": 0.6305000000000001,
+              "top10": 0.7583333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.35271317829457366,
+              "top5": 0.6317829457364341,
+              "top10": 0.7596899224806202
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.40183333333333343,
+              "top5": 0.6580000000000001,
+              "top10": 0.7683333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.40532544378698226,
+              "top5": 0.6597633136094675,
+              "top10": 0.7692307692307693
+            }
+          }
+        },
+        "checkpoint_159": {
+          "checkpoint": "checkpoint_159",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.32516666666666666,
+              "top5": 0.6200000000000001,
+              "top10": 0.7483333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3372093023255814,
+              "top5": 0.624031007751938,
+              "top10": 0.751937984496124
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4168333333333333,
+              "top5": 0.643,
+              "top10": 0.775
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.42011834319526625,
+              "top5": 0.6449704142011834,
+              "top10": 0.7751479289940828
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.33799999999999997,
+              "top5": 0.6350000000000001,
+              "top10": 0.7725
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3333333333333333,
+              "top5": 0.6356589147286822,
+              "top10": 0.7751937984496124
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.38100000000000006,
+              "top5": 0.6788333333333334,
+              "top10": 0.7825000000000002
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3816568047337278,
+              "top5": 0.6804733727810651,
+              "top10": 0.7840236686390533
+            }
+          }
+        },
+        "checkpoint_105": {
+          "checkpoint": "checkpoint_105",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.33799999999999997,
+              "top5": 0.6233333333333334,
+              "top10": 0.7591666666666668
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3333333333333333,
+              "top5": 0.624031007751938,
+              "top10": 0.7635658914728682
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3821666666666667,
+              "top5": 0.6588333333333334,
+              "top10": 0.79
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.38461538461538464,
+              "top5": 0.6627218934911243,
+              "top10": 0.7899408284023669
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_067": {
+          "checkpoint": "checkpoint_067",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4046666666666666,
+              "top5": 0.6958333333333333,
+              "top10": 0.8316666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4108527131782946,
+              "top5": 0.6976744186046512,
+              "top10": 0.8294573643410853
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5193333333333334,
+              "top5": 0.7983333333333335,
+              "top10": 0.8775
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5088757396449705,
+              "top5": 0.7958579881656804,
+              "top10": 0.878698224852071
+            }
+          }
+        },
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3798333333333334,
+              "top5": 0.7291666666666667,
+              "top10": 0.8325
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.375968992248062,
+              "top5": 0.7325581395348837,
+              "top10": 0.8333333333333334
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4351666666666667,
+              "top5": 0.7646666666666668,
+              "top10": 0.8783333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4319526627218935,
+              "top5": 0.7633136094674556,
+              "top10": 0.878698224852071
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_071": {
+          "checkpoint": "checkpoint_071",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3646666666666667,
+              "top5": 0.7066666666666667,
+              "top10": 0.7950000000000002
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3682170542635659,
+              "top5": 0.7054263565891473,
+              "top10": 0.7945736434108527
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.47966666666666663,
+              "top5": 0.7471666666666669,
+              "top10": 0.8413333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.47928994082840237,
+              "top5": 0.7455621301775148,
+              "top10": 0.8402366863905325
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.37799999999999995,
+              "top5": 0.69,
+              "top10": 0.8166666666666668
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.375968992248062,
+              "top5": 0.686046511627907,
+              "top10": 0.8178294573643411
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4338333333333334,
+              "top5": 0.7171666666666668,
+              "top10": 0.8158333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4349112426035503,
+              "top5": 0.7130177514792899,
+              "top10": 0.8165680473372781
+            }
+          }
+        },
+        "checkpoint_165": {
+          "checkpoint": "checkpoint_165",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.37516666666666665,
+              "top5": 0.6883333333333332,
+              "top10": 0.8183333333333332
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.37209302325581395,
+              "top5": 0.6821705426356589,
+              "top10": 0.8178294573643411
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4280000000000001,
+              "top5": 0.7330000000000002,
+              "top10": 0.8233333333333335
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4289940828402367,
+              "top5": 0.7307692307692307,
+              "top10": 0.8224852071005917
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_162": {
+          "checkpoint": "checkpoint_162",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3841666666666667,
+              "top5": 0.6824999999999999,
+              "top10": 0.8125
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3875968992248062,
+              "top5": 0.6821705426356589,
+              "top10": 0.8178294573643411
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4435,
+              "top5": 0.7088333333333334,
+              "top10": 0.8388333333333334
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4437869822485207,
+              "top5": 0.7100591715976331,
+              "top10": 0.8402366863905325
+            }
+          }
+        }
+      },
+      {
+        "best": {
+          "checkpoint": "best",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.38083333333333336,
+              "top5": 0.6974999999999999,
+              "top10": 0.7941666666666667
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.38372093023255816,
+              "top5": 0.6976744186046512,
+              "top10": 0.7984496124031008
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.44849999999999995,
+              "top5": 0.7096666666666667,
+              "top10": 0.8196666666666669
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4526627218934911,
+              "top5": 0.7100591715976331,
+              "top10": 0.8195266272189349
+            }
+          }
+        },
+        "checkpoint_074": {
+          "checkpoint": "checkpoint_074",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.349,
+              "top5": 0.6875,
+              "top10": 0.7908333333333333
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.3488372093023256,
+              "top5": 0.686046511627907,
+              "top10": 0.7906976744186046
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4643333333333334,
+              "top5": 0.7146666666666668,
+              "top10": 0.8133333333333336
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.46745562130177515,
+              "top5": 0.7159763313609467,
+              "top10": 0.8165680473372781
+            }
+          }
+        }
+      }
+    ]
+  },
+  "asl300": {
+    "MViT_V1_B": [
+      {
+        "checkpoint_065": {
+          "checkpoint": "checkpoint_065",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.609111111111111,
+              "top5": 0.8512777777777778,
+              "top10": 0.9140555555555556
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6032934131736527,
+              "top5": 0.8473053892215568,
+              "top10": 0.9101796407185628
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6500555555555555,
+              "top5": 0.8801666666666667,
+              "top10": 0.9305555555555556
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6459489456159823,
+              "top5": 0.8779134295227525,
+              "top10": 0.9289678135405105
+            }
+          }
+        }
+      }
+    ],
+    "MViT_V2_S": [
+      {
+        "checkpoint_112": {
+          "checkpoint": "checkpoint_112",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.628,
+              "top5": 0.8648888888888888,
+              "top10": 0.9162777777777777
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6212574850299402,
+              "top5": 0.8577844311377245,
+              "top10": 0.9131736526946108
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.6769999999999999,
+              "top5": 0.8952777777777777,
+              "top10": 0.9372222222222223
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.6725860155382908,
+              "top5": 0.8934517203107658,
+              "top10": 0.9345172031076582
+            }
+          }
+        }
+      }
+    ],
+    "Swin3D_B": [
+      {
+        "checkpoint_025": {
+          "checkpoint": "checkpoint_025",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.45605555555555555,
+              "top5": 0.7518333333333334,
+              "top10": 0.8482222222222221
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4565868263473054,
+              "top5": 0.7514970059880239,
+              "top10": 0.8473053892215568
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4957777777777778,
+              "top5": 0.7642222222222222,
+              "top10": 0.8635000000000003
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4983351831298557,
+              "top5": 0.7680355160932297,
+              "top10": 0.8645948945615982
+            }
+          }
+        }
+      }
+    ],
+    "Swin3D_S": [
+      {
+        "checkpoint_037": {
+          "checkpoint": "checkpoint_037",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4863333333333333,
+              "top5": 0.7868333333333333,
+              "top10": 0.8562777777777778
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.48952095808383234,
+              "top5": 0.7859281437125748,
+              "top10": 0.8562874251497006
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5426111111111112,
+              "top5": 0.8048888888888888,
+              "top10": 0.8721111111111111
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5427302996670367,
+              "top5": 0.8057713651498335,
+              "top10": 0.8734739178690344
+            }
+          }
+        }
+      }
+    ],
+    "Swin3D_T": [
+      {
+        "checkpoint_037": {
+          "checkpoint": "checkpoint_037",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.44133333333333324,
+              "top5": 0.7490555555555556,
+              "top10": 0.8248888888888888
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.437125748502994,
+              "top5": 0.7440119760479041,
+              "top10": 0.8218562874251497
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5087222222222223,
+              "top5": 0.7749444444444444,
+              "top10": 0.8675555555555557
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5072142064372919,
+              "top5": 0.7758046614872364,
+              "top10": 0.8679245283018868
+            }
+          }
+        }
+      }
+    ],
+    "Resnet2D_1D_18": [
+      {
+        "checkpoint_174": {
+          "checkpoint": "checkpoint_174",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3856666666666666,
+              "top5": 0.6686666666666666,
+              "top10": 0.7535
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.38772455089820357,
+              "top5": 0.6736526946107785,
+              "top10": 0.7604790419161677
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4754999999999999,
+              "top5": 0.7195,
+              "top10": 0.8165555555555556
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.47613762486126526,
+              "top5": 0.7203107658157603,
+              "top10": 0.8146503884572697
+            }
+          }
+        }
+      }
+    ],
+    "Resnet3D_18": [
+      {
+        "checkpoint_157": {
+          "checkpoint": "checkpoint_157",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3848333333333333,
+              "top5": 0.6778888888888889,
+              "top10": 0.7671111111111111
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.38323353293413176,
+              "top5": 0.6781437125748503,
+              "top10": 0.7679640718562875
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.44899999999999995,
+              "top5": 0.7032777777777778,
+              "top10": 0.7996666666666666
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4483906770255272,
+              "top5": 0.7014428412874584,
+              "top10": 0.7968923418423973
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_152": {
+          "checkpoint": "checkpoint_152",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4642777777777778,
+              "top5": 0.7398888888888888,
+              "top10": 0.8337777777777777
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4655688622754491,
+              "top5": 0.7410179640718563,
+              "top10": 0.8323353293413174
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5296666666666666,
+              "top5": 0.7907777777777778,
+              "top10": 0.8514444444444444
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5283018867924528,
+              "top5": 0.7880133185349611,
+              "top10": 0.8512763596004439
+            }
+          }
+        }
+      }
+    ],
+    "S3D": [
+      {
+        "checkpoint_073": {
+          "checkpoint": "checkpoint_073",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.3719444444444444,
+              "top5": 0.6202222222222222,
+              "top10": 0.7354444444444445
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.36377245508982037,
+              "top5": 0.6167664670658682,
+              "top10": 0.7365269461077845
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.4131666666666666,
+              "top5": 0.6790555555555555,
+              "top10": 0.7861111111111111
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.4095449500554939,
+              "top5": 0.6803551609322974,
+              "top10": 0.7869034406215316
+            }
+          }
+        }
+      },
+      {
+        "checkpoint_069": {
+          "checkpoint": "checkpoint_069",
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.38799999999999996,
+              "top5": 0.6321111111111111,
+              "top10": 0.7437777777777778
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.38323353293413176,
+              "top5": 0.6287425149700598,
+              "top10": 0.7395209580838323
+            }
+          },
+          "val set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.45366666666666666,
+              "top5": 0.7071111111111111,
+              "top10": 0.8069444444444444
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.44617092119866814,
+              "top5": 0.7014428412874584,
+              "top10": 0.804661487236404
+            }
+          }
+        }
+      }
+    ]
+  }
+}

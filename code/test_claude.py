@@ -271,6 +271,51 @@ def generate_latex_table(results: Dict, dataset: str = 'asl100',
     
     return latex
 
+def compare_splits_latex_table(wlasl_100_data, wlasl_300_data):
+    """
+    Create a LaTeX table comparing WLASL-100 and WLASL-300 splits.
+    
+    Args:
+        wlasl_100_data (dict): Dictionary with train/val/test data for WLASL-100
+        wlasl_300_data (dict): Dictionary with train/val/test data for WLASL-300
+    
+    Returns:
+        str: LaTeX table code
+    """
+    
+    latex_code = r"""\begin{table}[h!]
+    \centering
+    \begin{tabular}{|l|c|c|c|c|c|c|}
+    \hline
+    \textbf{Split} & \multicolumn{3}{c|}{\textbf{WLASL-100}} & \multicolumn{3}{c|}{\textbf{WLASL-300}} \\
+    \cline{2-7}
+    & \textbf{Examples} & \textbf{Signers} & \textbf{Mean Ex/Sign} & \textbf{Examples} & \textbf{Signers} & \textbf{Mean Ex/Sign} \\
+    \hline
+    """
+    
+    # Define the splits and their display names
+    splits = [('train', 'Train'), ('val', 'Validation'), ('test', 'Test')]
+    
+    for split_key, split_name in splits:
+        wlasl_100 = wlasl_100_data[split_key]
+        wlasl_300 = wlasl_300_data[split_key]
+        
+        latex_code += f"{split_name} & "
+        latex_code += f"{wlasl_100['num_ex']} & "
+        latex_code += f"{wlasl_100['num_s']} & "
+        latex_code += f"{wlasl_100['mean_ex']:.2f} & "
+        latex_code += f"{wlasl_300['num_ex']} & "
+        latex_code += f"{wlasl_300['num_s']} & "
+        latex_code += f"{wlasl_300['mean_ex']:.2f} \\\\\n"
+        latex_code += "\\hline\n"
+    
+    latex_code += r"""\end{tabular}
+    \caption{Comparison of WLASL-100 and WLASL-300 dataset splits}
+    \label{tab:wlasl_comparison}
+    \end{table}"""
+    
+    return latex_code
+
 # Example usage
 def run_visualizations(filepath: str = 'results.json'):
     """Run all visualizations."""
@@ -322,4 +367,10 @@ def run_visualizations(filepath: str = 'results.json'):
 # If running in Jupyter notebook
 if __name__ == "__main__":
     # Assuming you have saved your JSON data to 'results.json'
-    df, results = run_visualizations('results.json')
+    # df, results = run_visualizations('results.json')
+    with open('wlasl_100_stats_ref.json', 'r') as f:
+        asl100 = json.load(f)
+    with open('wlasl_300_stats_ref.json', 'r') as f:
+        asl300 = json.load(f)
+    table = compare_splits_latex_table(asl100, asl300)
+    print(table)

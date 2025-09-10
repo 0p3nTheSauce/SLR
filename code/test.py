@@ -413,9 +413,10 @@ def test_all(runs_dict:dict,
 					print(f'Warning: no weights found for {save_path}')
 					continue
 				
-				chk_pnt_dict = {}
-    
+				
+				runs_dict[split][arch][i] = {}
 				for check_path in checkpoint_paths:
+					
 					
 					print(f'Checkpoint: {check_path}')
 					checkpoint = torch.load(check_path)
@@ -440,16 +441,24 @@ def test_all(runs_dict:dict,
 						
 						if test_val:
 							print('Val')
+							if flip:
+								fname = check_path.name.replace('.pth', '_val-top-k_flipped.json')
+							else:
+								fname = check_path.name.replace('.pth', '_val-top-k.json')
 							val_res = test_top_k(
 								model=model,
 								test_loader=val_loader,
-								save_path=output / check_path.name.replace('.pth', '_val-top-k.json'),
+								save_path=output / fname,
 								flip=flip
 							)
 						else:
 							val_res = {}
-			
+
 						print('Test')
+						if flip:
+								fname = check_path.name.replace('.pth', '_val-top-k_flipped.json')
+						else:
+								fname = check_path.name.replace('.pth', '_val-top-k.json')
 						test_res = test_top_k(
 							model=model,
 							test_loader=test_loader,
@@ -463,7 +472,7 @@ def test_all(runs_dict:dict,
 			
 						if test_val:
 							experiment["val set"]= val_res
-						runs_dict[split][arch][i] = experiment #update runs_dict as we go
+						runs_dict[split][arch][i][check_path.name.replace('.pth', '')] = experiment #update runs_dict as we go
 			
 					if plot:
 						accuracy, class_report, all_preds, all_targets = test_model(model, test_loader)
@@ -608,6 +617,7 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None, fli
 				"top10": top10_per_instance
 		}
 	}
+		
 	if save_path is not None:
 		with open(save_path, 'w') as f:
 			json.dump(result, f, indent=2)
@@ -823,9 +833,9 @@ if __name__ == '__main__':
 	# 	runs_dict = json.load(f)
 	
 	result_dict, _ = test_all(runs_dict, test_last=True, top_k=True, plot=True,
-													 test_val=True)
+													 test_val=True, res_output='wlasl_results.json', skip_done=False)
 	# utils.print_dict(result_dict)
-	sum_results = summarize_results(sum_output='wlasl_runs_summary.json')
+	sum_results = summarize_results(result_dict, sum_output='wlasl_runs_summary.json')
 	# utils.print_dict(sum_results)
  
 	# test_runs()
