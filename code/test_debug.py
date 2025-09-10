@@ -453,11 +453,14 @@ if __name__ == "__main__":
 	#  '/home/luke/ExtraStorage/SLR/data/WLASL/splits/asl300.json',
 	#  '/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json')
  
-	refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json',
-							'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_ref.json',
-       				'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_overlapping.json')
-	refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json',
-							'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_ref.json',
-       				'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_overlapping.json')
+	# refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json',
+	# 						'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_ref.json',
+  #      				'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_overlapping.json')
+	# refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json',
+	# 						'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_ref.json',
+  #      				'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_overlapping.json')
 
-	merge_seen_ex()
+	# merge_seen_ex()
+	from test import extract_exp_number
+	n = extract_exp_number("runs/asl100/MViT_V2_S_exp002/best_val-top-k.json")
+	print(n)
