@@ -14,7 +14,8 @@ from pathlib import Path
 import re  
 import json
 import test
-
+from collections import Counter, defaultdict
+from typing import Optional
 
 def plot_simulated_training(x_range, f):
 	x = x_range
@@ -288,11 +289,6 @@ def reformat_results(runs_dict):
 				for p in res_fs:
 					test.parse_run_info_to_json(p) #type: ignore 
 
-
-
-
-
-
 def ask_nicely(message, requirment, error):
 	passed=False
 	ans = 'none'
@@ -306,12 +302,10 @@ def ask_nicely(message, requirment, error):
 
 
 def get_gloss_stats(instances):
-	train_stats = {'examples': 0, 'seen_signers': {}}
-	val_stats, test_stats = train_stats, train_stats
 	stats_managers = {
-		"train": train_stats,
-		"val": val_stats,
-		"test": test_stats
+				"train": {'examples': 0, 'seen_signers': {}},
+				"val": {'examples': 0, 'seen_signers': {}},
+				"test": {'examples': 0, 'seen_signers': {}}
 	}
 	for inst in instances:
 		sid = inst['signer_id']
@@ -336,40 +330,105 @@ def get_stats(split_path, output):
 		json.dump(stats, f, indent=2)
 	return stats
 
-def refine_stats(stat_path, output):
+def merge_seen(current, incoming):
+	return dict(Counter(current) + Counter(incoming))
+ 
+def refine_stats(stat_path,
+								 output_refined:Optional[str|Path] = None,
+								 output_overlapping:Optional[str|Path] = None):
+	#we want to know:
+	#- the number of examples in each split
+	#- the number of different signers in each split
+	#- the average number of examples per class, per split
+	#- the average number of signers per class, per split
+	#bonus
+	#for each class, check if there are overlap between signers in classes
 	with open(stat_path, 'r') as f:
 		stats = json.load(f)
-	train_stats = {'accum_num_ex': 0, 'accum_diff_signers': 0}
-	val_stats, test_stats = train_stats, train_stats
-	stats_manager = {
-		'train': train_stats,
-		'val': val_stats,
-		'test': test_stats
-	}
 	num_classes = len(stats)
-	for g in stats.keys():
-		for split in ['train', 'val', 'test']:
-			stats_manager[split]['accum_num_ex'] += stats[g][split]['examples']
-			stats_manager[split]['accum_diff_signers'] += len(stats[g][split]['seen_signers'])
-	 
-	final = {
-		'mean_num_ex': {
-			'train': round(stats_manager['train']['accum_num_ex'] / num_classes, 2),
-			'val': round(stats_manager['val']['accum_num_ex'] / num_classes, 2),
-			'test': round(stats_manager['test']['accum_num_ex'] / num_classes, 2)
-		},
-		'mean_num_signers': {
-			'train': round(stats_manager['train']['accum_diff_signers'] / num_classes, 2),
-			'val': round(stats_manager['val']['accum_diff_signers'] / num_classes, 2),
-			'test': round(stats_manager['test']['accum_diff_signers'] / num_classes, 2)
+	refined = {}
+	splits = ['train', 'val', 'test']
+	
+	for split in splits:
+		num_ex = 0
+		signers_count = 0	
+		seen_signers = {}
+		for gloss in stats.keys():
+			info = stats[gloss][split]
+			num_ex += info['examples']
+			signers_count += len(info['seen_signers']) #for the average we need to recount
+			seen_signers = merge_seen(seen_signers, info['seen_signers'])
+			 
+		refined[split] = {
+			'num_ex': num_ex,
+			'num_s': len(seen_signers),
+			'mean_ex': round(num_ex / num_classes, 2),
+			'mean_s': round(signers_count / num_classes, 2)
 		}
-	}
-	with open(output, 'w') as f:
-		json.dump(final, f, indent=2)
-	return final
+	
+	overlapping = {}
+	#bonus
+	for gloss in stats.keys():
+		test_signers = list(stats[gloss]['test']['seen_signers'].keys()) # + \
+    							# list(stats[gloss]['val']['seen_signers'].keys())
+		train_signers = list(stats[gloss]['train']['seen_signers'].keys())
+		overlapping[gloss] =  any(ts in train_signers for ts in test_signers)
+	
+	if output_refined:
+		with open(output_refined, 'w') as f:
+			json.dump(refined, f, indent=2)
+	if output_overlapping:
+		with open(output_overlapping, 'w') as f:
+			json.dump(overlapping, f, indent=2)
  
-
-
+	return refined, overlapping
+ 
+ 
+def merge_seen_ex():
+	d1 = {
+				"118": 1,
+				"90": 1,
+				"110": 1,
+				"113": 1,
+				"109": 2,
+				"121": 2,
+				"49": 6,
+				"18": 16,
+				"31": 1,
+				"36": 1,
+				"59": 1,
+				"12": 1,
+				"14": 3,
+				"11": 1,
+				"5": 2
+			}
+	
+	
+	d2 = {
+				"115": 2,
+				"94": 2,
+				"121": 1,
+				"113": 1,
+				"109": 3,
+				"5": 6,
+				"65": 1,
+				"36": 1,
+				"44": 1,
+				"12": 2,
+				"52": 1,
+				"6": 1,
+				"21": 1,
+				"20": 3,
+				"14": 3,
+				"2": 1,
+				"11": 2,
+				"10": 3
+			}
+	
+	d3 = merge_seen(d1, d2)
+	d4 = {}
+	print_dict(merge_seen(d3, d4))
+	 
 if __name__ == "__main__":
 	# test_early_stopping(mode='min')
 	# test_wait_for_run_completion()
@@ -386,10 +445,19 @@ if __name__ == "__main__":
 	# messages = ['enter split: ', 'split not found']
 	# requirements = [lambda x: x in ['asl100', 'asl300']]
 	# ask_nicely(messages, requirements, 'error')
+ 
+	# get_stats(
+	#  '/home/luke/ExtraStorage/SLR/data/WLASL/splits/asl100.json',
+	#  '/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json')
 	# get_stats(
 	#  '/home/luke/ExtraStorage/SLR/data/WLASL/splits/asl300.json',
 	#  '/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json')
+ 
 	refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json',
-              '/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_ref.json')
+							'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_ref.json',
+       				'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_overlapping.json')
 	refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json',
-              '/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_ref.json')
+							'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_ref.json',
+       				'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_overlapping.json')
+
+	merge_seen_ex()
