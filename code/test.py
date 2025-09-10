@@ -150,6 +150,28 @@ def summarize_results(runs_dict:Optional[dict]=None,
 	
 	return runs_dict
 
+def extract_exp_number(path):
+		match = re.search(r'_exp(\d+)/', path)
+		return match.group(1) if match else None
+
+def gen_run_dict(summary_path,take='best_test', out=None):
+	#takes the runs summary and converts it to the runs_done format
+	with open(summary_path, 'r') as f:
+		results = json.load(f)
+	best_done = {}
+	for split in results.keys():
+		best_done[split] = {}
+		for arch in results[split].keys():
+			p = results[split][arch][take]
+			exp = extract_exp_number(p)
+			best_done[split][arch] = [exp]
+	
+	if out:
+		with open(out, 'w') as f:
+			json.dump(best_done, f, indent=2)
+	
+	return best_done
+
 
 def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json',
 										 runs_path:str|Path='runs',
@@ -832,10 +854,10 @@ if __name__ == '__main__':
 	# with open('wlasl_runs_done.json', 'r') as f:
 	# 	runs_dict = json.load(f)
 	
-	result_dict, _ = test_all(runs_dict, test_last=True, top_k=True, plot=True,
-													 test_val=True, res_output='wlasl_results.json', skip_done=False)
+	# result_dict, _ = test_all(runs_dict, test_last=True, top_k=True, plot=True,
+													#  test_val=True, res_output='wlasl_results.json', skip_done=False)
 	# utils.print_dict(result_dict)
-	sum_results = summarize_results(result_dict, sum_output='wlasl_runs_summary.json')
+	# sum_results = summarize_results(result_dict, sum_output='wlasl_runs_summary.json')
 	# utils.print_dict(sum_results)
  
 	# test_runs()
@@ -852,3 +874,10 @@ if __name__ == '__main__':
 	# 	sum_output='wlasl_runs_flipped_summary.json'
 	#  )
 	# utils.print_dict(sum_results)
+
+
+	best_done = gen_run_dict('wlasl_runs_summary.json', out='wlasl_runs_best.json')
+	
+	result_dict, _ = test_all(best_done, test_last=True, top_k=True, plot=True,
+													 test_val=False, res_output='wlasl_results_flipped.json',
+              						skip_done=False, flip=True)
