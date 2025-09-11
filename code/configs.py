@@ -156,7 +156,8 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
 	parser.add_argument('-p', '--project', type=str, default=default_project, help='wandb project name')
 	parser.add_argument('-sp', '--split',type=str, help='The class split (e.g. asl100)', required=True)
-	parser.add_argument('-ed', '--enum_dir', action='store_true', help='set enumerate directories to on (for output)')
+	parser.add_argument('-ee', '--enum_exp', action='store_true', help='enumerate the experiment dir num (for output)')
+	parser.add_argument('-ec', '--enum_chck', action='store_true', help='enumerate the checkpoint dir num (for output)')
 	#TODO: maybe add tags for wandb as parameters
 	parser.add_argument('-t', '--tags', nargs='+', type=str,help='Additional wandb tags')
 
@@ -187,11 +188,11 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	args.labels = f'./preprocessed/labels/{args.split}'
 	output = f'runs/{args.split}/{args.model}_exp{exp_no}'
 	
-	if not args.recover and args.enum_dir: #fresh run
+	if not args.recover and args.enum_exp: #fresh run
 		output = enum_dir(output, make)  	
  
 	save_path = f'{output}/checkpoints'
-	if not args.recover and args.enum_dir:
+	if not args.recover and args.enum_chck:
 		args.save_path = enum_dir(save_path, make) 
 	else:
 		args.save_path = save_path

@@ -396,13 +396,14 @@ def test_all(runs_dict:dict,
 				cleanup_memory()
 				
 				config_path = configfiles / f'{split}/{arch}_{exp_no}.ini'
-				output = runs / f'{split}/{arch}_exp{exp_no}'
-		
-				if skip_done and is_done(output):
+				exp_dir = runs / f'{split}/{arch}_exp{exp_no}'
+				output = exp_dir / 'results'
+    
+				if skip_done and is_done(exp_dir):
 					continue
 					
 		
-				save_path = output / 'checkpoints'
+				save_path = exp_dir / 'checkpoints'
 				arg_dict = {
 					'architecture' : arch,
 					'exp_no': exp_no,
@@ -514,7 +515,7 @@ def test_all(runs_dict:dict,
 						test_res = test_top_k(
 							model=model,
 							test_loader=test_loader,
-							save_path=output / check_path.name.replace('.pth', '_test-top-k.json'),
+							save_path=output / fname,
 			 				flip=flip
 						)
 						experiment = {

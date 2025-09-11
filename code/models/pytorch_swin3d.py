@@ -64,7 +64,7 @@ class Swin3DSmall_basic(nn.Module):
     self.num_classes = num_classes
     self.drop_p=drop_p
     
-    swin3db = swin3d_b(weights=Swin3D_B_Weights.KINETICS400_IMAGENET22K_V1)
+    swin3db = swin3d_b(weights=Swin3D_B_Weights.KINETICS400_V1)
     
     self.backbone = nn.ModuleList([
       swin3db.patch_embed,
