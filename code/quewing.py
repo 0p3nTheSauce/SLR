@@ -401,8 +401,8 @@ def create_run(verbose:bool=True) -> None:
 		if verbose:
 			print(f"Run info saved to {RUNS_PATH}")
 		# Start training
-		os.makedirs(output, exist_ok=True)
-		os.makedirs(save_path, exist_ok=True)
+		# os.makedirs(output, exist_ok=True)
+		# os.makedirs(save_path, exist_ok=True)
 	else:
 		if verbose:
 			print("Training cancelled by user.")
