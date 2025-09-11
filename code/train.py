@@ -130,6 +130,9 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 		v2.Lambda(lambda x: x.permute(1,0,2,3)) 
 	])
 	
+	#should actually dirst resize before cropping
+	
+ 
 	train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
 																 v2.RandomHorizontalFlip(),
 																 final_transform])

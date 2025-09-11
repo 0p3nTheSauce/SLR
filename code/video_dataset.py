@@ -6,7 +6,36 @@ import torch
 #local imports
 from utils import load_rgb_frames_from_video, crop_frames
 from video_transforms import get_base, get_swap_ct,  correct_num_frames
-import torchvision.transforms as ts
+import torchvision.transforms.v2 as transforms_v2
+
+import numpy as np
+
+def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
+  """
+  Resize frame so person bounding box diagonal equals target_diagonal
+  
+  Args:
+      frame: input video frame
+      bbox: (x1, y1, x2, y2) of person bounding box
+      target_diagonal: desired diagonal size in pixels
+  """
+  x1, y1, x2, y2 = bbox
+  
+  orig_width = x2 - x1
+  orig_height = y2 - y1
+
+  curr_diag = np.sqrt(orig_width**2 + orig_height**2)
+  
+  scale_factor = target_diag / curr_diag
+  
+  #resize the tensor 
+  new_width = int(frames.shape[2] * scale_factor)
+  new_height = int(frames.shape[3] * scale_factor)
+  
+  transform = transforms_v2.Resize((new_height, new_width))
+  
+  return transform(frames)
+  
 
 ############################ Dataset Classes ############################
 
@@ -48,6 +77,13 @@ class VideoDataset(Dataset):
   def __getitem__(self, idx):
     item = self.data[idx]
     frames = self.__manual_load__(item)
+    
+    #in the WLASL paper, they first resize the frames so that 
+    #the person bounding box diagnol length is 256 pixels
+    #a^2 + b^2 = c^2
+    #a^2 + b^2 = 256^2
+    
+    
     if self.transforms is not None:
       frames = self.transforms(frames)
       
@@ -63,78 +99,7 @@ class VideoDataset(Dataset):
     return len(self.data)
     
   
-# class ContrastiveVideoDataset(VideoDataset):
-#   def __init__(self, *args, augmentation, **kwargs):
-#     # Remove transform from kwargs to prevent parent from using it
-#     super().__init__(*args, **kwargs)
-#     #Assume that self.transform will be the base_norm_fin, ie the standard
-#     #But transform should atleast have base_transform, otherwise shape issues when 
-#     # loading
-#     #By extension, augmementation must have at least base_tansform
-#     #But may just be that (augmentation through lack of normalisation)
-#     self.augmentation = augmentation
 
-#   def __getitem__(self, idx):
-#     item = self.data[idx]
-#     frames, _ = self.__manual_load__(item)  # Get raw frames, ignore label
-    
-#     # Apply two different augmentations
-#     view1 = self.transforms(frames) if self.transforms else frames
-#     view2 = self.augmentation(frames) if self.augmentation else frames
-#     #leaving like this for now, but likely to cause errors if same base_transform is not used
-    
-    
-#     return (view1, view2)
-
-# class SemiContrastiveVideoDataset(VideoDataset):
-#   def __init__(self, *args, augmentation, **kwargs):
-#     # Remove transform from kwargs to prevent parent from using it
-#     super().__init__(*args, **kwargs)
-#     #Assume that self.transform will be the base_norm_fin, ie the standard
-#     #But transform should atleast have base_transform, otherwise shape issues when 
-#     # loading
-#     #By extension, augmementation must have at least base_tansform
-#     #But may just be that (augmentation through lack of normalisation)
-#     self.augmentation = augmentation
-
-#   def __getitem__(self, idx):
-#     item = self.data[idx]
-#     frames, label = self.__manual_load__(item)  # Get raw frames, ignore label
-    
-#     # Apply two different augmentations
-#     view1 = self.transforms(frames) if self.transforms else frames
-#     view2 = self.augmentation(frames) if self.augmentation else frames
-#     #leaving like this for now, but likely to cause errors if same base_transform is not used
-    
-    
-#     return ((view1, view2), label)
-
-def contrastive_collate_fn(batch):
-  """Custom collate function for contrastive learning dataset"""
-  view1_list = []
-  view2_list = []
-  
-  for view1, view2 in batch:
-    # Ensure tensors are detached and on CPU for collation
-    if hasattr(view1, 'detach'):
-      view1 = view1.detach().cpu()
-    if hasattr(view2, 'detach'):
-      view2 = view2.detach().cpu()
-        
-    view1_list.append(view1)
-    view2_list.append(view2)
-  
-  try:
-    # Stack the views
-    view1_batch = torch.stack(view1_list)
-    view2_batch = torch.stack(view2_list)
-  except RuntimeError as e:
-    print(f"Error stacking tensors: {e}")
-    print(f"View1 shapes: {[v.shape for v in view1_list[:3]]}")  # Print first 3 shapes
-    print(f"View2 shapes: {[v.shape for v in view2_list[:3]]}")
-    raise
-  
-  return view1_batch, view2_batch
 
 if __name__ == "__main__":
 
