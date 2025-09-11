@@ -41,7 +41,7 @@ def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
 
 class VideoDataset(Dataset):
   def __init__(self, root, instances_path, classes_path,
-               crop=False, num_frames=64, transforms=None, include_meta=False):
+               crop=False, num_frames=64, transforms=None, include_meta=False, resize=True):
     '''root is the path to the root directory where the video files are located.'''
     if os.path.exists(root) is False:
       raise FileNotFoundError(f"Root directory {root} does not exist.")
@@ -49,6 +49,7 @@ class VideoDataset(Dataset):
       self.root = root
     self.transforms = transforms
     self.crop = crop
+    self.resize = resize
     self.num_frames = num_frames
     self.include_meta = include_meta
     with open(instances_path, 'r') as f:
@@ -80,8 +81,8 @@ class VideoDataset(Dataset):
     
     #in the WLASL paper, they first resize the frames so that 
     #the person bounding box diagnol length is 256 pixels
-    #a^2 + b^2 = c^2
-    #a^2 + b^2 = 256^2
+    if self.resize:
+      frames = resize_by_diag(frames, item['bbox'], 256)
     
     
     if self.transforms is not None:
