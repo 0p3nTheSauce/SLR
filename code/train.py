@@ -82,7 +82,7 @@ def setup_data(mean, std, config):
 	return dataloaders, num_classes
 	
 
-def get_model(model_idx, num_classes, drop_p:Optional[float]=None):
+def get_model(model_idx:int, num_classes:int, drop_p:Optional[float]=None):
 	model_constructors = {
 				0: MViTv1B_basic,
 				1: MViTv2S_basic,
@@ -107,7 +107,7 @@ def get_model(model_idx, num_classes, drop_p:Optional[float]=None):
 	if model_idx not in model_constructors:
 		raise ValueError(f"Unknown model_idx: {model_idx}")
 	if drop_p is not None:
-		model = model_constructors[model_idx](num_classes, drop_p)
+		model = model_constructors[model_idx](num_classes=num_classes, drop_p=drop_p)
 	else:
 		model = model_constructors[model_idx](num_classes)
 	print(f"Successfully using model {model_names[model_idx]}")
@@ -163,34 +163,14 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 	dataloaders = {'train': dataloader, 'val': val_dataloader}
 	
 	#model, metrics, optimizer, schedular, loss
-	#TODO: put this in a seperate function
-	if model_info['idx'] == 0:
-		model = MViTv1B_basic(num_classes, config.model_params['drop_p'])
-		print(f'Successfully using model MViTv2S_basic')
-	elif model_info['idx'] == 1:
-		model = MViTv2S_basic(num_classes, config.model_params['drop_p'])
-		print(f'Successfully using model MViTv2S_basic')
-	elif model_info['idx'] == 2:
-		model = Swin3DBig_basic(num_classes, config.model_params['drop_p'])
-		print(f'Successfully using model Swin3DBig_basic')
-	elif model_info['idx'] == 3:
-		model = Swin3DSmall_basic(num_classes, config.model_params['drop_p'])
-		print(f'Successfully using model Swin3DSmall_basic')
-	elif model_info['idx'] == 4:
-		model = Swin3DTiny_basic(num_classes, config.model_params['drop_p'])
-		print(f'Successfully using model Swin3DTiny_basic')
-	elif model_info['idx'] == 5:
-		model = Resnet2_plus1D_18_basic(num_classes, config.model_params['drop_p']) # no drop_p in this model
-		print(f'Successfully using model Resnet2_plus1D_18_basic')
-	elif model_info['idx'] == 6:
-		model = Resnet3D_18_basic(num_classes, config.model_params['drop_p'])  # no drop_p in this model
-		print(f'Successfully using model Resnet3D_18_basic')
-	elif model_info['idx'] == 7:
-		model = S3D_basic(num_classes, config.model_params['drop_p'])
-		print(f'Successfully using model S3D_basic')
-	else:
-		raise ValueError(f'something went wrong when trying to load: {model_info} \n\
-			probably need to add an if statement to train.py')
+
+	try:
+		drop_p = config.model_params['drop_p']
+	except Exception as e:
+		drop_p = None
+ 
+	model = get_model(model_info['idx'], num_classes, drop_p)
+	
 	
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	model.to(device)
