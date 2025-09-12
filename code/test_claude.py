@@ -371,9 +371,15 @@ def run_visualizations(filepath: str = 'results.json',formatter=None):
 if __name__ == "__main__":
     # Assuming you have saved your JSON data to 'results.json'
     # df, results = run_visualizations('results.json')
-    with open('wlasl_100_stats_ref.json', 'r') as f:
-        asl100 = json.load(f)
-    with open('wlasl_300_stats_ref.json', 'r') as f:
-        asl300 = json.load(f)
-    table = compare_splits_latex_table(asl100, asl300)
-    print(table)
+    # with open('wlasl_100_stats_ref.json', 'r') as f:
+    #     asl100 = json.load(f)
+    # with open('wlasl_300_stats_ref.json', 'r') as f:
+    #     asl300 = json.load(f)
+    # table = compare_splits_latex_table(asl100, asl300)
+    # print(table)
+    
+    with open('wlasl_flipped_summary.json', 'r') as f:
+        res = json.load(f)
+    print(generate_latex_table(res, 'asl100', metric_type='avg', caption='Flipped results', label='wlasl_results_flipped'))
+    print()
+    print(generate_latex_table(res, 'asl300', metric_type='avg', caption='Flipped results', label='wlasl_results_flipped'))

@@ -482,7 +482,7 @@ def clear_runs(runs_path, verbose=True, past_only=False, future_only=False):
 
 def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=None) -> None:
 	'''Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
-		Default behavior moves all the old runs, otherwise moves multiple 
+		Default behavior is to ask, otherwise moves multiple 
 		runs from the end specified by the num_from_end.
 	 
 			Args:
@@ -865,7 +865,7 @@ def main():
 	parser.add_argument('-cn', '--clear_new', action='store_true', help='clear the new runs only')
 	parser.add_argument('-ct', '--clear_temp', action='store_true', help='clear the temp file')	
 	parser.add_argument('-rr', '--remove_run', nargs='?',type=str, const='ask_me', default=None, help='remove a run from to_run. Optionally include the idx, otherwise with prompt for it')
-	parser.add_argument('-ro', '--return_old', nargs='?', const='ask', default=None , help='Default behavior moves all the old runs, otherwise moves multiple \
+	parser.add_argument('-ro', '--return_old', nargs='?', const='ask', default=None , help='Default is to ask, otherwise moves multiple \
 																																												runs from the end, the number of old runs specified by optional int')
 	parser.add_argument('-lc', '--list_configs', action='store_true', help='list the config files used in runs file')
 	parser.add_argument('-sc', '--shuffle_configs', action='store_true', help='rearrange configs in to_run')
