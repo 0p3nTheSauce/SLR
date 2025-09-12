@@ -1,8 +1,7 @@
 {
   "asl100": {
     "MViT_V1_B": {
-      "checkpoint": "checkpoint_108",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.5846666666666667,
           "top5": 0.8691666666666665,
@@ -16,8 +15,7 @@
       }
     },
     "MViT_V2_S": {
-      "checkpoint": "checkpoint_200",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.6096666666666666,
           "top5": 0.8591666666666665,
@@ -31,8 +29,7 @@
       }
     },
     "Swin3D_B": {
-      "checkpoint": "best",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.6398333333333334,
           "top5": 0.8554999999999999,
@@ -46,8 +43,7 @@
       }
     },
     "Swin3D_S": {
-      "checkpoint": "best",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.5998333333333333,
           "top5": 0.8525,
@@ -61,8 +57,7 @@
       }
     },
     "Swin3D_T": {
-      "checkpoint": "best",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.4761666666666667,
           "top5": 0.7396666666666667,
@@ -76,8 +71,7 @@
       }
     },
     "Resnet2D_1D_18": {
-      "checkpoint": "checkpoint_175",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.44349999999999995,
           "top5": 0.7163333333333334,
@@ -91,8 +85,7 @@
       }
     },
     "Resnet3D_18": {
-      "checkpoint": "checkpoint_117",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.5096666666666666,
           "top5": 0.7383333333333334,
@@ -106,8 +99,7 @@
       }
     },
     "S3D": {
-      "checkpoint": "checkpoint_067",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.30216666666666664,
           "top5": 0.5591666666666666,
@@ -123,8 +115,7 @@
   },
   "asl300": {
     "MViT_V1_B": {
-      "checkpoint": "checkpoint_065",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.5404444444444444,
           "top5": 0.7890555555555555,
@@ -138,8 +129,7 @@
       }
     },
     "MViT_V2_S": {
-      "checkpoint": "checkpoint_112",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.5597777777777778,
           "top5": 0.8187777777777777,
@@ -153,8 +143,7 @@
       }
     },
     "Swin3D_B": {
-      "checkpoint": "checkpoint_025",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.41783333333333333,
           "top5": 0.7229444444444444,
@@ -168,8 +157,7 @@
       }
     },
     "Swin3D_S": {
-      "checkpoint": "checkpoint_037",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.4609444444444443,
           "top5": 0.7693333333333334,
@@ -183,8 +171,7 @@
       }
     },
     "Swin3D_T": {
-      "checkpoint": "checkpoint_037",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.3577222222222222,
           "top5": 0.650611111111111,
@@ -198,8 +185,7 @@
       }
     },
     "Resnet2D_1D_18": {
-      "checkpoint": "checkpoint_174",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.3177222222222222,
           "top5": 0.6243333333333333,
@@ -213,8 +199,7 @@
       }
     },
     "Resnet3D_18": {
-      "checkpoint": "checkpoint_152",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.3798888888888889,
           "top5": 0.6271111111111111,
@@ -228,8 +213,7 @@
       }
     },
     "S3D": {
-      "checkpoint": "checkpoint_069",
-      "test set": {
+      "best_test": {
         "top_k_average_per_class_acc": {
           "top1": 0.23205555555555554,
           "top5": 0.4596111111111111,
