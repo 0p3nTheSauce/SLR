@@ -26,7 +26,9 @@ from typing import Optional
 
 ENTITY= 'ljgoodall2001-rhodes-university'
 # PROJECT = 'WLASL - SLR'
-PROJECT = 'asl300'
+PROJECT = 'WLASL-100'
+PROJECT_BASE = 'WLASL'
+
 
 def set_seed(seed=42):
 	torch.manual_seed(seed)
