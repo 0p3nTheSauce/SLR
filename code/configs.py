@@ -9,6 +9,17 @@ import wandb
 from stopping import EarlyStopper
 from pathlib import Path
 
+
+
+#TODO: make configs the sole source of these constants
+
+
+
+ENTITY= 'ljgoodall2001-rhodes-university'
+# PROJECT = 'WLASL - SLR'
+PROJECT = 'WLASL-100'
+PROJECT_BASE = 'WLASL'
+
 def load_config(arg_dict, verbose=False):
 	"""Load config from flat file and merge with command line args"""
 	conf_path = Path(arg_dict['config_path'])
@@ -146,7 +157,7 @@ def print_config(config_dict):
 			print(f"    {key:<{max_key_len}} : {value}")
 		print()
 
-def take_args(splits_available, models_available, make=False, default_project='WLASL-SLR'):
+def take_args(splits_available, models_available, make=False):
 	parser = argparse.ArgumentParser(description='Train a model')
  
 	#admin
@@ -154,7 +165,7 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
 	parser.add_argument('-ri', '--run_id', type=str, default=None, help=f'The run id to use (especially when also usign recover)')
 	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
-	parser.add_argument('-p', '--project', type=str, default=default_project, help='wandb project name')
+	parser.add_argument('-p', '--project', type=str, default=None, help='wandb project name')
 	parser.add_argument('-sp', '--split',type=str, help='The class split (e.g. asl100)', required=True)
 	parser.add_argument('-ee', '--enum_exp', action='store_true', help='enumerate the experiment dir num (for output)')
 	parser.add_argument('-ec', '--enum_chck', action='store_true', help='enumerate the checkpoint dir num (for output)')
@@ -182,15 +193,20 @@ def take_args(splits_available, models_available, make=False, default_project='W
 	
 	exp_no = str(int(args.exp_no)).zfill(3)
 	
+	if args.project is None:
+		args.project = f'{PROJECT_BASE}-{args.split[3:]}'
+ 
 	# args.model = model
 	args.exp_no = exp_no
 	args.root = '../data/WLASL/WLASL2000'
 	args.labels = f'./preprocessed/labels/{args.split}'
 	output = f'runs/{args.split}/{args.model}_exp{exp_no}'
 	
+	#recovering
 	if not args.recover and args.enum_exp: #fresh run
 		output = enum_dir(output, make)  	
- 
+
+	#saving
 	save_path = f'{output}/checkpoints'
 	if not args.recover and args.enum_chck:
 		args.save_path = enum_dir(save_path, make) 
@@ -219,7 +235,9 @@ def take_args(splits_available, models_available, make=False, default_project='W
 		tags.append('Recovered')
 	if args.tags is not None:
 		tags.extend(args.tags)
- 
+
+
+
 	return clean_dict, tags, output, save_path, args.project
 
 
