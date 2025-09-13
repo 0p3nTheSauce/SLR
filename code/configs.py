@@ -214,8 +214,9 @@ def take_args(splits_available, models_available, make=False, default_project='W
 		args.split,
 		args.model,
 		f"exp-{exp_no}",
-		'using resize by diag' #no feature just added
 	]
+	if args.recover:
+		tags.append('Recovered')
 	if args.tags is not None:
 		tags.extend(args.tags)
  
