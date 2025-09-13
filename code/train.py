@@ -400,8 +400,7 @@ def main():
 	available_splits = info['splits']
 	model_info = info['models']
 	
-	arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys(),
-																												 default_project=PROJECT)
+	arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys())
 	
 	config = load_config(arg_dict, verbose=True)
 	
