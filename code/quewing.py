@@ -6,7 +6,7 @@ import json
 import argparse
 import wandb
 import time
-
+import utils
 from pathlib import Path
 
 from typing import Union, Optional, Any
@@ -67,8 +67,9 @@ def get_run_id(run_name, entity, project):
 	else:
 		return ids[0]
 		
-def handle_already_running(entity, project, check_interval=300,
-													 verbose=False, max_retries=5, run_id=None):
+def handle_already_running(entity:str, project:str, check_interval:int=300,
+													 verbose:bool=False, max_retries:int=5, 
+													run_id:Optional[str]=None):
 	'''make sure the program does not start training when there is already a run going. Checks last available run
 		unless id is specified. Takes a few seconds to update api, so if in between runs either use id, or force
 		to sleep for a bit to give time to check runs
@@ -535,7 +536,7 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
 				continue
 		
 		all_runs['to_run'] = to_move + curr_to_run
-   
+	 
 		print_v(f'No runs moved', verbose and not to_move)
 	
 	else:
@@ -568,8 +569,33 @@ def shuffle_configs(runs_path:Path|str, verbose:bool=False) -> None:
 			admin = run['config']['admin']
 			print(f"{admin['config_path']} : {i}")
 	
-	idx = int(input("select index: "))
-	newpos = int(input("select  new position: "))
+	def requirement(x:str)->bool:
+		return ( x.isdigit() and 0 <= int(x) < len(curr_to_run) ) or x == 'q'
+		
+	idx_or_q = utils.ask_nicely(
+		"select index to move (or q to quit): ",
+		requirement,
+		"Invalid input, please enter a valid index or 'q' to quit."
+	)
+	
+	if idx_or_q == 'q':
+		print_v("No runs moved", verbose)
+		return
+	else:
+		idx = int(idx_or_q)
+
+	newpos_or_q = utils.ask_nicely(
+		"select new position (or q to quit): ",
+		requirement,
+		"Invalid input, please enter a valid index or 'q' to quit."
+	)
+ 
+	if newpos_or_q == 'q':
+		print_v("No runs moved", verbose)
+		return
+	else:
+		newpos = int(newpos_or_q)
+ 
 	srun = curr_to_run.pop(idx)
 	if not srun:
 		print(f"Invalid idx for list of configs len: {len(curr_to_run)}")
@@ -645,8 +671,9 @@ def return_from_temp(runs_path:str, temp_path:str, verbose:bool=True)->None:
 
 def start(mode : str, sesh_name : str, script_path : str, 
 					verbose : bool = False, proceed_onFF:bool = False,
-		 			project:Optional[str]=None) \
+		 			project:Optional[str]=None, run_id:Optional[str]=None) \
 			 -> subprocess.CompletedProcess[bytes]:
+      #TODO: this function could be cleaner
 	'''Starts a quefeather worker or daemon subprocess 
  
 		Args:
@@ -674,6 +701,8 @@ def start(mode : str, sesh_name : str, script_path : str,
 		feather_cmd += ' -poff'
 	if project:
 		feather_cmd += f' -dp {project}'
+	if run_id:
+		feather_cmd += f' -ri {run_id}'
 
 	feather_cmd += f' {mode}'
  
@@ -765,7 +794,8 @@ def check_tmux_session(sesh_name: str,dWndw_name: str, wWndw_name: str):
 		results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
 	return results
 
-def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False, project:Optional[str]=None) \
+def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False,
+					 project:Optional[str]=None, run_id:Optional[str]=None) \
 	-> None:
 	'''Function for the queue daemon process. The function works in a fetch execute repeat
 	cycle. The function reads runs from the queRuns.json file, then writes them to the
@@ -784,7 +814,8 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False, proj
 	advice = handle_already_running(ENTITY, project,
 																 check_interval = RETRY_WAIT_TIME,
 																 verbose=verbose,
-																 max_retries=max_retries)
+																 max_retries=max_retries,
+																 run_id=run_id)
 	proceed = advice or proceed_onFF	
  
 	while proceed:
@@ -872,6 +903,7 @@ def main():
 	#process & misc parameters
 	parser.add_argument('-d', '--daemon', action='store_true', help='start the quewing daemon')
 	parser.add_argument('-dp', '--daemon_project', type=str, help=f'Overide the default project: {PROJECT}')
+	parser.add_argument('-ri', '--run_id', type=str, help='specify a run id to monitor', default=None)
 	parser.add_argument('-poff', '--proceed_onFF', action='store_true', help='proceed on first fail')
 	#TODO: could combine sperate_mode and title flags into one arg
 	parser.add_argument('-sm', '--separate_mode', type=str, help='Send a seperator to the "mode" process')

@@ -18,7 +18,9 @@ from typing import Callable
 
 ############### Input ##################
 
-def ask_nicely(message: str, requirment: Callable[[str], bool], error: str) -> str:
+def ask_nicely(message: str,
+               requirment: Callable[[str], bool],
+               error: str) -> str:
 	passed=False
 	ans = 'none'
 	while not passed:
@@ -197,11 +199,14 @@ def cv_display_or_save(frames,output=None):
 
   ###############   PLOT Based       #################
 
-def visualise_frames(frames,num, size=(5,5), adapt=False):
+def visualise_frames(frames,num, size=(5,5), adapt=False, output=None):
   # permute and convert to numpy 
   '''Args:
     frames : torch.Tensor (T, C, H, W)
     num : int, to be visualised'''
+  if output:
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
   if adapt:
     #256 ~ 5
     factor = 5 / 256
@@ -215,11 +220,13 @@ def visualise_frames(frames,num, size=(5,5), adapt=False):
     step = 1
   else:
     step = num_frames // num
-  for frame in frames[::step]:
+  for i, frame in enumerate(frames[::step]):
     np_frame = frame.permute(1,2,0).cpu().numpy()
     plt.figure(figsize=size)
     plt.imshow(np_frame)
     plt.axis('off')
+    if output:
+      plt.savefig(output / f'frame{i}.png')
     plt.show()
   
 
@@ -524,11 +531,6 @@ def main():
   parser.add_argument('-re', '--remove_empty', action='store_true', help='Remove empty directories')
   parser.add_argument('-rf', '--remove_files', nargs='+', type=str, help='Remove files with provided suffixes (e.g. .png .txt) ' )
   args = parser.parse_args()
-  print(args.dont_ask)
-  print(args.remove_empty)
-  print(args.remove_files)
-  
-  
   
   clean_runs(path='runs',
              ask=not args.dont_ask,

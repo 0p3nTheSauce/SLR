@@ -114,11 +114,13 @@ def main():
   parser.add_argument('-v', '--verbose', action='store_true', help='Turn on verbose output')
   parser.add_argument('-poff', '--proceed_onFF', action='store_true', help='proceed on first fail')
   parser.add_argument('-dp', '--daemon_project', type=str, help='overide default project')
+  parser.add_argument('-ri', '--run_id', type=str, help='specify a run id to monitor', default=None)
   args = parser.parse_args()
-    
+  
+  
 
   if args.mode == 'daemon':
-    daemon(args.verbose, proceed_onFF=args.proceed_onFF, project=args.daemon_project)
+    daemon(args.verbose, proceed_onFF=args.proceed_onFF, project=args.daemon_project, run_id=args.run_id)
   elif args.mode == 'worker':
     run_train(args.verbose)
   elif args.mode == 'separator':
