@@ -64,8 +64,6 @@ class VideoDataset(Dataset):
     if os.path.exists(video_path) is False:
       raise FileNotFoundError(f"Video file {video_path} does not exist.")
     
-    
-    
     frames = load_rgb_frames_from_video(video_path=video_path, start=item['frame_start'],
                                         end=item['frame_end'])
     sampled_frames = correct_num_frames(frames, self.num_frames) 

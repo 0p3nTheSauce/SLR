@@ -428,6 +428,20 @@ def merge_seen_ex():
 	d3 = merge_seen(d1, d2)
 	d4 = {}
 	print_dict(merge_seen(d3, d4))
+
+def test_use_rudid():
+  from quewing import wait_for_run_completion
+  run_id = input("Enter run ID: ")
+  info = wait_for_run_completion(
+		entity = 'ljgoodall2001-rhodes-university',
+  	project = 'WLASL-100',
+  	check_interval = 5,
+   verbose=True,
+   run_id=run_id,
+   max_retries=5
+	)
+  
+  
 	 
 if __name__ == "__main__":
 	# test_early_stopping(mode='min')
@@ -461,6 +475,8 @@ if __name__ == "__main__":
   #      				'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_overlapping.json')
 
 	# merge_seen_ex()
-	from test import extract_exp_number
-	n = extract_exp_number("runs/asl100/MViT_V2_S_exp002/best_val-top-k.json")
-	print(n)
+	# from test import extract_exp_number
+	# n = extract_exp_number("runs/asl100/MViT_V2_S_exp002/best_val-top-k.json")
+	# print(n)
+ 
+	test_use_rudid()
