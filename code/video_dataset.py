@@ -5,10 +5,10 @@ import torch
 
 #local imports
 from utils import load_rgb_frames_from_video, crop_frames
-from video_transforms import get_base, get_swap_ct,  correct_num_frames
+from video_transforms import correct_num_frames
 import torchvision.transforms.v2 as transforms_v2
-
 import numpy as np
+
 
 def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
   """

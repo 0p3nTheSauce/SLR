@@ -107,7 +107,7 @@ def get_best_chck_info(n_dict):
 			
 def summarize_results_file(runs_dict:Optional[dict]=None,
 													result_path:str|Path='wlasl_results.json',
-             							sum_output:str|Path='wlasl_sum_results_.json'):
+						 							sum_output:str|Path='wlasl_sum_results_.json'):
 
 	if runs_dict is None:
 
@@ -204,8 +204,8 @@ def gen_run_dict(summary_path,take='best_test', out=None):
 
 
 def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json',
-										 runs_path:str|Path='runs',
-					 					output:Optional[str|Path]=None) -> dict:
+										 runs_path:str|Path='runs/',
+					 					output:Optional[str|Path]=None) -> dict[str, dict[str, list[str]]]:
 	with open(imp_path, 'r') as f:
 		imp_info = json.load(f)
 	
@@ -236,20 +236,25 @@ def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json',
  
 	return runs_dict
 
-def test_runs(all:bool=False,
+def create_test_dict(all:bool=False,
 							imp_path:str|Path='wlasl_implemented_info.json',
-							runs_path:str|Path='runs',
-			 				runs_done_path:str|Path='wlasl_runs_done.json'):
+							runs_path:str|Path='runs') -> dict[str, dict[str, list[str]]]:
+	'''Create a dictionary of runs to test.
+	Args:
+		all: if True, test all experiments in runs directory
+		imp_path: path to implemented info json
+		runs_path: path to runs directory
+	Returns:
+		dict: experiments to test dictionary'''
+	
+	runs_done_dict = create_runs_dict(imp_path, runs_path)
 	if all:
-		create_runs_dict(imp_path, runs_path, runs_done_path)
+		return runs_done_dict
 	
 	to_test = {}
  
 	with open(imp_path, 'r') as f:
 		imp_info = json.load(f)
-	
-	with open(runs_done_path, 'r') as f:
-		runs_dict = json.load(f)
  
 	cont = 'y'
 	while cont =='y':
@@ -264,12 +269,12 @@ def test_runs(all:bool=False,
 			arch = ask_nicely(
 				message='Please enter architecture name: ',
 				requirment=lambda x: x in imp_info['models'],
-				error=f'pick one of: {imp_info["models"]}'
+				error=f'pick one of: {imp_info["models"].keys()}'
 			)
 			to_test[split][arch] = []
 			cont3 = cont2
 			while cont3 == 'y':
-				av_exps = list(map(lambda z: int(z), runs_dict[split][arch]))
+				av_exps = list(map(lambda z: int(z), runs_done_dict[split][arch]))
 				exp_no = ask_nicely(
 					message='Please enter experiment number: ',
 					requirment=lambda x: int(x) in av_exps,
@@ -291,10 +296,8 @@ def test_runs(all:bool=False,
 			requirment=lambda x: x in ['y','n'],
 			error='enter y or n'
 		)
-
-	print("testing: ")
-	utils.print_dict(to_test)
-	test_all(runs_dict)
+ 
+	return to_test
 
 def parse_run_info_to_json(txt_file_path):
 		"""
@@ -359,7 +362,7 @@ def test_all(runs_dict:dict,
 						res_output:Optional[str|Path] = None,
 			 			skip_done:bool=True,
 						test_val:bool=False,
-			 			flip:bool=False,
+			 			shuffle:bool=False,
 			 			imp_path:str|Path='wlasl_implemented_info.json',
 						classes_path:str|Path='wlasl_class_list.json',
 						runs_dir:str|Path='./runs',
@@ -398,7 +401,7 @@ def test_all(runs_dict:dict,
 				config_path = configfiles / f'{split}/{arch}_{exp_no}.ini'
 				exp_dir = runs / f'{split}/{arch}_exp{exp_no}'
 				output = exp_dir / 'results'
-    
+		
 				if skip_done and is_done(exp_dir):
 					continue
 					
@@ -491,32 +494,29 @@ def test_all(runs_dict:dict,
 					#test it
 					
 					if top_k:
-						
+       
+						if shuffle:
+							suffix = '-top-k_shuffled.json'
+						else:
+							suffix = '-top-k.json'
+       
 						if test_val:
 							print('Val')
-							if flip:
-								fname = check_path.name.replace('.pth', '_val-top-k_flipped.json')
-							else:
-								fname = check_path.name.replace('.pth', '_val-top-k.json')
+							fname = check_path.name.replace('.pth', '_val' + suffix)
 							val_res = test_top_k(
 								model=model,
 								test_loader=val_loader,
-								save_path=output / fname,
-								flip=flip
+								save_path=output / fname
 							)
 						else:
 							val_res = {}
 
 						print('Test')
-						if flip:
-								fname = check_path.name.replace('.pth', '_val-top-k_flipped.json')
-						else:
-								fname = check_path.name.replace('.pth', '_val-top-k.json')
+						fname = check_path.name.replace('.pth', '_test' + suffix)
 						test_res = test_top_k(
 							model=model,
 							test_loader=test_loader,
-							save_path=output / fname,
-			 				flip=flip
+							save_path=output / fname
 						)
 						experiment = {
 							"exp_no" 	: exp_no,
@@ -590,7 +590,7 @@ def test_model(model, test_loader):
 	
 	return accuracy, report, all_preds, all_targets
 
-def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None, flip=False):
+def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 	
 	if seed is not None:
 		set_seed(0)
@@ -617,9 +617,6 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None, fli
 	for item in tqdm.tqdm(test_loader, desc="Testing"):
 		data, target = item['frames'], item['label_num'] 
 		data, target = data.to(device), target.to(device)
-		
-		if flip:
-			data = data.flip(dims=[1])
 	
 		predictions = model(data)
 
@@ -865,43 +862,4 @@ def plot_confusion_matrix(y_true, y_pred, classes_path=None, num_classes=100,
 	
 	
 if __name__ == '__main__':
-	# config_path = './configfiles/asl100.ini'
-	# configs = Config(config_path)
-	# run_test_r3d18_1( output='runs/asl100/r3d18_exp5')
-
-	
-	runs_dict = create_runs_dict(output='wlasl_runs_done.json')
-	# with open('wlasl_runs_done.json', 'r') as f:
-	# 	runs_dict = json.load(f)
-	
-	# result_dict, _ = test_all(runs_dict, test_last=True, top_k=True, plot=True,
-													#  test_val=True, res_output='wlasl_results.json', skip_done=False)
-	# utils.print_dict(result_dict)
-	# sum_results = summarize_results(result_dict, sum_output='wlasl_runs_summary.json')
-	# utils.print_dict(sum_results)
- 
-	# test_runs()
-
-	# result_dict, _ = test_all(
-	# 	runs_dict=runs_dict,
-	# 	test_last=True, 
-	# 	res_output='wlasl_runs_results_flipped.json',
-	# 	flip=True
-	# )
-	# utils.print_dict(result_dict)
-	# sum_results = summarize_results(
-	# 	runs_dict=result_dict,
-	# 	sum_output='wlasl_runs_flipped_summary.json'
-	#  )
-	# utils.print_dict(sum_results)
-
-
-	# best_done = gen_run_dict('wlasl_runs_summary.json', out='wlasl_runs_best.json')
-	
-	# result_dict, _ = test_all(best_done, test_last=True, top_k=True, plot=False,
-	# 												 test_val=False, res_output='wlasl_results_flipped.json',
-	#             						skip_done=False, flip=True)
-	with open('wlasl_results_flipped.json', 'r') as f:
-		result_dict = json.load(f)
-	sum_results = summarize_results_file(result_dict,
-                                      sum_output='wlasl_flipped_summary.json')
+	pass
