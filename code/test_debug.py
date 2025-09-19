@@ -370,7 +370,7 @@ def refine_stats(stat_path,
 	#bonus
 	for gloss in stats.keys():
 		test_signers = list(stats[gloss]['test']['seen_signers'].keys()) # + \
-    							# list(stats[gloss]['val']['seen_signers'].keys())
+									# list(stats[gloss]['val']['seen_signers'].keys())
 		train_signers = list(stats[gloss]['train']['seen_signers'].keys())
 		overlapping[gloss] =  any(ts in train_signers for ts in test_signers)
 	
@@ -430,53 +430,135 @@ def merge_seen_ex():
 	print_dict(merge_seen(d3, d4))
 
 def test_use_rudid():
-  from quewing import wait_for_run_completion
-  run_id = input("Enter run ID: ")
-  info = wait_for_run_completion(
+	from quewing import wait_for_run_completion
+	run_id = input("Enter run ID: ")
+	info = wait_for_run_completion(
 		entity = 'ljgoodall2001-rhodes-university',
-  	project = 'WLASL-100',
-  	check_interval = 5,
-   verbose=True,
-   run_id=run_id,
-   max_retries=5
+		project = 'WLASL-100',
+		check_interval = 5,
+	 verbose=True,
+	 run_id=run_id,
+	 max_retries=5
 	)
-  
-  
-	 
-if __name__ == "__main__":
-	# test_early_stopping(mode='min')
-	# test_wait_for_run_completion()
-	# pytest.main([__file__])
-	# test_stopper_save_and_load()
-	# tmux_session()
-	# test_blocking()
-	# test_dict_mod()
-	# test_arg_defaults()
-	# test_basename_extraction()
-	# parse_run_info_to_json('/home/luke/ExtraStorage/SLR/code/best_val-top-k.txt')
-	# with open('./wlasl_runs_done.json', 'r') as f:
-	#   reformat_results(json.load(f))
-	# messages = ['enter split: ', 'split not found']
-	# requirements = [lambda x: x in ['asl100', 'asl300']]
-	# ask_nicely(messages, requirements, 'error')
- 
-	# get_stats(
-	#  '/home/luke/ExtraStorage/SLR/data/WLASL/splits/asl100.json',
-	#  '/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json')
-	# get_stats(
-	#  '/home/luke/ExtraStorage/SLR/data/WLASL/splits/asl300.json',
-	#  '/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json')
- 
-	# refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_300_stats.json',
-	# 						'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_ref.json',
-  #      				'/home/luke/ExtraStorage/SLR/code/wlasl_300_stats_overlapping.json')
-	# refine_stats('/home/luke/ExtraStorage/SLR/code/wlasl_100_stats.json',
-	# 						'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_ref.json',
-  #      				'/home/luke/ExtraStorage/SLR/code/wlasl_100_stats_overlapping.json')
+	
+def frame_shuffling():
+	import torch
 
-	# merge_seen_ex()
-	# from test import extract_exp_number
-	# n = extract_exp_number("runs/asl100/MViT_V2_S_exp002/best_val-top-k.json")
-	# print(n)
+	# Create a 2D tensor
+	tensor = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+	# tensor = torch.rand(8, 3, 4, 4)
+	t = len(tensor)
+	# Shuffle rows
+	shuffled_indices = torch.randperm(tensor.size(0))
+	# shuffled_tensor = tensor[:, :, shuffled_indices, :, :]
+	shuffled_tensor = tensor[shuffled_indices]	
+	print("Shuffled indices:")
+	print(shuffled_indices)
+	print("Original:")
+	print(tensor)
+	print("\nShuffled rows:")
+	print(shuffled_tensor)
+	print(tensor.shape == shuffled_tensor.shape)
  
-	test_use_rudid()
+	og_idxs = torch.arange(tensor.size(0))
+	inv_permutation = shuffled_indices
+	print("Inverse permutation indices:")
+	print(inv_permutation)
+	# reversed_tensor = shuffled_tensor[:, :, inv_permutation, :, :]
+	reversed_tensor = shuffled_tensor[inv_permutation]
+ 
+	print("\nReversed to original:")
+	print(reversed_tensor)
+	print(tensor.shape == reversed_tensor.shape)
+	print(torch.all(tensor == reversed_tensor))
+
+
+def frame_shuffling2():
+	import utils
+	from video_transforms import Shuffle
+	import torch
+	import torchvision.transforms.v2 as ts
+	vid = './media/69241.mp4'
+	num_frames = 4
+	frames = utils.load_rgb_frames_from_video(vid, 4, 4+num_frames)
+	# print(frames.shape)
+	# utils.visualise_frames(frames, num_frames)
+
+	# shuffled_indices = torch.randperm(frames.size(0))
+	shuffled_indices = Shuffle.create_permutation(frames.size(0), seed=42)
+	print("Shuffled indices:")
+	print(shuffled_indices)
+	t = ts.Compose([
+		Shuffle(shuffled_indices)
+	])
+
+	f2 = t(frames)
+
+	# print(f2.shape)
+	# utils.visualise_frames(f2,num_frames)
+	unshuffled = t(f2)
+
+	print(unshuffled.shape)
+	print("EQUAL: ", torch.allclose(frames, unshuffled))
+	
+	
+def test_shuffle():
+		import torch
+		from video_transforms import Shuffle
+		# from torchvision.transforms import Transform
+		# Create a test tensor with 5 frames, 3 channels, 4x4 resolution
+		# Each frame has a unique value to easily track shuffling
+		num_frames = 5
+		test_tensor = torch.zeros(num_frames, 3, 4, 4)
+		for i in range(num_frames):
+				test_tensor[i] = i  # Each frame gets a unique value
+		
+		print("Original tensor (first channel of each frame):")
+		print(test_tensor[:, 0, 0, 0])  # Show first pixel of each frame
+		
+		# Test 1: Create a specific permutation and test
+		custom_perm = torch.tensor([2, 0, 4, 1, 3])
+		shuffle_transform = Shuffle(custom_perm)
+		shuffled = shuffle_transform(test_tensor)
+		
+		print("\nShuffled with custom permutation [2, 0, 4, 1, 3]:")
+		print(shuffled[:, 0, 0, 0])
+		
+		# Verify the shuffle worked correctly
+		expected = torch.tensor([2., 0., 4., 1., 3.])  # Expected order after shuffle
+		assert torch.allclose(shuffled[:, 0, 0, 0], expected), "Custom permutation test failed"
+		
+		# Test 2: Test with random permutation (fixed seed for reproducibility)
+		random_perm = Shuffle.create_permutation(num_frames, seed=42)
+		shuffle_transform_random = Shuffle(random_perm)
+		shuffled_random = shuffle_transform_random(test_tensor)
+		
+		print(f"\nShuffled with random permutation {random_perm.tolist()}:")
+		print(shuffled_random[:, 0, 0, 0])
+		
+		# Test 3: Verify that the original tensor is unchanged (transform should not modify in place)
+		print("\nOriginal tensor after shuffling (should be unchanged):")
+		print(test_tensor[:, 0, 0, 0])
+		
+		# Test 4: Test error cases
+		try:
+				# Wrong dimension
+				wrong_dim_tensor = torch.randn(5, 3, 4)  # 3D instead of 4D
+				shuffle_transform(wrong_dim_tensor)
+				assert False, "Should have raised assertion error for wrong dimension"
+		except AssertionError as e:
+				assert "Input tensor must be 4D" in str(e)
+		
+		try:
+				# Wrong channel count
+				wrong_channel_tensor = torch.randn(5, 1, 4, 4)  # 1 channel instead of 3
+				shuffle_transform(wrong_channel_tensor)
+				assert False, "Should have raised assertion error for wrong channel count"
+		except AssertionError as e:
+				assert "Input tensor must have 3 channels" in str(e)
+		
+		print("\nAll tests passed!")
+
+
+if __name__ == "__main__":
+	frame_shuffling2()
