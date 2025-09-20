@@ -559,6 +559,72 @@ def test_shuffle():
 		
 		print("\nAll tests passed!")
 
+def test__sum_model():
+  from test import _sum_model
+  d = {
+      "004": {
+        "best": {
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5343333333333333,
+              "top5": 0.82,
+              "top10": 0.895
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5387596899224806,
+              "top5": 0.8217054263565892,
+              "top10": 0.8992248062015504
+            }
+          }
+        },
+        "checkpoint_154": {
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.5965,
+              "top5": 0.8516666666666666,
+              "top10": 0.8916666666666666
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.5891472868217055,
+              "top5": 0.8488372093023255,
+              "top10": 0.8914728682170543
+            }
+          }
+        }
+      },
+      "005": {
+        "checkpoint_118": {
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.48899999999999993,
+              "top5": 0.8083333333333332,
+              "top10": 0.8758333333333332
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.49224806201550386,
+              "top5": 0.8062015503875969,
+              "top10": 0.875968992248062
+            }
+          }
+        },
+        "best": {
+          "test set": {
+            "top_k_average_per_class_acc": {
+              "top1": 0.45699999999999996,
+              "top5": 0.7583333333333333,
+              "top10": 0.8658333333333332
+            },
+            "top_k_per_instance_acc": {
+              "top1": 0.46124031007751937,
+              "top5": 0.7596899224806202,
+              "top10": 0.8682170542635659
+            }
+          }
+        }
+      }
+    }
+  print(type(d))
+
 
 if __name__ == "__main__":
-	frame_shuffling2()
+	test__sum_model()
