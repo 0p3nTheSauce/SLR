@@ -171,7 +171,7 @@ class Shuffle(Transform):
     return inpt.index_select(dim, self.permutation)
     
   @staticmethod
-  def create_permutation(num_frames, seed=None):
+  def create_permutation(num_frames:int, seed:int=None) -> list:
     """Create a random permutation for given number of frames"""
     if seed is not None:
       torch.manual_seed(seed)

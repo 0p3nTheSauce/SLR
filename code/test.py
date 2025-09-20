@@ -357,21 +357,52 @@ def is_done(dir_path:str|Path) -> bool:
 
 
 
+#TODO: maybe add more fine grained control for saving outputs
 
-def test_all(runs_dict:dict,
-						test_last:bool=False, top_k:bool=True, plot:bool=False,disp:bool=False,
-						res_output:Optional[str|Path] = None,
-			 			skip_done:bool=True,
-						test_val:bool=False,
-			 			shuffle:bool=False,
-			 			imp_path:str|Path='wlasl_implemented_info.json',
-						classes_path:str|Path='wlasl_class_list.json',
-						runs_dir:str|Path='./runs',
-						labels_dir:str|Path='./preprocessed/labels',
-						configs_dir:str|Path='./configfiles',
-						root_dir:str|Path='../data/WLASL/WLASL2000') -> tuple[dict, list]:
+def test_all(runs_dict:dict[str, dict[str, list[str]]],
+			test_last:bool=False, 
+			top_k:bool=True, 
+			plot:bool=False,
+			disp:bool=False,
+			res_output:Optional[str|Path] = None,
+			skip_done:bool=True,
+			test_val:bool=False,
+			shuffle:bool=False,
+			imp_path:str|Path='wlasl_implemented_info.json',
+			classes_path:str|Path='wlasl_class_list.json',
+			runs_dir:str|Path='./runs',
+			labels_dir:str|Path='./preprocessed/labels',
+			configs_dir:str|Path='./configfiles',
+			root_dir:str|Path='../data/WLASL/WLASL2000', 
+			err_output:Optional[str|Path]='result/test_errors.json') \
+				-> tuple[dict[str, dict[str, list[str]]], list]:
+	'''Test multiple sets experiments (saves results to experiment directory).  
+
+		Args:
+			runs_dict: 		experiments to test
+			test_last: 		test the weights of last epoch (best.pth always tested)
+			top_k: 			report top-k accuracies
+			plot: 			create plots (heatmap, bargraph, confusion matrix)
+			disp: 			display plots (if plot) (using utils.visualise_frames)
+			res_output: 	path to write results to (default does not save result dict)
+			skip_done: 		skips directories that have been tested (if they have result files)
+			test_val: 		test on the validation set as well (default only test set)	
+			shuffle: 		shuffle the frames before inference (using Shuffle from video_transforms)
+			imp_path: 		path to implemented info
+			classes_path: 	path to class list file (if plot)
+			runs_dir: 		path to experiment runs directory
+			labels_dir: 	path to preprocessed labels
+			configs_dir: 	path to configfiles directory
+			root_dir: 		path to raw videos directory
+			err_output: 	file to write run errors (don't write errors if not provided)
 	
+		Returns:
+			result_dict: 	all test results in one dictionary
+			problem_runs: 	experiments where the model did not load (because it uses old format)'''
+	
+
 	problem_runs = []
+	result_dict = {} # better to make a copy
  
 	with open(imp_path, 'r') as f:
 		imp_info = json.load(f)
@@ -389,13 +420,17 @@ def test_all(runs_dict:dict,
 		
 		labels = all_labels / f'{split}'
 		print(f'Processing split: {split}')
+		result_dict[split] = {} 
 		
 		for arch in runs_dict[split].keys(): #e.g. S3D
 			
 			print(f'With architecture: {arch}')
+			result_dict[split][arch] = []
 			
 			for i, exp_no in enumerate(runs_dict[split][arch]): #e.g. 001
+				
 				print(f'Experiment no: {exp_no}')
+				result_dict[split][arch][i] = {} 
 
 				cleanup_memory()
 				
@@ -425,10 +460,14 @@ def test_all(runs_dict:dict,
 				model_info = imp_info['models'][arch]
 				utils.print_dict(model_info)
 				
-				# if shuffle:
-				# 	permutation = Shuffle.
+				if shuffle:
+					permutation = Shuffle.create_permutation(config['data']['num_frames'])
+					maybe_shuffle_t = Shuffle(permutation)
+				else:
+					maybe_shuffle_t = v2.Lambda(lambda x: x) # nothing 
 
 				final_t = v2.Compose([
+					maybe_shuffle_t,
 					v2.Lambda(lambda x: x.float() / 255.0),
 					v2.Normalize(mean=model_info['mean'], std=model_info['std']),
 					v2.Lambda(lambda x: x.permute(1,0,2,3)) 
@@ -474,9 +513,7 @@ def test_all(runs_dict:dict,
 					continue
 				
 				
-				runs_dict[split][arch][i] = {}
 				for check_path in checkpoint_paths:
-					
 					
 					print(f'Checkpoint: {check_path}')
 					checkpoint = torch.load(check_path)
@@ -523,13 +560,12 @@ def test_all(runs_dict:dict,
 							save_path=output / fname
 						)
 						experiment = {
-							"exp_no" 	: exp_no,
 							"test set"		: test_res 
 						}
 			
 						if test_val:
 							experiment["val set"]= val_res
-						runs_dict[split][arch][i][check_path.name.replace('.pth', '')] = experiment #update runs_dict as we go
+						result_dict[split][arch][i][check_path.name.replace('.pth', '')] = experiment #update result_dict as we go
 			
 					if plot:
 						accuracy, class_report, all_preds, all_targets = test_model(model, test_loader)
@@ -562,15 +598,16 @@ def test_all(runs_dict:dict,
 							disp=disp
 						)
 	
-	#save modified runs_dict
+	#save result_dict
 	if res_output:
 		with open(res_output, 'w') as f:
-			json.dump(runs_dict, f, indent=2)
+			json.dump(result_dict, f, indent=2)
 	
-	with open('test_erros.json', 'w') as f:
-		json.dump(problem_runs, f, indent=2)
+	if err_output:
+		with open(err_output, 'w') as f:
+			json.dump(problem_runs, f, indent=2)
 	 
-	return runs_dict, problem_runs
+	return result_dict, problem_runs
 	
 
 def test_model(model, test_loader):
