@@ -25,7 +25,7 @@ import re
 from typing import Optional, Callable
 from argparse import ArgumentParser
 from utils import ask_nicely
-#################################### Testing #################################
+#################################### Utilities #################################
 
 def cleanup_memory():
 	"""Cleanup GPU and CPU memory"""
@@ -41,6 +41,8 @@ def set_seed(seed=42):
 	random.seed(seed)
 	torch.backends.cudnn.deterministic = True
 	torch.backends.cudnn.benchmark = False
+
+#########################                        ######################################
 
 def sep_arch_exp(path:str|Path):
 	path_obj = Path(path)
@@ -203,6 +205,7 @@ def gen_run_dict(summary_path,take='best_test', out=None):
 	
 	return best_done
 
+##############################   Interface functions  ######################################
 
 def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json',
 										 runs_path:str|Path='runs/',
@@ -236,6 +239,8 @@ def create_runs_dict(imp_path:str|Path='wlasl_implemented_info.json',
 			json.dump(runs_dict, f, indent=2)
  
 	return runs_dict
+
+#################################
 
 def create_test_dict(all:bool=False,
 							imp_path:str|Path='wlasl_implemented_info.json',
@@ -358,6 +363,7 @@ def is_done(dir_path:str|Path) -> bool:
 
 
 #TODO: maybe add more fine grained control for saving outputs
+#TODO: basically has to double test if plotting
 
 def test_all(runs_dict:dict[str, dict[str, list[str]]],
 			test_last:bool=False, 
@@ -425,19 +431,23 @@ def test_all(runs_dict:dict[str, dict[str, list[str]]],
 		for arch in runs_dict[split].keys(): #e.g. S3D
 			
 			print(f'With architecture: {arch}')
-			result_dict[split][arch] = []
+			# result_dict[split][arch] = [{} for _ in runs_dict[split][arch]]
+			result_dict[split][arch] = {}
 			
 			for i, exp_no in enumerate(runs_dict[split][arch]): #e.g. 001
 				
 				print(f'Experiment no: {exp_no}')
-				result_dict[split][arch][i] = {} 
+				result_dict[split][arch][exp_no] = {} 
 
 				cleanup_memory()
 				
 				config_path = configfiles / f'{split}/{arch}_{exp_no}.ini'
 				exp_dir = runs / f'{split}/{arch}_exp{exp_no}'
 				output = exp_dir / 'results'
-		
+
+				#ensure results subdir exists
+				output.mkdir(exist_ok=True)
+
 				if skip_done and is_done(exp_dir):
 					continue
 					
@@ -565,7 +575,7 @@ def test_all(runs_dict:dict[str, dict[str, list[str]]],
 			
 						if test_val:
 							experiment["val set"]= val_res
-						result_dict[split][arch][i][check_path.name.replace('.pth', '')] = experiment #update result_dict as we go
+						result_dict[split][arch][exp_no][check_path.name.replace('.pth', '')] = experiment #update result_dict as we go
 			
 					if plot:
 						accuracy, class_report, all_preds, all_targets = test_model(model, test_loader)
@@ -603,7 +613,7 @@ def test_all(runs_dict:dict[str, dict[str, list[str]]],
 		with open(res_output, 'w') as f:
 			json.dump(result_dict, f, indent=2)
 	
-	if err_output:
+	if err_output and problem_runs:
 		with open(err_output, 'w') as f:
 			json.dump(problem_runs, f, indent=2)
 	 
