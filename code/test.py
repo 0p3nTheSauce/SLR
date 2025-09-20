@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from torchvision.transforms import v2
+from video_transforms import Shuffle
 import os
 from video_dataset import VideoDataset
 from torch.utils.data import DataLoader
@@ -424,6 +425,9 @@ def test_all(runs_dict:dict,
 				model_info = imp_info['models'][arch]
 				utils.print_dict(model_info)
 				
+				# if shuffle:
+				# 	permutation = Shuffle.
+
 				final_t = v2.Compose([
 					v2.Lambda(lambda x: x.float() / 255.0),
 					v2.Normalize(mean=model_info['mean'], std=model_info['std']),
