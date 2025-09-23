@@ -378,7 +378,7 @@ def create_run(verbose:bool=True) -> None:
 	available_splits = info['splits']
 	model_info = info['models']
 	
-	arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys())
+	arg_dict, tags, output, save_path, project, entity = take_args(available_splits, model_info.keys())
 	
 	config = load_config(arg_dict, verbose=True)
 	
@@ -393,7 +393,7 @@ def create_run(verbose:bool=True) -> None:
 		info = {
 			'model_info': model_specifics,
 			'config': config,
-			'entity': ENTITY,
+			'entity': entity,
 			'project': project,
 			'tags': tags,
 			'output': output,
@@ -403,9 +403,7 @@ def create_run(verbose:bool=True) -> None:
 		add_new_run(RUNS_PATH, info, verbose=verbose)
 		if verbose:
 			print(f"Run info saved to {RUNS_PATH}")
-		# Start training
-		# os.makedirs(output, exist_ok=True)
-		# os.makedirs(save_path, exist_ok=True)
+
 	else:
 		if verbose:
 			print("Training cancelled by user.")

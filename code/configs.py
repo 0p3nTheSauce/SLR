@@ -163,9 +163,10 @@ def take_args(splits_available, models_available, make=False):
 	#admin
 	parser.add_argument('-ex', '--exp_no',type=int, help='Experiment number (e.g. 10)', required=True)
 	parser.add_argument('-r', '--recover', action='store_true', help='Recover from last checkpoint')
-	parser.add_argument('-ri', '--run_id', type=str, default=None, help=f'The run id to use (especially when also usign recover)')
+	parser.add_argument('-ri', '--run_id', type=str, default=None, help='The run id to use (especially when also usign recover)')
 	parser.add_argument('-m', '--model', type=str,help=f'One of the implemented models: {models_available}', required=True)
 	parser.add_argument('-p', '--project', type=str, default=None, help='wandb project name')
+	parser.add_argument('-et', '--entity', type=str, default=ENTITY, help=f'Entity if not {ENTITY}')
 	parser.add_argument('-sp', '--split',type=str, help='The class split (e.g. asl100)', required=True)
 	parser.add_argument('-ee', '--enum_exp', action='store_true', help='enumerate the experiment dir num (for output)')
 	parser.add_argument('-ec', '--enum_chck', action='store_true', help='enumerate the checkpoint dir num (for output)')
@@ -238,7 +239,7 @@ def take_args(splits_available, models_available, make=False):
 
 
 
-	return clean_dict, tags, output, save_path, args.project
+	return clean_dict, tags, output, save_path, args.project, args.entity
 
 
 # def print_wandb_config(config):
@@ -267,7 +268,7 @@ if __name__ == '__main__':
 	}
 	available_model = model_info.keys()
 	available_splits = ['asl100', 'asl300']
-	arg_dict, tags, output, save_path, project = take_args(available_splits, available_model, make=False)
+	arg_dict, tags, output, save_path, project, entity = take_args(available_splits, available_model, make=False)
 	print(f'project selected: {project}')
  
 	print_dict(arg_dict)
