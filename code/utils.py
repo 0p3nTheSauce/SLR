@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import json
 import matplotlib.pyplot as plt
-import gzip
 # from torchcodec.decoders import VideoDecoder
 import re
 from pathlib import Path
@@ -39,14 +38,14 @@ def ask_nicely(message: str,
 
 ############# pretty printing ##############
 
-def print_dict(dict):
-	print(string_nested_dict(dict))
+def print_dict(diction):
+	print(string_nested_dict(diction))
 	
-def string_nested_dict(dict):
+def string_nested_dict(diction):
 	ans = ""
-	if type(dict) == type({}):
+	if type(diction) is dict:
 		ans += "{\n"
-		for key, value in dict.items():
+		for key, value in diction.items():
 			ans += f'{key} : {string_nested_dict(value)}\n'
 		ans += "}\n"
 	else:
@@ -62,11 +61,11 @@ def load_rgb_frames_from_video(video_path : str, start : int, end : int
                               , all : bool =False) -> torch.Tensor:
   return cv_to_torch(cv_load(video_path, start, end, all))
 
-def cv_load(video_path, start, end, all=False):
-  if not os.path.exists(video_path):
+def cv_load(video_path:str|Path, start:int, end:int, all:bool=False):
+  video_path = Path(video_path)  
+  if not video_path.exists():
     raise FileNotFoundError(f'File {video_path} does not exist')
-  cap = cv2.VideoCapture(video_path)
-  frame_count = 0
+  cap = cv2.VideoCapture(str(video_path))
   frames = []
   while cap.isOpened():
     ret, frame = cap.read()
@@ -81,29 +80,7 @@ def cv_load(video_path, start, end, all=False):
   else:
     raise ValueError(f"No frames were loaded for file {video_path}")
 
-def load_tensorboard_json(filepath):
-  try:
-    # Try regular JSON first
-    with open(filepath, 'r', encoding='utf-8') as f:
-      return json.load(f)
-  except UnicodeDecodeError:
-    try:
-      # Try gzipped JSON
-      with gzip.open(filepath, 'rt', encoding='utf-8') as f:
-        return json.load(f)
-    except:
-        # Try with different encoding
-        try:
-          with open(filepath, 'r', encoding='latin-1') as f:
-            return json.load(f)
-        except:
-          # Last resort - read as binary and try to decode
-          with open(filepath, 'rb') as f:
-            content = f.read()
-            # Check if it's gzipped
-            if content.startswith(b'\x1f\x8b'):
-              content = gzip.decompress(content)
-              return json.loads(content.decode('utf-8', errors='ignore'))
+
 
 ################## Saving #####################
 
@@ -306,7 +283,7 @@ def extract_num(fname):
   num_substrs = re.findall(r'\d+', fname)
   if len(num_substrs) > 1:
     num_str_concat = ' '.join(sub for sub in num_substrs)
-    print(f'fname has multuple number substrings: ')
+    print('fname has multuple number substrings: ')
     print(num_str_concat)
     idx = -1
     while True:
@@ -461,7 +438,7 @@ def crop_frames(frames, bbox):
 #     os.makedirs(path, exist_ok=True)
 #   return path
 
-import os
+
 
 def enum_dir(path, make=False, decimals=3):
   '''Enumerate filenames'''
