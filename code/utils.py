@@ -1,8 +1,6 @@
 import torch
-import torch.nn.functional as F
 import cv2
 import numpy as np
-import json
 import matplotlib.pyplot as plt
 # from torchcodec.decoders import VideoDecoder
 import re
@@ -60,6 +58,8 @@ def string_nested_dict(diction):
 def load_rgb_frames_from_video(video_path : str, start : int, end : int
                               , all : bool =False) -> torch.Tensor:
   return cv_to_torch(cv_load(video_path, start, end, all))
+
+
 
 def cv_load(video_path:str|Path, start:int, end:int, all:bool=False):
   video_path = Path(video_path)  
@@ -428,77 +428,21 @@ def crop_frames(frames, bbox):
   x1, y1, x2, y2 = bbox
   return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
-# def enum_dir(path, make=False):
-#   if os.path.exists(path):
-#     if not path[-1].isdigit():
-#       path += '0'
-#     while os.path.exists(path):
-#       path = path[:-1] + str(int(path[-1]) + 1)
-#   if make:
-#     os.makedirs(path, exist_ok=True)
-#   return path
-
-
-
-def enum_dir(path, make=False, decimals=3):
+def enum_dir(path:str|Path, make:bool=False, decimals:int=3):
   '''Enumerate filenames'''
-  if os.path.exists(path):
-    if not path[-1].isdigit():
-      path += '0'.zfill(decimals)
-    while os.path.exists(path):
-      num = int(path[-decimals:]) 
-      path = path[:-decimals] + str(num + 1).zfill(decimals)
+  path = Path(path)
+  path_str = str(path)
+  if path.exists():
+    if not path_str[-1].isdigit():
+      path_str += '0'.zfill(decimals)
+    path = Path(path_str)
+    while path.exists():
+      num = int(path_str[-decimals:]) 
+      path_str = path_str[:-decimals] + str(num + 1).zfill(decimals)
+      path = Path(path_str)
   if make:
-    os.makedirs(path, exist_ok=True)
+    path.mkdir(parents=True, exist_ok=True)
   return path
-
-##################### once offs / Testing ######################
-
-
-
-def test_save():
-  instances = './preprocessed_labels/asl100/train_instances_fixed_bboxes_short.json'
-  with open(instances, 'r') as f:
-    all_inst = json.load(f)
-  inst0 = all_inst[0]
-  vid = f"{inst0['video_id']}.mp4"
-  vid_path = os.path.join('../data/WLASL2000',vid)
-  
-  cap = cv2.VideoCapture(vid_path)
-  fps = int(cap.get(cv2.CAP_PROP_FPS))
-  width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-  height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-  print(f'FPS: {fps}')
-  print(f'width: {width}')
-  print(f'height: {height}')  
-  frames = []
-  frame_count = 0
-  while cap.isOpened():
-    ret, frame = cap.read()
-    if not ret:
-      break
-    frames.append(frame)
-    frame_count += 1
-  print(f'processed {frame_count} frames')
-  frames = np.asarray(frames)
-  print(frames.shape)
-  save_video(frames, vid, fps=30)
-  # save_video(np_frames_col, f'col_{vid}', fps=15)
-
-def test_save2():
-  instances = './preprocessed_labels/asl100/train_instances_fixed_bboxes_short.json'
-  with open(instances, 'r') as f:
-    all_inst = json.load(f)
-  inst0 = all_inst[0]
-  vid = f"{inst0['video_id']}.mp4"
-  vid_path = os.path.join('../data/WLASL2000',vid)
-  frames = cv_load(vid_path,0,0,True)
- 
-  print(frames.shape)
-  print(frames.dtype)
-  cv_frames = torch_to_cv(frames) #type: ignore
-  save_video(cv_frames, vid, fps=24)
-
 
 
 def main():

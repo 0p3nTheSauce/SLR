@@ -1,7 +1,6 @@
 
 import subprocess
-import os
-import sys
+# import os
 import json
 import argparse
 import wandb
@@ -9,7 +8,9 @@ import time
 import utils
 from pathlib import Path
 
-from typing import Union, Optional, Any
+from typing import Optional, Any
+
+from configs import load_config, print_config, take_args
 #local imports
 # from train import PROJECT, ENTITY
 # ENTITY= 'ljgoodall2001-rhodes-university'
@@ -20,7 +21,6 @@ ENTITY= 'ljgoodall2001-rhodes-university'
 # PROJECT = 'asl300'
 PROJECT = 'WLASL-100'
 
-from configs import load_config, print_config, take_args
 
 #constants
 TEMP_PATH = './queTemp.json' #used by the worker process to get info on the next run
@@ -259,7 +259,8 @@ def add_new_run(runs_path, info, verbose=False):
 		'old_runs': [],
 		'to_run': []
 	}
-	if os.path.exists(runs_path):
+	runs_path = Path(runs_path)
+	if runs_path.exists():
 		with open(runs_path, 'r') as f:
 			all_runs = json.load(f)
 	if all_runs['to_run'] is None:
@@ -283,12 +284,13 @@ def get_next_run(runs_path, verbose=False):
 
 		Returns None if error, else next_run info
 	'''
+	runs_path = Path(runs_path)	
 
 	all_runs = {
 		'old_runs': [],
 		'to_run': []
 	}
-	if not os.path.exists(runs_path):
+	if not runs_path.exists():
 		print_v(f"No runs file found at {runs_path}. Returning None.", verbose)
 		return None
 	
@@ -325,7 +327,8 @@ def remove_old_run(runs_path, verbose=False):
 		'old_runs': [],
 		'to_run': []
 	}
-	if not os.path.exists(runs_path):
+	runs_path = Path(runs_path)
+	if not runs_path.exists():
 		print_v(f"No runs file found at {runs_path}.", verbose)
 		return None
 	
@@ -450,7 +453,7 @@ def remove_run(runs_path:str, verbose:bool=False, idx:Optional[int]=None) -> dic
 			json.dump(all_runs, f, indent=2)
 		print_v(f"run removed: {rem['config']['admin']['config_path']}", verbose)
 	else:
-		print_v(f"no run removed", verbose)
+		print_v("no run removed", verbose)
 	
 	return rem
 
@@ -460,7 +463,7 @@ def clear_runs(runs_path, verbose=True, past_only=False, future_only=False):
 		'old_runs': [],
 		'to_run': []
 	}
-	if not os.path.exists(runs_path):
+	if not runs_path.exists():
 		raise ValueError(f'could not find runs file: {runs_path}')
 	
 	if past_only:
@@ -506,7 +509,7 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
 	curr_old_run = all_runs['old_runs'] if all_runs['old_runs'] else [] 
 	
 	if not curr_old_run:
-		print(f'Warning: old_runs is empty')
+		print('Warning: old_runs is empty')
 		return
  
 	#def behavior to ask
@@ -537,7 +540,7 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
 		
 		all_runs['to_run'] = to_move + curr_to_run
 	 
-		print_v(f'No runs moved', verbose and not to_move)
+		print_v('No runs moved', verbose and not to_move)
 	
 	else:
 		old2mv = [] #return runs to the begining of to_run
@@ -549,7 +552,7 @@ def return_old(runs_path: str, verbose:bool=False, num_from_end:Optional[int]=No
 	with open(runs_path, 'w') as f:
 		json.dump(all_runs, f, indent=2)
  
-	print_v(f'Successfully moved old_runs to to_run', verbose)
+	print_v('Successfully moved old_runs to to_run', verbose)
 
 def shuffle_configs(runs_path:Path|str, verbose:bool=False) -> None:
 
@@ -562,7 +565,7 @@ def shuffle_configs(runs_path:Path|str, verbose:bool=False) -> None:
 	
 	curr_to_run = all_runs['to_run']
 	if not curr_to_run:
-		print(f'Warning: to_runs is empty')
+		print('Warning: to_runs is empty')
 		return
 
 	for i, run in enumerate(curr_to_run):
@@ -835,7 +838,7 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False,
 		#session: que_worker, name: [num] worker  	
 		#if worker exists, increments num 
 		try:
-			result = start('worker', SESSION, SCRIPT_PATH, verbose) #this actually not blocking 
+			_ = start('worker', SESSION, SCRIPT_PATH, verbose) #this actually not blocking 
 			print_v('worker started successfully', verbose)
 			time.sleep(10) #just give it a sec so that the run_id is written to file
 		except subprocess.CalledProcessError as e:
@@ -875,7 +878,7 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False,
 		#print a seperator to the output to seperate runs
 		try:
 			title = 'Starting new worker process'
-			result = separate('worker', SESSION, SCRIPT_PATH, title, verbose)
+			_ = separate('worker', SESSION, SCRIPT_PATH, title, verbose)
 		except subprocess.CalledProcessError as e:
 			print("Daemon ran into an error when writing the separator: ")
 			print(e.stderr)
@@ -962,7 +965,7 @@ def main():
  
 	if args.separate_mode:
 		try:
-			result = separate(args.separate_mode, SESSION, SCRIPT_PATH, args.title, verbose)
+			_ = separate(args.separate_mode, SESSION, SCRIPT_PATH, args.title, verbose)
 			print_v(f'Separator: "{args.title}" sent to {args.separate_mode}', verbose)
 		except subprocess.CalledProcessError as e:
 			print(f"Ran into an unexpected issue when sending separator: {args.title} to {args.separate_mode}")
@@ -973,7 +976,7 @@ def main():
 		create = False
 		#first check that the tmux session is set up
 		try:
-			results = check_tmux_session(SESSION, DAEMON, WORKER)
+			_ = check_tmux_session(SESSION, DAEMON, WORKER)
 			print_v('Tmux session validated', verbose)
 		except subprocess.CalledProcessError as e:
 			# if e.stderr.strip() != f"can't find session: {SESSION}":
@@ -989,7 +992,7 @@ def main():
 		#first time use, or after restart
 		if create:
 			try:
-				result = setup_tmux_session(SESSION, DAEMON, WORKER)
+				_ = setup_tmux_session(SESSION, DAEMON, WORKER)
 			except subprocess.CalledProcessError as e:
 				print("Ran into an unexpected issue when creating tmux sessions: ")
 				print(e.stderr)
@@ -997,7 +1000,7 @@ def main():
 
 		#run the daemon
 		try:
-			result = start('daemon', SESSION, SCRIPT_PATH, verbose, args.proceed_onFF, args.daemon_project)
+			_ = start('daemon', SESSION, SCRIPT_PATH, verbose, args.proceed_onFF, args.daemon_project)
 			print_v("daemon started successfully", verbose)
 			print_v("proceeding on first fail", verbose and args.proceed_onFF)
 			print_v(f"using project: {args.daemon_project}", verbose and args.daemon_project is not None)
