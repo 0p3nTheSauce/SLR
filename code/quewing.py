@@ -813,10 +813,10 @@ def daemon(verbose: bool=True, max_retries: int=5, proceed_onFF:bool=False,
 		project = PROJECT
 		
 	advice = handle_already_running(ENTITY, project,
-																 check_interval = RETRY_WAIT_TIME,
-																 verbose=verbose,
-																 max_retries=max_retries,
-																 run_id=run_id)
+										check_interval = RETRY_WAIT_TIME,
+										verbose=verbose,
+										max_retries=max_retries,
+										run_id=run_id)
 	proceed = advice or proceed_onFF	
  
 	while proceed:
