@@ -662,7 +662,7 @@ def test_shelly():
 
 def test_shelly2():
 	import cmd
-	from quewing2 import que
+	from quewing2 import que, join_session
 	
 	class QueShell(cmd.Cmd):
 		intro = 'Queue Management Shell. Type help or ? to list commands.\n'
@@ -677,6 +677,13 @@ def test_shelly2():
 			self.que.create_run()
 			self.que.save_state()
 		
+		def do_join_session(self, arg):
+			"""Join a tmux session: join_session <wndw_name> <sesh_name>"""
+			args = arg.split()
+			res = join_session(args[0], args[1])
+			if res:
+				self.que.print_v("success")
+   
 		def do_next(self, arg):
 			"""Get the next run from the queue"""
 			next_run = self.que.get_next_run()
