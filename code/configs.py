@@ -249,8 +249,11 @@ def take_args(splits_available, models_available, make=False) -> Optional[tuple]
 	# Load config
 	arg_dict = vars(args)
 	clean_dict = {}
+ 
+	redundants = ['project', 'tags', 'enum_exp', 'enum_chck', 'entity']
+ 
 	for key, value in arg_dict.items():
-		if key == 'project' or key == 'tags': #I don't wandb redundant
+		if key in redundants:
 			continue
 		if value is not None:
 			clean_dict[key] = value
