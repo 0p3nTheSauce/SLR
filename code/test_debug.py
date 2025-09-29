@@ -642,5 +642,23 @@ def test_send():
 		"que_training"
 	)
 
+def test_shelly():
+	import cmd
+
+	class MyShell(cmd.Cmd):
+		intro = 'Welcome! Type help or ? to list commands.\n'
+		prompt = '> '
+
+		def do_greet(self, arg):
+			"""Greet someone: greet <name>"""
+			print(f'Hello, {arg}!')
+		
+		def do_quit(self, arg):
+			"""Exit the application"""
+			return True
+
+	
+	MyShell().cmdloop()
+
 if __name__ == "__main__":
-	test_send()
+	test_shelly()

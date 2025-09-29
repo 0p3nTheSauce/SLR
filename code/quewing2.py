@@ -125,6 +125,7 @@ class que:
 		if maybe_args:
 			arg_dict, tags, output, save_path, project, entity = maybe_args
 		else:
+			self.print_v("Training cancelled by user")
 			return
   
 
