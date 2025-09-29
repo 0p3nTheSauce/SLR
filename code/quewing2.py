@@ -3,7 +3,7 @@ import json
 from typing import Optional, Callable, Tuple, Any
 import subprocess
 import time
-import cmd
+import cmd as cmdLib
 # locals
 import configs
 import utils
@@ -304,18 +304,26 @@ class que:
 def join_session(
 	wndw_name: str,
 	sesh_name: str,
-) -> subprocess.CompletedProcess[bytes]:
+) -> None:
 	"""Join a tmux session and optionally target a specific window."""
 	tmux_cmd = ["tmux", "attach-session", "-t", f"{sesh_name}:{wndw_name}"]
-	return subprocess.run(tmux_cmd, check=True)
+	try:
+		_ = subprocess.run(tmux_cmd, check=True)
+	except subprocess.CalledProcessError as e:
+		print("join_session ran into an error when spawning the worker process: ")
+		print(e.stderr)
 
 
 def switch_to_window(
 	wndw_name: str, sesh_name: str
-) -> subprocess.CompletedProcess[bytes]:
+) -> None:
 	"""Switch to specific window by index."""
 	tmux_cmd = ["tmux", "select-window", "-t", f"{sesh_name}:{wndw_name}"]
-	return subprocess.run(tmux_cmd, check=True)
+	try:
+		_ = subprocess.run(tmux_cmd, check=True)
+	except subprocess.CalledProcessError as e:
+		print("switch_to_window ran into an error when spawning the worker process: ")
+		print(e.stderr)
 
 
 def send(
@@ -377,7 +385,7 @@ class worker:
 
 	def start_here(self, next_run: dict, args: Optional[list[str]]=None) -> None:
 		'''Blocking start which prints worker output in daemon terminal'''
-    
+	
 		store_Data(self.temp_path, next_run)
 		cmd = [self.exec_path, self.wr_name]
 		if args:
@@ -396,10 +404,10 @@ class worker:
 		cmd = [self.exec_path, self.wr_name]
 		if args:
 			cmd.extend(args)
-    
+	
 		return subprocess.Popen(cmd, 
-                           stdout=open(self.log_path, 'w'),
-                           stderr=subprocess.STDOUT)
+						   stdout=open(self.log_path, 'w'),
+						   stderr=subprocess.STDOUT)
    
 	def monitor_log(self):
 		send(f"tail -f {self.log_path}", self.wr_name, self.sesh_name)
@@ -416,19 +424,31 @@ class daemon:
 		imp_path: str = IMP_PATH,
 		exec_path: str = WR_PATH,
 		verbose: bool = True,
-	):
+		wr: Optional[worker] = None,
+		q: Optional[que] = None
+	) -> None:
+     
 		self.name = name
 		self.w_name = w_name
 		self.sesh = sesh
 		self.runs_path = Path(runs_path)
 		self.temp_path = Path(temp_path)
-		self.que = que(runs_path=runs_path, implemented_path=imp_path, verbose=verbose)
-		self.worker = worker(
-			exec_path=exec_path,
-			temp_path=temp_path,
-			wr_name=w_name,
-			sesh_name=sesh
-		)
+		if wr:
+			self.worker = wr
+		else:
+			self.worker = worker(
+				exec_path=exec_path,
+				temp_path=temp_path,
+				wr_name=w_name,
+				sesh_name=sesh
+			)
+		if q:
+			self.que = q
+		else:	
+			self.que = que(runs_path=runs_path,
+					implemented_path=imp_path,
+					verbose=verbose
+			)
 		self.verbose = verbose
 
 
@@ -481,11 +501,24 @@ class daemon:
 				self.print_v(f"Process failed with return code: {return_code}")
 		
   
-class QueShell(cmd.Cmd):
-    intro = 'QueShell: Type help or ? to list commands.\n'
-    prompt = '(QueShell) '
-    
-    
+class QueShell(cmdLib.Cmd):
+	intro = 'QueShell: Type help or ? to list commands.\n'
+	prompt = '(QueShell)$ '
+	
+	def __init__(self, 
+				dn_name:str = DN_NAME,
+				wr_name:str = WR_NAME,
+				sesh_name:str = SESH_NAME,
+				 run_path:str = RUN_PATH,
+				 temp_path:str = TMP_PATH,
+				 imp_path: str = IMP_PATH,
+				exec_path: str = WR_PATH,
+				verbose: bool = True,
+				 ) -> None:
+		super().__init__()
+		self.
+	
+	
 
 if __name__ == "__main__":
 	# try:
