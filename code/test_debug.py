@@ -660,5 +660,77 @@ def test_shelly():
 	
 	MyShell().cmdloop()
 
+def test_shelly2():
+	import cmd
+	from quewing2 import que
+	
+	class QueShell(cmd.Cmd):
+		intro = 'Queue Management Shell. Type help or ? to list commands.\n'
+		prompt = '(que) > '
+		
+		def __init__(self, runs_path: str, implemented_path: str, verbose: bool = True):
+			super().__init__()
+			self.que = que(runs_path, implemented_path, verbose)
+		
+		def do_create(self, arg):
+			"""Create a new run and add it to the queue"""
+			self.que.create_run()
+			self.que.save_state()
+		
+		def do_next(self, arg):
+			"""Get the next run from the queue"""
+			next_run = self.que.get_next_run()
+			if next_run:
+				print(f"Next run: {self.que.get_config(next_run)}")
+				self.que.save_state()
+		
+		def do_list(self, arg):
+			"""List all configs in the queue"""
+			self.que.list_configs()
+		
+		def do_remove(self, arg):
+			"""Remove a run from the queue: remove [to_run|old_runs] [index]"""
+			args = arg.split()
+			loc = args[0] if len(args) > 0 else None
+			idx = int(args[1]) if len(args) > 1 else None
+			self.que.remove_run(loc, idx)
+			self.que.save_state()
+		
+		def do_return_old(self, arg):
+			"""Return old runs back to the queue: return_old [num_from_end]"""
+			num = int(arg) if arg.strip() else None
+			self.que.return_old(num)
+			self.que.save_state()
+		
+		def do_shuffle(self, arg):
+			"""Shuffle/reorder runs in the queue"""
+			self.que.shuffle_configs()
+			self.que.save_state()
+		
+		def do_clear(self, arg):
+			"""Clear runs: clear [past] [future]"""
+			past = 'past' in arg.lower()
+			future = 'future' in arg.lower()
+			self.que.clear_runs(past, future)
+			self.que.save_state()
+		
+		def do_save(self, arg):
+			"""Manually save the current state"""
+			self.que.save_state()
+		
+		def do_quit(self, arg):
+			"""Exit the shell"""
+			print("Goodbye!")
+			return True
+		
+		def do_exit(self, arg):
+			"""Exit the shell"""
+			return self.do_quit(arg)
+	from quewing2 import RUN_PATH, IMP_PATH
+	QueShell(
+		runs_path=RUN_PATH,
+		implemented_path=IMP_PATH
+     ).cmdloop()
+
 if __name__ == "__main__":
-	test_shelly()
+	test_shelly2()

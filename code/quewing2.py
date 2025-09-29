@@ -3,7 +3,7 @@ import json
 from typing import Optional, Callable, Tuple, Any
 import subprocess
 import time
-
+import cmd
 # locals
 import configs
 import utils
@@ -198,7 +198,11 @@ class que:
 			self.old_runs = []
 		if future:
 			self.to_run = []
-		self.print_v("Successfully cleared")
+   
+		if past ^ future:
+			self.print_v("Successfully cleared")
+		else:
+			self.print_v("No runs cleared")
 
 	def return_old(self, num_from_end: Optional[int] = None):
 		"""Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
@@ -295,8 +299,6 @@ class que:
 			print(self.get_config(run))
 			conf_list.append(self.get_config(run))
 		return conf_list
-
-	
 		
 
 def join_session(
@@ -478,6 +480,12 @@ class daemon:
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
 		
+  
+class QueShell(cmd.Cmd):
+    intro = 'QueShell: Type help or ? to list commands.\n'
+    prompt = '(QueShell) '
+    
+    
 
 if __name__ == "__main__":
 	# try:
