@@ -446,14 +446,10 @@ def main():
 		print(f"Run name: {run.name}")  # Human-readable name
 		print(f"Run path: {run.path}")  # entity/project/run_id format
 		
-		# Start training
-		# os.makedirs(output, exist_ok=True)
-		# os.makedirs(save_path, exist_ok=True)
+
 		train_loop(model_specifcs, run, recover=admin['recover'])
 	else:
 		print("Training cancelled")
-		# os.removedirs(output,)
-		# shutil.rmtree(output)
 	
 if __name__ == '__main__':
 	main()
