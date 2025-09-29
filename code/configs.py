@@ -1,11 +1,9 @@
 import configparser
 import argparse
-import importlib
 import ast
 from typing import Dict, Any
-
+import json
 from utils import enum_dir, print_dict
-import wandb
 from stopping import EarlyStopper
 from pathlib import Path
 
@@ -106,7 +104,6 @@ def print_config_old(config_dict, title='Training'):
 	admin = config_dict.get('admin', {})
 	model = admin.get('model', 'Unknown Model')
 	split = admin.get('split', 'unknown')
-	exp_no = admin.get('exp_no', '000')
 	
 	# Print header
 	print(f"{title} {model} on split {split}")
@@ -247,37 +244,24 @@ def take_args(splits_available, models_available, make=False):
 	
 	
 if __name__ == '__main__':
-	from models.pytorch_mvit import MViTv2S_basic 
-	from models.pytorch_swin3d import Swin3DBig_basic
-	# config_path = './configfiles/asl100/MViT_V2_S_000.ini'
-	# config = configparser.ConfigParser()
-	# config.read(config_path)    
-	# for section in config.sections():
-	# 	print(section)
-	model_info = {
-		"MViT_V2_S" : {
-			"class" : MViTv2S_basic,
-			"mean" : [0.45, 0.45, 0.45],
-			"std" : [0.225, 0.225, 0.225]
-		},
-		"Swin3D_B" : {
-			"class" : Swin3DBig_basic,
-			"mean" : [0.485, 0.456, 0.406],
-			"std" : [0.229, 0.224, 0.225],
-		}
-	}
-	available_model = model_info.keys()
-	available_splits = ['asl100', 'asl300']
-	arg_dict, tags, output, save_path, project, entity = take_args(available_splits, available_model, make=False)
-	print(f'project selected: {project}')
+
+	with open('./info/wlasl_implemented_info.json', 'r') as f:
+		info = json.load(f)
  
-	print_dict(arg_dict)
-	print()
+	model_info = info['models']
+ 
+	available_model = model_info.keys()
+	available_splits = info['splits']
+	arg_dict, tags, output, save_path, project, entity = take_args(available_splits, available_model, make=False)
+	# print(f'project selected: {project}')
+ 
+	# print_dict(arg_dict)
+	# print()
 	config = load_config(arg_dict, verbose=True)
 	# print_dict(config)
-	print()
+	# print()
 	print_config(config)
-	print(tags)
+	# print(tags)
 	# run = wandb.init(
 	# 	entity='ljgoodall2001-rhodes-university',
 	# 	project='Testing-configs',
