@@ -17,6 +17,8 @@ ENTITY= 'ljgoodall2001-rhodes-university'
 # PROJECT = 'WLASL - SLR'
 PROJECT = 'WLASL-100'
 PROJECT_BASE = 'WLASL'
+RUNS_PATH='./runs/'
+IMP_PATH = "./info/wlasl_implemented_info.json"
 
 def load_config(arg_dict, verbose=False):
 	"""Load config from flat file and merge with command line args"""
