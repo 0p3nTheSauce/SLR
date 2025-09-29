@@ -10,16 +10,17 @@ from argparse import ArgumentParser
 
 
 
-from typing import Callable
+from typing import Callable, Optional
 
 
 ############### Input ##################
 
 def ask_nicely(message: str,
                requirment: Callable[[str], bool],
-               error: str) -> str:
+               error: Optional[str] = None) -> str:
 	passed=False
 	ans = 'none'
+
 	while not passed:
 		passed=True
 		ans = input(message)
@@ -47,7 +48,7 @@ def string_nested_dict(diction):
 			ans += f'{key} : {string_nested_dict(value)}\n'
 		ans += "}\n"
 	else:
-		ans += str(dict)
+		ans += str(diction)
 	return ans
 
 
