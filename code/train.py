@@ -168,7 +168,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 
 	try:
 		drop_p = config.model_params['drop_p']
-	except Exception as e:
+	except Exception as _:
 		drop_p = None
  
 	model = get_model(model_info['idx'], num_classes, drop_p)
@@ -363,7 +363,7 @@ def train_loop(model_info, wandb_run, load=None, save_every=5,
 				# Save best model
 				if epoch_loss < best_val_score:
 					best_val_score = epoch_loss
-					model_name = save_path / f'best.pth'
+					model_name = save_path / 'best.pth'
 					torch.save(model.state_dict(), model_name)
 					print(f'New best model saved: {model_name} (Loss: {epoch_loss:.2f}%)')
 			
@@ -400,8 +400,11 @@ def main():
 	available_splits = info['splits']
 	model_info = info['models']
 	
-	arg_dict, tags, output, save_path, project = take_args(available_splits, model_info.keys())
-	
+	maybe_args = take_args(available_splits, model_info.keys())
+	if maybe_args:
+		arg_dict, tags, project, entity = maybe_args
+	else:
+		return
 	config = load_config(arg_dict, verbose=True)
 	
 	print_config(config)
@@ -425,7 +428,7 @@ def main():
 				
 			print(f"Resuming run with ID: {run_id}")
 			run = wandb.init(
-				entity=ENTITY,
+				entity=entity,
 				project=project,
 				id=run_id,
 				resume='must',

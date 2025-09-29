@@ -119,9 +119,14 @@ class que:
 		available_splits = self.implemented_info["splits"]
 		model_info = self.implemented_info["models"]
 
-		arg_dict, tags, output, save_path, project, entity = configs.take_args(
+		maybe_args = configs.take_args(
 			available_splits, model_info.keys()
 		)
+		if maybe_args:
+			arg_dict, tags, output, save_path, project, entity = maybe_args
+		else:
+			return
+  
 
 		config = configs.load_config(arg_dict, verbose=True)
 

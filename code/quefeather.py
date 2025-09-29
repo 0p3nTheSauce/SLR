@@ -1,11 +1,8 @@
 #!/home/luke/miniconda3/envs/wlasl/bin/python
 
-import json
 import wandb
-import os
-import sys
 from train import train_loop
-from quewing import daemon, TEMP_PATH, print_v, clean_Temp, store_Temp, retrieve_Temp, get_run_id
+from quewing import daemon, TEMP_PATH, print_v, store_Temp, retrieve_Temp, get_run_id
 import argparse
 import time
 
@@ -25,8 +22,6 @@ def run_train(verbose=False):
   entity = info['entity']
   project = info['project']
   tags = info['tags']
-  output = info['output']
-  save_path = info['save_path']
 
   admin = config['admin']
     
@@ -102,10 +97,10 @@ def main():
   subparsers = parser.add_subparsers(dest='mode', help='Operation mode', required=True)
 
   # Daemon subcommand
-  daemon_parser = subparsers.add_parser('daemon', help='Run as daemon')
+  _ = subparsers.add_parser('daemon', help='Run as daemon')
 
   # Worker subcommand  
-  worker_parser = subparsers.add_parser('worker', help='Run as worker')
+  _ = subparsers.add_parser('worker', help='Run as worker')
 
   # Separator subcommand (optional title)
   separator_parser = subparsers.add_parser('separator', help='Run as separator')

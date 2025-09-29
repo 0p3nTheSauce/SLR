@@ -3,11 +3,11 @@ import argparse
 import ast
 from typing import Dict, Any
 import json
-from utils import enum_dir, print_dict
+from utils import enum_dir, print_dict, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
 
-
+from typing import Optional
 
 #TODO: make configs the sole source of these constants
 
@@ -154,7 +154,7 @@ def print_config(config_dict):
 			print(f"    {key:<{max_key_len}} : {value}")
 		print()
 
-def take_args(splits_available, models_available, make=False):
+def take_args(splits_available, models_available, make=False) -> Optional[tuple]:
 	parser = argparse.ArgumentParser(description='Train a model')
  
 	#admin
@@ -198,16 +198,47 @@ def take_args(splits_available, models_available, make=False):
 	args.exp_no = exp_no
 	args.root = '../data/WLASL/WLASL2000'
 	args.labels = f'./preprocessed/labels/{args.split}'
-	output = f'runs/{args.split}/{args.model}_exp{exp_no}'
+	output = Path(f'runs/{args.split}/{args.model}_exp{exp_no}')
 	
 	#recovering
-	if not args.recover and args.enum_exp: #fresh run
-		output = enum_dir(output, make)  	
+	if not args.recover and output.exists(): #fresh run
+	
+		if not args.enum_exp:
+			ans = ask_nicely(
+				message=f'{output} already exists, do you want to cancel, proceed, or enumerate (c, p, e): ',
+				requirment=lambda x: x.lower() in ['c', 'p', 'e'],
+				error=f"Must choose one of: {['c', 'p', 'e']}"
+			)
+		else:
+			ans = 'e'
+   
+		if ans.lower() == 'e':
+			output = enum_dir(output, make) 
+   
+		if ans.lower() == 'c':
+			return
+
 
 	#saving
-	save_path = f'{output}/checkpoints'
-	if not args.recover and args.enum_chck:
-		args.save_path = enum_dir(save_path, make) 
+	save_path = output / 'checkpoints'
+	# if not args.recover and args.enum_chck:
+	if not args.recover and save_path.exists():
+		
+		if not args.enum_chck:
+			ans = ask_nicely(
+				message=f'{save_path} already exists, do you want to cancel, overwrite, or enumerate (c, o, e): ',
+				requirment=lambda x: x.lower() in ['c', 'o', 'e'],
+				error=f"Must choose one of: {['c', 'o', 'e']}"
+			)
+		else:
+			ans = 'e'
+   
+		if ans.lower() == 'e':
+			args.save_path = enum_dir(save_path, make) 
+   
+		if ans.lower() == 'c':
+			return
+  
 	else:
 		args.save_path = save_path
 	
@@ -236,15 +267,12 @@ def take_args(splits_available, models_available, make=False):
 
 
 
-	return clean_dict, tags, output, save_path, args.project, args.entity
+	return clean_dict, tags, args.project, args.entity
 
 
 # def print_wandb_config(config):
 	
-	
-	
-if __name__ == '__main__':
-
+def main():
 	with open('./info/wlasl_implemented_info.json', 'r') as f:
 		info = json.load(f)
  
@@ -252,23 +280,18 @@ if __name__ == '__main__':
  
 	available_model = model_info.keys()
 	available_splits = info['splits']
-	arg_dict, tags, output, save_path, project, entity = take_args(available_splits, available_model, make=False)
-	# print(f'project selected: {project}')
+	maybe_args = take_args(available_splits, available_model, make=False)
+	if maybe_args:
+		arg_dict, tags, project, entity = maybe_args
+	else:
+		return
  
-	# print_dict(arg_dict)
-	# print()
 	config = load_config(arg_dict, verbose=True)
-	# print_dict(config)
-	# print()
 	print_config(config)
-	# print(tags)
-	# run = wandb.init(
-	# 	entity='ljgoodall2001-rhodes-university',
-	# 	project='Testing-configs',
-	# 	name=f"{config['admin']['model']}_{config['admin']['split']}_exp{config['admin']['split']}",
-	# 	tags=tags,
-	# 	config=config      
-	# )
-	# wconf = run.config
-	# print(type(wconf))
+	print('\n'*2)
  
+	print_dict(config)
+ 
+if __name__ == '__main__':
+	main()
+	

@@ -378,8 +378,11 @@ def create_run(verbose:bool=True) -> None:
 	available_splits = info['splits']
 	model_info = info['models']
 	
-	arg_dict, tags, output, save_path, project, entity = take_args(available_splits, model_info.keys())
-	
+	maybe_args = take_args(available_splits, model_info.keys())
+	if maybe_args:
+		arg_dict, tags, project, entity = maybe_args
+	else:
+		return
 	config = load_config(arg_dict, verbose=True)
 	
 	print_config(config)
@@ -396,8 +399,6 @@ def create_run(verbose:bool=True) -> None:
 			'entity': entity,
 			'project': project,
 			'tags': tags,
-			'output': output,
-			'save_path': save_path
 		}
 			
 		add_new_run(RUNS_PATH, info, verbose=verbose)
