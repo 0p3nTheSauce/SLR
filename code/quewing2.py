@@ -4,7 +4,7 @@ from typing import Optional, Callable, Tuple, Any, List
 import subprocess
 import time
 import cmd as cmdLib
-
+import shlex
 # locals
 import configs
 import utils
@@ -46,6 +46,7 @@ class que:
 		assert implemented_path.exists(), f"{implemented_path} does not exist"
 		self.implemented_info = retrieve_Data(implemented_path)
 		assert self.implemented_info, "No implemented info found"
+  
 		self.verbose = verbose
 		self.old_runs = []
 		self.to_run = []
@@ -87,6 +88,8 @@ class que:
 			data = {"old_runs": [], "to_run": []}
 		return data
 
+
+
 	def _remove_a_run(self, location: str, idx: int):
 		"Removes a run from the run queue"
 		all_runs = self.load_state()
@@ -126,46 +129,6 @@ class que:
 		else:
 			self.print_v("No runs cleared")
 
-	def return_old(self, num_from_end: Optional[int] = None):
-		"""Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
-		Default behavior is to ask, otherwise moves multiple
-		runs from the end specified by the num_from_end."""
-
-		if len(self.old_runs) == 0:
-			print("Warning there are no old_runs")
-			return
-
-		if num_from_end is None:
-			for i, run in enumerate(self.old_runs):
-				admin = run["config"]["admin"]
-				print(f"{admin['config_path']} : {i}")
-
-			to_move = []
-			print("press q to quit")
-			while True:
-				ans = utils.ask_nicely(
-					message="select index, or q: ",
-					requirment=lambda x: x.isdigit() or x == "q",
-					error="Invalid, select index, or q: ",
-				)
-				if ans == "q":
-					break
-				srun = self.old_runs.pop(int(ans))
-				if not srun:
-					print(f"Invalid idx for list of configs len: {len(self.old_runs)}")
-				else:
-					self.print_v(f"Moving: {self.get_config(srun)}, to to_run")
-					to_move.append(srun)
-
-			self.to_run = to_move + self.to_run
-
-		else:
-			old2mv = []  # return runs to the begining of to_run
-			for _ in range(num_from_end):
-				old2mv.append(self.old_runs.pop(-1))
-			self.to_run = old2mv + self.to_run
-			self.print_v(f"moved {num_from_end} from old")
-
 	def list_configs(self) -> List:
 		conf_list = []
 		if len(self.to_run) == 0:
@@ -177,16 +140,22 @@ class que:
 
 	#High level functions taking multistep input
 
-	def create_run_argsH(self):
+	def create_run(self, sup_args: Optional[List[str]] = None):
 		"""Add a new entry to to_run"""
 		available_splits = self.implemented_info["splits"]
 		model_info = self.implemented_info["models"]
 
-		maybe_args = configs.take_args(available_splits, model_info.keys())
+		try:
+			maybe_args = configs.take_args(available_splits, model_info.keys(), sup_args)
+		except SystemExit as _:
+			maybe_args = None
+
+		assert isinstance(maybe_args, tuple), "Create runs needs arguments"
+  
 		if maybe_args:
 			arg_dict, tags, output, save_path, project, entity = maybe_args
 		else:
-			self.print_v("Training cancelled by user")
+			self.print_v("Nothing added to que")
 			return
 
 		config = configs.load_config(arg_dict, verbose=True)
@@ -199,8 +168,8 @@ class que:
 			message="Confirm: y/n: ",
 			requirment=lambda x: x.lower() in ["y", "n"],
 			error="y or n: ",
-		)
-		if proceed.lower() == "y":
+		).lower() == "y"
+		if proceed:
 			self.print_v("Saving run info")
 
 			info = {
@@ -217,7 +186,7 @@ class que:
 		else:
 			self.print_v("Training cancelled by user")		
 
-	def remove_run_H(self, loc: Optional[str] = None, idx: Optional[int] = None):
+	def remove_run(self, loc: Optional[str] = None, idx: Optional[int] = None):
 		"""remove a run"""
 		all_runs = self.load_state()
 
@@ -298,6 +267,46 @@ class que:
 			f"Run: {self.get_config(srun)} \
 		successfully moved to position: {newpos}"
 		)
+
+	def return_old(self, num_from_end: Optional[int] = None):
+		"""Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
+		Default behavior is to ask, otherwise moves multiple
+		runs from the end specified by the num_from_end."""
+
+		if len(self.old_runs) == 0:
+			print("Warning there are no old_runs")
+			return
+
+		if num_from_end is None:
+			for i, run in enumerate(self.old_runs):
+				admin = run["config"]["admin"]
+				print(f"{admin['config_path']} : {i}")
+
+			to_move = []
+			print("press q to quit")
+			while True:
+				ans = utils.ask_nicely(
+					message="select index, or q: ",
+					requirment=lambda x: x.isdigit() or x == "q",
+					error="Invalid, select index, or q: ",
+				)
+				if ans == "q":
+					break
+				srun = self.old_runs.pop(int(ans))
+				if not srun:
+					print(f"Invalid idx for list of configs len: {len(self.old_runs)}")
+				else:
+					self.print_v(f"Moving: {self.get_config(srun)}, to to_run")
+					to_move.append(srun)
+
+			self.to_run = to_move + self.to_run
+
+		else:
+			old2mv = []  # return runs to the begining of to_run
+			for _ in range(num_from_end):
+				old2mv.append(self.old_runs.pop(-1))
+			self.to_run = old2mv + self.to_run
+			self.print_v(f"moved {num_from_end} from old")
 
 
 def join_session(
@@ -538,11 +547,14 @@ class QueShell(cmdLib.Cmd):
 			imp_path=imp_path,
 			exec_path=exec_path,
 		)
+	
+
+  
 		
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
-		self.que.create_run()
-		self.que.save_state()
+		self.que.create_run(shlex.split(arg))
+		
 
 
 if __name__ == "__main__":
