@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 import json
 from typing import Optional, Callable, Tuple, Any, List 
 import subprocess
@@ -44,9 +45,10 @@ class que:
 		self.runs_path = Path(runs_path)
 		implemented_path = Path(implemented_path)
 		assert implemented_path.exists(), f"{implemented_path} does not exist"
-		self.implemented_info = retrieve_Data(implemented_path)
-		assert self.implemented_info, "No implemented info found"
-  
+		implemented_info = retrieve_Data(implemented_path)
+		assert implemented_info, "No implemented info found"
+		self.imp_models = implemented_info["models"]
+		self.imp_splits = implemented_info["splits"]
 		self.verbose = verbose
 		self.old_runs = []
 		self.to_run = []
@@ -141,12 +143,10 @@ class que:
 	#High level functions taking multistep input
 
 	def create_run(self, sup_args: Optional[List[str]] = None):
-		"""Add a new entry to to_run"""
-		available_splits = self.implemented_info["splits"]
-		model_info = self.implemented_info["models"]
+		"""Add a new entry to to_run, using args from configs.take_args"""
 
 		try:
-			maybe_args = configs.take_args(available_splits, model_info.keys(), sup_args)
+			maybe_args = configs.take_args(self.imp_splits, self.imp_models.keys(), sup_args)
 		except SystemExit as _:
 			maybe_args = None
 
@@ -162,7 +162,7 @@ class que:
 
 		configs.print_config(config)
 
-		model_specifics = model_info[config["admin"]["model"]]
+		model_specifics = self.imp_models[config["admin"]["model"]]
 
 		proceed = utils.ask_nicely(
 			message="Confirm: y/n: ",
@@ -308,6 +308,8 @@ class que:
 			self.to_run = old2mv + self.to_run
 			self.print_v(f"moved {num_from_end} from old")
 
+
+#TODO: put this in a class
 
 def join_session(
 	wndw_name: str,
@@ -548,8 +550,18 @@ class QueShell(cmdLib.Cmd):
 			exec_path=exec_path,
 		)
 	
-
-  
+	def do_help(self, arg):
+		"""Override help to provide detailed argparse help for create"""
+		if arg == 'create':
+			parser = configs.take_args(
+				self.que.imp_splits,
+				self.que.imp_models, 
+				return_parser_only=True
+			)
+			assert isinstance(parser, argparse.ArgumentParser)
+			parser.print_help()
+		else:
+			super().do_help(arg)
 		
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
