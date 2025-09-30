@@ -1,6 +1,6 @@
 from pathlib import Path
 import json
-from typing import Optional, Callable, Tuple, Any
+from typing import Optional, Callable, Tuple, Any, List 
 import subprocess
 import time
 import cmd as cmdLib
@@ -114,84 +114,6 @@ class que:
 			self.print_v("No runs in the queue.")
 			return None
 
-	def create_run_args(self):
-		"""Add a new entry to to_run"""
-		available_splits = self.implemented_info["splits"]
-		model_info = self.implemented_info["models"]
-
-		maybe_args = configs.take_args(available_splits, model_info.keys())
-		if maybe_args:
-			arg_dict, tags, output, save_path, project, entity = maybe_args
-		else:
-			self.print_v("Training cancelled by user")
-			return
-
-		config = configs.load_config(arg_dict, verbose=True)
-
-		configs.print_config(config)
-
-		model_specifics = model_info[config["admin"]["model"]]
-
-		proceed = utils.ask_nicely(
-			message="Confirm: y/n: ",
-			requirment=lambda x: x.lower() in ["y", "n"],
-			error="y or n: ",
-		)
-		if proceed.lower() == "y":
-			self.print_v("Saving run info")
-
-			info = {
-				"model_info": model_specifics,
-				"config": config,
-				"entity": entity,
-				"project": project,
-				"tags": tags,
-				"output": output,
-				"save_path": save_path,
-			}
-			self.to_run.append(info)
-			self.print_v(f"Added new run: {info}")
-		else:
-			self.print_v("Training cancelled by user")
-
-	def create_run(self, args: Optional[tuple]) -> None:
-		
-
-	def remove_run(self, loc: Optional[str] = None, idx: Optional[int] = None):
-		"""remove a run"""
-		all_runs = self.load_state()
-
-		av_loc = ["to_run", "old_runs", "q"]
-		if loc is None or loc not in av_loc:
-			loc = utils.ask_nicely(
-				message=f"Choose location: {av_loc}",
-				requirment=lambda x: x in av_loc,
-				error=f"one of {av_loc}: ",
-			)
-			if loc == "q":
-				self.print_v("cancelled")
-				return
-
-		if idx is not None:
-			self._remove_a_run(loc, idx)
-		else:
-			for i, run in enumerate(all_runs[loc]):
-				print(f"{self.get_config(run)} : {i}")
-
-			if len(all_runs["to_run"]) == 0:
-				print("runs are finished")
-			else:
-				ans = utils.ask_nicely(
-					message="select index, or q: ",
-					requirment=lambda x: x.isdigit() or x == "q",
-					error="select index, or q: ",
-				)
-				if ans == "q":
-					self.print_v("cancelled")
-					return
-				else:
-					self._remove_a_run(loc, int(ans))
-
 	def clear_runs(self, past: bool = False, future: bool = False):
 		"""reset the runs queue"""
 		if past:
@@ -244,6 +166,92 @@ class que:
 			self.to_run = old2mv + self.to_run
 			self.print_v(f"moved {num_from_end} from old")
 
+	def list_configs(self) -> List:
+		conf_list = []
+		if len(self.to_run) == 0:
+			print("runs are finished")
+		for run in self.to_run:
+			print(self.get_config(run))
+			conf_list.append(self.get_config(run))
+		return conf_list
+
+	#High level functions taking multistep input
+
+	def create_run_argsH(self):
+		"""Add a new entry to to_run"""
+		available_splits = self.implemented_info["splits"]
+		model_info = self.implemented_info["models"]
+
+		maybe_args = configs.take_args(available_splits, model_info.keys())
+		if maybe_args:
+			arg_dict, tags, output, save_path, project, entity = maybe_args
+		else:
+			self.print_v("Training cancelled by user")
+			return
+
+		config = configs.load_config(arg_dict, verbose=True)
+
+		configs.print_config(config)
+
+		model_specifics = model_info[config["admin"]["model"]]
+
+		proceed = utils.ask_nicely(
+			message="Confirm: y/n: ",
+			requirment=lambda x: x.lower() in ["y", "n"],
+			error="y or n: ",
+		)
+		if proceed.lower() == "y":
+			self.print_v("Saving run info")
+
+			info = {
+				"model_info": model_specifics,
+				"config": config,
+				"entity": entity,
+				"project": project,
+				"tags": tags,
+				"output": output,
+				"save_path": save_path,
+			}
+			self.to_run.append(info)
+			self.print_v(f"Added new run: {info}")
+		else:
+			self.print_v("Training cancelled by user")		
+
+	def remove_run_H(self, loc: Optional[str] = None, idx: Optional[int] = None):
+		"""remove a run"""
+		all_runs = self.load_state()
+
+		av_loc = ["to_run", "old_runs", "q"]
+		if loc is None or loc not in av_loc:
+			loc = utils.ask_nicely(
+				message=f"Choose location: {av_loc}",
+				requirment=lambda x: x in av_loc,
+				error=f"one of {av_loc}: ",
+			)
+			if loc == "q":
+				self.print_v("cancelled")
+				return
+
+		if idx is not None:
+			self._remove_a_run(loc, idx)
+		else:
+			for i, run in enumerate(all_runs[loc]):
+				print(f"{self.get_config(run)} : {i}")
+
+			if len(all_runs["to_run"]) == 0:
+				print("runs are finished")
+			else:
+				ans = utils.ask_nicely(
+					message="select index, or q: ",
+					requirment=lambda x: x.isdigit() or x == "q",
+					error="select index, or q: ",
+				)
+				if ans == "q":
+					self.print_v("cancelled")
+					return
+				else:
+					self._remove_a_run(loc, int(ans))
+
 	def shuffle_configs(self):
 		if len(self.to_run) == 0:
 			print("Warning, to_run is empty")
@@ -290,15 +298,6 @@ class que:
 			f"Run: {self.get_config(srun)} \
 		successfully moved to position: {newpos}"
 		)
-
-	def list_configs(self):
-		conf_list = []
-		if len(self.to_run) == 0:
-			print("runs are finished")
-		for run in self.to_run:
-			print(self.get_config(run))
-			conf_list.append(self.get_config(run))
-		return conf_list
 
 
 def join_session(
@@ -415,6 +414,24 @@ class worker:
 
 
 class daemon:
+	'''Class for the queue daemon process. The function works in a fetch execute repeat
+	cycle. The function reads runs from the queRuns.json file, then writes them to the
+	queTemp.json file for the worker process to find. The daemon spawns the worker, then 
+	waits for it to complete before proceeding. The daemon runs in it's own tmux session, 
+	while the worker outputs to a log file. 
+	
+	Args:
+		name: of own tmux window
+		w_name: of worker tmux window (monitor)
+		sesh: tmux session name
+		runs_path: to queRuns.json 
+		temp_path: to queTemp.json 
+		imp_path: to implemented_info.json
+		exec_path: to quefeather.py 
+		verbose: speaks to you
+		wr: supply its worker
+		q: supply its que
+	'''
 	def __init__(
 		self,
 		name: str = DN_NAME,
