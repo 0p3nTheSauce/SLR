@@ -4,6 +4,7 @@ from typing import Optional, Callable, Tuple, Any
 import subprocess
 import time
 import cmd as cmdLib
+
 # locals
 import configs
 import utils
@@ -33,7 +34,6 @@ def store_Data(path: Path, data: dict):
 		json.dump(data, file, indent=4)
 
 
-
 class que:
 	def __init__(
 		self,
@@ -54,8 +54,8 @@ class que:
 	@classmethod
 	def get_config(cls, next_run: dict) -> str:
 		admin = next_run["config"]["admin"]
-		return admin['config_path']
-		
+		return admin["config_path"]
+
 	def print_v(self, message: str) -> None:
 		"""Prints a message if verbose is True."""
 		if self.verbose:
@@ -114,20 +114,17 @@ class que:
 			self.print_v("No runs in the queue.")
 			return None
 
-	def create_run(self):
+	def create_run_args(self):
 		"""Add a new entry to to_run"""
 		available_splits = self.implemented_info["splits"]
 		model_info = self.implemented_info["models"]
 
-		maybe_args = configs.take_args(
-			available_splits, model_info.keys()
-		)
+		maybe_args = configs.take_args(available_splits, model_info.keys())
 		if maybe_args:
 			arg_dict, tags, output, save_path, project, entity = maybe_args
 		else:
 			self.print_v("Training cancelled by user")
 			return
-  
 
 		config = configs.load_config(arg_dict, verbose=True)
 
@@ -157,6 +154,9 @@ class que:
 		else:
 			self.print_v("Training cancelled by user")
 
+	def create_run(self, args: Optional[tuple]) -> None:
+		
+
 	def remove_run(self, loc: Optional[str] = None, idx: Optional[int] = None):
 		"""remove a run"""
 		all_runs = self.load_state()
@@ -177,7 +177,7 @@ class que:
 		else:
 			for i, run in enumerate(all_runs[loc]):
 				print(f"{self.get_config(run)} : {i}")
-				
+
 			if len(all_runs["to_run"]) == 0:
 				print("runs are finished")
 			else:
@@ -198,7 +198,7 @@ class que:
 			self.old_runs = []
 		if future:
 			self.to_run = []
-   
+
 		if past ^ future:
 			self.print_v("Successfully cleared")
 		else:
@@ -299,7 +299,7 @@ class que:
 			print(self.get_config(run))
 			conf_list.append(self.get_config(run))
 		return conf_list
-		
+
 
 def join_session(
 	wndw_name: str,
@@ -314,9 +314,7 @@ def join_session(
 		print(e.stderr)
 
 
-def switch_to_window(
-	wndw_name: str, sesh_name: str
-) -> None:
+def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	"""Switch to specific window by index."""
 	tmux_cmd = ["tmux", "select-window", "-t", f"{sesh_name}:{wndw_name}"]
 	try:
@@ -346,16 +344,18 @@ def print_tmux(
 ) -> None:
 	send(cmd=f"echo {message} ", wndw_name=wndw_name, sesh_name=sesh_name)
 
-def seperator(title : str="Next Run"):
+
+def seperator(title: str = "Next Run"):
 	"""This prints out a seperator between training runs"""
 	sep = ""
 	if title:
-		sep += ("\n" * 2) + ( "-" * 10) + ("\n")
+		sep += ("\n" * 2) + ("-" * 10) + ("\n")
 		sep += f"{title:^10}"
-		sep += ("\n" * 2) + ( "-" * 10) + ("\n")
+		sep += ("\n" * 2) + ("-" * 10) + ("\n")
 	else:
-		sep += '\n'
+		sep += "\n"
 	return sep
+
 
 def idle(message: str) -> str:
 	# testing if blocking
@@ -383,36 +383,37 @@ class worker:
 		self.wr_name = wr_name
 		self.sesh_name = sesh_name
 
-	def start_here(self, next_run: dict, args: Optional[list[str]]=None) -> None:
-		'''Blocking start which prints worker output in daemon terminal'''
-	
+	def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
+		"""Blocking start which prints worker output in daemon terminal"""
+
 		store_Data(self.temp_path, next_run)
 		cmd = [self.exec_path, self.wr_name]
 		if args:
 			cmd.extend(args)
-		with subprocess.Popen(cmd, 
-					  stdout=subprocess.PIPE, 
-					  stderr=subprocess.PIPE, 
-					  text=True) as proc:
+		with subprocess.Popen(
+			cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+		) as proc:
 			if proc.stdout:
 				for line in proc.stdout:
 					print(line.strip())
 
-	def start_log(self, next_run: dict,args: Optional[list[str]]=None) -> subprocess.Popen:
-		'''Non-blocking start which prints worker output to temp.json, and passes the process'''
+	def start_log(
+		self, next_run: dict, args: Optional[list[str]] = None
+	) -> subprocess.Popen:
+		"""Non-blocking start which prints worker output to temp.json, and passes the process"""
 		store_Data(self.temp_path, next_run)
 		cmd = [self.exec_path, self.wr_name]
 		if args:
 			cmd.extend(args)
-	
-		return subprocess.Popen(cmd, 
-						   stdout=open(self.log_path, 'w'),
-						   stderr=subprocess.STDOUT)
-   
+
+		return subprocess.Popen(
+			cmd, stdout=open(self.log_path, "w"), stderr=subprocess.STDOUT
+		)
+
 	def monitor_log(self):
 		send(f"tail -f {self.log_path}", self.wr_name, self.sesh_name)
-   
-   
+
+
 class daemon:
 	def __init__(
 		self,
@@ -425,9 +426,8 @@ class daemon:
 		exec_path: str = WR_PATH,
 		verbose: bool = True,
 		wr: Optional[worker] = None,
-		q: Optional[que] = None
+		q: Optional[que] = None,
 	) -> None:
-     
 		self.name = name
 		self.w_name = w_name
 		self.sesh = sesh
@@ -437,29 +437,23 @@ class daemon:
 			self.worker = wr
 		else:
 			self.worker = worker(
-				exec_path=exec_path,
-				temp_path=temp_path,
-				wr_name=w_name,
-				sesh_name=sesh
+				exec_path=exec_path, temp_path=temp_path, wr_name=w_name, sesh_name=sesh
 			)
 		if q:
 			self.que = q
-		else:	
-			self.que = que(runs_path=runs_path,
-					implemented_path=imp_path,
-					verbose=verbose
+		else:
+			self.que = que(
+				runs_path=runs_path, implemented_path=imp_path, verbose=verbose
 			)
 		self.verbose = verbose
-
 
 	def print_v(self, message: str) -> None:
 		"""Prints a message if verbose is True."""
 		if self.verbose:
 			print(message)
 
- 
 	def start_n_watch(self):
-		'''Start process in this terminal and watch'''
+		"""Start process in this terminal and watch"""
 		while True:
 			self.que.load_state()
 			next_run = self.que.get_next_run()
@@ -469,12 +463,12 @@ class daemon:
 				self.print_v("No more runs to execute")
 				break
 
-			self.print_v(seperator(que.get_config(next_run))) 
+			self.print_v(seperator(que.get_config(next_run)))
 
 			self.worker.start_here(next_run)
-   
+
 	def start_n_monitor_simple(self):
-		'''Start process and use existing tmux monitoring'''
+		"""Start process and use existing tmux monitoring"""
 		while True:
 			self.que.load_state()
 			next_run = self.que.get_next_run()
@@ -484,41 +478,55 @@ class daemon:
 				self.print_v("No more runs to execute")
 				break
 
-			self.print_v(seperator(que.get_config(next_run))) 
+			self.print_v(seperator(que.get_config(next_run)))
 
 			# Start process in background
 			proc = self.worker.start_log(next_run)
-			
+
 			# Start monitoring in tmux (non-blocking)
 			self.worker.monitor_log()
-			
+
 			# Wait for completion
 			return_code = proc.wait()
-			
+
 			if return_code == 0:
 				self.print_v("Process completed successfully")
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
-		
-  
+
+
 class QueShell(cmdLib.Cmd):
-	intro = 'QueShell: Type help or ? to list commands.\n'
-	prompt = '(QueShell)$ '
-	
-	def __init__(self, 
-				dn_name:str = DN_NAME,
-				wr_name:str = WR_NAME,
-				sesh_name:str = SESH_NAME,
-				 run_path:str = RUN_PATH,
-				 temp_path:str = TMP_PATH,
-				 imp_path: str = IMP_PATH,
-				exec_path: str = WR_PATH,
-				verbose: bool = True,
-				 ) -> None:
+	intro = "QueShell: Type help or ? to list commands.\n"
+	prompt = "(QueShell)$ "
+
+	def __init__(
+		self,
+		dn_name: str = DN_NAME,
+		wr_name: str = WR_NAME,
+		sesh_name: str = SESH_NAME,
+		run_path: str = RUN_PATH,
+		temp_path: str = TMP_PATH,
+		imp_path: str = IMP_PATH,
+		exec_path: str = WR_PATH,
+		verbose: bool = True,
+	) -> None:
 		super().__init__()
-		self.
-	
-	
+		self.que = que(run_path, imp_path, verbose)
+		self.daemon = daemon(
+			name=dn_name,
+			w_name=wr_name,
+			sesh=sesh_name,
+			runs_path=run_path,
+			temp_path=temp_path,
+			imp_path=imp_path,
+			exec_path=exec_path,
+		)
+		
+	def do_create(self, arg):
+		"""Create a new run and add it to the queue"""
+		self.que.create_run()
+		self.que.save_state()
+
 
 if __name__ == "__main__":
 	# try:
