@@ -1,7 +1,7 @@
 from pathlib import Path
 import argparse
 import json
-from typing import Optional, Callable, Tuple, Any, List 
+from typing import Optional,List, Literal
 import subprocess
 import time
 import cmd as cmdLib
@@ -21,19 +21,16 @@ RUN_PATH = "./queRuns.json"
 LOG_PATH = "./queLogs.log"
 IMP_PATH = "./info/wlasl_implemented_info.json"
 
-
 def retrieve_Data(path: Path) -> dict:
 	"""Retrieves data from a given path."""
 	with open(path, "r") as file:
 		data = json.load(file)
 	return data
 
-
 def store_Data(path: Path, data: dict):
 	"""Stores data to a given path."""
 	with open(path, "w") as file:
 		json.dump(data, file, indent=4)
-
 
 class que:
 	def __init__(
@@ -89,8 +86,6 @@ class que:
 			self.to_run = []
 			data = {"old_runs": [], "to_run": []}
 		return data
-
-
 
 	def _remove_a_run(self, location: str, idx: int):
 		"Removes a run from the run queue"
@@ -186,7 +181,37 @@ class que:
 		else:
 			self.print_v("Training cancelled by user")		
 
-	def remove_run(self, loc: Optional[str] = None, idx: Optional[int] = None):
+	def remove_run(self, loc: str,
+                	idx: int):
+		"Removes a run from the run queue"
+		# parser = argparse.ArgumentParser(description="Remove run at position, in location",
+        #                         prog='remove')
+		# parser.add_argument(
+		# 	'-loc', '--location', 
+		# 	choices=["to_run", "old_runs"],
+		# 	help="Location to save the run",
+		# 	default='to_run'
+		# )
+		# parser.add_argument(
+		# 	'-idx', '--index', 
+		# 	type=int,
+		# 	help="Position of run in location",
+		# 	required=True
+		# )
+		all_runs = self.load_state()
+		
+		if loc in all_runs.keys():
+			try:
+				rem = all_runs[loc].pop(idx)
+				self.load_state(all_runs)
+				return rem
+			except IndexError:
+				print(
+					f"Index: {idx} out of range for to run of length {len(all_runs[loc])}"
+				)
+		
+
+	def remove_run_old(self, loc: Optional[str] = None, idx: Optional[int] = None):
 		"""remove a run"""
 		all_runs = self.load_state()
 
@@ -308,7 +333,6 @@ class que:
 			self.to_run = old2mv + self.to_run
 			self.print_v(f"moved {num_from_end} from old")
 
-
 #TODO: put this in a class
 
 def join_session(
@@ -323,7 +347,6 @@ def join_session(
 		print("join_session ran into an error when spawning the worker process: ")
 		print(e.stderr)
 
-
 def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	"""Switch to specific window by index."""
 	tmux_cmd = ["tmux", "select-window", "-t", f"{sesh_name}:{wndw_name}"]
@@ -332,7 +355,6 @@ def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	except subprocess.CalledProcessError as e:
 		print("switch_to_window ran into an error when spawning the worker process: ")
 		print(e.stderr)
-
 
 def send(
 	cmd: str,
@@ -346,14 +368,12 @@ def send(
 		print("Send ran into an error when spawning the worker process: ")
 		print(e.stderr)
 
-
 def print_tmux(
 	message: str,
 	wndw_name: str,
 	sesh_name: str,
 ) -> None:
 	send(cmd=f"echo {message} ", wndw_name=wndw_name, sesh_name=sesh_name)
-
 
 def seperator(title: str = "Next Run"):
 	"""This prints out a seperator between training runs"""
@@ -366,7 +386,6 @@ def seperator(title: str = "Next Run"):
 		sep += "\n"
 	return sep
 
-
 def idle(message: str) -> str:
 	# testing if blocking
 	print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -376,7 +395,6 @@ def idle(message: str) -> str:
 		time.sleep(10)
 	print(f"Finishign at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 	return message
-
 
 class worker:
 	def __init__(
@@ -422,7 +440,6 @@ class worker:
 
 	def monitor_log(self):
 		send(f"tail -f {self.log_path}", self.wr_name, self.sesh_name)
-
 
 class daemon:
 	'''Class for the queue daemon process. The function works in a fetch execute repeat
@@ -548,6 +565,7 @@ class QueShell(cmdLib.Cmd):
 			temp_path=temp_path,
 			imp_path=imp_path,
 			exec_path=exec_path,
+			q=self.que
 		)
 	
 	def do_help(self, arg):
@@ -556,17 +574,44 @@ class QueShell(cmdLib.Cmd):
 			parser = configs.take_args(
 				self.que.imp_splits,
 				self.que.imp_models, 
-				return_parser_only=True
+				return_parser_only=True,
+				prog='create',
+				desc='Create a new training run'
 			)
 			assert isinstance(parser, argparse.ArgumentParser)
 			parser.print_help()
 		else:
 			super().do_help(arg)
-		
+	
+	def do_quit(self, arg):
+		"""Exit the shell"""
+		print("Goodbye!")
+		return True
+
+	def do_exit(self, arg):
+		"""Exit the shell"""
+		return self.do_quit(arg)
+
+	def do_EOF(self, arg):
+		"""Exit on Ctrl+D"""
+		print()  # Print newline for clean exit
+		return self.do_quit(arg)
+ 	
+	#que based functions
+
+	def do_save(self, arg):
+		"""Save state of que to queRuns.json"""
+		self.que.save_state()
+
+	def do_load(self, arg): #happens automatically anyway
+		"""Load state of que from queRuns.json"""
+		self.que.load_state() 
+  
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
 		self.que.create_run(shlex.split(arg))
-		
+	
+
 
 
 if __name__ == "__main__":
@@ -575,7 +620,4 @@ if __name__ == "__main__":
 	# except subprocess.CalledProcessError as e:
 	# 	print("Daemon ran into an error when spawning the worker process: ")
 	# 	print(e.stderr)
-	pass
-# class daemon:
-#     def __init__(self, verbose:bool=True, ) -> None:
-#         pass
+	QueShell().cmdloop()
