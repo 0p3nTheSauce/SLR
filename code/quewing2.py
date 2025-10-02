@@ -104,12 +104,13 @@ class que:
 
 	def clear_runs(self, past: bool = False, future: bool = False):
 		"""reset the runs queue"""
+  
 		if past:
 			self.old_runs = []
 		if future:
 			self.to_run = []
 
-		if past ^ future:
+		if past or future:
 			self.print_v("Successfully cleared")
 		else:
 			self.print_v("No runs cleared")
@@ -556,6 +557,8 @@ class QueShell(cmdLib.Cmd):
 
 	# que based functions
 
+	#	-	Low level 
+ 
 	def do_save(self, arg):
 		"""Save state of que to queRuns.json"""
 		self.que.save_state()
@@ -563,6 +566,32 @@ class QueShell(cmdLib.Cmd):
 	def do_load(self, arg):  # happens automatically anyway
 		"""Load state of que from queRuns.json"""
 		self.que.load_state()
+  
+	#	-	High level
+  
+	def do_clear(self, arg):
+		"""Clear past or future runs"""
+		args = shlex.split(arg)
+		parser = self._get_clear_runs_parser()
+		try:
+			parsed_args = parser.parse_args(args)
+		except SystemExit as _:
+			print("Clear cancelled")
+			return
+
+		self.que.clear_runs(parsed_args.past, parsed_args.future)
+  
+	def do_remove(self, arg):
+		"""Remove a run from the past or future"""
+		args = shlex.split(arg)
+		parser = self._get_remove_run_parser()
+		try:
+			parsed_args = parser.parse_args(args)
+		except SystemExit as _:
+			print("Remove cancelled")
+			return
+
+		self.que.remove_run(parsed_args.location, parsed_args.index)
   
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
@@ -584,17 +613,6 @@ class QueShell(cmdLib.Cmd):
   
 		self.que.create_run(arg_dict, tags, output, save_path, project, entity)
   
-	def do_remove(self, arg):
-		"""Remove a run from the past or future"""
-		args = shlex.split(arg)
-		parser = self._get_remove_run_parser()
-		try:
-			parsed_args = parser.parse_args(args)
-		except SystemExit as _:
-			print("Remove cancelled")
-			return
-
-		self.que.remove_run(parsed_args.location, parsed_args.index)
 	#helper functions 
  
 	def _get_remove_run_parser(self) -> argparse.ArgumentParser:
@@ -611,6 +629,21 @@ class QueShell(cmdLib.Cmd):
 			type=int,
 			help="Position of run in location",
 			required=True
+		)
+		return parser
+
+	def _get_clear_runs_parser(self) -> argparse.ArgumentParser:
+		parser = argparse.ArgumentParser(description="Clear future or past runs",
+								prog='clear')
+		parser.add_argument(
+			'-p', '--past',
+			action='store_true',
+			help='Remove all runs in old_runs'
+		)
+		parser.add_argument(
+			'-f', '--future',
+			action='store_true',
+			help='Remove all runs in to_run'
 		)
 		return parser
 
