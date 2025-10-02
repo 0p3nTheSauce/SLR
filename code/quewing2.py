@@ -268,6 +268,16 @@ class que:
 		else:
 			print(f"Location: {loc} not one of available keys: {all_runs.keys()}")
 
+	def shuffle(self, loc: Literal['to_run', 'old_runs'], o_idx:int, n_idx:int):
+		all_runs = self.fetch_state()
+		to_shuffle = all_runs[loc]
+		if len(to_shuffle) == 0:
+			print(f"{loc} is empty")
+			return
+		
+		
+		
+ 
  
 	# High level functions taking multistep input
 
@@ -582,7 +592,7 @@ class queShell(cmdLib.Cmd):
 		imp_path: str = IMP_PATH,
 		exec_path: str = WR_PATH,
 		verbose: bool = True,
-		auto_save: bool = False,
+		auto_save: bool = True,
 	) -> None:
 		super().__init__()
 		self.que = que(run_path, imp_path, verbose)
@@ -620,6 +630,7 @@ class queShell(cmdLib.Cmd):
 
 		if not parsed_args.no_save:
 			self.do_save(arg)
+			self.que.print_v("Changes saved")
 		else:
 			self.que.print_v("Exiting without saving")
 
