@@ -174,6 +174,25 @@ def take_args(
     prog: Optional[str] = None,
     desc: str = "Train a model"
 ) -> Optional[tuple | argparse.ArgumentParser]:
+    """Retrieve arguments for new trainign run
+
+    Args:
+        splits_available (List[str]): Implemented datastet splits
+        models_available (List[str]): implemented architectures
+        sup_args (Optional[List[str]], optional): Supply arguments instead of taking from command line. Defaults to None.
+        return_parser_only (bool, optional): Give the parser instead of arguments. Defaults to False.
+        make_dirs (bool, optional): Make output and checkpoint dirs. Defaults to False.
+        prog (Optional[str], optional): Script name. Defaults to configs.py.
+        desc (str, optional): What does the script do? Defaults to "Train a model".
+
+    Raises:
+        ValueError: If model or split supplied are not available 
+
+    Returns:
+        Optional[tuple | argparse.ArgumentParser]: Arguments, or parser, if  successful.
+    """
+    
+    
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
     # admin

@@ -125,41 +125,33 @@ class que:
 
 	# High level functions taking multistep input
 
-	def create_run(self, sup_args: Optional[List[str]] = None):
-		"""Add a new entry to to_run, using args from configs.take_args"""
-
-		try:
-			maybe_args = configs.take_args(
-				self.imp_splits, self.imp_models.keys(), sup_args
-			)
-		except SystemExit as _:
-			maybe_args = None
-
-		assert isinstance(maybe_args, tuple), "Create runs needs arguments"
-
-		if maybe_args:
-			arg_dict, tags, output, save_path, project, entity = maybe_args
-		else:
-			self.print_v("Nothing added to que")
-			return
-
+	def create_run(self,
+				arg_dict: dict,
+				tags: list[str],
+				output: str,
+				save_path: str,
+				project: str,
+				entity: str,
+				ask: bool = True) -> None: 
 		config = configs.load_config(arg_dict, verbose=True)
 
 		configs.print_config(config)
 
 		model_specifics = self.imp_models[config["admin"]["model"]]
+  
+		if ask:
+			proceed = (
+				utils.ask_nicely(
+					message="Confirm: y/n: ",
+					requirment=lambda x: x.lower() in ["y", "n"],
+					error="y or n: ",
+				).lower()
+				== "y"
+			)
+		else:
+			proceed = True
 
-		proceed = (
-			utils.ask_nicely(
-				message="Confirm: y/n: ",
-				requirment=lambda x: x.lower() in ["y", "n"],
-				error="y or n: ",
-			).lower()
-			== "y"
-		)
 		if proceed:
-			self.print_v("Saving run info")
-
 			info = {
 				"model_info": model_specifics,
 				"config": config,
@@ -174,13 +166,14 @@ class que:
 		else:
 			self.print_v("Training cancelled by user")
 
+
 	def remove_run(self, loc: str, idx: int) -> Optional[dict]:
 		"""Removes a run from the que 
   			Args:
-     			loc: to_run or old_runs
-        		idx: index of run
-          	Returns:
-           		rem: the removed run, if successful"""
+	 			loc: to_run or old_runs
+				idx: index of run
+		  	Returns:
+		   		rem: the removed run, if successful"""
 	
 		all_runs = self.load_state()
 
@@ -570,10 +563,26 @@ class QueShell(cmdLib.Cmd):
 	def do_load(self, arg):  # happens automatically anyway
 		"""Load state of que from queRuns.json"""
 		self.que.load_state()
-
+  
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
-		self.que.create_run(shlex.split(arg))
+		args = shlex.split(arg)
+
+		try: 
+			maybe_args = configs.take_args(
+				self.que.imp_splits, self.que.imp_models.keys(), args	
+	   		)
+		except (SystemExit, ValueError) as _:
+			print("Create cancelled (incorrect arguments)")
+			return
+   
+		if isinstance(maybe_args, tuple):
+			arg_dict, tags, output, save_path, project, entity = maybe_args
+		else:
+			print("Create cancelled (by user)")
+			return
+  
+		self.que.create_run(arg_dict, tags, output, save_path, project, entity)
   
 	def do_remove(self, arg):
 		"""Remove a run from the past or future"""
