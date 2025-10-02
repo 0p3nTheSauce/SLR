@@ -633,7 +633,6 @@ def test_sub():
 		for line in proc.stdout:
 			print(f"Received: {line.strip()}")
 
-
 def test_send():
 	from quewing2 import print_tmux
 	print_tmux(
@@ -733,11 +732,25 @@ def test_shelly2():
 		def do_exit(self, arg):
 			"""Exit the shell"""
 			return self.do_quit(arg)
+
+
+
 	from quewing2 import RUN_PATH, IMP_PATH
 	QueShell(
 		runs_path=RUN_PATH,
 		implemented_path=IMP_PATH
-     ).cmdloop()
+	 ).cmdloop()
+
+def test_safe_index():
+	l = [1,2,3]
+	i = random.randint(-4, 4)
+	while len(l) > 0:
+		if 0 <= abs(i) < len(l):
+			print(f'{i} in range for len(l) = {len(l)}')
+			print(f'l.pop({i}) = {l.pop(i)}')
+		else:
+			print(f'{i} out of range for len(l) = {len(l)}')
+		i = random.randint(-len(l) - 1, len(l) + 1)
 
 if __name__ == "__main__":
-	test_shelly2()
+	test_safe_index()
