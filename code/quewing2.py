@@ -1,11 +1,12 @@
 from pathlib import Path
 import argparse
 import json
-from typing import Optional,List, Literal
+from typing import Optional, List, Literal
 import subprocess
 import time
 import cmd as cmdLib
 import shlex
+
 # locals
 import configs
 import utils
@@ -21,16 +22,19 @@ RUN_PATH = "./queRuns.json"
 LOG_PATH = "./queLogs.log"
 IMP_PATH = "./info/wlasl_implemented_info.json"
 
+
 def retrieve_Data(path: Path) -> dict:
 	"""Retrieves data from a given path."""
 	with open(path, "r") as file:
 		data = json.load(file)
 	return data
 
+
 def store_Data(path: Path, data: dict):
 	"""Stores data to a given path."""
 	with open(path, "w") as file:
 		json.dump(data, file, indent=4)
+
 
 class que:
 	def __init__(
@@ -87,22 +91,6 @@ class que:
 			data = {"old_runs": [], "to_run": []}
 		return data
 
-	def _remove_a_run(self, location: str, idx: int):
-		"Removes a run from the run queue"
-		all_runs = self.load_state()
-		try:
-			rem = all_runs[location].pop(idx)
-			self.load_state(all_runs)
-			return rem
-		except KeyError:
-			print(f"Key {location} not available in all_runs")
-			return {}
-		except IndexError:
-			print(
-				f"Index: {idx} out of range for to run of length {len(all_runs[location])}"
-			)
-			return {}
-
 	def get_next_run(self) -> dict | None:
 		"""Retrieves the next run from the queue, and moves the run to old_runs"""
 		if self.to_run:
@@ -135,18 +123,20 @@ class que:
 			conf_list.append(self.get_config(run))
 		return conf_list
 
-	#High level functions taking multistep input
+	# High level functions taking multistep input
 
 	def create_run(self, sup_args: Optional[List[str]] = None):
 		"""Add a new entry to to_run, using args from configs.take_args"""
 
 		try:
-			maybe_args = configs.take_args(self.imp_splits, self.imp_models.keys(), sup_args)
+			maybe_args = configs.take_args(
+				self.imp_splits, self.imp_models.keys(), sup_args
+			)
 		except SystemExit as _:
 			maybe_args = None
 
 		assert isinstance(maybe_args, tuple), "Create runs needs arguments"
-  
+
 		if maybe_args:
 			arg_dict, tags, output, save_path, project, entity = maybe_args
 		else:
@@ -159,11 +149,14 @@ class que:
 
 		model_specifics = self.imp_models[config["admin"]["model"]]
 
-		proceed = utils.ask_nicely(
-			message="Confirm: y/n: ",
-			requirment=lambda x: x.lower() in ["y", "n"],
-			error="y or n: ",
-		).lower() == "y"
+		proceed = (
+			utils.ask_nicely(
+				message="Confirm: y/n: ",
+				requirment=lambda x: x.lower() in ["y", "n"],
+				error="y or n: ",
+			).lower()
+			== "y"
+		)
 		if proceed:
 			self.print_v("Saving run info")
 
@@ -179,72 +172,30 @@ class que:
 			self.to_run.append(info)
 			self.print_v(f"Added new run: {info}")
 		else:
-			self.print_v("Training cancelled by user")		
+			self.print_v("Training cancelled by user")
 
-	def remove_run(self, loc: str,
-                	idx: int):
-		"Removes a run from the run queue"
-		# parser = argparse.ArgumentParser(description="Remove run at position, in location",
-        #                         prog='remove')
-		# parser.add_argument(
-		# 	'-loc', '--location', 
-		# 	choices=["to_run", "old_runs"],
-		# 	help="Location to save the run",
-		# 	default='to_run'
-		# )
-		# parser.add_argument(
-		# 	'-idx', '--index', 
-		# 	type=int,
-		# 	help="Position of run in location",
-		# 	required=True
-		# )
+	def remove_run(self, loc: str, idx: int) -> Optional[dict]:
+		"""Removes a run from the que 
+  			Args:
+     			loc: to_run or old_runs
+        		idx: index of run
+          	Returns:
+           		rem: the removed run, if successful"""
+	
 		all_runs = self.load_state()
-		
+
 		if loc in all_runs.keys():
-			try:
+			if 0 <= abs(idx) < len(all_runs[loc]):
 				rem = all_runs[loc].pop(idx)
 				self.load_state(all_runs)
 				return rem
-			except IndexError:
-				print(
-					f"Index: {idx} out of range for to run of length {len(all_runs[loc])}"
-				)
-		
-
-	def remove_run_old(self, loc: Optional[str] = None, idx: Optional[int] = None):
-		"""remove a run"""
-		all_runs = self.load_state()
-
-		av_loc = ["to_run", "old_runs", "q"]
-		if loc is None or loc not in av_loc:
-			loc = utils.ask_nicely(
-				message=f"Choose location: {av_loc}",
-				requirment=lambda x: x in av_loc,
-				error=f"one of {av_loc}: ",
-			)
-			if loc == "q":
-				self.print_v("cancelled")
-				return
-
-		if idx is not None:
-			self._remove_a_run(loc, idx)
-		else:
-			for i, run in enumerate(all_runs[loc]):
-				print(f"{self.get_config(run)} : {i}")
-
-			if len(all_runs["to_run"]) == 0:
-				print("runs are finished")
 			else:
-				ans = utils.ask_nicely(
-					message="select index, or q: ",
-					requirment=lambda x: x.isdigit() or x == "q",
-					error="select index, or q: ",
+				print(
+					f"Index: {idx} out of range for to_run of length {len(all_runs[loc])}"
 				)
-				if ans == "q":
-					self.print_v("cancelled")
-					return
-				else:
-					self._remove_a_run(loc, int(ans))
+
+		else:
+			print(f"Location: {loc} not one of available keys: {all_runs.keys()}")
 
 	def shuffle_configs(self):
 		if len(self.to_run) == 0:
@@ -333,7 +284,9 @@ class que:
 			self.to_run = old2mv + self.to_run
 			self.print_v(f"moved {num_from_end} from old")
 
-#TODO: put this in a class
+
+# TODO: put this in a class
+
 
 def join_session(
 	wndw_name: str,
@@ -347,6 +300,7 @@ def join_session(
 		print("join_session ran into an error when spawning the worker process: ")
 		print(e.stderr)
 
+
 def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	"""Switch to specific window by index."""
 	tmux_cmd = ["tmux", "select-window", "-t", f"{sesh_name}:{wndw_name}"]
@@ -355,6 +309,7 @@ def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	except subprocess.CalledProcessError as e:
 		print("switch_to_window ran into an error when spawning the worker process: ")
 		print(e.stderr)
+
 
 def send(
 	cmd: str,
@@ -368,12 +323,14 @@ def send(
 		print("Send ran into an error when spawning the worker process: ")
 		print(e.stderr)
 
+
 def print_tmux(
 	message: str,
 	wndw_name: str,
 	sesh_name: str,
 ) -> None:
 	send(cmd=f"echo {message} ", wndw_name=wndw_name, sesh_name=sesh_name)
+
 
 def seperator(title: str = "Next Run"):
 	"""This prints out a seperator between training runs"""
@@ -386,6 +343,7 @@ def seperator(title: str = "Next Run"):
 		sep += "\n"
 	return sep
 
+
 def idle(message: str) -> str:
 	# testing if blocking
 	print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -395,6 +353,7 @@ def idle(message: str) -> str:
 		time.sleep(10)
 	print(f"Finishign at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 	return message
+
 
 class worker:
 	def __init__(
@@ -441,25 +400,27 @@ class worker:
 	def monitor_log(self):
 		send(f"tail -f {self.log_path}", self.wr_name, self.sesh_name)
 
+
 class daemon:
-	'''Class for the queue daemon process. The function works in a fetch execute repeat
+	"""Class for the queue daemon process. The function works in a fetch execute repeat
 	cycle. The function reads runs from the queRuns.json file, then writes them to the
-	queTemp.json file for the worker process to find. The daemon spawns the worker, then 
-	waits for it to complete before proceeding. The daemon runs in it's own tmux session, 
-	while the worker outputs to a log file. 
-	
+	queTemp.json file for the worker process to find. The daemon spawns the worker, then
+	waits for it to complete before proceeding. The daemon runs in it's own tmux session,
+	while the worker outputs to a log file.
+
 	Args:
-		name: of own tmux window
-		w_name: of worker tmux window (monitor)
-		sesh: tmux session name
-		runs_path: to queRuns.json 
-		temp_path: to queTemp.json 
-		imp_path: to implemented_info.json
-		exec_path: to quefeather.py 
-		verbose: speaks to you
-		wr: supply its worker
-		q: supply its que
-	'''
+			name: of own tmux window
+			w_name: of worker tmux window (monitor)
+			sesh: tmux session name
+			runs_path: to queRuns.json
+			temp_path: to queTemp.json
+			imp_path: to implemented_info.json
+			exec_path: to quefeather.py
+			verbose: speaks to you
+			wr: supply its worker
+			q: supply its que
+	"""
+
 	def __init__(
 		self,
 		name: str = DN_NAME,
@@ -565,24 +526,27 @@ class QueShell(cmdLib.Cmd):
 			temp_path=temp_path,
 			imp_path=imp_path,
 			exec_path=exec_path,
-			q=self.que
+			q=self.que,
 		)
-	
+
 	def do_help(self, arg):
 		"""Override help to provide detailed argparse help for create"""
-		if arg == 'create':
+		if arg == "create":
 			parser = configs.take_args(
 				self.que.imp_splits,
-				self.que.imp_models, 
+				self.que.imp_models,
 				return_parser_only=True,
-				prog='create',
-				desc='Create a new training run'
+				prog="create",
+				desc="Create a new training run",
 			)
 			assert isinstance(parser, argparse.ArgumentParser)
 			parser.print_help()
+		elif arg == "remove":
+			parser = self._get_remove_run_parser()
+			parser.print_help()
 		else:
 			super().do_help(arg)
-	
+
 	def do_quit(self, arg):
 		"""Exit the shell"""
 		print("Goodbye!")
@@ -596,22 +560,50 @@ class QueShell(cmdLib.Cmd):
 		"""Exit on Ctrl+D"""
 		print()  # Print newline for clean exit
 		return self.do_quit(arg)
- 	
-	#que based functions
+
+	# que based functions
 
 	def do_save(self, arg):
 		"""Save state of que to queRuns.json"""
 		self.que.save_state()
 
-	def do_load(self, arg): #happens automatically anyway
+	def do_load(self, arg):  # happens automatically anyway
 		"""Load state of que from queRuns.json"""
-		self.que.load_state() 
-  
+		self.que.load_state()
+
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
 		self.que.create_run(shlex.split(arg))
-	
+  
+	def do_remove(self, arg):
+		"""Remove a run from the past or future"""
+		args = shlex.split(arg)
+		parser = self._get_remove_run_parser()
+		try:
+			parsed_args = parser.parse_args(args)
+		except SystemExit as _:
+			print("Remove cancelled")
+			return
 
+		self.que.remove_run(parsed_args.location, parsed_args.index)
+	#helper functions 
+ 
+	def _get_remove_run_parser(self) -> argparse.ArgumentParser:
+		parser = argparse.ArgumentParser(description="Remove a run from future or past runs",
+								prog='remove')
+		parser.add_argument(
+			'-loc', '--location',
+			choices=["to_run", "old_runs"],
+			help="Location of the run",
+			required=True
+		)
+		parser.add_argument(
+			'-idx', '--index',
+			type=int,
+			help="Position of run in location",
+			required=True
+		)
+		return parser
 
 
 if __name__ == "__main__":
