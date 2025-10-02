@@ -358,9 +358,7 @@ class que:
 			self.to_run = old2mv + self.to_run
 			self.print_v(f"moved {num_from_end} from old")
 
-
 # TODO: put this in a class
-
 
 def join_session(
 	wndw_name: str,
@@ -374,7 +372,6 @@ def join_session(
 		print("join_session ran into an error when spawning the worker process: ")
 		print(e.stderr)
 
-
 def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	"""Switch to specific window by index."""
 	tmux_cmd = ["tmux", "select-window", "-t", f"{sesh_name}:{wndw_name}"]
@@ -383,7 +380,6 @@ def switch_to_window(wndw_name: str, sesh_name: str) -> None:
 	except subprocess.CalledProcessError as e:
 		print("switch_to_window ran into an error when spawning the worker process: ")
 		print(e.stderr)
-
 
 def send(
 	cmd: str,
@@ -397,14 +393,12 @@ def send(
 		print("Send ran into an error when spawning the worker process: ")
 		print(e.stderr)
 
-
 def print_tmux(
 	message: str,
 	wndw_name: str,
 	sesh_name: str,
 ) -> None:
 	send(cmd=f"echo {message} ", wndw_name=wndw_name, sesh_name=sesh_name)
-
 
 def seperator(title: str = "Next Run"):
 	"""This prints out a seperator between training runs"""
@@ -416,7 +410,6 @@ def seperator(title: str = "Next Run"):
 	else:
 		sep += "\n"
 	return sep
-
 
 def idle(message: str) -> str:
 	# testing if blocking
@@ -609,27 +602,8 @@ class queShell(cmdLib.Cmd):
 
 	def do_help(self, arg):
 		"""Override help to provide detailed argparse help"""
-
-		#TODO: seeing a pattern here
-  
-		if arg == "create":
-			parser = configs.take_args(
-				self.que.imp_splits,
-				self.que.imp_models,
-				return_parser_only=True,
-				prog="create",
-				desc="Create a new training run",
-			)
-			assert isinstance(parser, argparse.ArgumentParser)
-			parser.print_help()
-		elif arg == "remove": 
-			parser = self._get_remove_run_parser()
-			parser.print_help()
-		elif arg == "clear":
-			parser = self._get_clear_runs_parser()
-			parser.print_help()
-		elif arg == "list_runs":
-			parser = self._get_list_parser()
+		parser = self._get_parser(arg)
+		if parser:
 			parser.print_help()
 		else:
 			super().do_help(arg)
@@ -674,7 +648,7 @@ class queShell(cmdLib.Cmd):
 	def do_clear(self, arg):
 		"""Clear past or future runs"""
 		args = shlex.split(arg)
-		parser = self._get_clear_runs_parser()
+		parser = self._get_clear_parser()
 		try:
 			parsed_args = parser.parse_args(args)
 		except SystemExit as _:
@@ -683,7 +657,7 @@ class queShell(cmdLib.Cmd):
 
 		self.que.clear_runs(parsed_args.location)
 
-	def do_list_runs(self, arg):
+	def do_list(self, arg):
 		"""Summarise to a list of runs, in a given location"""
 		args = shlex.split(arg)
 		parser = self._get_list_parser()
@@ -698,7 +672,7 @@ class queShell(cmdLib.Cmd):
 	def do_remove(self, arg):
 		"""Remove a run from the past or future"""
 		args = shlex.split(arg)
-		parser = self._get_remove_run_parser()
+		parser = self._get_remove_parser()
 		try:
 			parsed_args = parser.parse_args(args)
 		except SystemExit as _:
@@ -729,7 +703,30 @@ class queShell(cmdLib.Cmd):
   
 	#helper functions 
  
-	def _get_remove_run_parser(self) -> argparse.ArgumentParser:
+	def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
+		"""Get argument parser for a given command"""
+		parsers = {
+			'create': lambda: configs.take_args(
+				self.que.imp_splits,
+				self.que.imp_models,
+				return_parser_only=True,
+				prog="create",
+				desc="Create a new training run",
+			),
+			'remove': self._get_remove_parser,
+			'clear': self._get_clear_parser,
+			'list': self._get_list_parser,
+			'quit': self._get_quit_parser
+		}
+		
+		if cmd in parsers:
+			parser = parsers[cmd]()  
+			assert isinstance(parser, argparse.ArgumentParser), f"{cmd} parser invalid"
+			return parser
+		return None
+
+ 
+	def _get_remove_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(description="Remove a run from future or past runs",
 								prog='remove')
 		parser.add_argument(
@@ -744,7 +741,7 @@ class queShell(cmdLib.Cmd):
 		)
 		return parser
 
-	def _get_clear_runs_parser(self) -> argparse.ArgumentParser:
+	def _get_clear_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(description="Clear future or past runs",
 								prog='clear')
 		parser.add_argument(
@@ -756,7 +753,7 @@ class queShell(cmdLib.Cmd):
 
 	def _get_list_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(description="Summarise to a list of runs, in a given location",
-								prog='list_runs')
+								prog='list')
 		parser.add_argument(
 			'location',
 			choices=["to_run", "old_runs"],

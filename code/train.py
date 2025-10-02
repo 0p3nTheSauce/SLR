@@ -401,9 +401,10 @@ def main():
 	model_info = info['models']
 	
 	maybe_args = take_args(available_splits, model_info.keys())
-	if maybe_args:
+	if isinstance(maybe_args, tuple):
 		arg_dict, tags, project, entity = maybe_args
 	else:
+		print(f'Need tuple not: {type(maybe_args)}')
 		return
 	config = load_config(arg_dict, verbose=True)
 	
