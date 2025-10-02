@@ -99,7 +99,7 @@ class que:
 			'old_runs' : self.old_runs
 		}
 
-	def get_next_run(self) -> dict | None:
+	def get_next_run(self) -> Optional[dict]:
 		"""Retrieves the next run from the queue, and moves the run to old_runs"""
 		if self.to_run:
 			next_run = self.to_run.pop(0)
@@ -108,7 +108,7 @@ class que:
 			return next_run
 		else:
 			self.print_v("No runs in the queue.")
-			return None
+			return 
 
 	def clear_runs(self, loc: Literal['to_run', 'old_runs', 'all']): 
 		"""reset the runs queue"""
@@ -125,46 +125,6 @@ class que:
 			self.print_v("Successfully cleared")
 		else:
 			self.print_v("No runs cleared")
-
-	def list_configs(self, loc:Literal['to_run', 'old_runs'],
-					disp: bool = True) -> List[str]:
-		all_runs = self.fetch_state()
-		to_disp = all_runs[loc]
-		self.print_v(f'{loc}:')
-		if len(to_disp) == 0:
-			print("runs are finished")
-		conf_list = []
-		for i, run in enumerate(to_disp):
-			config = self.get_config(run)
-			if disp:
-				print(f'{config} : {i}') 
-			conf_list.append(config)
-		return conf_list
-
-	def list_runs_o(self, loc:Literal['to_run', 'old_runs'],
-					disp: bool = False) -> List[str]:
-		"""Summarise to a list of runs, in a given location
-
-		Args:
-			loc (Literal[&#39;to_run&#39;, &#39;old_runs&#39;]): Location to list
-			disp (bool, optional): Print list, with indexes. Defaults to False.
-
-		Returns:
-			List[str]: Summarised run info 
-		"""
-
-		all_runs = self.fetch_state()
-		to_disp = all_runs[loc]
-		self.print_v(f'{loc}:')
-		if len(to_disp) == 0:
-			print("runs are finished")
-		conf_list = []
-		for i, run in enumerate(to_disp):
-			r_str = self.str_run(run)
-			if disp:
-				print(f'{r_str} : {i}') 
-			conf_list.append(r_str)
-		return conf_list
 
 	def list_runs(self, loc: Literal['to_run', 'old_runs'],
               disp: bool = False) -> List[str]:
@@ -214,10 +174,6 @@ class que:
 		
 		return conf_list
 
-	def str_run(self, run: dict) -> str:
-		admin = run['config']['admin']
-		return f"{admin['model']} ex: {admin['exp_no']} sp: {admin['split']} cf: {admin['config_path']}"
-	
 	def _run_sum(self, run: dict) -> dict:
 		"""Extract key details from a run configuration.
 		
@@ -235,8 +191,6 @@ class que:
 			'config_path': admin['config_path']
 		}
  
-	# High level functions taking multistep input
-
 	def create_run(self,
 				arg_dict: dict,
 				tags: list[str],
@@ -291,7 +245,6 @@ class que:
 		else:
 			self.print_v("Training cancelled by user")
 
-
 	def remove_run(self, loc: str, idx: int) -> Optional[dict]:
 		"""Removes a run from the que 
   			Args:
@@ -314,6 +267,9 @@ class que:
 
 		else:
 			print(f"Location: {loc} not one of available keys: {all_runs.keys()}")
+
+ 
+	# High level functions taking multistep input
 
 	def shuffle_configs(self):
 		if len(self.to_run) == 0:
@@ -690,6 +646,8 @@ class queShell(cmdLib.Cmd):
 
 		if not parsed_args.no_save:
 			self.do_save(arg)
+		else:
+			self.que.print_v("Exiting without saving")
 
 		print("Goodbye!")
 		return True
@@ -704,8 +662,6 @@ class queShell(cmdLib.Cmd):
 		return self.do_quit(arg)
 
 	# que based functions
-
-	#	-	Low level 
  
 	def do_save(self, arg):
 		"""Save state of que to queRuns.json"""
@@ -714,8 +670,6 @@ class queShell(cmdLib.Cmd):
 	def do_load(self, arg):  # happens automatically anyway
 		"""Load state of que from queRuns.json"""
 		self.que.load_state()
-  
-	#	-	High level
   
 	def do_clear(self, arg):
 		"""Clear past or future runs"""
@@ -774,8 +728,6 @@ class queShell(cmdLib.Cmd):
 		self.que.create_run(arg_dict, tags, output, save_path, project, entity)
   
 	#helper functions 
- 
-	#	-	Parser getters
  
 	def _get_remove_run_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(description="Remove a run from future or past runs",
