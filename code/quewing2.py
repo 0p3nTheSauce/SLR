@@ -620,8 +620,8 @@ class daemon:
 
 
 class queShell(cmdLib.Cmd):
-	intro = "QueShell: Type help or ? to list commands.\n"
-	prompt = "(QueShell)$ "
+	intro = "queShell: Type help or ? to list commands.\n"
+	prompt = "(que)$ "
 
 	def __init__(
 		self,
@@ -680,6 +680,17 @@ class queShell(cmdLib.Cmd):
 
 	def do_quit(self, arg):
 		"""Exit the shell"""
+		args = shlex.split(arg)
+		parser = self._get_quit_parser()
+		try:
+			parsed_args = parser.parse_args(args)
+		except SystemExit as _:
+			print("Quit cancelled")
+			return 
+
+		if not parsed_args.no_save:
+			self.do_save(arg)
+
 		print("Goodbye!")
 		return True
 
@@ -802,11 +813,16 @@ class queShell(cmdLib.Cmd):
   
 		return parser
 
-	#	- 	Misc
-	
-	def _auto_save(self):
-		if self.auto_save:
-			self.que.save_state()
+	def _get_quit_parser(self) -> argparse.ArgumentParser:
+		parser = argparse.ArgumentParser(description="Exit queShell",
+								prog='<quit|exit>')
+		parser.add_argument(
+			'-ns', '--no_save',
+			action='store_true',
+			help="Don't autosave on exit"
+		)
+  
+		return parser
 
 if __name__ == "__main__":
 	# try:
