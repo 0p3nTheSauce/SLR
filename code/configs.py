@@ -189,7 +189,7 @@ def take_args(
         ValueError: If model or split supplied are not available 
 
     Returns:
-        Optional[tuple | argparse.ArgumentParser]: Arguments, or parser, if  successful.
+        Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if  successful.
     """
     
     
