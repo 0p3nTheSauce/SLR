@@ -6,7 +6,8 @@ import subprocess
 import time
 import cmd as cmdLib
 import shlex
-
+from filelock import FileLock
+import sys
 # locals
 import configs
 import utils
@@ -109,9 +110,12 @@ class que:
 			self.print_v("No runs in the queue.")
 			return None
 
-	def clear_runs(self, past: bool = False, future: bool = False): 
+	def clear_runs(self, loc: Literal['to_run', 'old_runs', 'all']): 
 		"""reset the runs queue"""
 		#NOTE: might change this to use location : str instead
+		past = loc == 'old_runs'
+		future = loc == 'to_run'
+		past, future = loc == 'all', loc == 'all'
 		if past:
 			self.old_runs = []
 		if future:
@@ -137,7 +141,7 @@ class que:
 			conf_list.append(config)
 		return conf_list
 
-	def list_runs(self, loc:Literal['to_run', 'old_runs'],
+	def list_runs_o(self, loc:Literal['to_run', 'old_runs'],
 					disp: bool = False) -> List[str]:
 		"""Summarise to a list of runs, in a given location
 
@@ -162,10 +166,75 @@ class que:
 			conf_list.append(r_str)
 		return conf_list
 
-	def str_run(self, run: dict):
+	def list_runs(self, loc: Literal['to_run', 'old_runs'],
+              disp: bool = False) -> List[str]:
+		"""Summarise to a list of runs, in a given location
+
+		Args:
+			loc (Literal['to_run', 'old_runs']): Location to list
+			disp (bool, optional): Print list, with indexes. Defaults to False.
+
+		Returns:
+			List[str]: Summarised run info 
+		"""
+		
+		all_runs = self.fetch_state()
+		to_disp = all_runs[loc]
+		
+		# Nicer header
+		loc_display = loc.replace('_', ' ').title()
+		self.print_v(f'\n=== {loc_display} ===')
+		
+		if len(to_disp) == 0:
+			self.print_v("  No runs available\n")
+			return []
+		
+		# Extract run info
+		runs_info = [self._run_sum(run) for run in to_disp]
+		
+		# Calculate column widths
+		max_model = max(len(r['model']) for r in runs_info)
+		max_exp = max(len(str(r['exp_no'])) for r in runs_info)
+		max_split = max(len(r['split']) for r in runs_info)
+		
+		conf_list = []
+		for i, info in enumerate(runs_info):
+			# Format with padding for alignment
+			r_str = (f"{info['model']:<{max_model}}  "
+					f"ex: {info['exp_no']:<{max_exp}}  "
+					f"sp: {info['split']:<{max_split}}  "
+					f"cf: {info['config_path']}")
+			
+			if disp:
+				print(f'  [{i:2d}] {r_str}')
+			conf_list.append(r_str)
+		
+		if disp:
+			print()  # Add spacing after list
+		
+		return conf_list
+
+	def str_run(self, run: dict) -> str:
 		admin = run['config']['admin']
 		return f"{admin['model']} ex: {admin['exp_no']} sp: {admin['split']} cf: {admin['config_path']}"
+	
+	def _run_sum(self, run: dict) -> dict:
+		"""Extract key details from a run configuration.
 		
+		Args:
+			run: Dictionary containing run configuration with admin details
+			
+		Returns:
+			Dictionary with model, exp_no, split, and config_path
+		"""
+		admin = run['config']['admin']
+		return {
+			'model': admin['model'],
+			'exp_no': admin['exp_no'],
+			'split': admin['split'],
+			'config_path': admin['config_path']
+		}
+ 
 	# High level functions taking multistep input
 
 	def create_run(self,
@@ -176,9 +245,22 @@ class que:
 				project: str,
 				entity: str,
 				ask: bool = True) -> None: 
+		"""Create and add a new training run entry
+
+		Args:
+			arg_dict (dict): Arguments used by training function
+			tags (list[str]): Wandb tags
+			output (str): Experiment directory
+			save_path (str): Checkpoint directory
+			project (str): Wandb project
+			entity (str): Wandb entity
+			ask (bool, optional): Pre-check run before creation. Defaults to True.
+		"""
+     
 		config = configs.load_config(arg_dict, verbose=True)
 
-		configs.print_config(config)
+		if ask:
+			configs.print_config(config)
 
 		model_specifics = self.imp_models[config["admin"]["model"]]
   
@@ -537,7 +619,7 @@ class daemon:
 				self.print_v(f"Process failed with return code: {return_code}")
 
 
-class QueShell(cmdLib.Cmd):
+class queShell(cmdLib.Cmd):
 	intro = "QueShell: Type help or ? to list commands.\n"
 	prompt = "(QueShell)$ "
 
@@ -551,6 +633,7 @@ class QueShell(cmdLib.Cmd):
 		imp_path: str = IMP_PATH,
 		exec_path: str = WR_PATH,
 		verbose: bool = True,
+		auto_save: bool = False,
 	) -> None:
 		super().__init__()
 		self.que = que(run_path, imp_path, verbose)
@@ -564,9 +647,15 @@ class QueShell(cmdLib.Cmd):
 			exec_path=exec_path,
 			q=self.que,
 		)
+		self.auto_save = auto_save
+
+	# queShell based
 
 	def do_help(self, arg):
-		"""Override help to provide detailed argparse help for create"""
+		"""Override help to provide detailed argparse help"""
+
+		#TODO: seeing a pattern here
+  
 		if arg == "create":
 			parser = configs.take_args(
 				self.que.imp_splits,
@@ -577,8 +666,14 @@ class QueShell(cmdLib.Cmd):
 			)
 			assert isinstance(parser, argparse.ArgumentParser)
 			parser.print_help()
-		elif arg == "remove":
+		elif arg == "remove": 
 			parser = self._get_remove_run_parser()
+			parser.print_help()
+		elif arg == "clear":
+			parser = self._get_clear_runs_parser()
+			parser.print_help()
+		elif arg == "list_runs":
+			parser = self._get_list_parser()
 			parser.print_help()
 		else:
 			super().do_help(arg)
@@ -621,11 +716,11 @@ class QueShell(cmdLib.Cmd):
 			print("Clear cancelled")
 			return
 
-		self.que.clear_runs(parsed_args.past, parsed_args.future)
+		self.que.clear_runs(parsed_args.location)
 
 	def do_list_runs(self, arg):
 		"""Summarise to a list of runs, in a given location"""
-		args = [arg]
+		args = shlex.split(arg)
 		parser = self._get_list_parser()
 		try:
 			parsed_args = parser.parse_args(args)
@@ -669,20 +764,20 @@ class QueShell(cmdLib.Cmd):
   
 	#helper functions 
  
+	#	-	Parser getters
+ 
 	def _get_remove_run_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(description="Remove a run from future or past runs",
 								prog='remove')
 		parser.add_argument(
-			'-loc', '--location',
+			'location',
 			choices=["to_run", "old_runs"],
-			help="Location of the run",
-			required=True
+			help="Location of the run"
 		)
 		parser.add_argument(
-			'-idx', '--index',
+			'index',
 			type=int,
-			help="Position of run in location",
-			required=True
+			help="Position of run in location"
 		)
 		return parser
 
@@ -690,29 +785,28 @@ class QueShell(cmdLib.Cmd):
 		parser = argparse.ArgumentParser(description="Clear future or past runs",
 								prog='clear')
 		parser.add_argument(
-			'-p', '--past',
-			action='store_true',
-			help='Remove all runs in old_runs'
-		)
-		parser.add_argument(
-			'-f', '--future',
-			action='store_true',
-			help='Remove all runs in to_run'
+			'location',
+			choices=["to_run", "old_runs", "all"],
+			help="Location of the run"
 		)
 		return parser
 
 	def _get_list_parser(self) -> argparse.ArgumentParser:
-		parser = argparse.ArgumentParser(description="Remove a run from future or past runs",
-								prog='remove')
+		parser = argparse.ArgumentParser(description="Summarise to a list of runs, in a given location",
+								prog='list_runs')
 		parser.add_argument(
-			'-loc', '--location',
+			'location',
 			choices=["to_run", "old_runs"],
-			help="Location of the run",
-			required=True
+			help="Location of the run"
 		)
   
 		return parser
 
+	#	- 	Misc
+	
+	def _auto_save(self):
+		if self.auto_save:
+			self.que.save_state()
 
 if __name__ == "__main__":
 	# try:
@@ -720,4 +814,16 @@ if __name__ == "__main__":
 	# except subprocess.CalledProcessError as e:
 	# 	print("Daemon ran into an error when spawning the worker process: ")
 	# 	print(e.stderr)
-	QueShell().cmdloop()
+	#place lock on queRuns.json 
+ 
+	lock = FileLock(f'{RUN_PATH}.lock', timout=1)
+	try:
+		with lock:
+			print(f'Acquired lock on {RUN_PATH}')
+			queShell().cmdloop()
+	except TimeoutError:
+		print(f'Error: {RUN_PATH} is currently in used by another user')
+		sys.exit(1)
+	finally:
+		print(f"Released lock on {RUN_PATH}")
+     
