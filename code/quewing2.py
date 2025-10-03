@@ -92,12 +92,10 @@ class que:
 			data = {"old_runs": [], "to_run": []}
 		return data
 
-	def fetch_state(self) -> dict:
-		"""Return all_runs (without loading from file)"""
-		return {
-			'to_run' : self.to_run,
-			'old_runs' : self.old_runs
-		}
+	def fetch_state(self, loc: Literal['to_run', 'old_runs']) -> list:
+		"""Return reference to the specified list"""
+		return self.to_run if loc == 'to_run' else self.old_runs
+			
 
 	def get_next_run(self) -> Optional[dict]:
 		"""Retrieves the next run from the queue, and moves the run to old_runs"""
@@ -112,7 +110,6 @@ class que:
 
 	def clear_runs(self, loc: Literal['to_run', 'old_runs', 'all']): 
 		"""reset the runs queue"""
-		#NOTE: might change this to use location : str instead
 		past = loc == 'old_runs'
 		future = loc == 'to_run'
 		past, future = loc == 'all', loc == 'all'
@@ -138,8 +135,7 @@ class que:
 			List[str]: Summarised run info 
 		"""
 		
-		all_runs = self.fetch_state()
-		to_disp = all_runs[loc]
+		to_disp = self.fetch_state(loc)
 		
 		# Nicer header
 		loc_display = loc.replace('_', ' ').title()
@@ -245,7 +241,7 @@ class que:
 		else:
 			self.print_v("Training cancelled by user")
 
-	def remove_run(self, loc: str, idx: int) -> Optional[dict]:
+	def remove_run(self, loc: Literal['to_run', 'old_runs'], idx: int) -> Optional[dict]:
 		"""Removes a run from the que 
   			Args:
 	 			loc: to_run or old_runs
@@ -253,24 +249,19 @@ class que:
 		  	Returns:
 		   		rem: the removed run, if successful"""
 	
-		all_runs = self.fetch_state()
-
-		if loc in all_runs.keys():
-			if 0 <= abs(idx) < len(all_runs[loc]):
-				rem = all_runs[loc].pop(idx)
-				self.load_state(all_runs)
-				return rem
-			else:
-				print(
-					f"Index: {idx} out of range for to_run of length {len(all_runs[loc])}"
-				)
-
+		to_remove = self.fetch_state(loc)
+  
+		if abs(idx) < len(to_remove):
+			self.print_v(f'Successfully removed entry from {loc}')
+			return to_remove.pop(idx)
 		else:
-			print(f"Location: {loc} not one of available keys: {all_runs.keys()}")
-
+			print(
+				f"Index: {idx} out of range for len({loc}) = {len(to_remove)}"
+			)
+    
 	def shuffle(self, loc: Literal['to_run', 'old_runs'], o_idx:int, n_idx:int):
-		all_runs = self.fetch_state()
-		to_shuffle = all_runs[loc]
+
+		to_shuffle = self.fetch_state(loc)
 		if len(to_shuffle) == 0:
 			print(f"{loc} is empty")
 			return
@@ -278,18 +269,13 @@ class que:
 		if abs(o_idx) < len(to_shuffle):
 			srun = to_shuffle.pop(o_idx)
 		else:
-			print(f'{o_idx} out of range for len(to_shuffle) - 1 = {len(to_shuffle) - 1}')
+			print(f'{o_idx} out of range for len({loc}) - 1 = {len(to_shuffle) - 1}')
 			return
 		
 		if not abs(n_idx) <= len(to_shuffle):
-			print(f'Warning: {n_idx} out of range for len(to_shuffle) = {len(to_shuffle)}')
+			print(f'Warning: {n_idx} out of range for len({loc}) = {len(to_shuffle)}')
 		
 		to_shuffle.insert(n_idx, srun)
-
-		all_runs[loc] = to_shuffle
-		self.load_state(all_runs)
-    
-
  
 	# High level functions taking multistep input
 
