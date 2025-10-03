@@ -734,6 +734,15 @@ class queShell(cmdLib.Cmd):
 
 	# helper functions
 
+	def _parse_args_or_cancel(self, parser: argparse.ArgumentParser, arg: str, cmd_name: str) -> Optional[argparse.Namespace]:
+		"""Parse arguments or return None if parsing fails/is cancelled"""
+		args = shlex.split(arg)
+		try:
+			return parser.parse_args(args)
+		except SystemExit:
+			print(f"{cmd_name.capitalize()} cancelled")
+			return None
+
 	def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
 		"""Get argument parser for a given command"""
 		parsers = {
@@ -754,7 +763,7 @@ class queShell(cmdLib.Cmd):
 
 		if cmd in parsers:
 			parser = parsers[cmd]()
-			assert isinstance(parser, argparse.ArgumentParser), f"{cmd} parser invalid"
+			# assert isinstance(parser, argparse.ArgumentParser), f"{cmd} parser invalid"
 			return parser
 		return None
 
