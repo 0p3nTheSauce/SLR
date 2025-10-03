@@ -324,10 +324,7 @@ class que:
 		self.list_runs(n_loc, disp=self.verbose)
 
 	# High level functions taking multistep input
-
-	# def recover(self, loc:QueLocation, idx:int=)
-
-
+		
 # TODO: put this in a class
 
 
