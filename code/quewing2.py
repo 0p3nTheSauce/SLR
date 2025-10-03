@@ -274,10 +274,22 @@ class que:
 		if len(to_shuffle) == 0:
 			print(f"{loc} is empty")
 			return
+
+		if abs(o_idx) < len(to_shuffle):
+			srun = to_shuffle.pop(o_idx)
+		else:
+			print(f'{o_idx} out of range for len(to_shuffle) - 1 = {len(to_shuffle) - 1}')
+			return
 		
+		if not abs(n_idx) <= len(to_shuffle):
+			print(f'Warning: {n_idx} out of range for len(to_shuffle) = {len(to_shuffle)}')
 		
-		
- 
+		to_shuffle.insert(n_idx, srun)
+
+		all_runs[loc] = to_shuffle
+		self.load_state(all_runs)
+    
+
  
 	# High level functions taking multistep input
 
