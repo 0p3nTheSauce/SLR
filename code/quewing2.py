@@ -96,7 +96,6 @@ class que:
 		"""Return reference to the specified list"""
 		return self.to_run if loc == 'to_run' else self.old_runs
 			
-
 	def get_next_run(self) -> Optional[dict]:
 		"""Retrieves the next run from the queue, and moves the run to old_runs"""
 		if self.to_run:
@@ -260,7 +259,13 @@ class que:
 			)
     
 	def shuffle(self, loc: Literal['to_run', 'old_runs'], o_idx:int, n_idx:int):
-
+		"""Repositions a run from the que 
+  			Args:
+	 			loc: to_run or old_runs
+				o_idx: original index of run
+				n_idx: new index of run
+		"""
+  
 		to_shuffle = self.fetch_state(loc)
 		if len(to_shuffle) == 0:
 			print(f"{loc} is empty")
@@ -277,54 +282,8 @@ class que:
 		
 		to_shuffle.insert(n_idx, srun)
  
+ 
 	# High level functions taking multistep input
-
-	def shuffle_configs(self):
-		if len(self.to_run) == 0:
-			print("Warning, to_run is empty")
-			return
-
-		for i, run in enumerate(self.to_run):
-			print(f"{self.get_config(run)} : {i}")
-
-		def requirement(x: str) -> bool:
-			return (x.isdigit() and 0 <= int(x) < len(self.to_run)) or x == "q"
-
-		idx_or_q = utils.ask_nicely(
-			"select index to move (or q to quit): ",
-			requirement,
-			"Invalid input, please enter a valid index or 'q' to quit.",
-		)
-
-		if idx_or_q == "q":
-			self.print_v("No runs moved")
-			return
-		else:
-			idx = int(idx_or_q)
-
-		newpos_or_q = utils.ask_nicely(
-			"select new position (or q to quit): ",
-			requirement,
-			"Invalid input, please enter a valid index or 'q' to quit.",
-		)
-
-		if newpos_or_q == "q":
-			self.print_v("No runs moved")
-			return
-		else:
-			newpos = int(newpos_or_q)
-
-		srun = self.to_run.pop(idx)
-		if not srun:
-			print(f"Invalid idx for list of configs len: {len(self.to_run)}")
-			return
-
-		self.to_run.insert(newpos, srun)
-
-		self.print_v(
-			f"Run: {self.get_config(srun)} \
-		successfully moved to position: {newpos}"
-		)
 
 	def return_old(self, num_from_end: Optional[int] = None):
 		"""Return the runs in old_runs to to_run. Adds them at the beggining of to_runs.
@@ -689,6 +648,18 @@ class queShell(cmdLib.Cmd):
 			return
 
 		self.que.remove_run(parsed_args.location, parsed_args.index)
+
+	def do_shuffle(self, arg):
+		"""Reposition a run in the que"""
+		args = shlex.split(arg)
+		parser = self._get_shuffle_parser()
+		try:
+			parsed_args = parser.parse_args(args)
+		except SystemExit as _:
+			print("Shuffle cancelled")
+			return
+
+		self.que.shuffle(parsed_args.location, parsed_args.o_index, parsed_args.n_index)
   
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
@@ -725,7 +696,8 @@ class queShell(cmdLib.Cmd):
 			'remove': self._get_remove_parser,
 			'clear': self._get_clear_parser,
 			'list': self._get_list_parser,
-			'quit': self._get_quit_parser
+			'quit': self._get_quit_parser,
+			'shuffle' : self._get_shuffle_parser
 		}
 		
 		if cmd in parsers:
@@ -734,6 +706,25 @@ class queShell(cmdLib.Cmd):
 			return parser
 		return None
 
+	def _get_shuffle_parser(self) -> argparse.ArgumentParser:
+		parser = argparse.ArgumentParser(description="Repositions a run from the que",
+								prog='shuffle')
+		parser.add_argument(
+			'location',
+			choices=["to_run", "old_runs"],
+			help="Location of the run"
+		)
+		parser.add_argument(
+			'o_index',
+			type=int,
+			help="Original position of run in location"
+		)
+		parser.add_argument(
+			'n_index',
+			type=int,
+			help="New position of run in location"
+		)
+		return parser
  
 	def _get_remove_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(description="Remove a run from future or past runs",
