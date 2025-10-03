@@ -382,12 +382,23 @@ class worker:
 		log_path: str = LOG_PATH,
 		wr_name: str = WR_NAME,
 		sesh_name: str = SESH_NAME,
+		debug : bool = True
 	):
 		self.temp_path = Path(temp_path)
 		self.exec_path = exec_path
 		self.log_path = log_path
 		self.wr_name = wr_name
 		self.sesh_name = sesh_name
+		self.debug = debug
+  
+	def work(self):
+		info = retrieve_Data(self.temp_path)
+
+		if not info or 'run_id' in info.keys():
+			#empty temp file
+			raise ValueError(f'Tried to read next run from {self.temp_path} but it was empty')
+
+		
 
 	def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
 		"""Blocking start which prints worker output in daemon terminal"""
@@ -523,9 +534,6 @@ class daemon:
 
 			self.worker.start_here(next_run)
 
-	def monitor_log(self):
-		self.tmux_man.send(f"tail -f {self.worker.log_path}")
-
 	def start_n_monitor_simple(self):
 		"""Start process and use existing tmux monitoring"""
 		while True:
@@ -553,6 +561,8 @@ class daemon:
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
 
+	def monitor_log(self):
+		self.tmux_man.send(f"tail -f {self.worker.log_path}")
 
 class queShell(cmdLib.Cmd):
 	intro = "queShell: Type help or ? to list commands.\n"
@@ -693,6 +703,10 @@ class queShell(cmdLib.Cmd):
 			return
 
 		self.que.create_run(arg_dict, tags, output, save_path, project, entity)
+
+	# daemon based functions
+ 
+	
 
 	# helper functions
 
