@@ -745,7 +745,7 @@ def test_safe_index():
 	l = [1,2,3]
 	i = random.randint(-4, 4)
 	while len(l) > 0:
-		if 0 <= abs(i) < len(l):
+		if abs(i) < len(l):
 			print(f'{i} in range for len(l) = {len(l)}')
 			print(f'l.pop({i}) = {l.pop(i)}')
 		else:
