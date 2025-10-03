@@ -23,8 +23,8 @@ TMP_PATH = "./queTemp.json"
 RUN_PATH = "./queRuns.json"
 LOG_PATH = "./queLogs.log"
 IMP_PATH = "./info/wlasl_implemented_info.json"
-TO_RUN = 'to_run'
-OLD_RUNS = 'old_runs'
+TO_RUN = "to_run"
+OLD_RUNS = "old_runs"
 # List for argparse choices
 QUE_LOCATIONS = [TO_RUN, OLD_RUNS]
 QueLocation: TypeAlias = Literal["to_run", "old_runs"]
@@ -41,6 +41,7 @@ def store_Data(path: Path, data: dict):
 	"""Stores data to a given path."""
 	with open(path, "w") as file:
 		json.dump(data, file, indent=4)
+
 
 class que:
 	def __init__(
@@ -131,11 +132,11 @@ class que:
 		"""Summarise to a list of runs, in a given location
 
 		Args:
-						loc (QueLocation): Location to list
-						disp (bool, optional): Print list, with indexes. Defaults to False.
+										loc (QueLocation): Location to list
+										disp (bool, optional): Print list, with indexes. Defaults to False.
 
 		Returns:
-						List[str]: Summarised run info
+										List[str]: Summarised run info
 		"""
 
 		to_disp = self.fetch_state(loc)
@@ -181,10 +182,10 @@ class que:
 		"""Extract key details from a run configuration.
 
 		Args:
-						run: Dictionary containing run configuration with admin details
+										run: Dictionary containing run configuration with admin details
 
 		Returns:
-						Dictionary with model, exp_no, split, and config_path
+										Dictionary with model, exp_no, split, and config_path
 		"""
 		admin = run["config"]["admin"]
 		return {
@@ -207,13 +208,13 @@ class que:
 		"""Create and add a new training run entry
 
 		Args:
-						arg_dict (dict): Arguments used by training function
-						tags (list[str]): Wandb tags
-						output (str): Experiment directory
-						save_path (str): Checkpoint directory
-						project (str): Wandb project
-						entity (str): Wandb entity
-						ask (bool, optional): Pre-check run before creation. Defaults to True.
+										arg_dict (dict): Arguments used by training function
+										tags (list[str]): Wandb tags
+										output (str): Experiment directory
+										save_path (str): Checkpoint directory
+										project (str): Wandb project
+										entity (str): Wandb entity
+										ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
 
 		config = configs.load_config(arg_dict, verbose=True)
@@ -253,10 +254,10 @@ class que:
 	def remove_run(self, loc: QueLocation, idx: int) -> Optional[dict]:
 		"""Removes a run from the que
 		Args:
-						loc: TO_RUN or OLD_RUNS
-						idx: index of run
+										loc: TO_RUN or OLD_RUNS
+										idx: index of run
 		Returns:
-						rem: the removed run, if successful"""
+										rem: the removed run, if successful"""
 
 		to_remove = self.fetch_state(loc)
 
@@ -269,9 +270,9 @@ class que:
 	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int):
 		"""Repositions a run from the que
 		Args:
-						loc: TO_RUN or OLD_RUNS
-						o_idx: original index of run
-						n_idx: new index of run
+										loc: TO_RUN or OLD_RUNS
+										o_idx: original index of run
+										n_idx: new index of run
 		"""
 
 		to_shuffle = self.fetch_state(loc)
@@ -289,7 +290,7 @@ class que:
 			print(f"Warning: {n_idx} out of range for len({loc}) = {len(to_shuffle)}")
 
 		to_shuffle.insert(n_idx, srun)
-  
+
 		self.list_runs(loc, disp=self.verbose)
 
 	def move(
@@ -301,9 +302,9 @@ class que:
 		"""Moves a run between locations in que (at beginning)
 
 		Args:
-				o_loc (QueLocation): Old location
-				n_loc (QueLocation): New location
-				o_idx (int): Old index
+						o_loc (QueLocation): Old location
+						n_loc (QueLocation): New location
+						o_idx (int): Old index
 		"""
 
 		old_location = self.fetch_state(o_loc)
@@ -318,82 +319,60 @@ class que:
 
 		new_location = self.fetch_state(n_loc)
 		new_location.insert(0, run)
-		
+
 		self.print_v("Successfully added\n")
-	
+
 		self.list_runs(n_loc, disp=self.verbose)
 
 	# High level functions taking multistep input
-		
+
+
 # TODO: put this in a class
 
 
-def join_session(
-	wndw_name: str,
-	sesh_name: str,
-) -> None:
-	"""Join a tmux session and optionally target a specific window."""
-	tmux_cmd = ["tmux", "attach-session", "-t", f"{sesh_name}:{wndw_name}"]
-	try:
-		_ = subprocess.run(tmux_cmd, check=True)
-	except subprocess.CalledProcessError as e:
-		print("join_session ran into an error when spawning the worker process: ")
-		print(e.stderr)
+class tmux_manager:
+	def __init__(
+		self,
+		wr_name: str,
+		dn_name: str,
+		sesh_name: str,
+	) -> None:
+		self.wr_name = wr_name
+		self.dn_name = dn_name
+		self.sesh_name = sesh_name
 
+	def join_session(self):
+		tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}:{self.wr_name}"]
+		try:
+			_ = subprocess.run(tmux_cmd, check=True)
+		except subprocess.CalledProcessError as e:
+			print("join_session ran into an error when spawning the worker process: ")
+			print(e.stderr)
 
-def switch_to_window(wndw_name: str, sesh_name: str) -> None:
-	"""Switch to specific window by index."""
-	tmux_cmd = ["tmux", "select-window", "-t", f"{sesh_name}:{wndw_name}"]
-	try:
-		_ = subprocess.run(tmux_cmd, check=True)
-	except subprocess.CalledProcessError as e:
-		print("switch_to_window ran into an error when spawning the worker process: ")
-		print(e.stderr)
+	def switch_to_window(self):
+		tmux_cmd = ["tmux", "select-window", "-t", f"{self.sesh_name}:{self.wr_name}"]
+		try:
+			_ = subprocess.run(tmux_cmd, check=True)
+		except subprocess.CalledProcessError as e:
+			print(
+				"switch_to_window ran into an error when spawning the worker process: "
+			)
+			print(e.stderr)
 
-
-def send(
-	cmd: str,
-	wndw_name: str,
-	sesh_name: str,
-) -> None:
-	tmux_cmd = ["tmux", "send-keys", "-t", f"{sesh_name}:{wndw_name}", cmd, "Enter"]
-	try:
-		subprocess.run(tmux_cmd, check=True)
-	except subprocess.CalledProcessError as e:
-		print("Send ran into an error when spawning the worker process: ")
-		print(e.stderr)
-
-
-def print_tmux(
-	message: str,
-	wndw_name: str,
-	sesh_name: str,
-) -> None:
-	send(cmd=f"echo {message} ", wndw_name=wndw_name, sesh_name=sesh_name)
-
-
-def seperator(title: str = "Next Run"):
-	"""This prints out a seperator between training runs"""
-	sep = ""
-	if title:
-		sep += ("\n" * 2) + ("-" * 10) + ("\n")
-		sep += f"{title:^10}"
-		sep += ("\n" * 2) + ("-" * 10) + ("\n")
-	else:
-		sep += "\n"
-	return sep
-
-
-def idle(message: str) -> str:
-	# testing if blocking
-	print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-	for i in range(10):
-		print(f"Idling: {i}")
-		print(message)
-		time.sleep(10)
-	print(f"Finishign at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-	return message
-
+	def send(self, cmd: str):  # use with caution
+		tmux_cmd = [
+			"tmux",
+			"send-keys",
+			"-t",
+			f"{self.sesh_name}:{self.wr_name}",
+			cmd,
+			"Enter",
+		]
+		try:
+			subprocess.run(tmux_cmd, check=True)
+		except subprocess.CalledProcessError as e:
+			print("Send ran into an error when spawning the worker process: ")
+			print(e.stderr)
 
 class worker:
 	def __init__(
@@ -427,7 +406,7 @@ class worker:
 	def start_log(
 		self, next_run: dict, args: Optional[list[str]] = None
 	) -> subprocess.Popen:
-		"""Non-blocking start which prints worker output to temp.json, and passes the process"""
+		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
 		store_Data(self.temp_path, next_run)
 		cmd = [self.exec_path, self.wr_name]
 		if args:
@@ -437,9 +416,15 @@ class worker:
 			cmd, stdout=open(self.log_path, "w"), stderr=subprocess.STDOUT
 		)
 
-	def monitor_log(self):
-		send(f"tail -f {self.log_path}", self.wr_name, self.sesh_name)
-
+	def idle(self, message: str) -> str:
+		# testing if blocking
+		print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+		for i in range(10):
+			print(f"Idling: {i}")
+			print(message)
+			time.sleep(10)
+		print(f"Finishign at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+		return message
 
 class daemon:
 	"""Class for the queue daemon process. The function works in a fetch execute repeat
@@ -449,22 +434,22 @@ class daemon:
 	while the worker outputs to a log file.
 
 	Args:
-									name: of own tmux window
-									w_name: of worker tmux window (monitor)
-									sesh: tmux session name
-									runs_path: to queRuns.json
-									temp_path: to queTemp.json
-									imp_path: to implemented_info.json
-									exec_path: to quefeather.py
-									verbose: speaks to you
-									wr: supply its worker
-									q: supply its que
+		name: of own tmux window
+		wr_name: of worker tmux window (monitor)
+		sesh: tmux session name
+		runs_path: to queRuns.json
+		temp_path: to queTemp.json
+		imp_path: to implemented_info.json
+		exec_path: to quefeather.py
+		verbose: speaks to you
+		wr: supply its worker
+		q: supply its que
 	"""
 
 	def __init__(
 		self,
 		name: str = DN_NAME,
-		w_name: str = WR_NAME,
+		wr_name: str = WR_NAME,
 		sesh: str = SESH_NAME,
 		runs_path: str = RUN_PATH,
 		temp_path: str = TMP_PATH,
@@ -473,9 +458,10 @@ class daemon:
 		verbose: bool = True,
 		wr: Optional[worker] = None,
 		q: Optional[que] = None,
+		tm: Optional[tmux_manager] = None 
 	) -> None:
 		self.name = name
-		self.w_name = w_name
+		self.wr_name = wr_name
 		self.sesh = sesh
 		self.runs_path = Path(runs_path)
 		self.temp_path = Path(temp_path)
@@ -483,7 +469,7 @@ class daemon:
 			self.worker = wr
 		else:
 			self.worker = worker(
-				exec_path=exec_path, temp_path=temp_path, wr_name=w_name, sesh_name=sesh
+				exec_path=exec_path, temp_path=temp_path, wr_name=wr_name, sesh_name=sesh
 			)
 		if q:
 			self.que = q
@@ -491,12 +477,36 @@ class daemon:
 			self.que = que(
 				runs_path=runs_path, implemented_path=imp_path, verbose=verbose
 			)
+		if tm:
+			self.tmux_man = tm
+		else:
+			self.tmux_man = tmux_manager(
+				wr_name=wr_name,
+				dn_name=name,
+				sesh_name=sesh
+			)
 		self.verbose = verbose
 
 	def print_v(self, message: str) -> None:
 		"""Prints a message if verbose is True."""
 		if self.verbose:
 			print(message)
+
+	def seperator(self, run: dict) -> str:
+		sep = ""
+		r_info = self.que._run_sum(run)
+		r_str = f"{r_info['model']} \
+				Exp: {r_info['exp_no']} \
+				Split: {r_info['split']} \
+				Config: {r_info['config_path']}"
+
+		if r_str:
+			sep += ("\n" * 2) + ("-" * 10) + ("\n")
+			sep += f"{r_str:^10}"
+			sep += ("\n" * 2) + ("-" * 10) + ("\n")
+		else:
+			sep += "\n"
+		return sep.title()
 
 	def start_n_watch(self):
 		"""Start process in this terminal and watch"""
@@ -509,9 +519,12 @@ class daemon:
 				self.print_v("No more runs to execute")
 				break
 
-			self.print_v(seperator(que.get_config(next_run)))
+			self.print_v(self.seperator(next_run))
 
 			self.worker.start_here(next_run)
+
+	def monitor_log(self):
+		self.tmux_man.send(f"tail -f {self.worker.log_path}")
 
 	def start_n_monitor_simple(self):
 		"""Start process and use existing tmux monitoring"""
@@ -524,13 +537,13 @@ class daemon:
 				self.print_v("No more runs to execute")
 				break
 
-			self.print_v(seperator(que.get_config(next_run)))
+			self.print_v(self.seperator(next_run))
 
 			# Start process in background
 			proc = self.worker.start_log(next_run)
 
 			# Start monitoring in tmux (non-blocking)
-			self.worker.monitor_log()
+			self.monitor_log()
 
 			# Wait for completion
 			return_code = proc.wait()
@@ -561,7 +574,7 @@ class queShell(cmdLib.Cmd):
 		self.que = que(run_path, imp_path, verbose)
 		self.daemon = daemon(
 			name=dn_name,
-			w_name=wr_name,
+			wr_name=wr_name,
 			sesh=sesh_name,
 			runs_path=run_path,
 			temp_path=temp_path,
@@ -633,8 +646,6 @@ class queShell(cmdLib.Cmd):
 		if parsed_args is None:
 			return
 
-
-  
 		self.que.list_runs(parsed_args.location, disp=True)
 
 	def do_remove(self, arg):
@@ -730,9 +741,7 @@ class queShell(cmdLib.Cmd):
 		parser.add_argument(
 			"o_location", choices=QUE_LOCATIONS, help="Original location."
 		)
-		parser.add_argument(
-			"n_location", choices=QUE_LOCATIONS, help="New location."
-		)
+		parser.add_argument("n_location", choices=QUE_LOCATIONS, help="New location.")
 		parser.add_argument(
 			"o_index", type=int, help="Old position of run in original location"
 		)
