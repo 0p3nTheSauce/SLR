@@ -8,7 +8,7 @@ import cmd as cmdLib
 import shlex
 from filelock import FileLock
 import sys
-
+import wandb
 # locals
 import configs
 import utils
@@ -374,8 +374,71 @@ class tmux_manager:
 			print("Send ran into an error when spawning the worker process: ")
 			print(e.stderr)
 
+class wandb_manager:
+	def __init__(
+		self,
+		check_interval:int=300,
+		verbose:bool=False,
+  		max_retries:int=5,
+	):
+		self.check_interval = check_interval,
+		self.verbose = verbose	
+		self.max_retries = max_retries
+  
+	@classmethod
+	def get_run_id(cls, 
+					run_name,
+					entity: str,
+				 	project: str,
+      				idx: Optional[int] = None) -> Optional[str]:
+		api = wandb.Api()
 
+		runs = api.runs(f"{entity}/{project}")
+		ids = []
+		for run in runs:
+			if run.name == run_name:
+				ids.append(run.id)
+    
+		if len(ids) == 0:
+			print(f"No runs found with name: {run_name}")
+			return None
+		elif len(ids) > 1:
+			print(f"Multiple runs found with name: {run_name}")
+			if isinstance(idx, int) and abs(idx) < len(runs):
+				print(f"Returning id for idx: {idx}")
+				return ids[idx]
+			else:
+				print("No idx supplied, returning None")
+				return None
+		else:
+			return ids[0]
 
+	@classmethod
+	def list_runs(cls,
+				entity:str, 
+				project:str,
+				disp:bool = False,
+    			) -> list[str]:
+		api = wandb.Api()
+		runs = api.runs(f"{entity}/{project}")
+
+		if disp:
+			for run in runs:
+				print(f"Run ID: {run.id}")
+				print(f"Run name: {run.name}")
+				print(f"State: {run.state}")
+				print(f"Created: {run.created_at}")
+				print("---")
+		
+		return runs
+
+	@classmethod
+	def run_present(run_id:str, runs:List[str]) -> bool:
+		return any([run.id == run_id for run in runs])
+
+	@classmethod	
+	def validate_runId(cls, run_id:str, entity:str, project:str) -> bool:
+		return cls.run_present(run_id), cls.list_runs(entity, project)
 
 class worker:
 	def __init__(
