@@ -858,13 +858,15 @@ class daemon:
 		cmd = [self.worker.exec_path, self.wr_name, 'idle']
 		if args:
 			cmd.extend(args)
-		with subprocess.Popen(
-			cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-		) as proc:
-			if proc.stdout:
-				for line in proc.stdout:
-					print(line.strip())
-
+		# with subprocess.Popen(
+		# 	cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+		# ) as proc:
+		# 	if proc.stdout:
+		# 		for line in proc.stdout:
+		# 			print(line.strip())
+		subprocess.run(cmd, check=True)
+  
+  
 class queShell(cmdLib.Cmd):
 	intro = "queShell: Type help or ? to list commands.\n"
 	prompt = "(que)$ "
