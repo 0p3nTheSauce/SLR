@@ -1,7 +1,7 @@
 from pathlib import Path
 import argparse
 import json
-from typing import Optional, List, Literal, TypeAlias
+from typing import Optional, List, Literal, TypeAlias, Tuple, Dict
 import subprocess
 import time
 import cmd as cmdLib
@@ -103,6 +103,95 @@ class que:
 		"""Return reference to the specified list"""
 		return self.to_run if loc == TO_RUN else self.old_runs
 
+	def _run_sum(self, run: dict) -> dict:
+		"""Extract key details from a run configuration.
+
+		Args:
+										run: Dictionary containing run configuration with admin details
+
+		Returns:
+										Dictionary with model, exp_no, split, and config_path
+		"""
+		admin = run["config"]["admin"]
+	
+		dic = {}
+  
+		if 'run_id' in run:
+			dic['run_id'] = run['run_id']
+  
+		dic.update({
+			"model": admin["model"],
+			"exp_no": admin["exp_no"],
+			"split": admin["split"],
+			"config_path": admin["config_path"],
+		})
+		
+		return dic
+
+	def _get_runs_info(self, run_confs: List[Dict]) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
+		"""Get summarised run info, and stats for printing
+
+		Args:
+			run_confs (List[Dict]): A list of run configs (to_run or old_runs)
+
+		Returns:
+			Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths 
+		"""
+     
+		runs_info = [self._run_sum(run) for run in run_confs]
+
+		# Calculate column widths
+		max_model = max(len(r["model"]) for r in runs_info)
+		max_exp = max(len(str(r["exp_no"])) for r in runs_info)
+		max_split = max(len(r["split"]) for r in runs_info)
+
+		stats = {}
+  
+		if 'run_id' in runs_info[0]:
+			max_id = max(len(r['run_id']) for r in runs_info)
+			stats['max_id']	= max_id
+
+		stats.update({
+			'max_model': max_model,
+			'max_exp': max_exp,
+			'max_split': max_split
+		})
+  
+		
+
+		return runs_info, stats
+
+	def _run_str(self, r_info:Dict[str, str], stats: Optional[Dict[str, int]] = None) -> str:
+		"""Convert a run to summarised string representation
+
+		Args:
+			r_info (Dict): Summarised run info.
+			stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+
+		Returns:
+			str: Summarised string representation of run info
+		"""
+     
+		if stats is None:
+			stats = {
+				'max_id': 0,
+				'max_model': 0,
+				'max_exp': 0,
+				'max_split': 0,
+			}
+
+		r_str = ""
+
+		if 'run_id' in r_info:
+			r_str += f"Run ID: {r_info['run_id']:<stats['max_id']}"
+
+		r_str = f"{r_info['model']:<stats['max_model']} \
+				Exp: {r_info['exp_no']:<stats['max_exp']} \
+				Split: {r_info['split']:<stats['max_split']} \
+				Config: {r_info['config_path']}"
+		
+		return r_str
+
 	def get_next_run(self) -> Optional[dict]:
 		"""Retrieves the next run from the queue, and moves the run to OLD_RUNS"""
 		if self.to_run:
@@ -113,6 +202,12 @@ class que:
 		else:
 			self.print_v("No runs in the queue.")
 			return
+
+	def get_next_run_new(self) -> Optional[dict]:
+		"""Retrieves the next run from the queue"""
+		if self.to_run:
+			next_run = self.to_run.pop(0)
+			self.print_v(f"Retrieved next run: {next_run}")
 
 	def clear_runs(self, loc: QueLocation):
 		"""reset the runs queue"""
@@ -153,23 +248,12 @@ class que:
 			return []
 
 		# Extract run info
-		runs_info = [self._run_sum(run) for run in to_disp]
-
-		# Calculate column widths
-		max_model = max(len(r["model"]) for r in runs_info)
-		max_exp = max(len(str(r["exp_no"])) for r in runs_info)
-		max_split = max(len(r["split"]) for r in runs_info)
+		runs_info, stats = self._get_runs_info(to_disp)
 
 		conf_list = []
 		for i, info in enumerate(runs_info):
 			# Format with padding for alignment
-			r_str = (
-				f"{info['model']:<{max_model}}  "
-				f"Exp: {info['exp_no']:<{max_exp}}  "
-				f"Split: {info['split']:<{max_split}}  "
-				f"Config: {info['config_path']}"
-			)
-
+			r_str = self._run_str(info, stats)
 			if disp:
 				print(f"  [{i:2d}] {r_str}")
 			conf_list.append(r_str)
@@ -179,22 +263,7 @@ class que:
 
 		return conf_list
 
-	def _run_sum(self, run: dict) -> dict:
-		"""Extract key details from a run configuration.
 
-		Args:
-										run: Dictionary containing run configuration with admin details
-
-		Returns:
-										Dictionary with model, exp_no, split, and config_path
-		"""
-		admin = run["config"]["admin"]
-		return {
-			"model": admin["model"],
-			"exp_no": admin["exp_no"],
-			"split": admin["split"],
-			"config_path": admin["config_path"],
-		}
 
 	def create_run(
 		self,
