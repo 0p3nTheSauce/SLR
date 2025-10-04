@@ -576,34 +576,6 @@ class worker:
 		train_loop(model_specifcs, run, recover=admin["recover"])
 		run.finish()
 
-   
-	def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
-		"""Blocking start which prints worker output in daemon terminal"""
-
-		store_Data(self.temp_path, next_run)
-		cmd = [self.exec_path, self.wr_name]
-		if args:
-			cmd.extend(args)
-		with subprocess.Popen(
-			cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-		) as proc:
-			if proc.stdout:
-				for line in proc.stdout:
-					print(line.strip())
-
-	def start_log(
-		self, next_run: dict, args: Optional[list[str]] = None
-	) -> subprocess.Popen:
-		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
-		store_Data(self.temp_path, next_run)
-		cmd = [self.exec_path, self.wr_name]
-		if args:
-			cmd.extend(args)
-
-		return subprocess.Popen(
-			cmd, stdout=open(self.log_path, "w"), stderr=subprocess.STDOUT
-		)
-
 	def idle(self, message: str) -> str:
 		# testing if blocking
 		print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -709,9 +681,9 @@ class daemon:
 
 			self.print_v(self.seperator(next_run))
 
-			self.worker.start_here(next_run)
+			self.start_here(next_run)
 
-	def start_n_monitor_simple(self):
+	def start_n_monitor(self):
 		"""Start process and use existing tmux monitoring"""
 		while True:
 			self.que.load_state()
@@ -725,7 +697,7 @@ class daemon:
 			self.print_v(self.seperator(next_run))
 
 			# Start process in background
-			proc = self.worker.start_log(next_run)
+			proc = self.start_log(next_run)
 
 			# Start monitoring in tmux (non-blocking)
 			self.monitor_log()
@@ -740,6 +712,33 @@ class daemon:
 
 	def monitor_log(self):
 		self.tmux_man.send(f"tail -f {self.worker.log_path}")
+
+	def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
+		"""Blocking start which prints worker output in daemon terminal"""
+
+		store_Data(self.temp_path, next_run)
+		cmd = [self.worker.exec_path, self.wr_name]
+		if args:
+			cmd.extend(args)
+		with subprocess.Popen(
+			cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+		) as proc:
+			if proc.stdout:
+				for line in proc.stdout:
+					print(line.strip())
+
+	def start_log(
+		self, next_run: dict, args: Optional[list[str]] = None
+	) -> subprocess.Popen:
+		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
+		store_Data(self.temp_path, next_run)
+		cmd = [self.worker.exec_path, self.wr_name]
+		if args:
+			cmd.extend(args)
+
+		return subprocess.Popen(
+			cmd, stdout=open(self.worker.log_path, "w"), stderr=subprocess.STDOUT
+		)
 
 class queShell(cmdLib.Cmd):
 	intro = "queShell: Type help or ? to list commands.\n"
