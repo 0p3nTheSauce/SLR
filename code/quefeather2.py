@@ -6,28 +6,31 @@ from typing import Literal, TypeAlias
 Feather: TypeAlias = Literal["worker", "daemon"]
 FEATHERS = [WR_NAME, DN_NAME]
 
-
 class queFeather:
     def __init__(
         self,
-        setting: Feather,
+        mode: Feather,
     ):
-        self.mode = setting
+        self.mode = mode
     
     def run(self,args):
-        pass
-
-        
-    def run_daemon(self, args):
-        daem = daemon()
-        if args == 'watch':
-            daem.start_n_watch()
+        if self.mode == "daemon":
+            self.run_daemon(args)
         else:
+            self.run_worker(args)
+        
+    def run_daemon(self, setting: Literal['watch', 'monitor', 'idle']):
+        daem = daemon()
+        if setting == 'watch':
+            daem.start_n_watch()
+        elif setting == 'monitor':
             daem.start_n_monitor()
+        else:
+            daem.start_idle()
 
-    def run_worker(self, args):
+    def run_worker(self, setting: Literal['work', 'idle']):
         wr = worker()
-        if args == 'work':
+        if setting == 'work':
             wr.work()
         else:
             wr.idle("Testing")
@@ -40,20 +43,27 @@ def main():
     daemon_parser = subparsers.add_parser('daemon', help='Run as daemon')
 
     daemon_parser.add_argument(
-        'mode',
-        choices=['watch', 'monitor'],
+        'setting',
+        choices=['watch', 'monitor', 'idle'],
         help='Operation of daemon'
     )
 
     # Worker subcommand  
     worker_parser = subparsers.add_parser('worker', help='Run as worker')
 
-
+    worker_parser.add_argument(
+        'setting',
+        choices=['work', 'idle'],
+        help='Operation of worker'
+    )
 
     args = parser.parse_args()
 
-              
-    # run_train(args.verbose)
+    qf = queFeather(mode=args.mode)
+    qf.run(args)
+    
+if __name__ == '__main__':
+    main()
 
 
 
