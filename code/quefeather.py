@@ -1,5 +1,5 @@
-
 #!/home/luke/miniconda3/envs/wlasl/bin/python
+
 import argparse
 from quewing import daemon, worker, WR_NAME, DN_NAME
 from typing import Literal, TypeAlias
