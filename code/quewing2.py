@@ -13,7 +13,7 @@ import torch
 # locals
 import configs
 import utils
-
+from train import train_loop
 # constants
 SESH_NAME = "que_training"
 DN_NAME = "daemon"
@@ -425,12 +425,12 @@ class wandb_manager:
 		return runs
 
 	@classmethod
-	def run_present(run_id:str, runs:List[str]) -> bool:
+	def run_present(cls, run_id:str, runs:List) -> bool:
 		return any([run.id == run_id for run in runs])
 
 	@classmethod	
 	def validate_runId(cls, run_id:str, entity:str, project:str) -> bool:
-		return cls.run_present(run_id), cls.list_runs(entity, project)
+		return cls.run_present(run_id, cls.list_runs(entity, project))
 
 class gpu_manager:
 
@@ -511,7 +511,8 @@ class worker:
 		log_path: str = LOG_PATH,
 		wr_name: str = WR_NAME,
 		sesh_name: str = SESH_NAME,
-		debug : bool = True
+		debug : bool = True,
+		verbose : bool = True
 	):
 		self.temp_path = Path(temp_path)
 		self.exec_path = exec_path
@@ -519,6 +520,11 @@ class worker:
 		self.wr_name = wr_name
 		self.sesh_name = sesh_name
 		self.debug = debug
+		self.verbose = verbose
+
+	def print_v(self, message : str) -> None:
+		if self.verbose:
+			print(message)
   
 	def work(self):
 		info = retrieve_Data(self.temp_path)
@@ -541,9 +547,39 @@ class worker:
 		if admin['recover']:
 			if 'run_id' in info:
 				run_id = info['run_id']
+			else:
+				run_id = wandb_manager.get_run_id(run_name, entity, project, idx=-1) #probably want the last one
+    
+			self.print_v(f"Resuming run with ID: {run_id}")
 			
-				
+			run = wandb.init(
+				entity=entity,
+				project=project,
+				id=run_id,
+				resume='must',
+				name=run_name,
+				tags=tags,
+				config=config      
+			)		
+		else:
+			self.print_v(f"Starting new run with name: {run_name}")
+			self.print_v(f"Starting new run with name: {run_name}")
+			run = wandb.init(
+				entity=entity, project=project, name=run_name, tags=tags, config=config
+			)
+			# write run id to temp, so that daemon waits for it
+			run_info = {"run_id": run.id, "run_name": run.name, "run_project": project}
+			self.print_v("writing my id to temp file")
+			store_Data(self.temp_path, run_info)
+   
+		self.print_v(f"Run ID: {run.id}")
+		self.print_v(f"Run name: {run.name}")  # Human-readable name
+		self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
+  
+		train_loop(model_specifcs, run, recover=admin["recover"])
+		run.finish()
 
+   
 	def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
 		"""Blocking start which prints worker output in daemon terminal"""
 
