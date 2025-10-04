@@ -9,6 +9,7 @@ import shlex
 from filelock import FileLock
 import sys
 import wandb
+import torch
 # locals
 import configs
 import utils
@@ -375,15 +376,6 @@ class tmux_manager:
 			print(e.stderr)
 
 class wandb_manager:
-	def __init__(
-		self,
-		check_interval:int=300,
-		verbose:bool=False,
-  		max_retries:int=5,
-	):
-		self.check_interval = check_interval,
-		self.verbose = verbose	
-		self.max_retries = max_retries
   
 	@classmethod
 	def get_run_id(cls, 
@@ -440,6 +432,77 @@ class wandb_manager:
 	def validate_runId(cls, run_id:str, entity:str, project:str) -> bool:
 		return cls.run_present(run_id), cls.list_runs(entity, project)
 
+class gpu_manager:
+
+	@classmethod
+	def get_gpu_memory_usage(cls, gpu_id=0):
+		"""Get GPU memory usage across all processes"""
+  
+		result = subprocess.run(
+			['nvidia-smi', f'--id={gpu_id}', 
+			'--query-gpu=memory.used,memory.total',
+			'--format=csv,noheader,nounits'],
+			capture_output=True,
+			text=True
+		)
+		used, total = map(float, result.stdout.strip().split(','))
+  
+		return used / 1024, total / 1024  # In GB
+
+	@classmethod
+	def wait_for_completion(
+		cls,
+		check_interval: int = 3600,  # 1 hour
+		confirm_interval: int = 60,  # 1 minute
+		num_checks: int = 5,  # confirm consistency over 5 minutes
+		verbose: bool = False,
+		gpu_id: int = 0,
+		max_util_gb: float = 1.0  # Maximum memory usage in GB
+	) -> bool:
+
+		assert torch.cuda.is_available(), 'CUDA is not available'
+		
+		used, total = cls.get_gpu_memory_usage(gpu_id)		
+  
+		proceed = used > max_util_gb  # Fixed logic
+		
+		while proceed:
+			if verbose:
+				print()
+				print(f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used/total*100:.1f}%)")
+				print(f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+			try:
+				time.sleep(check_interval)
+				used, _ = cls.get_gpu_memory_usage(gpu_id)		
+			except KeyboardInterrupt:
+				print()
+				print("Monitoring interrupted by user")
+				return False
+
+			if used <= max_util_gb and cls._confirm_usage(confirm_interval, num_checks, gpu_id, max_util_gb):
+				break
+
+		if verbose:
+			print()
+			print(f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used/total*100:.1f}%)")
+		
+		return True
+
+	@classmethod
+	def _confirm_usage(
+		cls,
+		confirm_interval: int = 60,  # 1 minute
+		num_checks: int = 5,  # confirm consistency over 5 minutes
+		gpu_id: int = 0,
+		max_util_gb: float = 1.0
+	) -> bool:
+		for _ in range(num_checks):
+			used, _ = cls.get_gpu_memory_usage(gpu_id)
+			if used > max_util_gb:
+				return False
+			time.sleep(confirm_interval)
+		return True
+ 
 class worker:
 	def __init__(
 		self,

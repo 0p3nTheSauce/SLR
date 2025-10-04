@@ -752,5 +752,10 @@ def test_safe_index():
 			print(f'{i} out of range for len(l) = {len(l)}')
 		i = random.randint(-len(l) - 1, len(l) + 1)
 
+def test_wait_for_completion():
+    from quewing2 import gpu_manager
+    
+    print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
+
 if __name__ == "__main__":
-	test_safe_index()
+	test_wait_for_completion()
