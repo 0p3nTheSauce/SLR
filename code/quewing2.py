@@ -583,7 +583,7 @@ class worker:
 			print(f"Idling: {i}")
 			print(message)
 			time.sleep(10)
-		print(f"Finishign at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+		print(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 		return message
 
 class daemon:
