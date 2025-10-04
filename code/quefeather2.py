@@ -1,7 +1,7 @@
 
 #!/home/luke/miniconda3/envs/wlasl/bin/python
 import argparse
-from quewing2 import daemon, worker
+from quewing2 import daemon, worker, retrieve_Data, store_Data
 
 def run_daemon(args):
     daem = daemon()
@@ -12,8 +12,9 @@ def run_daemon(args):
 
 def run_worker(args):
     wr = worker()
+    info = retrieve_Data(wr.temp_path)
     if args == 'here':
-        wr.start_here()
+        wr.start_here(info)
 
 def main():
     parser = argparse.ArgumentParser(prog='quefeather.py')
