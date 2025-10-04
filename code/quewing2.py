@@ -199,22 +199,23 @@ class que:
         return r_str
 
     def get_next_run(self) -> Optional[dict]:
-        """Retrieves the next run from the queue, and moves the run to OLD_RUNS"""
+        """Retrieves the next run from the que"""
+        self.load_state()
         if self.to_run:
             next_run = self.to_run.pop(0)
-            self.print_v(
-                f"Retrieved next run: {self.run_str(self.run_sum(next_run))}"
-            )
+            self.save_state()
+            self.print_v(f"Retrieved next run: {self.run_str(self.run_sum(next_run))}")
             return next_run
         else:
             self.print_v("No runs in the queue.")
             return
 
-    def get_next_run_new(self) -> Optional[dict]:
-        """Retrieves the next run from the queue"""
-        if self.to_run:
-            next_run = self.to_run.pop(0)
-            self.print_v(f"Retrieved next run: {next_run}")
+    def store_old_run(self, old_run: Dict):
+        """Saves run to OLD_RUNS"""
+        self.load_state()
+        self.old_runs.insert(0, old_run)
+        self.save_state()
+        self.print_v("Saved to old_runs")
 
     def clear_runs(self, loc: QueLocation):
         """reset the runs queue"""
@@ -283,13 +284,13 @@ class que:
         """Create and add a new training run entry
 
         Args:
-                                                                        arg_dict (dict): Arguments used by training function
-                                                                        tags (list[str]): Wandb tags
-                                                                        output (str): Experiment directory
-                                                                        save_path (str): Checkpoint directory
-                                                                        project (str): Wandb project
-                                                                        entity (str): Wandb entity
-                                                                        ask (bool, optional): Pre-check run before creation. Defaults to True.
+            arg_dict (dict): Arguments used by training function
+            tags (list[str]): Wandb tags
+            output (str): Experiment directory
+            save_path (str): Checkpoint directory
+            project (str): Wandb project
+            entity (str): Wandb entity
+            ask (bool, optional): Pre-check run before creation. Defaults to True.
         """
 
         config = configs.load_config(arg_dict, verbose=True)
@@ -398,8 +399,6 @@ class que:
         self.print_v("Successfully added\n")
 
         self.list_runs(n_loc, disp=self.verbose)
-
-    # High level functions taking multistep input
 
 
 class tmux_manager:
@@ -672,7 +671,6 @@ class worker:
         print(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         return message
 
-
 class daemon:
     """Class for the queue daemon process. The function works in a fetch execute repeat
     cycle. The function reads runs from the queRuns.json file, then writes them to the
@@ -681,16 +679,16 @@ class daemon:
     while the worker outputs to a log file.
 
     Args:
-            name: of own tmux window
-            wr_name: of worker tmux window (monitor)
-            sesh: tmux session name
-            runs_path: to queRuns.json
-            temp_path: to queTemp.json
-            imp_path: to implemented_info.json
-            exec_path: to quefeather.py
-            verbose: speaks to you
-            wr: supply its worker
-            q: supply its que
+        name: of own tmux window
+        wr_name: of worker tmux window (monitor)
+        sesh: tmux session name
+        runs_path: to queRuns.json
+        temp_path: to queTemp.json
+        imp_path: to implemented_info.json
+        exec_path: to quefeather.py
+        verbose: speaks to you
+        wr: supply its worker
+        q: supply its que
     """
 
     def __init__(
@@ -738,13 +736,9 @@ class daemon:
         if self.verbose:
             print(message)
 
-    def seperator(self, run: dict) -> str:
+    def seperator(self, run: Dict) -> str:
         sep = ""
-        r_info = self.que.run_sum(run)
-        r_str = f"{r_info['model']} \
-				Exp: {r_info['exp_no']} \
-				Split: {r_info['split']} \
-				Config: {r_info['config_path']}"
+        r_str = self.que.run_str(self.que.run_sum(run))
 
         if r_str:
             sep += ("\n" * 2) + ("-" * 10) + ("\n")
@@ -757,9 +751,7 @@ class daemon:
     def start_n_watch(self):
         """Start process in this terminal and watch"""
         while True:
-            self.que.load_state()
             next_run = self.que.get_next_run()
-            self.que.save_state()
 
             if next_run is None:
                 self.print_v("No more runs to execute")
@@ -767,14 +759,27 @@ class daemon:
 
             self.print_v(self.seperator(next_run))
 
-            self.start_here(next_run)
+            store_Data(self.temp_path, next_run)
+
+            # worker
+            self.worker_here()
+
+            # retrieve run_id
+            info = retrieve_Data(self.temp_path)
+
+            if "run_id" in info:
+                run_id = info["run_id"]
+            else:
+                run_id = "Unknown"
+
+            next_run["run_id"] = run_id
+
+            self.que.store_old_run(next_run)
 
     def start_n_monitor(self):
         """Start process and use existing tmux monitoring"""
         while True:
-            self.que.load_state()
             next_run = self.que.get_next_run()
-            self.que.save_state()
 
             if next_run is None:
                 self.print_v("No more runs to execute")
@@ -782,8 +787,10 @@ class daemon:
 
             self.print_v(self.seperator(next_run))
 
+            store_Data(self.temp_path, next_run)
+
             # Start process in background
-            proc = self.start_log(next_run)
+            proc = self.worker_log()
 
             # Start monitoring in tmux (non-blocking)
             self.monitor_log()
@@ -796,13 +803,24 @@ class daemon:
             else:
                 self.print_v(f"Process failed with return code: {return_code}")
 
+            # retrieve run_id
+            info = retrieve_Data(self.temp_path)
+
+            if "run_id" in info:
+                run_id = info["run_id"]
+            else:
+                run_id = "Unknown"
+
+            next_run["run_id"] = run_id
+
+            self.que.store_old_run(next_run)
+
     def monitor_log(self):
         self.tmux_man.send(f"tail -f {self.worker.log_path}")
 
-    def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
+    def worker_here(self, args: Optional[list[str]] = None) -> None:
         """Blocking start which prints worker output in daemon terminal"""
 
-        store_Data(self.temp_path, next_run)
         cmd = [self.worker.exec_path, self.wr_name]
         if args:
             cmd.extend(args)
@@ -813,11 +831,9 @@ class daemon:
                 for line in proc.stdout:
                     print(line.strip())
 
-    def start_log(
-        self, next_run: dict, args: Optional[list[str]] = None
-    ) -> subprocess.Popen:
+    def worker_log(self, args: Optional[list[str]] = None) -> subprocess.Popen:
         """Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
-        store_Data(self.temp_path, next_run)
+
         cmd = [self.worker.exec_path, self.wr_name]
         if args:
             cmd.extend(args)
