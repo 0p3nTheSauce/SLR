@@ -169,11 +169,11 @@ class que:
         """Convert a run to summarised string representation
 
         Args:
-                r_info (Dict): Summarised run info.
-                stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+            r_info (Dict): Summarised run info.
+            stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
 
         Returns:
-                str: Summarised string representation of run info
+            str: Summarised string representation of run info
         """
 
         if stats is None:
@@ -187,12 +187,14 @@ class que:
         r_str = ""
 
         if "run_id" in r_info:
-            r_str += f"Run ID: {r_info['run_id']:<stats['max_id']}"
+            r_str += f"Run ID: {r_info['run_id']:<{stats['max_id']}}  "
 
-        r_str = f"{r_info['model']:<stats['max_model']} \
-				Exp: {r_info['exp_no']:<stats['max_exp']} \
-				Split: {r_info['split']:<stats['max_split']} \
-				Config: {r_info['config_path']}"
+        r_str += (
+            f"{r_info['model']:<{stats['max_model']}}  "
+            f"Exp: {r_info['exp_no']:<{stats['max_exp']}}  "
+            f"Split: {r_info['split']:<{stats['max_split']}}  "
+            f"Config: {r_info['config_path']}"
+        )
 
         return r_str
 
