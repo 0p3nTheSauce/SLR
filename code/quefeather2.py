@@ -1,7 +1,7 @@
 
 #!/home/luke/miniconda3/envs/wlasl/bin/python
 import argparse
-from quewing2 import daemon, worker, retrieve_Data, WR_NAME, DN_NAME
+from quewing2 import daemon, worker, WR_NAME, DN_NAME
 from typing import Literal, TypeAlias
 Feather: TypeAlias = Literal["worker", "daemon"]
 FEATHERS = [WR_NAME, DN_NAME]
@@ -23,14 +23,14 @@ class queFeather:
         if args == 'watch':
             daem.start_n_watch()
         else:
-            daem.start_n_monitor_simple()
+            daem.start_n_monitor()
 
     def run_worker(self, args):
         wr = worker()
-        info = retrieve_Data(wr.temp_path)
-        if args == 'here':
-            wr.start_here(info)
-
+        if args == 'work':
+            wr.work()
+        else:
+            wr.idle("Testing")
 
 def main():
     parser = argparse.ArgumentParser(prog='quefeather.py')
