@@ -103,7 +103,7 @@ class que:
 		"""Return reference to the specified list"""
 		return self.to_run if loc == TO_RUN else self.old_runs
 
-	def _run_sum(self, run: dict) -> dict:
+	def run_sum(self, run: dict) -> dict:
 		"""Extract key details from a run configuration.
 
 		Args:
@@ -128,7 +128,7 @@ class que:
 		
 		return dic
 
-	def _get_runs_info(self, run_confs: List[Dict]) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
+	def get_runs_info(self, run_confs: List[Dict]) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
 		"""Get summarised run info, and stats for printing
 
 		Args:
@@ -138,7 +138,7 @@ class que:
 			Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths 
 		"""
      
-		runs_info = [self._run_sum(run) for run in run_confs]
+		runs_info = [self.run_sum(run) for run in run_confs]
 
 		# Calculate column widths
 		max_model = max(len(r["model"]) for r in runs_info)
@@ -161,7 +161,7 @@ class que:
 
 		return runs_info, stats
 
-	def _run_str(self, r_info:Dict[str, str], stats: Optional[Dict[str, int]] = None) -> str:
+	def run_str(self, r_info:Dict[str, str], stats: Optional[Dict[str, int]] = None) -> str:
 		"""Convert a run to summarised string representation
 
 		Args:
@@ -248,12 +248,12 @@ class que:
 			return []
 
 		# Extract run info
-		runs_info, stats = self._get_runs_info(to_disp)
+		runs_info, stats = self.get_runs_info(to_disp)
 
 		conf_list = []
 		for i, info in enumerate(runs_info):
 			# Format with padding for alignment
-			r_str = self._run_str(info, stats)
+			r_str = self.run_str(info, stats)
 			if disp:
 				print(f"  [{i:2d}] {r_str}")
 			conf_list.append(r_str)
@@ -723,7 +723,7 @@ class daemon:
 
 	def seperator(self, run: dict) -> str:
 		sep = ""
-		r_info = self.que._run_sum(run)
+		r_info = self.que.run_sum(run)
 		r_str = f"{r_info['model']} \
 				Exp: {r_info['exp_no']} \
 				Split: {r_info['split']} \
