@@ -328,9 +328,6 @@ class que:
 	# High level functions taking multistep input
 
 
-# TODO: put this in a class
-
-
 class tmux_manager:
 	def __init__(
 		self,
