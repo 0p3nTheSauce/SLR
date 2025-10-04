@@ -18,10 +18,64 @@ from models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny
 from models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
-from quewing import get_run_id
+# from code.experiments.scripts.quewing import get_run_id
 
-from typing import Optional
+from typing import Optional, List
 
+class wandb_manager:
+	@classmethod
+	def get_run_id(
+		cls, run_name, entity: str, project: str, idx: Optional[int] = None
+	) -> Optional[str]:
+		api = wandb.Api()
+
+		runs = api.runs(f"{entity}/{project}")
+		ids = []
+		for run in runs:
+			if run.name == run_name:
+				ids.append(run.id)
+
+		if len(ids) == 0:
+			print(f"No runs found with name: {run_name}")
+			return None
+		elif len(ids) > 1:
+			print(f"Multiple runs found with name: {run_name}")
+			if isinstance(idx, int) and abs(idx) < len(runs):
+				print(f"Returning id for idx: {idx}")
+				return ids[idx]
+			else:
+				print("No idx supplied, returning None")
+				return None
+		else:
+			return ids[0]
+
+	@classmethod
+	def list_runs(
+		cls,
+		entity: str,
+		project: str,
+		disp: bool = False,
+	) -> list[str]:
+		api = wandb.Api()
+		runs = api.runs(f"{entity}/{project}")
+
+		if disp:
+			for run in runs:
+				print(f"Run ID: {run.id}")
+				print(f"Run name: {run.name}")
+				print(f"State: {run.state}")
+				print(f"Created: {run.created_at}")
+				print("---")
+
+		return runs
+
+	@classmethod
+	def run_present(cls, run_id: str, runs: List) -> bool:
+		return any([run.id == run_id for run in runs])
+
+	@classmethod
+	def validate_runId(cls, run_id: str, entity: str, project: str) -> bool:
+		return cls.run_present(run_id, cls.list_runs(entity, project))
 
 
 ENTITY= 'ljgoodall2001-rhodes-university'
@@ -422,7 +476,13 @@ def main():
 			if 'run_id' in config['admin']:
 				run_id = config['admin']['run_id']
 			else: 
-				run_id = get_run_id(run_name, ENTITY, project)
+				# run_id = get_run_id(run_name, ENTITY, project)
+				run_id = wandb_manager.get_run_id(
+					run_name,
+					entity,
+					project,
+					idx=-1 #last if same name
+				)
 			if run_id is None:
 				print("Run id nto found automatically, pass as arg instead")
 				return

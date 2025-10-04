@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import random
 # @pytest.fixture
 
-from quewing import wait_for_run_completion
+from code.experiments.scripts.quewing import wait_for_run_completion
 from utils import print_dict
 import time
 import subprocess
@@ -228,7 +228,7 @@ def test_stopper_save_and_load(stopper, arg_dict):
 	print(f"Restored best score: {stopper.best_score}, Best epoch: {stopper.best_epoch}, Counter: {stopper.counter}")
 
 def tmux_session():
-	from quewing import setup_tmux_session, check_tmux_session, separate
+	from code.experiments.scripts.quewing import setup_tmux_session, check_tmux_session, separate
 	# result = check_tmux_session('test', 'd', 'w', True)
 	# if result != 'ok':
 	#   setup_tmux_session('test', 'd', 'w', True)
@@ -430,7 +430,7 @@ def merge_seen_ex():
 	print_dict(merge_seen(d3, d4))
 
 def test_use_rudid():
-	from quewing import wait_for_run_completion
+	from experiments.scripts.quewing import wait_for_run_completion
 	run_id = input("Enter run ID: ")
 	info = wait_for_run_completion(
 		entity = 'ljgoodall2001-rhodes-university',
@@ -634,7 +634,7 @@ def test_sub():
 			print(f"Received: {line.strip()}")
 
 def test_send():
-	from quewing2 import print_tmux
+	from code.quewing import print_tmux
 	print_tmux(
 		"hello",
 		"worker",
@@ -661,7 +661,7 @@ def test_shelly():
 
 def test_shelly2():
 	import cmd
-	from quewing2 import que, join_session
+	from code.quewing import que, join_session
 	
 	class QueShell(cmd.Cmd):
 		intro = 'Queue Management Shell. Type help or ? to list commands.\n'
@@ -735,7 +735,7 @@ def test_shelly2():
 
 
 
-	from quewing2 import RUN_PATH, IMP_PATH
+	from quewing import RUN_PATH, IMP_PATH
 	QueShell(
 		runs_path=RUN_PATH,
 		implemented_path=IMP_PATH
@@ -753,7 +753,7 @@ def test_safe_index():
 		i = random.randint(-len(l) - 1, len(l) + 1)
 
 def test_wait_for_completion():
-    from quewing2 import gpu_manager
+    from quewing import gpu_manager
     
     print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
 
