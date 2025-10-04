@@ -374,6 +374,9 @@ class tmux_manager:
 			print("Send ran into an error when spawning the worker process: ")
 			print(e.stderr)
 
+
+
+
 class worker:
 	def __init__(
 		self,
@@ -398,7 +401,22 @@ class worker:
 			#empty temp file
 			raise ValueError(f'Tried to read next run from {self.temp_path} but it was empty')
 
-		
+		model_specifcs = info['model_info']
+		config = info['config']
+		entity = info['entity']
+		project = info['project']
+		tags = info['tags']
+
+		admin = config['admin']
+  
+		#setup wandb run
+		run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
+  
+		if admin['recover']:
+			if 'run_id' in info:
+				run_id = info['run_id']
+			
+				
 
 	def start_here(self, next_run: dict, args: Optional[list[str]] = None) -> None:
 		"""Blocking start which prints worker output in daemon terminal"""
