@@ -19,19 +19,34 @@ class queFeather:
         else:
             self.run_worker(args, kwargs)
         
-    def run_daemon(self, setting: Literal['watch', 'monitor', 'idle', 'idle_mon'], args : Optional[argparse.Namespace] = None):
+    def run_daemon(self, setting: Literal['sWatch', 'sMonitor','monitorO', 'idle', 'idle_log'], args : Optional[argparse.Namespace] = None):
         daem = daemon()
         print("The daemon sais: ")
-        if setting == 'watch':
+        cmd_d = {
+            0: 'sWatch',
+            1: 'sMonitor',
+            2: 'monitorO',
+            3: 'idle',
+            4: 'idle_log'
+        }
+        
+        
+        if setting == cmd_d[0]:
             daem.start_n_watch()
-        elif setting == 'monitor':
+        elif setting == cmd_d[1]:
             daem.start_n_monitor()
-        elif setting == 'idle':
+        elif setting == cmd_d[2]:
+            daem.monitor_log()
+        elif setting == cmd_d[3]:
             daem.start_idle()
+        elif setting == cmd_d[4]:
+            daem.start_idle_log()
         else:
             print('huh?')
+            print(f'You gave me: {setting}')
+            print(f'but i only accept: {cmd_d.values()}')
 
-    def run_worker(self, setting: Literal['work', 'idle', 'idle_log'], args : Optional[argparse.Namespace] = None):
+    def run_worker(self, setting: Literal['work', 'idle', 'idle_log', 'idle_gpu'], args : Optional[argparse.Namespace] = None):
         wr = worker()
         print("The worker sais: ")
         wait = args.wait if args else None
@@ -43,6 +58,9 @@ class queFeather:
             wr.idle("Testing", wait, cycles)
         elif setting == 'idle_log':
             wr.idle_log("Testing", wait, cycles)
+        elif setting == 'idle_gpu':
+            z = wr.sim_gpu_usage()
+            print(z.shape)
         else:
             print('huh?')
 def main():
@@ -54,7 +72,7 @@ def main():
 
     daemon_parser.add_argument(
         'setting',
-        choices=['watch', 'monitor', 'idle'],
+        choices=['sWatch', 'sMonitor','monitorO', 'idle', 'idle_log'],
         help='Operation of daemon'
     )
 
@@ -63,7 +81,7 @@ def main():
 
     worker_parser.add_argument(
         'setting',
-        choices=['work', 'idle', 'idle_log'],
+        choices=['work', 'idle', 'idle_log', 'idle_gpu'],
         help='Operation of worker'
     )
     
