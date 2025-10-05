@@ -604,16 +604,40 @@ class worker:
 		train_loop(model_specifcs, run, recover=admin["recover"])
 		run.finish()
 
-	def idle(self, message: str) -> str:
-		# testing if blocking
+	def idle(self, message: str, wait: Optional[int] = None, cycles : Optional[int] = None) -> str:
+		t = wait if wait else 1
+		c = cycles if cycles else 10
+		print('\n'*2)
+		print('-'*10)
 		print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-		for i in range(10):
+		for i in range(c):
 			print(f"Idling: {i}")
 			print(message)
-			time.sleep(1)
+			time.sleep(t)
 		print(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 		return message
 
+	def idle_log(self, message: str, wait: Optional[int] = None, cycles : Optional[int] = None):
+		t = wait if wait else 1
+		c = cycles if cycles else 10
+		with open(self.log_path, 'a') as f:
+			f.write('\n'*2)
+			f.write('-'*10)
+			f.write('\n')
+			f.write(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+			print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+			f.flush()
+
+			for i in range(c):
+				f.write(f"Idling: {i}\n")
+				print(f"Idling: {i}")
+				f.write(message + '\n')
+				time.sleep(t)
+				f.flush()
+
+			f.write(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+			print(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+			f.flush()
 
 class daemon:
 	"""Class for the queue daemon process. The function works in a fetch execute repeat
@@ -648,6 +672,7 @@ class daemon:
 		wr: Optional[worker] = None,
 		q: Optional[que] = None,
 		tm: Optional[tmux_manager] = None,
+		stp_on_fail : bool = True,
 	) -> None:
 		self.name = name
 		self.wr_name = wr_name
@@ -674,6 +699,8 @@ class daemon:
 		else:
 			self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=name, sesh_name=sesh)
 		self.verbose = verbose
+		self.stp_on_fail = stp_on_fail
+
 
 	def print_v(self, message: str) -> None:
 		"""Prints a message if verbose is True."""
@@ -746,7 +773,8 @@ class daemon:
 				self.print_v("Process completed successfully")
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
-
+				if self.stp_on_fail:
+					break
 			# retrieve run_id
 			info = retrieve_Data(self.temp_path)
 
@@ -767,6 +795,24 @@ class daemon:
 				self.worker_idle_here()
 		except KeyboardInterrupt:
 			self.print_v("Finished idling, bye")
+   
+	def start_idle_log(self):
+		"""Start process and use existing tmux monitoring"""
+		try:
+			while True:
+				self.print_v("Starting new idle process\n")
+				proc = self.worker_idle_log()
+				self.monitor_log()
+				return_code = proc.wait()
+				if return_code == 0:
+					self.print_v("Process completed successfully")
+				else:
+					self.print_v(f"Process failed with return code: {return_code}")
+					if self.stp_on_fail:
+						break
+	
+		except KeyboardInterrupt:
+			self.print_v("Finished idling, bye")
   
 	def monitor_log(self):
 		self.tmux_man.send(f"tail -f {self.worker.log_path}")
@@ -777,13 +823,9 @@ class daemon:
 		cmd = [self.worker.exec_path, self.wr_name]
 		if args:
 			cmd.extend(args)
-		with subprocess.Popen(
-			cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-		) as proc:
-			if proc.stdout:
-				for line in proc.stdout:
-					print(line.strip())
-
+		subprocess.run(cmd, check=True)
+  
+  
 	def worker_log(self, args: Optional[list[str]] = None) -> subprocess.Popen:
 		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
 
@@ -803,6 +845,14 @@ class daemon:
 			cmd.extend(args)
 		subprocess.run(cmd, check=True)
   
+	def worker_idle_log(self,  args: Optional[list[str]] = None):
+		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
+		cmd = [self.worker.exec_path, self.wr_name, 'idle']
+		if args:
+			cmd.extend(args)
+		return subprocess.Popen(
+			cmd, stdout=open(self.worker.log_path, "w"), stderr=subprocess.STDOUT
+		)
   
 class queShell(cmdLib.Cmd):
 	intro = "queShell: Type help or ? to list commands.\n"
