@@ -825,7 +825,6 @@ class daemon:
 			cmd.extend(args)
 		subprocess.run(cmd, check=True)
   
-  
 	def worker_log(self, args: Optional[list[str]] = None) -> subprocess.Popen:
 		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
 
