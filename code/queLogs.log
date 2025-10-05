@@ -1,43 +1,31 @@
-wandb: Currently logged in as: ljgoodall2001 (ljgoodall2001-rhodes-university) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: Tracking run with wandb version 0.21.1
-wandb: Run data is saved locally in /home/luke/ExtraStorage/SLR/code/wandb/run-20251004_230341-x8xe4vp3
-wandb: Run `wandb offline` to turn off syncing.
-wandb: Syncing run S3D_asl300_exp001
-wandb: ⭐️ View project at https://wandb.ai/ljgoodall2001-rhodes-university/WLASL-300
-wandb: 🚀 View run at https://wandb.ai/ljgoodall2001-rhodes-university/WLASL-300/runs/x8xe4vp3
-Successfully using model S3D_basic
-Epoch 0/200
-----------
-Step 10: Accumulated Loss: 6.4890, Current Accuracy: 0.00%
-Traceback (most recent call last):
-  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 148, in <module>
-    main()
-  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 140, in main
-    run_train(args.verbose)
-  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 65, in run_train
-    train_loop(model_specifcs, run, recover=admin["recover"])
-  File "/home/luke/ExtraStorage/SLR/code/train.py", line 316, in train_loop
-    accumulated_loss += loss.item()
-KeyboardInterrupt
-Traceback (most recent call last):
-  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 148, in <module>
-    main()
-  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 140, in main
-    run_train(args.verbose)
-  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 65, in run_train
-    train_loop(model_specifcs, run, recover=admin["recover"])
-  File "/home/luke/ExtraStorage/SLR/code/train.py", line 316, in train_loop
-    accumulated_loss += loss.item()
-KeyboardInterrupt
-[1;34mwandb[0m: 
-[1;34mwandb[0m: 🚀 View run [33mS3D_asl300_exp001[0m at: [34mhttps://wandb.ai/ljgoodall2001-rhodes-university/WLASL-300/runs/x8xe4vp3[0m
-[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20251004_230341-x8xe4vp3/logs[0m
+The worker sais: 
 
 
-----------Starting at 2025-10-05 15:46:07Idling: 0TestingIdling: 1TestingIdling: 2TestingIdling: 3TestingIdling: 4TestingIdling: 5TestingIdling: 6TestingIdling: 7TestingIdling: 8TestingIdling: 9TestingFinishing at 2025-10-05 15:46:17
 
 ----------
-Starting at 2025-10-05 15:57:47
+Starting at 2025-10-05 20:51:11
+Idling: 0
+Testing
+Idling: 1
+Testing
+Idling: 2
+Testing
+Traceback (most recent call last):
+  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 94, in <module>
+    main()
+  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 91, in main
+    qf.run(args.setting, args)
+  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 20, in run
+    self.run_worker(args, kwargs)
+  File "/home/luke/ExtraStorage/SLR/code/./quefeather.py", line 45, in run_worker
+    wr.idle("Testing", wait, cycles)
+  File "/home/luke/ExtraStorage/SLR/code/quewing.py", line 616, in idle
+    time.sleep(t)
+KeyboardInterrupt
+
+
+----------
+Starting at 2025-10-05 21:02:35
 Idling: 0
 Testing
 Idling: 1
@@ -58,37 +46,11 @@ Idling: 8
 Testing
 Idling: 9
 Testing
-Finishing at 2025-10-05 15:58:37
+Finishing at 2025-10-05 21:02:45
 
 
 ----------
-Starting at 2025-10-05 16:17:10
-Idling: 0
-Testing
-Idling: 1
-Testing
-Idling: 2
-Testing
-Idling: 3
-Testing
-Idling: 4
-Testing
-Idling: 5
-Testing
-Idling: 6
-Testing
-Idling: 7
-Testing
-Idling: 8
-Testing
-Idling: 9
-Testing
-Idling: 10
-Testing
-
-
-----------
-Starting at 2025-10-05 16:18:31
+Starting at 2025-10-05 21:03:45
 Idling: 0
 Testing
 Idling: 1
@@ -112,4 +74,79 @@ Testing
 Idling: 10
 Testing
 Idling: 11
+Testing
+Idling: 12
+Testing
+Idling: 13
+Testing
+Idling: 14
+Testing
+Idling: 15
+Testing
+Idling: 16
+Testing
+Idling: 17
+Testing
+Idling: 18
+Testing
+Idling: 19
+Testing
+Finishing at 2025-10-05 21:04:25
+
+
+----------
+Starting at 2025-10-05 21:04:49
+Idling: 0
+Testing
+Idling: 1
+Testing
+Idling: 2
+Testing
+Idling: 3
+Testing
+Idling: 4
+Testing
+Idling: 5
+Testing
+Idling: 6
+Testing
+Idling: 7
+Testing
+Idling: 8
+Testing
+
+
+----------
+Starting at 2025-10-05 21:40:23
+Idling: 0
+Testing
+Idling: 1
+Testing
+Idling: 2
+Testing
+Idling: 3
+Testing
+Idling: 4
+Testing
+Idling: 5
+Testing
+Idling: 6
+Testing
+Idling: 7
+Testing
+Idling: 8
+Testing
+Idling: 9
+Testing
+Idling: 10
+Testing
+Idling: 11
+Testing
+Idling: 12
+Testing
+Idling: 13
+Testing
+Idling: 14
+Testing
+Idling: 15
 Testing

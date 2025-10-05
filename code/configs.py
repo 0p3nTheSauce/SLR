@@ -322,6 +322,8 @@ def take_args(
     else:
         args.save_path = save_path
 
+    args.save_path = str(save_path)
+
     # Set config path
     if args.config_path is None:
         args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"

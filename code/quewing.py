@@ -58,7 +58,7 @@ class que:
 		assert implemented_path.exists(), f"{implemented_path} does not exist"
 		implemented_info = retrieve_Data(implemented_path)
 		assert implemented_info, "No implemented info found"
-		self.imp_models = implemented_info["models"]
+		self.imp_models : Dict[str, Dict] = implemented_info["models"]
 		self.imp_splits = implemented_info["splits"]
 		self.verbose = verbose
 		self.old_runs = []
@@ -109,10 +109,10 @@ class que:
 		"""Extract key details from a run configuration.
 
 		Args:
-			run: Dictionary containing run configuration with admin details
+				run: Dictionary containing run configuration with admin details
 
 		Returns:
-			Dictionary with model, exp_no, split, and config_path
+				Dictionary with model, exp_no, split, and config_path
 		"""
 		admin = run["config"]["admin"]
 
@@ -138,10 +138,10 @@ class que:
 		"""Get summarised run info, and stats for printing
 
 		Args:
-			run_confs (List[Dict]): A list of run configs (to_run or old_runs)
+				run_confs (List[Dict]): A list of run configs (to_run or old_runs)
 
 		Returns:
-			Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
+				Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
 		"""
 
 		runs_info = [self.run_sum(run) for run in run_confs]
@@ -169,11 +169,11 @@ class que:
 		"""Convert a run to summarised string representation
 
 		Args:
-			r_info (Dict): Summarised run info.
-			stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+				r_info (Dict): Summarised run info.
+				stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
 
 		Returns:
-			str: Summarised string representation of run info
+				str: Summarised string representation of run info
 		"""
 
 		if stats is None:
@@ -221,7 +221,6 @@ class que:
 		"""reset the runs queue"""
 		past = loc == OLD_RUNS
 		future = loc == TO_RUN
-		past, future = loc == "all", loc == "all"
 		if past:
 			self.old_runs = []
 		if future:
@@ -236,11 +235,11 @@ class que:
 		"""Summarise to a list of runs, in a given location
 
 		Args:
-			loc (QueLocation): Location to list
-			disp (bool, optional): Print list, with indexes. Defaults to False.
+				loc (QueLocation): Location to list
+				disp (bool, optional): Print list, with indexes. Defaults to False.
 
 		Returns:
-			List[str]: Summarised run info
+				List[str]: Summarised run info
 		"""
 
 		to_disp = self.fetch_state(loc)
@@ -275,8 +274,6 @@ class que:
 		self,
 		arg_dict: dict,
 		tags: list[str],
-		output: str,
-		save_path: str,
 		project: str,
 		entity: str,
 		ask: bool = True,
@@ -284,16 +281,22 @@ class que:
 		"""Create and add a new training run entry
 
 		Args:
-			arg_dict (dict): Arguments used by training function
-			tags (list[str]): Wandb tags
-			output (str): Experiment directory
-			save_path (str): Checkpoint directory
-			project (str): Wandb project
-			entity (str): Wandb entity
-			ask (bool, optional): Pre-check run before creation. Defaults to True.
+				arg_dict (dict): Arguments used by training function
+				tags (list[str]): Wandb tags
+				output (str): Experiment directory
+				save_path (str): Checkpoint directory
+				project (str): Wandb project
+				entity (str): Wandb entity
+				ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
 
-		config = configs.load_config(arg_dict, verbose=True)
+		try:
+			config = configs.load_config(arg_dict, verbose=True)
+		except ValueError:
+			print(f"{arg_dict['conf_path']} not found")
+			self.print_v("Training cancelled")
+			return
+
 
 		if ask:
 			configs.print_config(config)
@@ -319,21 +322,19 @@ class que:
 				"entity": entity,
 				"project": project,
 				"tags": tags,
-				"output": output,
-				"save_path": save_path,
 			}
 			self.to_run.append(info)
-			self.print_v(f"Added new run: {info}")
+			self.print_v(f"Added new run: {self.run_str(self.run_sum(info))}")
 		else:
 			self.print_v("Training cancelled by user")
 
 	def remove_run(self, loc: QueLocation, idx: int) -> Optional[dict]:
 		"""Removes a run from the que
 		Args:
-			loc: TO_RUN or OLD_RUNS
-			idx: index of run
+				loc: TO_RUN or OLD_RUNS
+				idx: index of run
 		Returns:
-			rem: the removed run, if successful"""
+				rem: the removed run, if successful"""
 
 		to_remove = self.fetch_state(loc)
 
@@ -346,9 +347,9 @@ class que:
 	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int):
 		"""Repositions a run from the que
 		Args:
-			loc: TO_RUN or OLD_RUNS
-			o_idx: original index of run
-			n_idx: new index of run
+				loc: TO_RUN or OLD_RUNS
+				o_idx: original index of run
+				n_idx: new index of run
 		"""
 
 		to_shuffle = self.fetch_state(loc)
@@ -378,9 +379,9 @@ class que:
 		"""Moves a run between locations in que (at beginning)
 
 		Args:
-			o_loc (QueLocation): Old location
-			n_loc (QueLocation): New location
-			o_idx (int): Old index
+				o_loc (QueLocation): Old location
+				n_loc (QueLocation): New location
+				o_idx (int): Old index
 		"""
 
 		old_location = self.fetch_state(o_loc)
@@ -445,6 +446,7 @@ class tmux_manager:
 			print("Send ran into an error when spawning the worker process: ")
 			print(e.stderr)
 
+
 class gpu_manager:
 	@classmethod
 	def get_gpu_memory_usage(cls, gpu_id=0):
@@ -474,6 +476,18 @@ class gpu_manager:
 		gpu_id: int = 0,
 		max_util_gb: float = 1.0,  # Maximum memory usage in GB
 	) -> bool:
+		"""Wait for GPU memory to be free before proceeding
+
+		Args:
+			check_interval (int, optional): Wait period before checking again. Defaults to 3600 (1 hour).  
+			confirm_interval (int, optional): Wait period before checking again when confirming. Defaults to 60 (1 minute). 
+			num_checks: (int, optional): Confirm consistency over how many checks. Defaults to 5 (5 minutes). 
+			gpu_id (int, optional): CUDA GPU. Defaults to 0.
+			max_util_gb (float, optional): Threshold GPU usage to trigger waiting. Defaults to 1.0 (GB).
+
+		Returns:
+			bool: Whether monitoring was killed by the user.
+		"""
 		assert torch.cuda.is_available(), "CUDA is not available"
 
 		used, total = cls.get_gpu_memory_usage(gpu_id)
@@ -516,6 +530,8 @@ class gpu_manager:
 		gpu_id: int = 0,
 		max_util_gb: float = 1.0,
 	) -> bool:
+		
+      
 		for _ in range(num_checks):
 			used, _ = cls.get_gpu_memory_usage(gpu_id)
 			if used > max_util_gb:
@@ -548,6 +564,8 @@ class worker:
 			print(message)
 
 	def work(self):
+		gpu_manager.wait_for_completion()
+		
 		info = retrieve_Data(self.temp_path)
 
 		if not info or "run_id" in info.keys():
@@ -592,10 +610,6 @@ class worker:
 			run = wandb.init(
 				entity=entity, project=project, name=run_name, tags=tags, config=config
 			)
-			# write run id to temp, so that daemon waits for it
-			run_info = {"run_id": run.id, "run_name": run.name, "run_project": project}
-			self.print_v("writing my id to temp file")
-			store_Data(self.temp_path, run_info)
 
 		self.print_v(f"Run ID: {run.id}")
 		self.print_v(f"Run name: {run.name}")  # Human-readable name
@@ -604,11 +618,24 @@ class worker:
 		train_loop(model_specifcs, run, recover=admin["recover"])
 		run.finish()
 
-	def idle(self, message: str, wait: Optional[int] = None, cycles : Optional[int] = None) -> str:
+		# write at end to avoid overwriting a run
+		run_info = {"run_id": run.id, "run_name": run.name, "run_project": project}
+		self.print_v("writing my id to temp file")
+		store_Data(self.temp_path, run_info)
+
+	def idle(
+		self, message: str, wait: Optional[int] = None, cycles: Optional[int] = None,
+	) -> str:
+		gpu_manager.wait_for_completion(
+			check_interval=5, #seconds,
+			confirm_interval=1, #second
+			num_checks=10, #confirm consistency over 10 seconds
+			verbose=self.verbose
+		)
 		t = wait if wait else 1
 		c = cycles if cycles else 10
-		print('\n'*2)
-		print('-'*10)
+		print("\n" * 2)
+		print("-" * 10)
 		print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 		for i in range(c):
 			print(f"Idling: {i}")
@@ -617,13 +644,21 @@ class worker:
 		print(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 		return message
 
-	def idle_log(self, message: str, wait: Optional[int] = None, cycles : Optional[int] = None):
+	def idle_log(
+		self, message: str, wait: Optional[int] = None, cycles: Optional[int] = None
+	):
+		gpu_manager.wait_for_completion(
+			check_interval=5, #seconds,
+			confirm_interval=1, #second
+			num_checks=10, #confirm consistency over 10 seconds
+			verbose=self.verbose
+		)
 		t = wait if wait else 1
 		c = cycles if cycles else 10
-		with open(self.log_path, 'a') as f:
-			f.write('\n'*2)
-			f.write('-'*10)
-			f.write('\n')
+		with open(self.log_path, "a") as f:
+			f.write("\n" * 2)
+			f.write("-" * 10)
+			f.write("\n")
 			f.write(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
 			print(f"Starting at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 			f.flush()
@@ -631,13 +666,25 @@ class worker:
 			for i in range(c):
 				f.write(f"Idling: {i}\n")
 				print(f"Idling: {i}")
-				f.write(message + '\n')
+				f.write(message + "\n")
 				time.sleep(t)
 				f.flush()
 
 			f.write(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
 			print(f"Finishing at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 			f.flush()
+
+	def sim_gpu_usage(self):
+		print("about to work")
+		x = torch.rand(10000, 10000, device='cuda')
+		y = torch.rand(10000, 10000, device='cuda')
+		z = torch.rand(10000, 10000, device='cuda')
+		for i in range(100):
+			z = x @ y
+			time.sleep(2)
+			print(f"Idling: {i}")
+		print("bunch of work done")
+		return z.cpu()
 
 class daemon:
 	"""Class for the queue daemon process. The function works in a fetch execute repeat
@@ -647,16 +694,16 @@ class daemon:
 	while the worker outputs to a log file.
 
 	Args:
-		name: of own tmux window
-		wr_name: of worker tmux window (monitor)
-		sesh: tmux session name
-		runs_path: to queRuns.json
-		temp_path: to queTemp.json
-		imp_path: to implemented_info.json
-		exec_path: to quefeather.py
-		verbose: speaks to you
-		wr: supply its worker
-		q: supply its que
+			name: of own tmux window
+			wr_name: of worker tmux window (monitor)
+			sesh: tmux session name
+			runs_path: to queRuns.json
+			temp_path: to queTemp.json
+			imp_path: to implemented_info.json
+			exec_path: to quefeather.py
+			verbose: speaks to you
+			wr: supply its worker
+			q: supply its que
 	"""
 
 	def __init__(
@@ -672,7 +719,7 @@ class daemon:
 		wr: Optional[worker] = None,
 		q: Optional[que] = None,
 		tm: Optional[tmux_manager] = None,
-		stp_on_fail : bool = True,
+		stp_on_fail: bool = True,
 	) -> None:
 		self.name = name
 		self.wr_name = wr_name
@@ -700,7 +747,6 @@ class daemon:
 			self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=name, sesh_name=sesh)
 		self.verbose = verbose
 		self.stp_on_fail = stp_on_fail
-
 
 	def print_v(self, message: str) -> None:
 		"""Prints a message if verbose is True."""
@@ -795,7 +841,7 @@ class daemon:
 				self.worker_idle_here()
 		except KeyboardInterrupt:
 			self.print_v("Finished idling, bye")
-   
+
 	def start_idle_log(self):
 		"""Start process and use existing tmux monitoring"""
 		try:
@@ -810,21 +856,21 @@ class daemon:
 					self.print_v(f"Process failed with return code: {return_code}")
 					if self.stp_on_fail:
 						break
-	
+
 		except KeyboardInterrupt:
 			self.print_v("Finished idling, bye")
-  
+
 	def monitor_log(self):
 		self.tmux_man.send(f"tail -f {self.worker.log_path}")
 
 	def worker_here(self, args: Optional[list[str]] = None) -> None:
 		"""Blocking start which prints worker output in daemon terminal"""
 
-		cmd = [self.worker.exec_path, self.wr_name]
+		cmd = [self.worker.exec_path, self.wr_name, 'work']
 		if args:
 			cmd.extend(args)
 		subprocess.run(cmd, check=True)
-  
+
 	def worker_log(self, args: Optional[list[str]] = None) -> subprocess.Popen:
 		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
 
@@ -839,20 +885,21 @@ class daemon:
 	def worker_idle_here(self, args: Optional[list[str]] = None):
 		"""Blocking start which prints worker output in daemon terminal"""
 
-		cmd = [self.worker.exec_path, self.wr_name, 'idle']
+		cmd = [self.worker.exec_path, self.wr_name, "idle"]
 		if args:
 			cmd.extend(args)
 		subprocess.run(cmd, check=True)
-  
-	def worker_idle_log(self,  args: Optional[list[str]] = None):
+
+	def worker_idle_log(self, args: Optional[list[str]] = None):
 		"""Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
-		cmd = [self.worker.exec_path, self.wr_name, 'idle']
+		cmd = [self.worker.exec_path, self.wr_name, "idle"]
 		if args:
 			cmd.extend(args)
 		return subprocess.Popen(
 			cmd, stdout=open(self.worker.log_path, "w"), stderr=subprocess.STDOUT
 		)
-  
+
+
 class queShell(cmdLib.Cmd):
 	intro = "queShell: Type help or ? to list commands.\n"
 	prompt = "(que)$ "
@@ -979,19 +1026,19 @@ class queShell(cmdLib.Cmd):
 
 		try:
 			maybe_args = configs.take_args(
-				self.que.imp_splits, self.que.imp_models.keys(), args
+				self.que.imp_splits, list(self.que.imp_models.keys()), args
 			)
 		except (SystemExit, ValueError) as _:
 			print("Create cancelled (incorrect arguments)")
 			return
 
 		if isinstance(maybe_args, tuple):
-			arg_dict, tags, output, save_path, project, entity = maybe_args
+			arg_dict, tags, project, entity = maybe_args
 		else:
 			print("Create cancelled (by user)")
 			return
 
-		self.que.create_run(arg_dict, tags, output, save_path, project, entity)
+		self.que.create_run(arg_dict, tags, project, entity)
 
 	# daemon based functions
 
@@ -1016,7 +1063,7 @@ class queShell(cmdLib.Cmd):
 		parsers = {
 			"create": lambda: configs.take_args(
 				self.que.imp_splits,
-				self.que.imp_models,
+				list(self.que.imp_models.keys()),
 				return_parser_only=True,
 				prog="create",
 				desc="Create a new training run",
@@ -1077,7 +1124,7 @@ class queShell(cmdLib.Cmd):
 		)
 		parser.add_argument(
 			"location",
-			choices=[TO_RUN, OLD_RUNS, "all"],
+			choices=[TO_RUN, OLD_RUNS],
 			help="Location of the run",
 		)
 		return parser
