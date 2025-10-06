@@ -13,3 +13,4 @@ code/weights/
 code/wandb
 code/queRuns.json
 code/queTemp.json
+.vscode/
