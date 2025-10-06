@@ -1,4 +1,4 @@
-from typing import Optional, Union
+from typing import Optional, Union, Tuple, Dict
 import torch
 import json
 from sklearn.metrics import accuracy_score, classification_report
@@ -150,10 +150,10 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 	return result
 
 def test_topk_clsrep(model: torch.nn.Module,
-                     test_loader: DataLoader[VideoDataset], 
-                     seed: Optional[int]=None,
-                     verbose: bool =False,
-                     save_path: Optional[Union[str, Path]]=None):
+					 test_loader: DataLoader[VideoDataset], 
+					 seed: Optional[int]=None,
+					 verbose: bool =False,
+					 save_path: Optional[Union[str, Path]]=None) -> Tuple[Dict, Dict]:
 	if seed is not None:
 		set_seed(0)
 
@@ -221,6 +221,7 @@ def test_topk_clsrep(model: torch.nn.Module,
 	cls_report = classification_report(
 		all_targets, all_preds, output_dict=True, zero_division=0
 	)
+	assert isinstance(cls_report, Dict), "Sklearn machine broke"
 
 	# per class accuracy
 	top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
@@ -257,8 +258,31 @@ def test_topk_clsrep(model: torch.nn.Module,
 
 	return topk_res, cls_report
 	
-def test_run(weights: Path, num_frames: int, frame_size: int):
-    pass
+def test_run(
+	weights: Path,
+	model_info: Dict,
+	test_classes: Path,
+	test_instances: Path,
+	num_frames: int,
+	frame_size: int,
+	vids_dir: Path = Path("../data/WLASL/WLASL2000/"),
+	imp_path: Path = Path("./info/wlasl_implemented_info.json"),
+	cls_lst_path: Path = Path("./info/wlasl_class_list.json"),
+	shuffle: bool = False,
+	plot:bool = False,
+	disp:bool = False,
+	seed: int = 42,
+	res_output: Optional[Path] = None,
+	):
+	set_seed(42)	
+
+	with open(imp_path, 'r') as f:
+		imp_info = json.load(f)
+	
+	if not imp_info:
+		raise ValueError("Implemented info empty")
+
+	
 
 
 ##############################   Multi-run Testing  ######################################
