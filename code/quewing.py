@@ -293,7 +293,7 @@ class que:
 		try:
 			config = configs.load_config(arg_dict, verbose=True)
 		except ValueError:
-			print(f"{arg_dict['conf_path']} not found")
+			print(f"{arg_dict['config_path']} not found")
 			self.print_v("Training cancelled")
 			return
 
