@@ -1,6 +1,4 @@
-#credit to claude for initial version of this code
-# Visualizations for model performance comparison
-
+from sklearn.metrics import confusion_matrix
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,6 +14,218 @@ def load_results(filepath: str) -> Dict:
 	"""Load results from JSON file."""
 	with open(filepath, 'r') as f:
 		return json.load(f)
+
+
+
+def plot_heatmap(
+    report,
+    classes_path,
+    title="Classification Report Heatmap",
+    save_path=None,
+    disp=True,
+):
+    with open(classes_path, "r") as f:
+        test_classes = json.load(f)
+
+    df = pd.DataFrame(report).iloc[:-1, :].T
+    num_classes_to_plot = min(len(df) - 2, len(test_classes))
+
+    plt.figure(figsize=(10, 10))
+    sns.heatmap(
+        df.iloc[:num_classes_to_plot, :3],
+        annot=True,
+        cmap="Blues",
+        fmt=".2f",
+        xticklabels=["Precision", "Recall", "F1-Score"],
+        yticklabels=[test_classes[i] for i in range(num_classes_to_plot)],
+    )
+    plt.title(title)
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(
+            save_path,
+        )
+    if disp:
+        plt.show()
+
+def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
+    with open(classes_path, "r") as f:
+        test_classes = json.load(f)
+    classes = list(reports[0].keys())[
+        :-3
+    ]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
+
+    num_reports = len(reports)
+    assert num_reports == len(names)  # it may be better to extract names from reports
+
+    # Create bar plot
+    x = np.arange(len(classes))
+    width = 0.8 / num_reports  # 0.8 gives good spacing, adjust as needed
+
+    fig, ax = plt.subplots(figsize=(10, 18))
+    for i, report in enumerate(reports):
+        metric_list = [report[cls][metric] for cls in classes]
+        offset = (i - (num_reports - 1) / 2) * width  # Center the bars
+        ax.barh(x + offset, metric_list, height=width, label=f"{names[i]}", alpha=0.8)
+
+    ax.set_ylabel("Classes")
+    ax.set_xlabel(f"{metric} scores")
+    ax.set_title(f"{metric}")
+
+    class_labels = [
+        test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}"
+        for cls in classes
+    ]
+    ax.set_yticks(x)  # This is the key missing line!
+    ax.set_yticklabels(class_labels)
+
+    ax.legend()
+    ax.set_xlim(0, 1.1)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+def plot_bar_graph(
+    report,
+    classes_path,
+    title="Classification Report - Per Class Metrics",
+    save_path=None,
+    disp=True,
+):
+    with open(classes_path, "r") as f:
+        test_classes = json.load(f)
+
+    classes = list(report.keys())[
+        :-3
+    ]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
+
+    # Prepare data for plotting
+    precision = [report[cls]["precision"] for cls in classes]
+    recall = [report[cls]["recall"] for cls in classes]
+    f1_score = [report[cls]["f1-score"] for cls in classes]
+
+    # Create bar plot
+    x = np.arange(len(classes))
+    width = 0.25
+
+    fig, ax = plt.subplots(figsize=(10, 18))
+    _ = ax.barh(x - width, precision, height=width, label="Precision", alpha=0.8)
+    _ = ax.barh(x, recall, height=width, label="Recall", alpha=0.8)
+    _ = ax.barh(x + width, f1_score, height=width, label="F1-Score", alpha=0.8)
+
+    ax.set_ylabel("Classes")
+    ax.set_xlabel("Scores")
+    ax.set_title(title)
+    ax.set_yticks(x)
+
+    # Fix: Only use as many class names as we have classes in the report
+
+    class_labels = [
+        test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}"
+        for cls in classes
+    ]
+    ax.set_yticklabels(class_labels)
+
+    ax.legend()
+    ax.set_xlim(0, 1.1)
+
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
+    if disp:
+        plt.show()
+
+def plot_heatmap_reports_metric(reports, classes_path, metric, names):
+    with open(classes_path, "r") as f:
+        test_classes = json.load(f)
+
+    assert len(reports) == len(names)
+
+    classes = list(reports[0].keys())[:-3]
+    metric_scores = [[report[cls][metric] for cls in classes] for report in reports]
+
+    df = pd.DataFrame(metric_scores, index=names, columns=classes)
+    df = df.T
+
+    num_to_plot = min(len(classes), len(test_classes))
+
+    plt.figure(figsize=(10, 10))
+    sns.heatmap(
+        df.iloc[:num_to_plot, :],
+        annot=True,
+        cmap="Blues",
+        fmt=".2f",
+        xticklabels=names,
+        yticklabels=[test_classes[i] for i in range(num_to_plot)],
+    )
+    plt.title(f"Classification Report Heatmap - {metric.title()}")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_confusion_matrix(
+    y_true,
+    y_pred,
+    classes_path=None,
+    num_classes=100,
+    title="Confusion Matrix",
+    size=(10, 8),
+    row_perc=True,
+    save_path=None,
+    disp=True,
+):
+    """
+    Plot confusion matrix from true and predicted labels
+
+    Parameters:
+    y_true: array-like, true labels
+    y_pred: array-like, predicted labels
+    classes_path: str, path to JSON file with class names (optional)
+    title: str, plot title
+    """
+
+    # Create confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Load class names if provided
+    class_names = None
+    if classes_path is not None and num_classes:
+        with open(classes_path, "r") as f:
+            test_classes = json.load(f)
+
+        class_names = test_classes[:num_classes]
+
+    if row_perc:
+        cm_row_percent = cm / cm.sum(axis=1, keepdims=True) * 100  # Normalize each row
+        cm_row_percent = np.nan_to_num(cm_row_percent).round(
+            2
+        )  # Handle division by zero
+        cm = cm_row_percent
+        title += " rowise normalised"
+
+    plt.figure(figsize=size)
+    sns.heatmap(
+        cm,
+        annot=False,
+        fmt="d",
+        cmap="Blues",
+        linewidths=0.5,  # Add gridlines between cells
+        linecolor="gray",  # Gridline color (e.g., gray, white, black)
+    )
+    plt.title(title)
+    plt.xticks(
+        ticks=np.arange(num_classes), labels=class_names, rotation=90, fontsize=8
+    )  # type: ignore
+    plt.yticks(ticks=np.arange(num_classes), labels=class_names, rotation=0, fontsize=8)  # type: ignore
+    plt.xlabel("Predicted", fontsize=12)
+    plt.ylabel("True", fontsize=12)
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
+    if disp:
+        plt.show()
 
 def extract_metrics_df(results: Dict) -> pd.DataFrame:
 	"""Extract metrics into a pandas DataFrame for easier manipulation."""
@@ -216,132 +426,9 @@ def plot_dataset_comparison_scatter(df: pd.DataFrame, metric: str = 'top1_avg', 
 	plt.tight_layout()
 	plt.show()
 
-def generate_latex_table(results: Dict, dataset: str = 'asl100', 
-						split: str = 'test', metric_type: str = 'both',
-						caption:Optional[str] = None,
-	  					label: Optional[str] = None) -> str:
-	"""
-	Generate a LaTeX table for the results.
-	
-	Args:
-		results: Dictionary with results
-		dataset: 'asl100' or 'asl300'
-		split: 'val' or 'test'
-		metric_type: 'avg' for average per class, 'inst' for per instance, 'both' for both
-		caption: Table caption
-		label: Table label for referencing
-	
-	Returns:
-		LaTeX table as string
-	"""
-	# Extract data
-	data = []
-	for model in results[dataset]:
-		split_key = f'best_{split}'
-		if split_key in results[dataset][model]:
-			metrics = results[dataset][model][split_key]
-			row = {'Model': model.replace('_', '\\_')}  # Escape underscores for LaTeX
-			
-			if metric_type in ['avg', 'both']:
-				row['Top-1'] = f"{metrics['top_k_average_per_class_acc']['top1']*100:.1f}"
-				row['Top-5'] = f"{metrics['top_k_average_per_class_acc']['top5']*100:.1f}"
-				row['Top-10'] = f"{metrics['top_k_average_per_class_acc']['top10']*100:.1f}"
-			
-			if metric_type == 'inst':
-				row['Top-1'] = f"{metrics['top_k_per_instance_acc']['top1']*100:.1f}"
-				row['Top-5'] = f"{metrics['top_k_per_instance_acc']['top5']*100:.1f}"
-				row['Top-10'] = f"{metrics['top_k_per_instance_acc']['top10']*100:.1f}"
-			
-			if metric_type == 'both':
-				row['Top-1 (Inst)'] = f"{metrics['top_k_per_instance_acc']['top1']*100:.1f}"
-				row['Top-5 (Inst)'] = f"{metrics['top_k_per_instance_acc']['top5']*100:.1f}"
-				row['Top-10 (Inst)'] = f"{metrics['top_k_per_instance_acc']['top10']*100:.1f}"
-			
-			data.append(row)
-	
-	# Create DataFrame and sort by Top-1 accuracy
-	df = pd.DataFrame(data)
-	sort_col = 'Top-1' if 'Top-1' in df.columns else list(df.columns)[1]
-	df[sort_col] = df[sort_col].astype(float)
-	df = df.sort_values(sort_col, ascending=False)
-	df[sort_col] = df[sort_col].apply(lambda x: f"{x:.1f}")
-	
-	# Generate LaTeX
-	latex = "\\begin{table}[htbp]\n"
-	latex += "\\centering\n"
-	
-	if caption:
-		latex += f"\\caption{{{caption}}}\n"
-	if label:
-		latex += f"\\label{{{label}}}\n"
-	
-	# Determine column alignment
-	num_cols = len(df.columns)
-	col_align = 'l' + 'c' * (num_cols - 1)
-	
-	latex += f"\\begin{{tabular}}{{{col_align}}}\n"
-	latex += "\\toprule\n"
-	
-	# Header
-	header = " & ".join(df.columns)
-	latex += header + " \\\\\n"
-	latex += "\\midrule\n"
-	
-	# Data rows
-	for _, row in df.iterrows():
-		row_str = " & ".join(str(val) for val in row.values)
-		latex += row_str + " \\\\\n"
-	
-	latex += "\\bottomrule\n"
-	latex += "\\end{tabular}\n"
-	latex += "\\end{table}\n"
-	
-	return latex
 
-def compare_splits_latex_table(wlasl_100_data, wlasl_300_data):
-	"""
-	Create a LaTeX table comparing WLASL-100 and WLASL-300 splits.
-	
-	Args:
-		wlasl_100_data (dict): Dictionary with train/val/test data for WLASL-100
-		wlasl_300_data (dict): Dictionary with train/val/test data for WLASL-300
-	
-	Returns:
-		str: LaTeX table code
-	"""
-	
-	latex_code = r"""\begin{table}[h!]
-	\centering
-	\begin{tabular}{|l|c|c|c|c|c|c|}
-	\hline
-	\textbf{Split} & \multicolumn{3}{c|}{\textbf{WLASL-100}} & \multicolumn{3}{c|}{\textbf{WLASL-300}} \\
-	\cline{2-7}
-	& \textbf{Examples} & \textbf{Signers} & \textbf{Mean Ex/Sign} & \textbf{Examples} & \textbf{Signers} & \textbf{Mean Ex/Sign} \\
-	\hline
-	"""
-	
-	# Define the splits and their display names
-	splits = [('train', 'Train'), ('val', 'Validation'), ('test', 'Test')]
-	
-	for split_key, split_name in splits:
-		wlasl_100 = wlasl_100_data[split_key]
-		wlasl_300 = wlasl_300_data[split_key]
-		
-		latex_code += f"{split_name} & "
-		latex_code += f"{wlasl_100['num_ex']} & "
-		latex_code += f"{wlasl_100['num_s']} & "
-		latex_code += f"{wlasl_100['mean_ex']:.2f} & "
-		latex_code += f"{wlasl_300['num_ex']} & "
-		latex_code += f"{wlasl_300['num_s']} & "
-		latex_code += f"{wlasl_300['mean_ex']:.2f} \\\\\n"
-		latex_code += "\\hline\n"
-	
-	latex_code += r"""\end{tabular}
-	\caption{Comparison of WLASL-100 and WLASL-300 dataset splits}
-	\label{tab:wlasl_comparison}
-	\end{table}"""
-	
-	return latex_code
+
+
 
 # Example usage
 def run_visualizations(filepath: str,
@@ -380,20 +467,6 @@ def run_visualizations(filepath: str,
 	# 4. Dataset comparison scatter
 	if sc:
 		plot_dataset_comparison_scatter(df, metric='top1_avg', split='test')
-	
-	if tb:
-		for split in splits:
-			# 5. Generate LaTeX tables
-			latex = generate_latex_table(
-				results, 
-				dataset=split, 
-				split='test',
-				metric_type='both',
-				caption=f'{split} Test Set Results (\\% Accuracy)',
-				label=f'tab:{split}_results'
-			)
-			print(f"{split} LaTeX Table:\n")
-			print(latex)
 	
 	return df, results
 
