@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import random
 # @pytest.fixture
 
-from code.experiments.scripts.quewing import wait_for_run_completion
 from utils import print_dict
 import time
 import subprocess
@@ -16,6 +15,8 @@ import json
 import test
 from collections import Counter, defaultdict
 from typing import Optional
+
+
 
 def plot_simulated_training(x_range, f):
 	x = x_range
@@ -192,22 +193,7 @@ def simulate_wandb_run(mode='min',entity='ljgoodall2001-rhodes-university',
 	print(f"Early stopping at epoch {x} with score {score}")
 	print(f"Best score: {stopper.best_score}, Best epoch: {stopper.best_epoch}")
 		
-		
-def test_wait_for_run_completion():
-	# Test the wait_for_run_completion function
-	# This is a mock test, as we cannot run actual wandb runs here
-	entity = 'ljgoodall2001-rhodes-university'
-	project = 'test_quewing'
 	
-	# Simulate a wandb run
-	
-	
-	run_info = wait_for_run_completion(entity, project, check_interval=5)
-	if run_info is None:
-		print("No run found or run is still in progress.")
-		return
-	print("Run information:")
-	print_dict(run_info)
 
 
 
@@ -227,22 +213,7 @@ def test_stopper_save_and_load(stopper, arg_dict):
 	assert stopper.best_score is not None, "Best score should not be None after loading state"
 	print(f"Restored best score: {stopper.best_score}, Best epoch: {stopper.best_epoch}, Counter: {stopper.counter}")
 
-def tmux_session():
-	from code.experiments.scripts.quewing import setup_tmux_session, check_tmux_session, separate
-	# result = check_tmux_session('test', 'd', 'w', True)
-	# if result != 'ok':
-	#   setup_tmux_session('test', 'd', 'w', True)
-	session = 'test'
-	try:
-		result = check_tmux_session('test', 'd', 'w')
-	except subprocess.CalledProcessError as e:
-		# print(e.stderr)
-		if e.stderr.strip() != f"can't find session: {session}":
-			print("'",e.stderr,"'")
-		else:
-			print("check completed successfully")
-		setup_tmux_session('test', 'd', 'w')
-	print(separate('d', 'test', './quefeather.py','Testing', True)  )
+
 
 def test_blocking():
 	#have a feeling the run.subprocess is 'blocking' in the sences
@@ -634,7 +605,7 @@ def test_sub():
 			print(f"Received: {line.strip()}")
 
 def test_send():
-	from code.quewing import print_tmux
+	from quewing import print_tmux
 	print_tmux(
 		"hello",
 		"worker",
@@ -661,7 +632,7 @@ def test_shelly():
 
 def test_shelly2():
 	import cmd
-	from code.quewing import que, join_session
+	from quewing import que, join_session
 	
 	class QueShell(cmd.Cmd):
 		intro = 'Queue Management Shell. Type help or ? to list commands.\n'
@@ -757,5 +728,14 @@ def test_wait_for_completion():
     
     print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
 
+def test_test_run():
+	with open('queRuns.json') as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs['old_runs']
+
+	test.test_run(old_runs[0])
+
+
 if __name__ == "__main__":
-	test_wait_for_completion()
+	test_test_run()

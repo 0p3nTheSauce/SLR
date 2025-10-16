@@ -1,3 +1,4 @@
+from typing import Optional, Union, Tuple, Dict, List, Literal
 import torch
 import json
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
@@ -19,9 +20,13 @@ from pathlib import Path
 import configs
 import utils
 import gc
-from typing import Optional
+
 from argparse import ArgumentParser
 from utils import ask_nicely
+
+#locals
+from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
+
 #################################### Utilities #################################
 
 
@@ -32,22 +37,346 @@ def cleanup_memory():
         torch.cuda.synchronize()
     gc.collect()
 
+##############################   Individual-run testing   ######################################
 
-##############################   Testing functions  ######################################
+def test_model(model, test_loader):
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	model.to(device)
+	model.eval()
+	all_preds = []
+	all_targets = []
 
+	with torch.no_grad():
+		for item in tqdm.tqdm(test_loader, desc="Testing"):
+			data, target = item["frames"], item["label_num"]
+			data, target = data.to(device), target.to(device)
+			output = model(data)
+			_, preds = torch.max(output, 1)
+			all_preds.extend(preds.cpu().numpy())
+			all_targets.extend(target.cpu().numpy())
+
+	accuracy = accuracy_score(all_targets, all_preds)
+	report = classification_report(
+		all_targets, all_preds, output_dict=True, zero_division=0
+	)
+
+	return accuracy, report, all_preds, all_targets
+
+def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
+	if seed is not None:
+		set_seed(0)
+
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	model.to(device)
+	model.eval()
+
+	correct = 0
+	correct_5 = 0
+	correct_10 = 0
+
+	num_classes = len(set(test_loader.dataset.classes))
+
+	top1_fp = np.zeros(num_classes, dtype=np.int64)
+	top1_tp = np.zeros(num_classes, dtype=np.int64)
+
+	top5_fp = np.zeros(num_classes, dtype=np.int64)
+	top5_tp = np.zeros(num_classes, dtype=np.int64)
+
+	top10_fp = np.zeros(num_classes, dtype=np.int64)
+	top10_tp = np.zeros(num_classes, dtype=np.int64)
+
+	for item in tqdm.tqdm(test_loader, desc="Testing"):
+		data, target = item["frames"], item["label_num"]
+		data, target = data.to(device), target.to(device)
+
+		predictions = model(data)
+
+		out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
+
+		if target[0].item() in out_labels[-5:]:
+			correct_5 += 1
+			top5_tp[target[0].item()] += 1
+		else:
+			top5_fp[target[0].item()] += 1
+		if target[0].item() in out_labels[-10:]:
+			correct_10 += 1
+			top10_tp[target[0].item()] += 1
+		else:
+			top10_fp[target[0].item()] += 1
+		if torch.argmax(predictions[0]).item() == target[0].item():
+			correct += 1
+			top1_tp[target[0].item()] += 1
+		else:
+			top1_fp[target[0].item()] += 1
+
+		if verbose:
+			print(
+				f"Video ID: {item['video_id']}\n\
+							Correct 1: {float(correct) / len(test_loader)}\n\
+							Correct 5: {float(correct_5) / len(test_loader)}\n\
+							Correct 10: {float(correct_10) / len(test_loader)}"
+			)
+
+	# per class accuracy
+	top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
+	top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
+	top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
+	top1_per_instance = correct / len(test_loader)
+	top5_per_instance = correct_5 / len(test_loader)
+	top10_per_instance = correct_10 / len(test_loader)
+	fstr = "top-k average per class acc: {}, {}, {}".format(
+		top1_per_class, top5_per_class, top10_per_class
+	)
+	fstr2 = "top-k per instance acc: {}, {}, {}".format(
+		top1_per_instance, top5_per_instance, top10_per_instance
+	)
+	print(fstr)
+	print(fstr2)
+
+	result = {
+		"top_k_average_per_class_acc": {
+			"top1": top1_per_class,
+			"top5": top5_per_class,
+			"top10": top10_per_class,
+		},
+		"top_k_per_instance_acc": {
+			"top1": top1_per_instance,
+			"top5": top5_per_instance,
+			"top10": top10_per_instance,
+		},
+	}
+
+	if save_path is not None:
+		with open(save_path, "w") as f:
+			json.dump(result, f, indent=2)
+
+	return result
+
+def test_topk_clsrep(model: torch.nn.Module,
+					 test_loader: DataLoader[VideoDataset], 
+					 seed: Optional[int]=None,
+					 verbose: bool =False,
+					 save_path: Optional[Union[str, Path]]=None) -> Tuple[Dict, Dict]:
+	if seed is not None:
+		set_seed(0)
+
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+	model.to(device)
+	model.eval()
+ 
+	all_preds = []
+	all_targets = []
+ 
+	correct = 0
+	correct_5 = 0
+	correct_10 = 0
+ 
+	assert isinstance(test_loader.dataset, VideoDataset), "This function uses a custom dataset"
+	num_classes = len(set(test_loader.dataset.classes))
+
+	top1_fp = np.zeros(num_classes, dtype=np.int64)
+	top1_tp = np.zeros(num_classes, dtype=np.int64)
+
+	top5_fp = np.zeros(num_classes, dtype=np.int64)
+	top5_tp = np.zeros(num_classes, dtype=np.int64)
+
+	top10_fp = np.zeros(num_classes, dtype=np.int64)
+	top10_tp = np.zeros(num_classes, dtype=np.int64)
+	
+	with torch.no_grad():
+		for item in tqdm.tqdm(test_loader, desc="Testing"):
+			data, target = item["frames"], item["label_num"]
+			data, target = data.to(device), target.to(device)
+
+			predictions = model(data)
+	
+			#for classification report:
+			_, preds = torch.max(predictions, 1)
+			all_preds.extend(preds.cpu().numpy())
+			all_targets.extend(target.cpu().numpy())
+
+			out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
+
+			if target[0].item() in out_labels[-5:]:
+				correct_5 += 1
+				top5_tp[target[0].item()] += 1
+			else:
+				top5_fp[target[0].item()] += 1
+			if target[0].item() in out_labels[-10:]:
+				correct_10 += 1
+				top10_tp[target[0].item()] += 1
+			else:
+				top10_fp[target[0].item()] += 1
+			if torch.argmax(predictions[0]).item() == target[0].item():
+				correct += 1
+				top1_tp[target[0].item()] += 1
+			else:
+				top1_fp[target[0].item()] += 1
+
+			if verbose:
+				print(
+					f"Video ID: {item['video_id']}\n\
+								Correct 1: {float(correct) / len(test_loader)}\n\
+								Correct 5: {float(correct_5) / len(test_loader)}\n\
+								Correct 10: {float(correct_10) / len(test_loader)}"
+				)
+
+	cls_report = classification_report(
+		all_targets, all_preds, output_dict=True, zero_division=0
+	)
+	assert isinstance(cls_report, Dict), "Sklearn machine broke"
+
+	# per class accuracy
+	top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
+	top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
+	top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
+	top1_per_instance = correct / len(test_loader)
+	top5_per_instance = correct_5 / len(test_loader)
+	top10_per_instance = correct_10 / len(test_loader)
+	fstr = "top-k average per class acc: {}, {}, {}".format(
+		top1_per_class, top5_per_class, top10_per_class
+	)
+	fstr2 = "top-k per instance acc: {}, {}, {}".format(
+		top1_per_instance, top5_per_instance, top10_per_instance
+	)
+	print(fstr)
+	print(fstr2)
+
+	topk_res = {
+		"top_k_average_per_class_acc": {
+			"top1": top1_per_class,
+			"top5": top5_per_class,
+			"top10": top10_per_class,
+		},
+		"top_k_per_instance_acc": {
+			"top1": top1_per_instance,
+			"top5": top5_per_instance,
+			"top10": top10_per_instance,
+		},
+	}
+
+	if save_path is not None:
+		with open(save_path, "w") as f:
+			json.dump(topk_res, f, indent=2)
+
+	return topk_res, cls_report
+	
+def _get_test_loader(perm: Optional[torch.Tensor],
+					  model_info: Dict,
+					frame_size: int,
+					num_frames: int,
+					root: Path,
+					labels: Path,
+					set: Literal['test', 'val']) -> DataLoader[VideoDataset]:
+	if perm:
+		maybe_shuffle_t = Shuffle(perm)
+	else:
+		maybe_shuffle_t = v2.Lambda(lambda x: x)
+
+	final_t = v2.Compose(
+		[
+			maybe_shuffle_t,
+			v2.Lambda(lambda x: x.float() / 255.0),
+			v2.Normalize(mean=model_info["mean"], std=model_info["std"]),
+			v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+		]
+	)
+
+	test_transforms = v2.Compose(
+		[v2.CenterCrop(frame_size), final_t]
+	)
+
+	instances = labels / f'{set}_instances_fixed_frange_bboxes_len.json'
+	classes = labels / f'{set}_classes_fixed_frange_bboxes_len.json'
+
+	tset = VideoDataset(
+		root, 
+		instances,
+		classes,
+		num_frames=num_frames,
+		transforms=test_transforms,
+	)
+	return DataLoader(
+		tset,
+		batch_size=1,
+		shuffle=False,
+		num_workers=2,
+		pin_memory=False,
+		drop_last=False
+	)
+
+
+
+def test_run(
+	config: Dict,
+	perm: Optional[torch.Tensor] = None,
+	model: Optional[torch.nn.Module] = None,
+	test_loader: Optional[DataLoader[VideoDataset]] = None,
+	val_loader: Optional[DataLoader[VideoDataset]] = None,
+	test_val: bool = False,
+	plot:bool = False,
+	disp:bool = False,
+	seed: int = 42,
+	):
+	set_seed(seed)	
+
+	main_conf = config['config']
+	admin = main_conf['admin']
+	model_info = config['model_info']
+	data = main_conf['data']
+
+	results = {}
+
+	save_path = Path(admin['save_path'])
+	output = save_path.parent / 'results'
+	output.mkdir(exist_ok=True)
+
+	tloaders = {
+		"test": _get_test_loader(perm,
+						    model_info, 
+							data['frame_size'],
+							data['num_frames'],
+							Path(admin['root']),
+							Path(admin['labels']),
+							'test' 
+							    )	 
+	}
+
+	if test_val:
+		tloaders['val'] = _get_test_loader(perm,
+						    model_info, 
+							data['frame_size'],
+							data['num_frames'],
+							Path(admin['root']),
+							Path(admin['labels']),
+							'val' 
+							    )
+  
+	test_loader = tloaders['test']
+	assert isinstance(test_loader.dataset, VideoDataset), "This function uses a custom dataset"
+	num_classes = len(set(test_loader.dataset.classes))
+
+
+
+	
+	print(output)
+	
+
+
+##############################   Multi-run Testing  ######################################
 
 def create_runs_dict(
     imp_path: str | Path = "wlasl_implemented_info.json",
     runs_path: str | Path = "runs/",
     output: Optional[str | Path] = None,
 ) -> dict[str, dict[str, list[str]]]:
-    """Create a dictionary of runs that have been done.
-    Args:
-                                                                                                                                    imp_path: path to implemented info json
-                                                                                                                                    runs_path: path to runs directory
-                                                                                                                                    output: path to write runs dict to (default None, does not save)
-    Returns:
-                                                                                                                                    dict: experiments done dictionary"""
+	"""Create a dictionary of runs that have been done.
+	Args:
+		imp_path: path to implemented info json
+		runs_path: path to runs directory
+		output: path to write runs dict to (default None, does not save)
+	Returns:
+		dict: experiments done dictionary"""
 
     def sep_arch_exp(path: str | Path):
         path_obj = Path(path)
@@ -85,22 +414,18 @@ def create_runs_dict(
 
     return runs_dict
 
-
-#################################
-
-
 def create_test_dict(
     all: bool = False,
     imp_path: str | Path = "wlasl_implemented_info.json",
     runs_path: str | Path = "runs",
 ) -> dict[str, dict[str, list[str]]]:
-    """Create a dictionary of runs to test.
-    Args:
-                                                                                                                                    all: if True, test all experiments in runs directory
-                                                                                                                                    imp_path: path to implemented info json
-                                                                                                                                    runs_path: path to runs directory
-    Returns:
-                                                                                                                                    dict: experiments to test dictionary"""
+	"""Create a dictionary of runs to test.
+	Args:
+																																	all: if True, test all experiments in runs directory
+																																	imp_path: path to implemented info json
+																																	runs_path: path to runs directory
+	Returns:
+																																	dict: experiments to test dictionary"""
 
     runs_done_dict = create_runs_dict(imp_path, runs_path)
     if all:
@@ -179,27 +504,27 @@ def test_all(
 ) -> tuple[dict[str, dict[str, list[str]]], list]:
     """Test multiple sets experiments (saves results to experiment directory).
 
-    Args:
-                                                                                                                                    runs_dict: 		experiments to test
-                                                                                                                                    test_last: 		test the weights of last epoch (best.pth always tested)
-                                                                                                                                    top_k: 			report top-k accuracies
-                                                                                                                                    plot: 			create plots (heatmap, bargraph, confusion matrix)
-                                                                                                                                    disp: 			display plots (if plot) (using utils.visualise_frames)
-                                                                                                                                    res_output: 	path to write results to (default does not save result dict)
-                                                                                                                                    skip_done: 		skips directories that have been tested (if they have result files)
-                                                                                                                                    test_val: 		test on the validation set as well (default only test set)
-                                                                                                                                    shuffle: 		shuffle the frames before inference (using Shuffle from video_transforms)
-                                                                                                                                    imp_path: 		path to implemented info
-                                                                                                                                    classes_path: 	path to class list file (if plot)
-                                                                                                                                    runs_dir: 		path to experiment runs directory
-                                                                                                                                    labels_dir: 	path to preprocessed labels
-                                                                                                                                    configs_dir: 	path to configfiles directory
-                                                                                                                                    root_dir: 		path to raw videos directory
-                                                                                                                                    err_output: 	file to write run errors (don't write errors if not provided)
+	Args:
+		runs_dict: 		experiments to test
+		test_last: 		test the weights of last epoch (best.pth always tested)
+		top_k: 			report top-k accuracies
+		plot: 			create plots (heatmap, bargraph, confusion matrix)
+		disp: 			display plots (if plot) (using utils.visualise_frames)
+		res_output: 	path to write results to (default does not save result dict)
+		skip_done: 		skips directories that have been tested (if they have result files)
+		test_val: 		test on the validation set as well (default only test set)
+		shuffle: 		shuffle the frames before inference (using Shuffle from video_transforms)
+		imp_path: 		path to implemented info
+		classes_path: 	path to class list file (if plot)
+		runs_dir: 		path to experiment runs directory
+		labels_dir: 	path to preprocessed labels
+		configs_dir: 	path to configfiles directory
+		root_dir: 		path to raw videos directory
+		err_output: 	file to write run errors (don't write errors if not provided)
 
-    Returns:
-                                                                                                                                    result_dict: 	all test results in one dictionary
-                                                                                                                                    problem_runs: 	experiments where the model did not load (because it uses old format)"""
+	Returns:
+		result_dict: 	all test results in one dictionary
+		problem_runs: 	experiments where the model did not load (because it uses old format)"""
 
     problem_runs = []
     result_dict = {}  # better to make a copy
@@ -439,125 +764,6 @@ def _is_done(dir_path: str | Path) -> bool:
             return True
     return False
 
-
-def test_model(model, test_loader):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    model.eval()
-    all_preds = []
-    all_targets = []
-
-    with torch.no_grad():
-        for item in tqdm.tqdm(test_loader, desc="Testing"):
-            data, target = item["frames"], item["label_num"]
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            _, preds = torch.max(output, 1)
-            all_preds.extend(preds.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
-
-    accuracy = accuracy_score(all_targets, all_preds)
-    report = classification_report(
-        all_targets, all_preds, output_dict=True, zero_division=0
-    )
-
-    return accuracy, report, all_preds, all_targets
-
-
-def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
-    if seed is not None:
-        set_seed(0)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    model.eval()
-
-    correct = 0
-    correct_5 = 0
-    correct_10 = 0
-
-    num_classes = len(set(test_loader.dataset.classes))
-
-    top1_fp = np.zeros(num_classes, dtype=np.int64)
-    top1_tp = np.zeros(num_classes, dtype=np.int64)
-
-    top5_fp = np.zeros(num_classes, dtype=np.int64)
-    top5_tp = np.zeros(num_classes, dtype=np.int64)
-
-    top10_fp = np.zeros(num_classes, dtype=np.int64)
-    top10_tp = np.zeros(num_classes, dtype=np.int64)
-
-    for item in tqdm.tqdm(test_loader, desc="Testing"):
-        data, target = item["frames"], item["label_num"]
-        data, target = data.to(device), target.to(device)
-
-        predictions = model(data)
-
-        out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
-
-        if target[0].item() in out_labels[-5:]:
-            correct_5 += 1
-            top5_tp[target[0].item()] += 1
-        else:
-            top5_fp[target[0].item()] += 1
-        if target[0].item() in out_labels[-10:]:
-            correct_10 += 1
-            top10_tp[target[0].item()] += 1
-        else:
-            top10_fp[target[0].item()] += 1
-        if torch.argmax(predictions[0]).item() == target[0].item():
-            correct += 1
-            top1_tp[target[0].item()] += 1
-        else:
-            top1_fp[target[0].item()] += 1
-
-        if verbose:
-            print(
-                f"Video ID: {item['video_id']}\n\
-							Correct 1: {float(correct) / len(test_loader)}\n\
-							Correct 5: {float(correct_5) / len(test_loader)}\n\
-							Correct 10: {float(correct_10) / len(test_loader)}"
-            )
-
-    # per class accuracy
-    top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
-    top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
-    top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
-    top1_per_instance = correct / len(test_loader)
-    top5_per_instance = correct_5 / len(test_loader)
-    top10_per_instance = correct_10 / len(test_loader)
-    fstr = "top-k average per class acc: {}, {}, {}".format(
-        top1_per_class, top5_per_class, top10_per_class
-    )
-    fstr2 = "top-k per instance acc: {}, {}, {}".format(
-        top1_per_instance, top5_per_instance, top10_per_instance
-    )
-    print(fstr)
-    print(fstr2)
-    # result = {
-    # 	'per_class': [top1_per_class,top5_per_class,top10_per_class],
-    # 	'per_instance': [top1_per_instance, top5_per_instance, top10_per_instance]
-    # }
-    result = {
-        "top_k_average_per_class_acc": {
-            "top1": top1_per_class,
-            "top5": top5_per_class,
-            "top10": top10_per_class,
-        },
-        "top_k_per_instance_acc": {
-            "top1": top1_per_instance,
-            "top5": top5_per_instance,
-            "top10": top10_per_instance,
-        },
-    }
-
-    if save_path is not None:
-        with open(save_path, "w") as f:
-            json.dump(result, f, indent=2)
-
-    return result
-
-
 def summarise(
     results_dict: dict[
         str, dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]]]
@@ -572,54 +778,54 @@ def summarise(
 
     Takes the best.pth weights from the test set, only one metric and experiment per architecture per split.
 
-    Args:
-                                    results_dict: 	results from test_all
-                                    splits: 		splits to summarise (e.g. ['asl100', 'asl2000'])
-                                    model_exps: 	model experiment pairs
-    """
-    if to_summarise is not None:
-        splits, model_exps = _unpack_to_summarise(to_summarise)
-    print(splits)
-    print(model_exps)
-    if splits is None or model_exps is None:
-        raise ValueError(
-            "Either to_summarise or splits and model_exps must be provided"
-        )
-    summary = {}
-    for i, split in enumerate(splits):
-        if split not in results_dict:
-            raise ValueError(f"{split} not in results_dict")
-        split_dict = results_dict[split]
-        try:
-            res = _sum_split(split_dict, model_exps[i], metric)
-        except KeyError as e:
-            raise KeyError(f"{split} does not have all models and experiments") from e
-        summary[split] = res
-    return summary
+	Args:
+									results_dict: 	results from test_all
+									splits: 		splits to summarise (e.g. ['asl100', 'asl2000'])
+									model_exps: 	model experiment pairs
+	"""
+	if to_summarise is not None:
+		splits, model_exps = _unpack_to_summarise(to_summarise)
+	print(splits)
+	print(model_exps)
+	if splits is None or model_exps is None:
+		raise ValueError(
+			"Either to_summarise or splits and model_exps must be provided"
+		)
+	summary = {}
+	for i, split in enumerate(splits):
+		if split not in results_dict:
+			raise ValueError(f"{split} not in results_dict")
+		split_dict = results_dict[split]
+		try:
+			res = _sum_split(split_dict, model_exps[i], metric)
+		except KeyError as e:
+			raise KeyError(f"{split} does not have all models and experiments") from e
+		summary[split] = res
+	return summary
 
 
 def _unpack_to_summarise(
     to_summarise: dict[str, dict[str, list[str]]],
 ) -> tuple[list[str], list[list[tuple[str, str]]]]:
-    """Unpack to_summarise dictionary into splits and model_exps lists.
-    Args:
-                                    to_summarise: 	to_test dictionary
-    Returns:
-                                    splits: 		list of splits
-                                    model_exps: 	corresponding architecture and experiment pairs
-    """
-    splits = []
-    model_exps = []
-    for split in to_summarise.keys():
-        splits.append(split)
-        model_exps.append(
-            [
-                (arch, exp)
-                for arch in to_summarise[split].keys()
-                for exp in to_summarise[split][arch]
-            ]
-        )
-    return splits, model_exps
+	"""Unpack to_summarise dictionary into splits and model_exps lists.
+	Args:
+									to_summarise: 	to_test dictionary
+	Returns:
+									splits: 		list of splits
+									model_exps: 	corresponding architecture and experiment pairs
+	"""
+	splits = []
+	model_exps = []
+	for split in to_summarise.keys():
+		splits.append(split)
+		model_exps.append(
+			[
+				(arch, exp)
+				for arch in to_summarise[split].keys()
+				for exp in to_summarise[split][arch]
+			]
+		)
+	return splits, model_exps
 
 
 def _sum_split(
@@ -627,13 +833,13 @@ def _sum_split(
     model_exps: list[tuple[str, str]],
     metric: str,
 ) -> dict[str, dict[str, str] | dict[str, float]]:
-    """Summarise results for a given split over multiple architectures and experiments.
-    Args:
-                                    split_dict: 	dictionary of results for a given split
-                                    model_exps: 	list of tuples of architecture and experiment number to summarise (e.g. [('S3D', '001'), ('R3D', '002')])
-                                    metric: 	metric to summarise (e.g. 'top_k_average_per_class_acc')
-    Returns:
-                                    dict: 		summarised results for the given split"""
+	"""Summarise results for a given split over multiple architectures and experiments.
+	Args:
+									split_dict: 	dictionary of results for a given split
+									model_exps: 	list of tuples of architecture and experiment number to summarise (e.g. [('S3D', '001'), ('R3D', '002')])
+									metric: 	metric to summarise (e.g. 'top_k_average_per_class_acc')
+	Returns:
+									dict: 		summarised results for the given split"""
 
     results = {}
     for arch, exp in model_exps:
@@ -658,366 +864,149 @@ def _sum_model(
     exp: str,
     metric: str,
 ) -> dict[str, float]:
-    """Summarise results for a given architecture over multiple experiments.
-    Args:
-                                                                                                                                    arch_dict: 	dictionary of results for a given architecture
-                                                                                                                                    exp: 		experiment number to summarise (e.g. '001')
-                                                                                                                                    metric: 	metric to summarise (e.g. 'top_k_average_per_class_acc')
-    Returns:
-                                                                                                                                    dict: 		summarised results for the given architecture and experiment"""
+	"""Summarise results for a given architecture over multiple experiments.
+	Args:
+																																	arch_dict: 	dictionary of results for a given architecture
+																																	exp: 		experiment number to summarise (e.g. '001')
+																																	metric: 	metric to summarise (e.g. 'top_k_average_per_class_acc')
+	Returns:
+																																	dict: 		summarised results for the given architecture and experiment"""
 
     return arch_dict[exp]["best"]["test set"][metric]
 
 
-###############################  Plottting #############################################################
-
-
-def plot_heatmap(
-    report,
-    classes_path,
-    title="Classification Report Heatmap",
-    save_path=None,
-    disp=True,
-):
-    with open(classes_path, "r") as f:
-        test_classes = json.load(f)
-
-    df = pd.DataFrame(report).iloc[:-1, :].T
-    num_classes_to_plot = min(len(df) - 2, len(test_classes))
-
-    plt.figure(figsize=(10, 10))
-    sns.heatmap(
-        df.iloc[:num_classes_to_plot, :3],
-        annot=True,
-        cmap="Blues",
-        fmt=".2f",
-        xticklabels=["Precision", "Recall", "F1-Score"],
-        yticklabels=[test_classes[i] for i in range(num_classes_to_plot)],
-    )
-    plt.title(title)
-    plt.tight_layout()
-    if save_path:
-        plt.savefig(
-            save_path,
-        )
-    if disp:
-        plt.show()
-
-
-def plot_heatmap_reports_metric(reports, classes_path, metric, names):
-    with open(classes_path, "r") as f:
-        test_classes = json.load(f)
-
-    assert len(reports) == len(names)
-
-    classes = list(reports[0].keys())[:-3]
-    metric_scores = [[report[cls][metric] for cls in classes] for report in reports]
-
-    df = pd.DataFrame(metric_scores, index=names, columns=classes)
-    df = df.T
-
-    num_to_plot = min(len(classes), len(test_classes))
-
-    plt.figure(figsize=(10, 10))
-    sns.heatmap(
-        df.iloc[:num_to_plot, :],
-        annot=True,
-        cmap="Blues",
-        fmt=".2f",
-        xticklabels=names,
-        yticklabels=[test_classes[i] for i in range(num_to_plot)],
-    )
-    plt.title(f"Classification Report Heatmap - {metric.title()}")
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_bar_graph(
-    report,
-    classes_path,
-    title="Classification Report - Per Class Metrics",
-    save_path=None,
-    disp=True,
-):
-    with open(classes_path, "r") as f:
-        test_classes = json.load(f)
-
-    classes = list(report.keys())[
-        :-3
-    ]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
-
-    # Prepare data for plotting
-    precision = [report[cls]["precision"] for cls in classes]
-    recall = [report[cls]["recall"] for cls in classes]
-    f1_score = [report[cls]["f1-score"] for cls in classes]
-
-    # Create bar plot
-    x = np.arange(len(classes))
-    width = 0.25
-
-    fig, ax = plt.subplots(figsize=(10, 18))
-    _ = ax.barh(x - width, precision, height=width, label="Precision", alpha=0.8)
-    _ = ax.barh(x, recall, height=width, label="Recall", alpha=0.8)
-    _ = ax.barh(x + width, f1_score, height=width, label="F1-Score", alpha=0.8)
-
-    ax.set_ylabel("Classes")
-    ax.set_xlabel("Scores")
-    ax.set_title(title)
-    ax.set_yticks(x)
-
-    # Fix: Only use as many class names as we have classes in the report
-
-    class_labels = [
-        test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}"
-        for cls in classes
-    ]
-    ax.set_yticklabels(class_labels)
-
-    ax.legend()
-    ax.set_xlim(0, 1.1)
-
-    plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path)
-    if disp:
-        plt.show()
-
-
-def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
-    with open(classes_path, "r") as f:
-        test_classes = json.load(f)
-    classes = list(reports[0].keys())[
-        :-3
-    ]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
-
-    num_reports = len(reports)
-    assert num_reports == len(names)  # it may be better to extract names from reports
-
-    # Create bar plot
-    x = np.arange(len(classes))
-    width = 0.8 / num_reports  # 0.8 gives good spacing, adjust as needed
-
-    fig, ax = plt.subplots(figsize=(10, 18))
-    for i, report in enumerate(reports):
-        metric_list = [report[cls][metric] for cls in classes]
-        offset = (i - (num_reports - 1) / 2) * width  # Center the bars
-        ax.barh(x + offset, metric_list, height=width, label=f"{names[i]}", alpha=0.8)
-
-    ax.set_ylabel("Classes")
-    ax.set_xlabel(f"{metric} scores")
-    ax.set_title(f"{metric}")
-
-    class_labels = [
-        test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}"
-        for cls in classes
-    ]
-    ax.set_yticks(x)  # This is the key missing line!
-    ax.set_yticklabels(class_labels)
-
-    ax.legend()
-    ax.set_xlim(0, 1.1)
-
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_confusion_matrix(
-    y_true,
-    y_pred,
-    classes_path=None,
-    num_classes=100,
-    title="Confusion Matrix",
-    size=(10, 8),
-    row_perc=True,
-    save_path=None,
-    disp=True,
-):
-    """
-    Plot confusion matrix from true and predicted labels
-
-    Parameters:
-    y_true: array-like, true labels
-    y_pred: array-like, predicted labels
-    classes_path: str, path to JSON file with class names (optional)
-    title: str, plot title
-    """
-
-    # Create confusion matrix
-    cm = confusion_matrix(y_true, y_pred)
-
-    # Load class names if provided
-    class_names = None
-    if classes_path is not None and num_classes:
-        with open(classes_path, "r") as f:
-            test_classes = json.load(f)
-
-        class_names = test_classes[:num_classes]
-
-    if row_perc:
-        cm_row_percent = cm / cm.sum(axis=1, keepdims=True) * 100  # Normalize each row
-        cm_row_percent = np.nan_to_num(cm_row_percent).round(
-            2
-        )  # Handle division by zero
-        cm = cm_row_percent
-        title += " rowise normalised"
-
-    plt.figure(figsize=size)
-    sns.heatmap(
-        cm,
-        annot=False,
-        fmt="d",
-        cmap="Blues",
-        linewidths=0.5,  # Add gridlines between cells
-        linecolor="gray",  # Gridline color (e.g., gray, white, black)
-    )
-    plt.title(title)
-    plt.xticks(
-        ticks=np.arange(num_classes), labels=class_names, rotation=90, fontsize=8
-    )  # type: ignore
-    plt.yticks(ticks=np.arange(num_classes), labels=class_names, rotation=0, fontsize=8)  # type: ignore
-    plt.xlabel("Predicted", fontsize=12)
-    plt.ylabel("True", fontsize=12)
-    plt.tight_layout()
-    if save_path:
-        plt.savefig(save_path)
-    if disp:
-        plt.show()
-
-
-########################### Other testing functions #############
-
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="test.py")
-    subparsers = parser.add_subparsers(
-        dest="command", help="Available commands", required=True
-    )
-    # create test dictionary
-    create_parser = subparsers.add_parser("ctd", help="Create test dictionary")
-    create_parser.add_argument(
-        "-a",
-        "--all",
-        action="store_true",
-        help="Test all experiments in runs directory",
-    )
-    create_parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="Output path for the test dictionary (default: test_dict.json)",
-        required=True,
-    )
-    # summarise
-    summarise_parser = subparsers.add_parser(
-        "summarise", help="Summarise results from multiple experiments"
-    )
-    summarise_parser.add_argument(
-        "-r",
-        "--results",
-        type=str,
-        required=True,
-        help="Path to results JSON file from test_all",
-    )
-    summarise_parser.add_argument(
-        "-t",
-        "--to_summarise",
-        type=str,
-        help="Path to test dictionary JSON file (if not provided, splits and model_exps must be provided)",
-        required=True,
-    )
-    summarise_parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="Output path for the summary JSON file (default: summary.json)",
-        default="summary.json",
-    )
-    summarise_parser.add_argument(
-        "-m",
-        "--metric",
-        type=str,
-        help="Metric to summarise (default: top_k_average_per_class_acc)",
-        default="top_k_average_per_class_acc",
-    )
+	parser = ArgumentParser(description="test.py")
+	subparsers = parser.add_subparsers(
+		dest="command", help="Available commands", required=True
+	)
+	# create test dictionary
+	create_parser = subparsers.add_parser("ctd", help="Create test dictionary")
+	create_parser.add_argument(
+		"-a",
+		"--all",
+		action="store_true",
+		help="Test all experiments in runs directory",
+	)
+	create_parser.add_argument(
+		"-o",
+		"--output",
+		type=str,
+		help="Output path for the test dictionary (default: test_dict.json)",
+		required=True,
+	)
+	# summarise
+	summarise_parser = subparsers.add_parser(
+		"summarise", help="Summarise results from multiple experiments"
+	)
+	summarise_parser.add_argument(
+		"-r",
+		"--results",
+		type=str,
+		required=True,
+		help="Path to results JSON file from test_all",
+	)
+	summarise_parser.add_argument(
+		"-t",
+		"--to_summarise",
+		type=str,
+		help="Path to test dictionary JSON file (if not provided, splits and model_exps must be provided)",
+		required=True,
+	)
+	summarise_parser.add_argument(
+		"-o",
+		"--output",
+		type=str,
+		help="Output path for the summary JSON file (default: summary.json)",
+		default="summary.json",
+	)
+	summarise_parser.add_argument(
+		"-m",
+		"--metric",
+		type=str,
+		help="Metric to summarise (default: top_k_average_per_class_acc)",
+		default="top_k_average_per_class_acc",
+	)
 
-    # test from test dictionary
-    test_parser = subparsers.add_parser(
-        "test", help="Test experiments from a test dictionary"
-    )
-    test_parser.add_argument(
-        "-tt",
-        "--to_test",
-        type=str,
-        help="Path to test dictionary JSON file",
-        required=True,
-    )
-    test_parser.add_argument(
-        "-tl",
-        "--test_last",
-        action="store_true",
-        help="Test the weights of last epoch (best.pth always tested)",
-    )
-    test_parser.add_argument(
-        "-pt",
-        "--plot",
-        action="store_true",
-        help="Plot results (heatmap, bargraph, confusion matrix)",
-    )
-    test_parser.add_argument(
-        "-sd",
-        "--skip_done",
-        action="store_true",
-        help="Skip directories that have been tested (if they have result files)",
-    )
-    test_parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        help="Output path for the results JSON file (if not provided, does not save)",
-    )
-    test_parser.add_argument(
-        "-eo",
-        "--err_output",
-        type=str,
-        help="Output path for the errors JSON file (if not provided, does not save)",
-    )
-    test_parser.add_argument(
-        "-sl",
-        "--shuffle",
-        action="store_true",
-        help="Shuffle the frames before inference",
-    )
+	# test from test dictionary
+	test_parser = subparsers.add_parser(
+		"test", help="Test experiments from a test dictionary"
+	)
+	test_parser.add_argument(
+		"-tt",
+		"--to_test",
+		type=str,
+		help="Path to test dictionary JSON file",
+		required=True,
+	)
+	test_parser.add_argument(
+		"-tl",
+		"--test_last",
+		action="store_true",
+		help="Test the weights of last epoch (best.pth always tested)",
+	)
+	test_parser.add_argument(
+		"-pt",
+		"--plot",
+		action="store_true",
+		help="Plot results (heatmap, bargraph, confusion matrix)",
+	)
+	test_parser.add_argument(
+		"-sd",
+		"--skip_done",
+		action="store_true",
+		help="Skip directories that have been tested (if they have result files)",
+	)
+	test_parser.add_argument(
+		"-o",
+		"--output",
+		type=str,
+		help="Output path for the results JSON file (if not provided, does not save)",
+	)
+	test_parser.add_argument(
+		"-eo",
+		"--err_output",
+		type=str,
+		help="Output path for the errors JSON file (if not provided, does not save)",
+	)
+	test_parser.add_argument(
+		"-sl",
+		"--shuffle",
+		action="store_true",
+		help="Shuffle the frames before inference",
+	)
 
-    args = parser.parse_args()
-    if args.command == "ctd":
-        to_test = create_test_dict(all=args.all)
-        with open(args.output, "w") as f:
-            json.dump(to_test, f, indent=2)
-        print(f"Test dictionary saved to {args.output}")
-    elif args.command == "summarise":
-        with open(args.results, "r") as f:
-            results_dict = json.load(f)
-        with open(args.to_summarise, "r") as f:
-            to_summarise = json.load(f)
-        summary = summarise(
-            results_dict=results_dict, to_summarise=to_summarise, metric=args.metric
-        )
-        with open(args.output, "w") as f:
-            json.dump(summary, f, indent=2)
-        print(f"Summary saved to {args.output}")
-    elif args.command == "test":
-        with open(args.to_test, "r") as f:
-            to_test = json.load(f)
-        test_all(
-            runs_dict=to_test,
-            test_last=args.test_last,
-            plot=args.plot,
-            skip_done=args.skip_done,
-            shuffle=args.shuffle,
-            res_output=args.output,
-            err_output=args.err_output,
-        )
-        if args.output:
-            print(f"Results saved to {args.output}")
-        if args.err_output:
-            print(f"Errors saved to {args.err_output}")
+	args = parser.parse_args()
+	if args.command == "ctd":
+		to_test = create_test_dict(all=args.all)
+		with open(args.output, "w") as f:
+			json.dump(to_test, f, indent=2)
+		print(f"Test dictionary saved to {args.output}")
+	elif args.command == "summarise":
+		with open(args.results, "r") as f:
+			results_dict = json.load(f)
+		with open(args.to_summarise, "r") as f:
+			to_summarise = json.load(f)
+		summary = summarise(
+			results_dict=results_dict, to_summarise=to_summarise, metric=args.metric
+		)
+		with open(args.output, "w") as f:
+			json.dump(summary, f, indent=2)
+		print(f"Summary saved to {args.output}")
+	elif args.command == "test":
+		with open(args.to_test, "r") as f:
+			to_test = json.load(f)
+		test_all(
+			runs_dict=to_test,
+			test_last=args.test_last,
+			plot=args.plot,
+			skip_done=args.skip_done,
+			shuffle=args.shuffle,
+			res_output=args.output,
+			err_output=args.err_output,
+		)
+		if args.output:
+			print(f"Results saved to {args.output}")
+		if args.err_output:
+			print(f"Errors saved to {args.err_output}")

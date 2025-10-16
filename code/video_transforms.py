@@ -1,15 +1,10 @@
 import torch
 from typing import Callable
-import torch.nn.functional as F
 import random
 import utils
-from torchvision.transforms import v2
 import time
-
-import time
-import torch
 import gc
-from typing import Callable, Any, Optional
+from typing import Optional
 import statistics
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as ts
@@ -133,7 +128,6 @@ def correct_num_frames(frames, target_length=64, randomise=False):
     padding = torch.zeros(target_length - frames.shape[0], frames.shape[1], frames.shape[2], frames.shape[3], device=frames.device)
     return torch.cat((frames, padding), dim=0)
   else:
-    step = frames.shape[0] // target_length
     sampled_frames = sample(frames, target_length, randomise=randomise)
     diff = target_length - len(sampled_frames) 
     if diff > 0:
@@ -171,7 +165,7 @@ class Shuffle(Transform):
     return inpt.index_select(dim, self.permutation)
     
   @staticmethod
-  def create_permutation(num_frames:int, seed:int=None) -> list:
+  def create_permutation(num_frames:int, seed:Optional[int]=None) -> torch.Tensor:
     """Create a random permutation for given number of frames"""
     if seed is not None:
       torch.manual_seed(seed)
