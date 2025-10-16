@@ -20,7 +20,7 @@ RUNS_PATH = "./runs/"
 IMP_PATH = "./info/wlasl_implemented_info.json"
 
 
-def load_config(arg_dict, verbose=False):
+def load_config(arg_dict: Dict, verbose: bool=False) -> Dict:
     """Load config from flat file and merge with command line args"""
     conf_path = Path(arg_dict["config_path"])
     if not conf_path.exists():
