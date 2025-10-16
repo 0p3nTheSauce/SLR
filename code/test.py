@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple, Dict
+from typing import Optional, Union, Tuple, Dict, List, Literal
 import torch
 import json
 from sklearn.metrics import accuracy_score, classification_report
@@ -258,30 +258,105 @@ def test_topk_clsrep(model: torch.nn.Module,
 
 	return topk_res, cls_report
 	
+def _get_test_loader(perm: Optional[torch.Tensor],
+					  model_info: Dict,
+					frame_size: int,
+					num_frames: int,
+					root: Path,
+					labels: Path,
+					set: Literal['test', 'val']) -> DataLoader[VideoDataset]:
+	if perm:
+		maybe_shuffle_t = Shuffle(perm)
+	else:
+		maybe_shuffle_t = v2.Lambda(lambda x: x)
+
+	final_t = v2.Compose(
+		[
+			maybe_shuffle_t,
+			v2.Lambda(lambda x: x.float() / 255.0),
+			v2.Normalize(mean=model_info["mean"], std=model_info["std"]),
+			v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+		]
+	)
+
+	test_transforms = v2.Compose(
+		[v2.CenterCrop(frame_size), final_t]
+	)
+
+	instances = labels / f'{set}_instances_fixed_frange_bboxes_len.json'
+	classes = labels / f'{set}_classes_fixed_frange_bboxes_len.json'
+
+	tset = VideoDataset(
+		root, 
+		instances,
+		classes,
+		num_frames=num_frames,
+		transforms=test_transforms,
+	)
+	return DataLoader(
+		tset,
+		batch_size=1,
+		shuffle=False,
+		num_workers=2,
+		pin_memory=False,
+		drop_last=False
+	)
+
+
+
 def test_run(
-	weights: Path,
-	model_info: Dict,
-	test_classes: Path,
-	test_instances: Path,
-	num_frames: int,
-	frame_size: int,
-	vids_dir: Path = Path("../data/WLASL/WLASL2000/"),
-	imp_path: Path = Path("./info/wlasl_implemented_info.json"),
-	cls_lst_path: Path = Path("./info/wlasl_class_list.json"),
-	shuffle: bool = False,
+	config: Dict,
+	perm: Optional[torch.Tensor] = None,
+	model: Optional[torch.nn.Module] = None,
+	test_loader: Optional[DataLoader[VideoDataset]] = None,
+	val_loader: Optional[DataLoader[VideoDataset]] = None,
+	test_val: bool = False,
 	plot:bool = False,
 	disp:bool = False,
 	seed: int = 42,
-	res_output: Optional[Path] = None,
 	):
-	set_seed(42)	
+	set_seed(seed)	
 
-	with open(imp_path, 'r') as f:
-		imp_info = json.load(f)
+	main_conf = config['config']
+	admin = main_conf['admin']
+	model_info = config['model_info']
+	data = main_conf['data']
+
+	results = {}
+
+	save_path = Path(admin['save_path'])
+	output = save_path.parent / 'results'
+	output.mkdir(exist_ok=True)
+
+	tloaders = {
+		"test": _get_test_loader(perm,
+						    model_info, 
+							data['frame_size'],
+							data['num_frames'],
+							Path(admin['root']),
+							Path(admin['labels']),
+							'test' 
+							    )	 
+	}
+
+	if test_val:
+		tloaders['val'] = _get_test_loader(perm,
+						    model_info, 
+							data['frame_size'],
+							data['num_frames'],
+							Path(admin['root']),
+							Path(admin['labels']),
+							'val' 
+							    )
+  
+	test_loader = tloaders['test']
+	assert isinstance(test_loader.dataset, VideoDataset), "This function uses a custom dataset"
+	num_classes = len(set(test_loader.dataset.classes))
+
+
+
 	
-	if not imp_info:
-		raise ValueError("Implemented info empty")
-
+	print(output)
 	
 
 
