@@ -1,24 +1,18 @@
 import torch # type: ignore
-# import os
 import json
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
 from pathlib import Path
-
 #local imports
 import wandb
 from video_dataset import VideoDataset
 from configs import load_config, print_config, take_args
-from models.pytorch_mvit import MViTv2S_basic, MViTv1B_basic
-from models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
-from models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
-from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
-# from code.experiments.scripts.quewing import get_run_id
+from models import get_model, norm_vals
 from utils import wandb_manager, set_seed
-from typing import Optional
+
 
 
 ENTITY= 'ljgoodall2001-rhodes-university'
@@ -71,38 +65,6 @@ def setup_data(mean, std, config):
 	
 	return dataloaders, num_classes
 	
-
-def get_model(model_idx:int, num_classes:int, drop_p:Optional[float]=None):
-	model_constructors = {
-				0: MViTv1B_basic,
-				1: MViTv2S_basic,
-				2: Swin3DBig_basic,
-				3: Swin3DSmall_basic,
-				4: Swin3DTiny_basic,
-				5: Resnet2_plus1D_18_basic,
-				6: Resnet3D_18_basic,
-				7: S3D_basic,
-		}
-	#TODO: the is definitely a cleaner way to do this
-	model_names = {
-				0: "MViTv1B_basic",
-				1: "MViTv2S_basic",
-				2: "Swin3DBig_basic",
-				3: "Swin3DSmall_basic",
-				4: "Swin3DTiny_basic",
-				5: "Resnet2_plus1D_18_basic",
-				6: "Resnet3D_18_basic",
-				7: "S3D_basic",
-		}
-	if model_idx not in model_constructors:
-		raise ValueError(f"Unknown model_idx: {model_idx}")
-	if drop_p is not None:
-		model = model_constructors[model_idx](num_classes=num_classes, drop_p=drop_p)
-	else:
-		model = model_constructors[model_idx](num_classes)
-	print(f"Successfully using model {model_names[model_idx]}")
- 
-	return model	
  
  
 def train_loop(model_name, wandb_run, load=None, save_every=5,
@@ -113,6 +75,11 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 
 	config = wandb_run.config
 	
+	model_info = norm_vals(model_name)
+ 
+	if model_info is None:
+		raise ValueError(f"Model name {model_name} not recognized for normalization values")
+ 
 	#setup transforms
 	final_transform = v2.Compose([
 		v2.Lambda(lambda x: x.float() / 255.0),
@@ -122,7 +89,6 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 	
 	#should actually dirst resize before cropping
 	
- 
 	train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
 																 v2.RandomHorizontalFlip(),
 																 final_transform])
@@ -159,8 +125,10 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 	except Exception as _:
 		drop_p = None
  
-	model = get_model(model_info['idx'], num_classes, drop_p)
+	model = get_model(model_name, num_classes, drop_p)
 	
+	if model is None:
+		raise ValueError(f"Model name {model_name} not recognized for model creation")
 	
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	model.to(device)
