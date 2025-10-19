@@ -1,10 +1,7 @@
-from typing import Optional, Union, Tuple, Dict, List, Literal
+from typing import Optional, Union, Tuple, Dict, Literal
 import torch
 import json
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
-import seaborn as sns
-import matplotlib.pyplot as plt
-import pandas as pd
+from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
 from torchvision.transforms import v2
 from video_transforms import Shuffle
@@ -15,7 +12,7 @@ from torch.utils.data import DataLoader
 # from configs import Config
 import tqdm
 
-from train import set_seed, get_model
+from train import get_model
 from pathlib import Path
 import configs
 import utils
@@ -64,7 +61,7 @@ def test_model(model, test_loader):
 
 def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 	if seed is not None:
-		set_seed(0)
+		utils.set_seed(0)
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model.to(device)
@@ -158,7 +155,7 @@ def test_topk_clsrep(model: torch.nn.Module,
 					 verbose: bool =False,
 					 save_path: Optional[Union[str, Path]]=None) -> Tuple[Dict, Dict]:
 	if seed is not None:
-		set_seed(0)
+		utils.set_seed(0)
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model.to(device)
@@ -318,7 +315,7 @@ def test_run(
 	disp:bool = False,
 	seed: int = 42,
 	):
-	set_seed(seed)	
+	utils.set_seed(seed)	
 
 	main_conf = config['config']
 	admin = main_conf['admin']
