@@ -51,6 +51,8 @@ def test_model(model, test_loader):
 		all_targets, all_preds, output_dict=True, zero_division=0
 	)
 
+	assert isinstance(report, Dict), "Sklearn machine broke"
+
 	return accuracy, report, all_preds, all_targets
 
 def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
@@ -383,6 +385,34 @@ def test_run(
 			'classification_report': cls_report
 		}
 
+		if plot:
+			fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
+			plot_heatmap(
+				report=cls_report,
+				classes_path=Path(admin['classes_path']),
+				title=f"{set_name.capitalize()} set Classification Report",
+				save_path=output / fname,
+				disp=disp,
+			)
+
+			fname = check_path.name.replace(".pth", f"_{set_name}-bargraph.png")
+			plot_bar_graph(
+				report=cls_report,
+				classes_path=Path(admin['classes_path']),
+				title=f"{set_name.capitalize()} set Classification Report",
+				save_path=output / fname,
+				disp=disp,
+			)
+			fname = check_path.name.replace(".pth", f"_{set_name}-confmat.png")
+			assert isinstance(test_loader.dataset, VideoDataset), "This function uses a custom dataset"
+			plot_confusion_matrix(
+				y_true=tloader.dataset.classes,
+				y_pred=[],
+				classes_path=Path(admin['classes_path']),
+				title=f"{set_name.capitalize()} set Confusion Matrix",
+				save_path=output / fname,
+				disp=disp,
+			)
 
 
 	
