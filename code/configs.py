@@ -6,7 +6,7 @@ import json
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
-
+from models import avail_models
 from typing import Optional
 
 # TODO: make configs the sole source of these constants
@@ -97,51 +97,6 @@ def parse_ini_config(ini_file: str | Path) -> Dict[str, Any]:
     return wandb_config
 
 
-def print_config_old(config_dict, title="Training"):
-    """
-    Print configuration dictionary in a more readable format.
-
-    Args:
-                    config_dict (dict): Dictionary containing configuration sections
-                    title: 'Testing' or 'Training'
-    """
-    # Extract admin info for header
-    admin = config_dict.get("admin", {})
-    model = admin.get("model", "Unknown Model")
-    split = admin.get("split", "unknown")
-
-    # Print header
-    print(f"{title} {model} on split {split}")
-
-    # Print admin section in formatted way
-    if "admin" in config_dict:
-        print(f"              Experiment no: {admin.get('exp_no', 'N/A')}")
-        print(f"              Raw videos at: {admin.get('root', 'N/A')}")
-        print(f"              Labels at: {admin.get('labels', 'N/A')}")
-        print(f"              Saving files to: {admin.get('save_path', 'N/A')}")
-        if title == "Training":
-            print(f"              Recovering: {admin.get('recovering', False)}")
-        print(f"              Config: {admin.get('config_path', 'N/A')}")
-        print()
-
-    # Print other sections in organized format
-    sections_order = ["training", "optimizer", "scheduler", "data", "model_params"]
-
-    for section in sections_order:
-        if section in config_dict:
-            print(f"{section.upper()}:")
-            section_data = config_dict[section]
-
-            # Calculate max key length for alignment
-            max_key_len = (
-                max(len(str(k)) for k in section_data.keys()) if section_data else 0
-            )
-
-            for key, value in section_data.items():
-                print(f"    {key:<{max_key_len}} : {value}")
-            print()
-
-
 def print_config(config_dict):
     """
     Print configuration dictionary in a more readable format.
@@ -167,7 +122,6 @@ def print_config(config_dict):
 
 def take_args(
     splits_available: List[str],
-    models_available: List[str],
     sup_args: Optional[List[str]] = None,
     return_parser_only: bool = False,
     make_dirs: bool = False,
@@ -191,7 +145,7 @@ def take_args(
     Returns:
         Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if  successful.
     """
-    
+    models_available = avail_models()
     
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
@@ -360,14 +314,11 @@ def main():
     with open("./info/wlasl_implemented_info.json", "r") as f:
         info = json.load(f)
 
-    model_info = info["models"]
-
-    available_model = model_info.keys()
     available_splits = info["splits"]
     try:
         # maybe_args = take_args(available_splits,available_model,
         #                  sup_args=['-x', '5', '-m', 'S3D', '-sp', 'asl100'])
-        maybe_args = take_args(available_splits, available_model, sup_args=["-h"])
+        maybe_args = take_args(available_splits, sup_args=["-h"])
     except SystemExit as e:
         maybe_args = None
         print(f"Parsing failed with exit code: {e.code}")
