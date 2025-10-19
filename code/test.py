@@ -31,11 +31,11 @@ from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 
 
 def cleanup_memory():
-    """Cleanup GPU and CPU memory"""
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
-    gc.collect()
+	"""Cleanup GPU and CPU memory"""
+	if torch.cuda.is_available():
+		torch.cuda.empty_cache()
+		torch.cuda.synchronize()
+	gc.collect()
 
 ##############################   Individual-run testing   ######################################
 
@@ -333,24 +333,24 @@ def test_run(
 
 	tloaders = {
 		"test": _get_test_loader(perm,
-						    model_info, 
+							model_info, 
 							data['frame_size'],
 							data['num_frames'],
 							Path(admin['root']),
 							Path(admin['labels']),
 							'test' 
-							    )	 
+								)	 
 	}
 
 	if test_val:
 		tloaders['val'] = _get_test_loader(perm,
-						    model_info, 
+							model_info, 
 							data['frame_size'],
 							data['num_frames'],
 							Path(admin['root']),
 							Path(admin['labels']),
 							'val' 
-							    )
+								)
   
 	test_loader = tloaders['test']
 	assert isinstance(test_loader.dataset, VideoDataset), "This function uses a custom dataset"
@@ -366,9 +366,9 @@ def test_run(
 ##############################   Multi-run Testing  ######################################
 
 def create_runs_dict(
-    imp_path: str | Path = "wlasl_implemented_info.json",
-    runs_path: str | Path = "runs/",
-    output: Optional[str | Path] = None,
+	imp_path: str | Path = "wlasl_implemented_info.json",
+	runs_path: str | Path = "runs/",
+	output: Optional[str | Path] = None,
 ) -> dict[str, dict[str, list[str]]]:
 	"""Create a dictionary of runs that have been done.
 	Args:
@@ -378,46 +378,46 @@ def create_runs_dict(
 	Returns:
 		dict: experiments done dictionary"""
 
-    def sep_arch_exp(path: str | Path):
-        path_obj = Path(path)
-        exp_no = path_obj.name[-3:]
-        arch = path_obj.name[:-7]
-        return arch, exp_no
+	def sep_arch_exp(path: str | Path):
+		path_obj = Path(path)
+		exp_no = path_obj.name[-3:]
+		arch = path_obj.name[:-7]
+		return arch, exp_no
 
-    with open(imp_path, "r") as f:
-        imp_info = json.load(f)
+	with open(imp_path, "r") as f:
+		imp_info = json.load(f)
 
-    runs_path = Path(runs_path)
-    available_models = imp_info["models"].keys()
+	runs_path = Path(runs_path)
+	available_models = imp_info["models"].keys()
 
-    runs_dict = {}
-    for split in imp_info["splits"]:
-        folder = runs_path / split
-        split_dict = {}
+	runs_dict = {}
+	for split in imp_info["splits"]:
+		folder = runs_path / split
+		split_dict = {}
 
-        for arch in available_models:
-            split_dict[arch] = []
+		for arch in available_models:
+			split_dict[arch] = []
 
-        for path in folder.iterdir():
-            if not path.is_dir():
-                continue
-            arch, exp_no = sep_arch_exp(path)
-            if arch not in available_models:
-                raise ValueError(f"{path} name does not fit convention")
-            split_dict[arch].append(exp_no)
+		for path in folder.iterdir():
+			if not path.is_dir():
+				continue
+			arch, exp_no = sep_arch_exp(path)
+			if arch not in available_models:
+				raise ValueError(f"{path} name does not fit convention")
+			split_dict[arch].append(exp_no)
 
-        runs_dict[split] = split_dict
+		runs_dict[split] = split_dict
 
-    if output:
-        with open(output, "w") as f:
-            json.dump(runs_dict, f, indent=2)
+	if output:
+		with open(output, "w") as f:
+			json.dump(runs_dict, f, indent=2)
 
-    return runs_dict
+	return runs_dict
 
 def create_test_dict(
-    all: bool = False,
-    imp_path: str | Path = "wlasl_implemented_info.json",
-    runs_path: str | Path = "runs",
+	all: bool = False,
+	imp_path: str | Path = "wlasl_implemented_info.json",
+	runs_path: str | Path = "runs",
 ) -> dict[str, dict[str, list[str]]]:
 	"""Create a dictionary of runs to test.
 	Args:
@@ -427,57 +427,57 @@ def create_test_dict(
 	Returns:
 																																	dict: experiments to test dictionary"""
 
-    runs_done_dict = create_runs_dict(imp_path, runs_path)
-    if all:
-        return runs_done_dict
+	runs_done_dict = create_runs_dict(imp_path, runs_path)
+	if all:
+		return runs_done_dict
 
-    to_test = {}
+	to_test = {}
 
-    with open(imp_path, "r") as f:
-        imp_info = json.load(f)
+	with open(imp_path, "r") as f:
+		imp_info = json.load(f)
 
-    cont = "y"
-    while cont == "y":
-        split = ask_nicely(
-            message="Please enter split: ",
-            requirment=lambda x: x in imp_info["splits"],
-            error=f"pick one of: {imp_info['splits']}",
-        )
-        to_test[split] = {}
-        cont2 = cont
-        while cont2 == "y":
-            arch = ask_nicely(
-                message="Please enter architecture name: ",
-                requirment=lambda x: x in imp_info["models"],
-                error=f"pick one of: {imp_info['models'].keys()}",
-            )
-            to_test[split][arch] = []
-            cont3 = cont2
-            while cont3 == "y":
-                av_exps = list(map(lambda z: int(z), runs_done_dict[split][arch]))
-                exp_no = ask_nicely(
-                    message="Please enter experiment number: ",
-                    requirment=lambda x: int(x) in av_exps,
-                    error=f"pick one of {av_exps}",
-                )
-                to_test[split][arch].append(exp_no.zfill(3))
-                cont3 = ask_nicely(
-                    message="Enter another experiment? [y/n]: ",
-                    requirment=lambda x: x in ["y", "n"],
-                    error="enter y or n",
-                )
-            cont2 = ask_nicely(
-                message="Enter another architecture? [y/n]: ",
-                requirment=lambda x: x in ["y", "n"],
-                error="enter y or n",
-            )
-        cont = ask_nicely(
-            message="Enter another split? [y/n]: ",
-            requirment=lambda x: x in ["y", "n"],
-            error="enter y or n",
-        )
+	cont = "y"
+	while cont == "y":
+		split = ask_nicely(
+			message="Please enter split: ",
+			requirment=lambda x: x in imp_info["splits"],
+			error=f"pick one of: {imp_info['splits']}",
+		)
+		to_test[split] = {}
+		cont2 = cont
+		while cont2 == "y":
+			arch = ask_nicely(
+				message="Please enter architecture name: ",
+				requirment=lambda x: x in imp_info["models"],
+				error=f"pick one of: {imp_info['models'].keys()}",
+			)
+			to_test[split][arch] = []
+			cont3 = cont2
+			while cont3 == "y":
+				av_exps = list(map(lambda z: int(z), runs_done_dict[split][arch]))
+				exp_no = ask_nicely(
+					message="Please enter experiment number: ",
+					requirment=lambda x: int(x) in av_exps,
+					error=f"pick one of {av_exps}",
+				)
+				to_test[split][arch].append(exp_no.zfill(3))
+				cont3 = ask_nicely(
+					message="Enter another experiment? [y/n]: ",
+					requirment=lambda x: x in ["y", "n"],
+					error="enter y or n",
+				)
+			cont2 = ask_nicely(
+				message="Enter another architecture? [y/n]: ",
+				requirment=lambda x: x in ["y", "n"],
+				error="enter y or n",
+			)
+		cont = ask_nicely(
+			message="Enter another split? [y/n]: ",
+			requirment=lambda x: x in ["y", "n"],
+			error="enter y or n",
+		)
 
-    return to_test
+	return to_test
 
 
 # TODO: maybe add more fine grained control for saving outputs
@@ -485,24 +485,24 @@ def create_test_dict(
 
 
 def test_all(
-    runs_dict: dict[str, dict[str, list[str]]],
-    test_last: bool = False,
-    top_k: bool = True,
-    plot: bool = False,
-    disp: bool = False,
-    res_output: Optional[str | Path] = None,
-    skip_done: bool = True,
-    test_val: bool = False,
-    shuffle: bool = False,
-    imp_path: str | Path = "wlasl_implemented_info.json",
-    classes_path: str | Path = "wlasl_class_list.json",
-    runs_dir: str | Path = "./runs",
-    labels_dir: str | Path = "./preprocessed/labels",
-    configs_dir: str | Path = "./configfiles",
-    root_dir: str | Path = "../data/WLASL/WLASL2000",
-    err_output: Optional[str | Path] = "result/test_errors.json",
+	runs_dict: dict[str, dict[str, list[str]]],
+	test_last: bool = False,
+	top_k: bool = True,
+	plot: bool = False,
+	disp: bool = False,
+	res_output: Optional[str | Path] = None,
+	skip_done: bool = True,
+	test_val: bool = False,
+	shuffle: bool = False,
+	imp_path: str | Path = "wlasl_implemented_info.json",
+	classes_path: str | Path = "wlasl_class_list.json",
+	runs_dir: str | Path = "./runs",
+	labels_dir: str | Path = "./preprocessed/labels",
+	configs_dir: str | Path = "./configfiles",
+	root_dir: str | Path = "../data/WLASL/WLASL2000",
+	err_output: Optional[str | Path] = "result/test_errors.json",
 ) -> tuple[dict[str, dict[str, list[str]]], list]:
-    """Test multiple sets experiments (saves results to experiment directory).
+	"""Test multiple sets experiments (saves results to experiment directory).
 
 	Args:
 		runs_dict: 		experiments to test
@@ -526,257 +526,257 @@ def test_all(
 		result_dict: 	all test results in one dictionary
 		problem_runs: 	experiments where the model did not load (because it uses old format)"""
 
-    problem_runs = []
-    result_dict = {}  # better to make a copy
+	problem_runs = []
+	result_dict = {}  # better to make a copy
 
-    with open(imp_path, "r") as f:
-        imp_info = json.load(f)
+	with open(imp_path, "r") as f:
+		imp_info = json.load(f)
 
-    if not imp_info:
-        raise ValueError("Implemented info empty")
+	if not imp_info:
+		raise ValueError("Implemented info empty")
 
-    root = Path(root_dir)
-    all_labels = Path(labels_dir)
-    runs = Path(runs_dir)
-    configfiles = Path(configs_dir)
+	root = Path(root_dir)
+	all_labels = Path(labels_dir)
+	runs = Path(runs_dir)
+	configfiles = Path(configs_dir)
 
-    for split in runs_dict.keys():  # e.g. asl100
-        labels = all_labels / f"{split}"
-        print(f"Processing split: {split}")
-        result_dict[split] = {}
+	for split in runs_dict.keys():  # e.g. asl100
+		labels = all_labels / f"{split}"
+		print(f"Processing split: {split}")
+		result_dict[split] = {}
 
-        for arch in runs_dict[split].keys():  # e.g. S3D
-            print(f"With architecture: {arch}")
-            # result_dict[split][arch] = [{} for _ in runs_dict[split][arch]]
-            result_dict[split][arch] = {}
+		for arch in runs_dict[split].keys():  # e.g. S3D
+			print(f"With architecture: {arch}")
+			# result_dict[split][arch] = [{} for _ in runs_dict[split][arch]]
+			result_dict[split][arch] = {}
 
-            for i, exp_no in enumerate(runs_dict[split][arch]):  # e.g. 001
-                print(f"Experiment no: {exp_no}")
-                result_dict[split][arch][exp_no] = {}
+			for i, exp_no in enumerate(runs_dict[split][arch]):  # e.g. 001
+				print(f"Experiment no: {exp_no}")
+				result_dict[split][arch][exp_no] = {}
 
-                cleanup_memory()
+				cleanup_memory()
 
-                config_path = configfiles / f"{split}/{arch}_{exp_no}.ini"
-                exp_dir = runs / f"{split}/{arch}_exp{exp_no}"
-                output = exp_dir / "results"
+				config_path = configfiles / f"{split}/{arch}_{exp_no}.ini"
+				exp_dir = runs / f"{split}/{arch}_exp{exp_no}"
+				output = exp_dir / "results"
 
-                # ensure results subdir exists
-                output.mkdir(exist_ok=True)
+				# ensure results subdir exists
+				output.mkdir(exist_ok=True)
 
-                if skip_done and _is_done(exp_dir):
-                    continue
+				if skip_done and _is_done(exp_dir):
+					continue
 
-                save_path = exp_dir / "checkpoints"
+				save_path = exp_dir / "checkpoints"
 
-                config = configs.load_config({"config_path": config_path})
-                configs.print_config(config)
+				config = configs.load_config({"config_path": config_path})
+				configs.print_config(config)
 
-                # setup data
+				# setup data
 
-                model_info = imp_info["models"][arch]
-                utils.print_dict(model_info)
+				model_info = imp_info["models"][arch]
+				utils.print_dict(model_info)
 
-                if shuffle:
-                    permutation = Shuffle.create_permutation(
-                        config["data"]["num_frames"]
-                    )
-                    maybe_shuffle_t = Shuffle(permutation)
-                else:
-                    maybe_shuffle_t = v2.Lambda(lambda x: x)  # nothing
+				if shuffle:
+					permutation = Shuffle.create_permutation(
+						config["data"]["num_frames"]
+					)
+					maybe_shuffle_t = Shuffle(permutation)
+				else:
+					maybe_shuffle_t = v2.Lambda(lambda x: x)  # nothing
 
-                final_t = v2.Compose(
-                    [
-                        maybe_shuffle_t,
-                        v2.Lambda(lambda x: x.float() / 255.0),
-                        v2.Normalize(mean=model_info["mean"], std=model_info["std"]),
-                        v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
-                    ]
-                )
+				final_t = v2.Compose(
+					[
+						maybe_shuffle_t,
+						v2.Lambda(lambda x: x.float() / 255.0),
+						v2.Normalize(mean=model_info["mean"], std=model_info["std"]),
+						v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+					]
+				)
 
-                test_transforms = v2.Compose(
-                    [v2.CenterCrop(config["data"]["frame_size"]), final_t]
-                )
+				test_transforms = v2.Compose(
+					[v2.CenterCrop(config["data"]["frame_size"]), final_t]
+				)
 
-                test_instances = labels / "test_instances_fixed_frange_bboxes_len.json"
-                val_instances = labels / "val_instances_fixed_frange_bboxes_len.json"
-                test_classes = labels / "test_classes_fixed_frange_bboxes_len.json"
-                val_classes = labels / "val_classes_fixed_frange_bboxes_len.json"
+				test_instances = labels / "test_instances_fixed_frange_bboxes_len.json"
+				val_instances = labels / "val_instances_fixed_frange_bboxes_len.json"
+				test_classes = labels / "test_classes_fixed_frange_bboxes_len.json"
+				val_classes = labels / "val_classes_fixed_frange_bboxes_len.json"
 
-                test_set = VideoDataset(
-                    root,
-                    test_instances,
-                    test_classes,
-                    transforms=test_transforms,
-                    num_frames=config["data"]["num_frames"],
-                )
-                val_set = VideoDataset(
-                    root,
-                    val_instances,
-                    val_classes,
-                    transforms=test_transforms,
-                    num_frames=config["data"]["num_frames"],
-                )
+				test_set = VideoDataset(
+					root,
+					test_instances,
+					test_classes,
+					transforms=test_transforms,
+					num_frames=config["data"]["num_frames"],
+				)
+				val_set = VideoDataset(
+					root,
+					val_instances,
+					val_classes,
+					transforms=test_transforms,
+					num_frames=config["data"]["num_frames"],
+				)
 
-                test_loader = DataLoader(
-                    test_set,
-                    batch_size=1,
-                    shuffle=True,
-                    num_workers=2,
-                    pin_memory=False,
-                    drop_last=False,
-                )
-                val_loader = DataLoader(
-                    val_set,
-                    batch_size=1,
-                    shuffle=True,
-                    num_workers=2,
-                    pin_memory=False,
-                    drop_last=False,
-                )
+				test_loader = DataLoader(
+					test_set,
+					batch_size=1,
+					shuffle=True,
+					num_workers=2,
+					pin_memory=False,
+					drop_last=False,
+				)
+				val_loader = DataLoader(
+					val_set,
+					batch_size=1,
+					shuffle=True,
+					num_workers=2,
+					pin_memory=False,
+					drop_last=False,
+				)
 
-                num_classes = len(set(test_set.classes))
-                print(f"Number of samples: {len(test_set)}")
-                print(f"Number of classes: {num_classes}")
+				num_classes = len(set(test_set.classes))
+				print(f"Number of samples: {len(test_set)}")
+				print(f"Number of classes: {num_classes}")
 
-                # setup model
+				# setup model
 
-                model = get_model(model_info["idx"], num_classes)
+				model = get_model(model_info["idx"], num_classes)
 
-                if test_last:  # some of these may have valid best.pth, others not
-                    checkpoint_paths = [
-                        x for x in save_path.iterdir() if x.name.endswith(".pth")
-                    ]
-                    if len(checkpoint_paths) > 2:
-                        # contains more than just best and last
-                        checkpoint_paths = sorted(checkpoint_paths)
-                        checkpoint_paths = [checkpoint_paths[0]] + [
-                            checkpoint_paths[-1]
-                        ]
-                else:
-                    checkpoint_paths = [save_path / "best.pth"]
+				if test_last:  # some of these may have valid best.pth, others not
+					checkpoint_paths = [
+						x for x in save_path.iterdir() if x.name.endswith(".pth")
+					]
+					if len(checkpoint_paths) > 2:
+						# contains more than just best and last
+						checkpoint_paths = sorted(checkpoint_paths)
+						checkpoint_paths = [checkpoint_paths[0]] + [
+							checkpoint_paths[-1]
+						]
+				else:
+					checkpoint_paths = [save_path / "best.pth"]
 
-                if len(checkpoint_paths) == 0:
-                    print(f"Warning: no weights found for {save_path}")
-                    continue
+				if len(checkpoint_paths) == 0:
+					print(f"Warning: no weights found for {save_path}")
+					continue
 
-                for check_path in checkpoint_paths:
-                    print(f"Checkpoint: {check_path}")
-                    checkpoint = torch.load(check_path)
-                    if check_path.name == "best.pth":
-                        try:
-                            model.load_state_dict(checkpoint)
-                        except Exception:
-                            print(f"Failed to load checkpoint: {check_path}")
-                            problem_runs.append(str(check_path))
-                            continue
-                    else:
-                        try:
-                            model.load_state_dict(checkpoint["model_state_dict"])
-                        except Exception:
-                            print(f"Failed to load checkpoint: {check_path}")
-                            problem_runs.append(str(check_path))
-                            continue
+				for check_path in checkpoint_paths:
+					print(f"Checkpoint: {check_path}")
+					checkpoint = torch.load(check_path)
+					if check_path.name == "best.pth":
+						try:
+							model.load_state_dict(checkpoint)
+						except Exception:
+							print(f"Failed to load checkpoint: {check_path}")
+							problem_runs.append(str(check_path))
+							continue
+					else:
+						try:
+							model.load_state_dict(checkpoint["model_state_dict"])
+						except Exception:
+							print(f"Failed to load checkpoint: {check_path}")
+							problem_runs.append(str(check_path))
+							continue
 
-                    # test it
+					# test it
 
-                    if top_k:
-                        if shuffle:
-                            suffix = "-top-k_shuffled.json"
-                        else:
-                            suffix = "-top-k.json"
+					if top_k:
+						if shuffle:
+							suffix = "-top-k_shuffled.json"
+						else:
+							suffix = "-top-k.json"
 
-                        if test_val:
-                            print("Val")
-                            fname = check_path.name.replace(".pth", "_val" + suffix)
-                            val_res = test_top_k(
-                                model=model,
-                                test_loader=val_loader,
-                                save_path=output / fname,
-                            )
-                        else:
-                            val_res = {}
+						if test_val:
+							print("Val")
+							fname = check_path.name.replace(".pth", "_val" + suffix)
+							val_res = test_top_k(
+								model=model,
+								test_loader=val_loader,
+								save_path=output / fname,
+							)
+						else:
+							val_res = {}
 
-                        print("Test")
-                        fname = check_path.name.replace(".pth", "_test" + suffix)
-                        test_res = test_top_k(
-                            model=model,
-                            test_loader=test_loader,
-                            save_path=output / fname,
-                        )
-                        experiment = {"test set": test_res}
+						print("Test")
+						fname = check_path.name.replace(".pth", "_test" + suffix)
+						test_res = test_top_k(
+							model=model,
+							test_loader=test_loader,
+							save_path=output / fname,
+						)
+						experiment = {"test set": test_res}
 
-                        if test_val:
-                            experiment["val set"] = val_res
-                        result_dict[split][arch][exp_no][
-                            check_path.name.replace(".pth", "")
-                        ] = experiment  # update result_dict as we go
+						if test_val:
+							experiment["val set"] = val_res
+						result_dict[split][arch][exp_no][
+							check_path.name.replace(".pth", "")
+						] = experiment  # update result_dict as we go
 
-                    if plot:
-                        accuracy, class_report, all_preds, all_targets = test_model(
-                            model, test_loader
-                        )
-                        # print(f'Test accuracy: {accuracy}')
-                        fname = check_path.name.replace(".pth", "_test-heatmap.png")
-                        plot_heatmap(
-                            report=class_report,
-                            classes_path=classes_path,
-                            title="Test set Classification Report",
-                            save_path=output / fname,
-                            disp=disp,
-                        )
+					if plot:
+						accuracy, class_report, all_preds, all_targets = test_model(
+							model, test_loader
+						)
+						# print(f'Test accuracy: {accuracy}')
+						fname = check_path.name.replace(".pth", "_test-heatmap.png")
+						plot_heatmap(
+							report=class_report,
+							classes_path=classes_path,
+							title="Test set Classification Report",
+							save_path=output / fname,
+							disp=disp,
+						)
 
-                        fname = check_path.name.replace(".pth", "_test-bargraph.png")
-                        plot_bar_graph(
-                            report=class_report,
-                            classes_path=classes_path,
-                            title="Test set Classification Report",
-                            save_path=output / fname,
-                            disp=disp,
-                        )
-                        fname = check_path.name.replace(".pth", "_test-confmat.png")
-                        plot_confusion_matrix(
-                            y_true=all_targets,
-                            y_pred=all_preds,
-                            classes_path=classes_path,
-                            size=(15, 15),
-                            title="Test set Classification Report",
-                            save_path=output / fname,
-                            disp=disp,
-                        )
+						fname = check_path.name.replace(".pth", "_test-bargraph.png")
+						plot_bar_graph(
+							report=class_report,
+							classes_path=classes_path,
+							title="Test set Classification Report",
+							save_path=output / fname,
+							disp=disp,
+						)
+						fname = check_path.name.replace(".pth", "_test-confmat.png")
+						plot_confusion_matrix(
+							y_true=all_targets,
+							y_pred=all_preds,
+							classes_path=classes_path,
+							size=(15, 15),
+							title="Test set Classification Report",
+							save_path=output / fname,
+							disp=disp,
+						)
 
-    # save result_dict
-    if res_output:
-        with open(res_output, "w") as f:
-            json.dump(result_dict, f, indent=2)
+	# save result_dict
+	if res_output:
+		with open(res_output, "w") as f:
+			json.dump(result_dict, f, indent=2)
 
-    if err_output and problem_runs:
-        with open(err_output, "w") as f:
-            json.dump(problem_runs, f, indent=2)
+	if err_output and problem_runs:
+		with open(err_output, "w") as f:
+			json.dump(problem_runs, f, indent=2)
 
-    return result_dict, problem_runs
+	return result_dict, problem_runs
 
 
 def _is_done(dir_path: str | Path) -> bool:
-    """Check if a directory has been tested (if it has a json result file)"""
-    folder = Path(dir_path)
-    for p in folder.iterdir():
-        if p.name.endswith(".json") and ("checkpoint" in p.name or "best" in p.name):
-            return True
-    return False
+	"""Check if a directory has been tested (if it has a json result file)"""
+	folder = Path(dir_path)
+	for p in folder.iterdir():
+		if p.name.endswith(".json") and ("checkpoint" in p.name or "best" in p.name):
+			return True
+	return False
 
 def summarise(
-    results_dict: dict[
-        str, dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]]]
-    ],
-    splits: Optional[list[str]] = None,
-    model_exps: Optional[list[list[tuple[str, str]]]] = None,
-    to_summarise: Optional[dict[str, dict[str, list[str]]]] = None,
-    metric: str = "top_k_average_per_class_acc",
+	results_dict: dict[
+		str, dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]]]
+	],
+	splits: Optional[list[str]] = None,
+	model_exps: Optional[list[list[tuple[str, str]]]] = None,
+	to_summarise: Optional[dict[str, dict[str, list[str]]]] = None,
+	metric: str = "top_k_average_per_class_acc",
 ) -> dict[str, dict[str, dict[str, str] | dict[str, float]]]:
-    # starting very oppinionated
-    """Summarise results over multiple splits, architectures and experiments.
+	# starting very oppinionated
+	"""Summarise results over multiple splits, architectures and experiments.
 
-    Takes the best.pth weights from the test set, only one metric and experiment per architecture per split.
+	Takes the best.pth weights from the test set, only one metric and experiment per architecture per split.
 
 	Args:
 									results_dict: 	results from test_all
@@ -805,7 +805,7 @@ def summarise(
 
 
 def _unpack_to_summarise(
-    to_summarise: dict[str, dict[str, list[str]]],
+	to_summarise: dict[str, dict[str, list[str]]],
 ) -> tuple[list[str], list[list[tuple[str, str]]]]:
 	"""Unpack to_summarise dictionary into splits and model_exps lists.
 	Args:
@@ -829,9 +829,9 @@ def _unpack_to_summarise(
 
 
 def _sum_split(
-    split_dict: dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]]],
-    model_exps: list[tuple[str, str]],
-    metric: str,
+	split_dict: dict[str, dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]]],
+	model_exps: list[tuple[str, str]],
+	metric: str,
 ) -> dict[str, dict[str, str] | dict[str, float]]:
 	"""Summarise results for a given split over multiple architectures and experiments.
 	Args:
@@ -841,28 +841,28 @@ def _sum_split(
 	Returns:
 									dict: 		summarised results for the given split"""
 
-    results = {}
-    for arch, exp in model_exps:
-        results[arch] = {
-            "exp": exp,
-        }
-        if arch not in split_dict:
-            raise ValueError(f"{arch} not in split_dict")
-        arch_dict = split_dict[arch]
-        if exp not in arch_dict:
-            raise ValueError(f"{exp} not in split_dict[{arch}]")
-        try:
-            res = _sum_model(arch_dict, exp, metric)
-        except KeyError as e:
-            raise KeyError(f"{arch} {exp} does not have metric {metric}") from e
-        results[arch][metric] = res
-    return results
+	results = {}
+	for arch, exp in model_exps:
+		results[arch] = {
+			"exp": exp,
+		}
+		if arch not in split_dict:
+			raise ValueError(f"{arch} not in split_dict")
+		arch_dict = split_dict[arch]
+		if exp not in arch_dict:
+			raise ValueError(f"{exp} not in split_dict[{arch}]")
+		try:
+			res = _sum_model(arch_dict, exp, metric)
+		except KeyError as e:
+			raise KeyError(f"{arch} {exp} does not have metric {metric}") from e
+		results[arch][metric] = res
+	return results
 
 
 def _sum_model(
-    arch_dict: dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]],
-    exp: str,
-    metric: str,
+	arch_dict: dict[str, dict[str, dict[str, dict[str, dict[str, float]]]]],
+	exp: str,
+	metric: str,
 ) -> dict[str, float]:
 	"""Summarise results for a given architecture over multiple experiments.
 	Args:
@@ -872,7 +872,7 @@ def _sum_model(
 	Returns:
 																																	dict: 		summarised results for the given architecture and experiment"""
 
-    return arch_dict[exp]["best"]["test set"][metric]
+	return arch_dict[exp]["best"]["test set"][metric]
 
 
 
