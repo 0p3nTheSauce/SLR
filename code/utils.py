@@ -1,3 +1,4 @@
+from typing import List
 import torch
 import cv2
 import numpy as np
@@ -7,10 +8,81 @@ import re
 from pathlib import Path
 import shutil
 from argparse import ArgumentParser
-
-
+import wandb
+import random
 
 from typing import Callable, Optional
+
+
+#############  Seed ###################
+
+def set_seed(seed=42):
+	torch.manual_seed(seed)
+	torch.cuda.manual_seed_all(seed)
+	np.random.seed(seed)
+	random.seed(seed)
+	torch.backends.cudnn.deterministic = True
+	torch.backends.cudnn.benchmark = False
+
+
+############## wandb ##################
+
+class wandb_manager:
+	@classmethod
+	def get_run_id(
+		cls, run_name, entity: str, project: str, idx: Optional[int] = None
+	) -> Optional[str]:
+		api = wandb.Api()
+
+		runs = api.runs(f"{entity}/{project}")
+		ids = []
+		for run in runs:
+			if run.name == run_name:
+				ids.append(run.id)
+
+		if len(ids) == 0:
+			print(f"No runs found with name: {run_name}")
+			return None
+		elif len(ids) > 1:
+			print(f"Multiple runs found with name: {run_name}")
+			if isinstance(idx, int) and abs(idx) < len(runs):
+				print(f"Returning id for idx: {idx}")
+				return ids[idx]
+			else:
+				print("No idx supplied, returning None")
+				return None
+		else:
+			return ids[0]
+
+	@classmethod
+	def list_runs(
+		cls,
+		entity: str,
+		project: str,
+		disp: bool = False,
+	) -> list[str]:
+		api = wandb.Api()
+		runs = api.runs(f"{entity}/{project}")
+
+		if disp:
+			for run in runs:
+				print(f"Run ID: {run.id}")
+				print(f"Run name: {run.name}")
+				print(f"State: {run.state}")
+				print(f"Created: {run.created_at}")
+				print("---")
+
+		return runs
+
+	@classmethod
+	def run_present(cls, run_id: str, runs: List) -> bool:
+		return any([run.id == run_id for run in runs])
+
+	@classmethod
+	def validate_runId(cls, run_id: str, entity: str, project: str) -> bool:
+		return cls.run_present(run_id, cls.list_runs(entity, project))
+
+
 
 
 ############### Input ##################
