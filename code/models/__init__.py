@@ -9,8 +9,8 @@ from .pytorch_s3d import S3D_basic
 
 def get_model(model_name: str,
 	num_classes: int, 
-	drop_p: Optional[float] = None
-	) -> Optional[torch.nn.Module]:
+	drop_p: float
+	) -> torch.nn.Module:
 	"""Get model by name.
 
 	Args:
@@ -33,9 +33,8 @@ def get_model(model_name: str,
 	}
    
 	if model_name not in model_constructors:
-		print(f"Model {model_name} not recognized. Available models: {list(model_constructors.keys())}")
-		return None
-   
+		raise ValueError(f"Model {model_name} not recognized. Available models: {list(model_constructors.keys())}")
+		
 	return model_constructors[model_name](num_classes=num_classes, drop_p=drop_p)
 
 def avail_models() -> list[str]:

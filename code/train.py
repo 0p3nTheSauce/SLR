@@ -123,13 +123,10 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 	try:
 		drop_p = config.model_params['drop_p']
 	except Exception as _:
-		drop_p = None
+		drop_p = 0.0
  
 	model = get_model(model_name, num_classes, drop_p)
-	
-	if model is None:
-		raise ValueError(f"Model name {model_name} not recognized for model creation")
-	
+
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	model.to(device)
 	

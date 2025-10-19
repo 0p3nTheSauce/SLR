@@ -253,7 +253,7 @@ def test_topk_clsrep(model: torch.nn.Module,
 	return topk_res, cls_report
 	
 def _get_test_loader(perm: Optional[torch.Tensor],
-					  model_info: Dict,
+					  model_norms: Dict,
 					frame_size: int,
 					num_frames: int,
 					root: Path,
@@ -268,7 +268,7 @@ def _get_test_loader(perm: Optional[torch.Tensor],
 		[
 			maybe_shuffle_t,
 			v2.Lambda(lambda x: x.float() / 255.0),
-			v2.Normalize(mean=model_info["mean"], std=model_info["std"]),
+			v2.Normalize(mean=model_norms["mean"], std=model_norms["std"]),
 			v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
 		]
 	)
@@ -301,19 +301,22 @@ def _get_test_loader(perm: Optional[torch.Tensor],
 def test_run(
 	config: Dict,
 	perm: Optional[torch.Tensor] = None,
-	model: Optional[torch.nn.Module] = None,
-	test_loader: Optional[DataLoader[VideoDataset]] = None,
-	val_loader: Optional[DataLoader[VideoDataset]] = None,
 	test_val: bool = False,
+	check: str = 'best.pth',
 	plot:bool = False,
 	disp:bool = False,
 	seed: int = 42,
-	):
+	) -> Optional[Dict]:
 	utils.set_seed(seed)	
 
 	main_conf = config['config']
 	admin = main_conf['admin']
-	model_info = config['model_info']
+	model_name = config['model_info']
+	model_norms = norm_vals(model_name)
+	if model_norms is None:
+		print(f"Model {model_name} not recognized for normalization values")
+		return None
+ 
 	data = main_conf['data']
 
 	results = {}
@@ -324,7 +327,7 @@ def test_run(
 
 	tloaders = {
 		"test": _get_test_loader(perm,
-							model_info, 
+							model_norms, 
 							data['frame_size'],
 							data['num_frames'],
 							Path(admin['root']),
@@ -335,7 +338,7 @@ def test_run(
 
 	if test_val:
 		tloaders['val'] = _get_test_loader(perm,
-							model_info, 
+							model_norms, 
 							data['frame_size'],
 							data['num_frames'],
 							Path(admin['root']),
@@ -346,6 +349,39 @@ def test_run(
 	test_loader = tloaders['test']
 	assert isinstance(test_loader.dataset, VideoDataset), "This function uses a custom dataset"
 	num_classes = len(set(test_loader.dataset.classes))
+
+	model = get_model(model_name, num_classes,drop_p=0.0)
+ 
+	check_path = save_path / check
+ 
+	print(f"Loading weights from: {check_path}")
+ 
+	checkpoint = torch.load(check_path)
+ 
+	if check_path.name == "best.pth":
+		model.load_state_dict(checkpoint)
+	else:
+		model.load_state_dict(checkpoint["model_state_dict"])
+  
+	if perm is not None:
+		suffix = "-top-k_shuffled.json"
+	else:
+		suffix = "-top-k.json"
+  
+	for set_name, tloader in tloaders.items():
+		print(f"Testing on {set_name} set")
+		fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
+		topk_res, cls_report = test_topk_clsrep(
+			model=model,
+			test_loader=tloader,
+			seed=seed,
+			verbose=False,
+			save_path=output / fname
+		)
+		results[set_name] = {
+			'top-k': topk_res,
+			'classification_report': cls_report
+		}
 
 
 
@@ -637,11 +673,8 @@ def test_all(
 
 				# setup model
 
-				model = get_model(arch, num_classes)
-				if model is None:
-					print(f"Model {arch} not recognized for model creation")
-					problem_runs.append(f"{split}/{arch}_exp{exp_no}")
-					continue
+				model = get_model(arch, num_classes, drop_p=0.0)
+			
 
 				if test_last:  # some of these may have valid best.pth, others not
 					checkpoint_paths = [
