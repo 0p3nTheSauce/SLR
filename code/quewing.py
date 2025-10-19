@@ -1026,7 +1026,7 @@ class queShell(cmdLib.Cmd):
 
 		try:
 			maybe_args = configs.take_args(
-				self.que.imp_splits, list(self.que.imp_models.keys()), args
+				self.que.imp_splits, args
 			)
 		except (SystemExit, ValueError) as _:
 			print("Create cancelled (incorrect arguments)")

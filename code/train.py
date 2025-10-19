@@ -18,16 +18,13 @@ from models.pytorch_s3d import S3D_basic
 from stopping import EarlyStopper
 # from code.experiments.scripts.quewing import get_run_id
 from utils import wandb_manager, set_seed
-from typing import Optional, List
+from typing import Optional
 
 
 ENTITY= 'ljgoodall2001-rhodes-university'
 # PROJECT = 'WLASL - SLR'
 PROJECT = 'WLASL-100'
 PROJECT_BASE = 'WLASL'
-
-
-
 
 def setup_data(mean, std, config):
 	
@@ -108,7 +105,7 @@ def get_model(model_idx:int, num_classes:int, drop_p:Optional[float]=None):
 	return model	
  
  
-def train_loop(model_info, wandb_run, load=None, save_every=5,
+def train_loop(model_name, wandb_run, load=None, save_every=5,
 								 recover=False, seed=None):
 	
 	if seed is not None:
@@ -391,7 +388,7 @@ def main():
 	available_splits = info['splits']
 	model_info = info['models']
 	
-	maybe_args = take_args(available_splits, model_info.keys())
+	maybe_args = take_args(splits_available=available_splits)
 	if isinstance(maybe_args, tuple):
 		arg_dict, tags, project, entity = maybe_args
 	else:
