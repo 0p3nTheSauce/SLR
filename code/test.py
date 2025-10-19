@@ -7,23 +7,17 @@ from torchvision.transforms import v2
 from video_transforms import Shuffle
 from video_dataset import VideoDataset
 from torch.utils.data import DataLoader
-
-# from models.pytorch_r3d import Resnet3D18_basic
-# from configs import Config
 import tqdm
-
 from train import get_model
 from pathlib import Path
 import configs
 import utils
 import gc
-
 from argparse import ArgumentParser
 from utils import ask_nicely
-
 #locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
-
+from models import norm_vals
 #################################### Utilities #################################
 
 
@@ -570,8 +564,14 @@ def test_all(
 
 				# setup data
 
-				model_info = imp_info["models"][arch]
-				utils.print_dict(model_info)
+				# model_info = imp_info["models"][arch]
+				model_norms = norm_vals(arch)
+    
+				if model_norms is None:
+					print(f"Model {arch} not recognized for normalization values")
+					problem_runs.append(f"{split}/{arch}_exp{exp_no}")
+					continue	
+				# utils.print_dict(model_info)
 
 				if shuffle:
 					permutation = Shuffle.create_permutation(
@@ -585,7 +585,7 @@ def test_all(
 					[
 						maybe_shuffle_t,
 						v2.Lambda(lambda x: x.float() / 255.0),
-						v2.Normalize(mean=model_info["mean"], std=model_info["std"]),
+						v2.Normalize(mean=model_norms["mean"], std=model_norms["std"]),
 						v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
 					]
 				)
@@ -637,7 +637,11 @@ def test_all(
 
 				# setup model
 
-				model = get_model(model_info["idx"], num_classes)
+				model = get_model(arch, num_classes)
+				if model is None:
+					print(f"Model {arch} not recognized for model creation")
+					problem_runs.append(f"{split}/{arch}_exp{exp_no}")
+					continue
 
 				if test_last:  # some of these may have valid best.pth, others not
 					checkpoint_paths = [
