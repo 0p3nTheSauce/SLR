@@ -4,8 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from typing import Dict, Optional, Callable, List
-
+from typing import Dict, Optional, Callable, List, Union
+from pathlib import Path
 # Set style for better-looking plots
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
@@ -15,17 +15,39 @@ def load_results(filepath: str) -> Dict:
 	with open(filepath, 'r') as f:
 		return json.load(f)
 
-
-
 def plot_heatmap(
-    report,
-    classes_path,
-    title="Classification Report Heatmap",
-    save_path=None,
-    disp=True,
-):
+    report: Dict[str, Dict[str, float]],
+    classes_path: Union[str, Path],
+    title: str = "Classification Report Heatmap",
+    save_path: Optional[Union[str, Path]] = None,
+    disp: bool = True,
+) -> None:
+    """Plot a heatmap visualization of a classification report.
+    
+    Creates a seaborn heatmap showing precision, recall, and F1-score metrics
+    for each class in the classification report.
+    
+    Args:
+        report (Dict[str, Dict[str, float]]): Classification report dictionary,
+            typically from sklearn.metrics.classification_report with output_dict=True.
+        classes_path (Union[str, Path]): Path to JSON file containing list of class names.
+        title (str, optional): Title for the heatmap plot. 
+            Defaults to "Classification Report Heatmap".
+        save_path (Optional[Union[str, Path]], optional): Path to save the figure.
+            If None, figure is not saved. Defaults to None.
+        disp (bool, optional): Whether to display the plot with plt.show(). 
+            Defaults to True.
+    
+    Returns:
+        None
+    
+    Example:
+        >>> from sklearn.metrics import classification_report
+        >>> report = classification_report(y_true, y_pred, output_dict=True)
+        >>> plot_heatmap(report, "classes.json", save_path="heatmap.png")
+    """
     with open(classes_path, "r") as f:
-        test_classes = json.load(f)
+        test_classes: List[str] = json.load(f)
 
     df = pd.DataFrame(report).iloc[:-1, :].T
     num_classes_to_plot = min(len(df) - 2, len(test_classes))
@@ -42,60 +64,43 @@ def plot_heatmap(
     plt.title(title)
     plt.tight_layout()
     if save_path:
-        plt.savefig(
-            save_path,
-        )
+        plt.savefig(save_path)
     if disp:
         plt.show()
 
-def plot_bar_graph_reports_metric(reports, classes_path, metric, names):
-    with open(classes_path, "r") as f:
-        test_classes = json.load(f)
-    classes = list(reports[0].keys())[
-        :-3
-    ]  # Exclude 'accuracy', 'macro avg', 'weighted avg'
-
-    num_reports = len(reports)
-    assert num_reports == len(names)  # it may be better to extract names from reports
-
-    # Create bar plot
-    x = np.arange(len(classes))
-    width = 0.8 / num_reports  # 0.8 gives good spacing, adjust as needed
-
-    fig, ax = plt.subplots(figsize=(10, 18))
-    for i, report in enumerate(reports):
-        metric_list = [report[cls][metric] for cls in classes]
-        offset = (i - (num_reports - 1) / 2) * width  # Center the bars
-        ax.barh(x + offset, metric_list, height=width, label=f"{names[i]}", alpha=0.8)
-
-    ax.set_ylabel("Classes")
-    ax.set_xlabel(f"{metric} scores")
-    ax.set_title(f"{metric}")
-
-    class_labels = [
-        test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}"
-        for cls in classes
-    ]
-    ax.set_yticks(x)  # This is the key missing line!
-    ax.set_yticklabels(class_labels)
-
-    ax.legend()
-    ax.set_xlim(0, 1.1)
-
-    plt.tight_layout()
-    plt.show()
-
-
-
 def plot_bar_graph(
-    report,
-    classes_path,
-    title="Classification Report - Per Class Metrics",
-    save_path=None,
-    disp=True,
-):
+    report: Dict[str, Dict[str, float]],
+    classes_path: Union[str, Path],
+    title: str = "Classification Report - Per Class Metrics",
+    save_path: Optional[Union[str, Path]] = None,
+    disp: bool = True,
+) -> None:
+    """Plot a horizontal bar graph of classification metrics per class.
+    
+    Creates a bar plot showing precision, recall, and F1-score for each class
+    as horizontal bars with different colors.
+    
+    Args:
+        report (Dict[str, Dict[str, float]]): Classification report dictionary,
+            typically from sklearn.metrics.classification_report with output_dict=True.
+        classes_path (Union[str, Path]): Path to JSON file containing list of class names.
+        title (str, optional): Title for the bar graph. 
+            Defaults to "Classification Report - Per Class Metrics".
+        save_path (Optional[Union[str, Path]], optional): Path to save the figure.
+            If None, figure is not saved. Defaults to None.
+        disp (bool, optional): Whether to display the plot with plt.show(). 
+            Defaults to True.
+    
+    Returns:
+        None
+    
+    Example:
+        >>> from sklearn.metrics import classification_report
+        >>> report = classification_report(y_true, y_pred, output_dict=True)
+        >>> plot_bar_graph(report, "classes.json", save_path="bar_graph.png")
+    """
     with open(classes_path, "r") as f:
-        test_classes = json.load(f)
+        test_classes: List[str] = json.load(f)
 
     classes = list(report.keys())[
         :-3
@@ -121,7 +126,6 @@ def plot_bar_graph(
     ax.set_yticks(x)
 
     # Fix: Only use as many class names as we have classes in the report
-
     class_labels = [
         test_classes[int(cls)] if int(cls) < len(test_classes) else f"Class_{cls}"
         for cls in classes
@@ -137,63 +141,61 @@ def plot_bar_graph(
     if disp:
         plt.show()
 
-def plot_heatmap_reports_metric(reports, classes_path, metric, names):
-    with open(classes_path, "r") as f:
-        test_classes = json.load(f)
-
-    assert len(reports) == len(names)
-
-    classes = list(reports[0].keys())[:-3]
-    metric_scores = [[report[cls][metric] for cls in classes] for report in reports]
-
-    df = pd.DataFrame(metric_scores, index=names, columns=classes)
-    df = df.T
-
-    num_to_plot = min(len(classes), len(test_classes))
-
-    plt.figure(figsize=(10, 10))
-    sns.heatmap(
-        df.iloc[:num_to_plot, :],
-        annot=True,
-        cmap="Blues",
-        fmt=".2f",
-        xticklabels=names,
-        yticklabels=[test_classes[i] for i in range(num_to_plot)],
-    )
-    plt.title(f"Classification Report Heatmap - {metric.title()}")
-    plt.tight_layout()
-    plt.show()
-
 
 def plot_confusion_matrix(
-    y_true,
-    y_pred,
-    classes_path=None,
-    num_classes=100,
-    title="Confusion Matrix",
-    size=(10, 8),
-    row_perc=True,
-    save_path=None,
-    disp=True,
-):
+    y_true: Union[np.ndarray, List[int]],
+    y_pred: Union[np.ndarray, List[int]],
+    classes_path: Optional[Union[str, Path]] = None,
+    num_classes: int = 100,
+    title: str = "Confusion Matrix",
+    size: tuple[int, int] = (10, 8),
+    row_perc: bool = True,
+    save_path: Optional[Union[str, Path]] = None,
+    disp: bool = True,
+) -> None:
+    """Plot confusion matrix from true and predicted labels.
+    
+    Creates a heatmap visualization of the confusion matrix, optionally normalized
+    by row (true class) to show percentage distributions.
+    
+    Args:
+        y_true (Union[np.ndarray, List[int]]): Array-like of true labels.
+        y_pred (Union[np.ndarray, List[int]]): Array-like of predicted labels.
+        classes_path (Optional[Union[str, Path]], optional): Path to JSON file 
+            containing list of class names. If None, numeric labels are used. 
+            Defaults to None.
+        num_classes (int, optional): Number of classes to display in the matrix. 
+            Defaults to 100.
+        title (str, optional): Title for the confusion matrix plot. 
+            Defaults to "Confusion Matrix".
+        size (tuple[int, int], optional): Figure size as (width, height) in inches. 
+            Defaults to (10, 8).
+        row_perc (bool, optional): If True, normalize each row to show percentages. 
+            Defaults to True.
+        save_path (Optional[Union[str, Path]], optional): Path to save the figure.
+            If None, figure is not saved. Defaults to None.
+        disp (bool, optional): Whether to display the plot with plt.show(). 
+            Defaults to True.
+    
+    Returns:
+        None
+    
+    Example:
+        >>> plot_confusion_matrix(
+        ...     y_true, y_pred, 
+        ...     classes_path="classes.json",
+        ...     num_classes=50,
+        ...     save_path="confusion_matrix.png"
+        ... )
     """
-    Plot confusion matrix from true and predicted labels
-
-    Parameters:
-    y_true: array-like, true labels
-    y_pred: array-like, predicted labels
-    classes_path: str, path to JSON file with class names (optional)
-    title: str, plot title
-    """
-
     # Create confusion matrix
     cm = confusion_matrix(y_true, y_pred)
 
     # Load class names if provided
-    class_names = None
+    class_names: Optional[List[str]] = None
     if classes_path is not None and num_classes:
         with open(classes_path, "r") as f:
-            test_classes = json.load(f)
+            test_classes: List[str] = json.load(f)
 
         class_names = test_classes[:num_classes]
 
