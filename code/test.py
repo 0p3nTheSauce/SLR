@@ -150,8 +150,20 @@ def test_topk_clsrep(model: torch.nn.Module,
 					 seed: Optional[int]=None,
 					 verbose: bool =False,
 					 save_path: Optional[Union[str, Path]]=None) -> Tuple[Dict, Dict]:
+	"""Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
+
+	Args:
+		model (torch.nn.Module): Initialised model to test.
+		test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
+		seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
+		verbose (bool, optional): Verbose output. Defaults to False.
+		save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
+
+	Returns:
+		Tuple[Dict, Dict]: Dictionary of top-k accuracies and classification report dictionary.
+	"""
 	if seed is not None:
-		utils.set_seed(0)
+		utils.set_seed(seed)
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model.to(device)
@@ -308,6 +320,7 @@ def test_run(
 	plot:bool = False,
 	disp:bool = False,
 	seed: int = 42,
+	classes_path: str = './info/wlasl_class_list.json'
 	) -> Optional[Dict]:
 	utils.set_seed(seed)	
 
@@ -389,7 +402,7 @@ def test_run(
 			fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
 			plot_heatmap(
 				report=cls_report,
-				classes_path=Path(admin['classes_path']),
+				classes_path=classes_path,
 				title=f"{set_name.capitalize()} set Classification Report",
 				save_path=output / fname,
 				disp=disp,
@@ -398,7 +411,7 @@ def test_run(
 			fname = check_path.name.replace(".pth", f"_{set_name}-bargraph.png")
 			plot_bar_graph(
 				report=cls_report,
-				classes_path=Path(admin['classes_path']),
+				classes_path=classes_path,
 				title=f"{set_name.capitalize()} set Classification Report",
 				save_path=output / fname,
 				disp=disp,
@@ -408,7 +421,7 @@ def test_run(
 			plot_confusion_matrix(
 				y_true=tloader.dataset.classes,
 				y_pred=[],
-				classes_path=Path(admin['classes_path']),
+				classes_path=classes_path,
 				title=f"{set_name.capitalize()} set Confusion Matrix",
 				save_path=output / fname,
 				disp=disp,
