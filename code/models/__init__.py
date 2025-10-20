@@ -16,10 +16,13 @@ def get_model(model_name: str,
 	Args:
 		model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'
 		num_classes (int): Number of output classes.
-		drop_p (Optional[float], optional): Dropout in final classification layer. Defaults to None.
+		drop_p (float): Dropout in final classification layer.
+
+	Raises:
+		ValueError: If model_name is not recognized.
 
 	Returns:
-		Optional[torch.nn.Module]: Model instance or None if model_name not recognized.
+		torch.nn.Module: Model instance
 	"""
 	model_constructors = {
 			'S3D': S3D_basic,
@@ -54,13 +57,26 @@ def avail_models() -> list[str]:
 		'MViT_v1B',
 	]
 
-def norm_vals(model_name: str) -> Optional[Dict[str, tuple[float, float, float]]]:
+def norm_vals(model_name: str) -> Dict[str, tuple[float, float, float]]:
 	"""Get normalization values for a given model.
+
 	Args:
-		model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'	
+		model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'
+
+	Raises:
+		ValueError: If model_name is not recognized.
+
 	Returns:
-		Optional[Dict[str, tuple[float, float, float]]]: Dictionary with 'mean' and 'std' keys or None if model_name not recognized.
-	"""	
+		Dict[str, tuple[float, float, float]]: Dictionary with 'mean' and 'std' keys.
+	"""
+
+# """Get normalization values for a given model.
+	# Args:
+	# 	model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'	
+	# Returns:
+	# 	Dict[str, tuple[float, float, float]]: Dictionary with 'mean' and 'std' keys.
+	# """	
+	
 
 	norm_dict = {
 		'S3D': {
@@ -96,6 +112,10 @@ def norm_vals(model_name: str) -> Optional[Dict[str, tuple[float, float, float]]
 			'std': (0.225, 0.225, 0.225)
 		},
 	}
+
+	if model_name not in norm_dict:
+		raise ValueError(f"Model {model_name} not recognized. Available models: {list(norm_dict.keys())}")
+
 	return norm_dict.get(model_name, None)
 	
 
