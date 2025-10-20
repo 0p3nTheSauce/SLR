@@ -1,4 +1,5 @@
-from typing import Optional, Union, Tuple, Dict, Literal
+from typing import Optional, Union, Tuple, Dict, Literal, List
+
 import torch
 import json
 from sklearn.metrics import accuracy_score, classification_report
@@ -156,7 +157,7 @@ def test_topk_clsrep(
     seed: Optional[int] = None,
     verbose: bool = False,
     save_path: Optional[Union[str, Path]] = None,
-) -> Tuple[Dict, Dict]:
+) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]:
     """Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
     Args:
@@ -167,7 +168,7 @@ def test_topk_clsrep(
             save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
 
     Returns:
-            Tuple[Dict, Dict]: Dictionary of top-k accuracies and classification report dictionary.
+            Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
     """
     if seed is not None:
         utils.set_seed(seed)
@@ -273,7 +274,7 @@ def test_topk_clsrep(
         with open(save_path, "w") as f:
             json.dump(topk_res, f, indent=2)
 
-    return topk_res, cls_report
+    return topk_res, cls_report, all_targets, all_preds
 
 
 def _get_test_loader(
@@ -396,7 +397,7 @@ def test_run(
     for set_name, tloader in tloaders.items():
         print(f"Testing on {set_name} set")
         fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
-        topk_res, cls_report = test_topk_clsrep(
+        topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
             model=model,
             test_loader=tloader,
             seed=seed,
@@ -430,8 +431,8 @@ def test_run(
                 "This function uses a custom dataset"
             )
             plot_confusion_matrix(
-                y_true=tloader.dataset.classes,
-                y_pred=[],
+                y_true=all_targets,
+                y_pred=all_preds,
                 classes_path=classes_path,
                 title=f"{set_name.capitalize()} set Confusion Matrix",
                 save_path=output / fname,
