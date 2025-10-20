@@ -400,17 +400,6 @@ def merge_seen_ex():
 	d4 = {}
 	print_dict(merge_seen(d3, d4))
 
-def test_use_rudid():
-	from experiments.scripts.quewing import wait_for_run_completion
-	run_id = input("Enter run ID: ")
-	info = wait_for_run_completion(
-		entity = 'ljgoodall2001-rhodes-university',
-		project = 'WLASL-100',
-		check_interval = 5,
-	 verbose=True,
-	 run_id=run_id,
-	 max_retries=5
-	)
 	
 def frame_shuffling():
 	import torch
