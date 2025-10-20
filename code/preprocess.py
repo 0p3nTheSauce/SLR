@@ -1,19 +1,25 @@
+from typing import List
 import json
-
-# import os
 import torch
 import tqdm
 from ultralytics import YOLO  # type: ignore (have a feeling this will bork the system)
-
-# from torchcodec.decoders import VideoDecoder #this thing causes too many problems
 import cv2
-
 from argparse import ArgumentParser
 from pathlib import Path
 
 # local imports
 from utils import load_rgb_frames_from_video
 
+#constants
+OUTPUT_DIR = "preprocessed/labels"
+SPLIT_DIR = "splits"
+
+
+def get_avail_splits(pre_proc_dir: str = OUTPUT_DIR) -> List[str]:
+    ppd = Path(pre_proc_dir)
+    if not ppd.exists() or not ppd.is_dir():
+        raise ValueError(f"Invalied preprocessed directory: {pre_proc_dir}, must exist and be directory")
+    return list(str(ppd.iterdir()))
 
 def correct_bbox(bbox, frame_shape):
     # bbox is a list of [x1, y1, x2, y2]

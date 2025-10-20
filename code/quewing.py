@@ -1158,7 +1158,7 @@ if __name__ == "__main__":
 	# 	print(e.stderr)
 	# place lock on queRuns.json
 
-	lock = FileLock(f"{RUN_PATH}.lock", timout=1)
+	lock = FileLock(f"{RUN_PATH}.lock", timeout=1)
 	try:
 		with lock:
 			print(f"Acquired lock on {RUN_PATH}")
