@@ -164,9 +164,7 @@ def train_loop(
 
 	optimizer = optim.AdamW(param_groups, eps=config.optimizer["eps"])
 
-	scheduler = optim.lr_scheduler.CosineAnnealingLR(
-		optimizer, T_max=config.scheduler["tmax"], eta_min=config.scheduler["eta_min"]
-	)
+	scheduler = get_scheduler(optimizer, config.get("scheduler", None))
 
 	loss_func = nn.CrossEntropyLoss()
 
