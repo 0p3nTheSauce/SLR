@@ -65,51 +65,8 @@ def train_loop(model_name: str, wandb_run, load=None, save_every=5,
 	config = wandb_run.config
 	
 	model_info = norm_vals(model_name)
- 
-	if model_info is None:
-		raise ValueError(f"Model name {model_name} not recognized for normalization values")
- 
-	#setup transforms
-	final_transform = v2.Compose([
-		v2.Lambda(lambda x: x.float() / 255.0),
-		v2.Normalize(mean=model_info['mean'], std=model_info['mean']),
-		v2.Lambda(lambda x: x.permute(1,0,2,3)) 
-	])
-	
-	#should actually dirst resize before cropping
-	
-	train_transforms = v2.Compose([v2.RandomCrop(config.data['frame_size']),
-																 v2.RandomHorizontalFlip(),
-																 final_transform])
-	test_transforms = v2.Compose([v2.CenterCrop(config.data['frame_size']),
-																final_transform])
-	
-	#setup data
-	label_path = Path(config.admin['labels'])
- 
-	#TODO: substitute for setup_data function
- 
-	train_instances = label_path / f'train_instances_{LABEL_SUFFIX}.json'
-	val_instances = label_path / 'val_instances_fixed_frange_bboxes_len.json'
-	train_classes = label_path / 'train_classes_fixed_frange_bboxes_len.json'
-	val_classes = label_path / 'val_classes_fixed_frange_bboxes_len.json'
-	
-	dataset = VideoDataset(config.admin['root'],train_instances, train_classes,
-		transforms=train_transforms, num_frames=config.data['num_frames'])
-	dataloader = DataLoader(dataset, batch_size=config.training['batch_size'],
-		shuffle=True, num_workers=2,pin_memory=True)
-	num_classes = len(set(dataset.classes))
-	
-	val_dataset = VideoDataset(config.admin['root'], val_instances, val_classes,
-		transforms=test_transforms, num_frames=config.data['num_frames'])
-	val_dataloader = DataLoader(val_dataset,
-		batch_size=config.training['batch_size'], shuffle=True, num_workers=2,pin_memory=False)
-	val_classes = len(set(val_dataset.classes))
-	assert num_classes == val_classes
-	
-	dataloaders = {'train': dataloader, 'val': val_dataloader}
-	
-	#model, metrics, optimizer, schedular, loss
+
+	dataloaders, num_classes = setup_data(model_info['mean'], model_info['std'], config)
 
 	try:
 		drop_p = config.model_params['drop_p']

@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Tuple
 import torch
 #locals
 from .pytorch_mvit import MViTv2S_basic, MViTv1B_basic
@@ -31,8 +31,8 @@ def get_model(model_name: str,
 			'Swin3D_T': Swin3DTiny_basic,		
 			'Swin3D_S': Swin3DSmall_basic,	
 			'Swin3D_B': Swin3DBig_basic,
-			'MViT_v2S': MViTv2S_basic,
-			'MViT_v1B': MViTv1B_basic,
+			'MViTv2_S': MViTv2S_basic,
+			'MViTv1_B': MViTv1B_basic,
 	}
    
 	if model_name not in model_constructors:
@@ -53,30 +53,25 @@ def avail_models() -> list[str]:
 		'Swin3D_T',
 		'Swin3D_S',
 		'Swin3D_B',
-		'MViT_v2S',
-		'MViT_v1B',
+		'MViTv2_S',
+		'MViTv1_B',
 	]
 
-def norm_vals(model_name: str) -> Dict[str, tuple[float, float, float]]:
-	"""Get normalization values for a given model.
+def norm_vals(model_name: str) -> Dict[str, Tuple[float, float, float]]:
+	"""Get normalization values (mean and std) for a given model.
 
 	Args:
-		model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'
+		model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViTv2_S', 'MViTv1_B'
 
 	Raises:
 		ValueError: If model_name is not recognized.
 
 	Returns:
-		Dict[str, tuple[float, float, float]]: Dictionary with 'mean' and 'std' keys.
+		Dict: Dictionary containing:
+        - 'mean': Tuple of three floats
+        - 'std': Tuple of three floats
 	"""
 
-# """Get normalization values for a given model.
-	# Args:
-	# 	model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'	
-	# Returns:
-	# 	Dict[str, tuple[float, float, float]]: Dictionary with 'mean' and 'std' keys.
-	# """	
-	
 
 	norm_dict = {
 		'S3D': {
@@ -103,11 +98,11 @@ def norm_vals(model_name: str) -> Dict[str, tuple[float, float, float]]:
 			'mean': (0.485, 0.456, 0.406),
 			'std': (0.229, 0.224, 0.225)
 		},
-		'MViT_v2S': {
+		'MViTv2_S': {
 			'mean': (0.45, 0.45, 0.45),
 			'std': (0.225, 0.225, 0.225)
 		},
-		'MViT_v1B': {
+		'MViTv1_B': {
 			'mean': (0.45, 0.45, 0.45),
 			'std': (0.225, 0.225, 0.225)
 		},
