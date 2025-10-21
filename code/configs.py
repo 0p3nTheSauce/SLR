@@ -5,13 +5,13 @@ from typing import Dict, Any, List, Optional
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
-#locals
-from models import avail_models
 
+# locals
+from models import avail_models
 
 # TODO: make configs the sole source of these constants
 
-#constants 
+# constants
 # - wandb
 ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT = "WLASL-100"
@@ -30,10 +30,13 @@ RUNS_PATH = "./runs"
 def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
     ppd = Path(pre_proc_dir)
     if not ppd.exists() or not ppd.is_dir():
-        raise ValueError(f"Invalied preprocessed directory: {pre_proc_dir}, must exist and be directory")
+        raise ValueError(
+            f"Invalied preprocessed directory: {pre_proc_dir}, must exist and be directory"
+        )
     return list(map(lambda x: x.name, ppd.iterdir()))
 
-def load_config(arg_dict: Dict, verbose: bool=False) -> Dict:
+
+def load_config(arg_dict: Dict, verbose: bool = False) -> Dict:
     """Load config from flat file and merge with command line args"""
     conf_path = Path(arg_dict["config_path"])
     if not conf_path.exists():
@@ -134,12 +137,11 @@ def print_config(config_dict):
 
 
 def take_args(
-
     sup_args: Optional[List[str]] = None,
     return_parser_only: bool = False,
     make_dirs: bool = False,
     prog: Optional[str] = None,
-    desc: str = "Train a model"
+    desc: str = "Train a model",
 ) -> Optional[tuple | argparse.ArgumentParser]:
     """Retrieve arguments for new trainign run
 
@@ -153,19 +155,27 @@ def take_args(
         desc (str, optional): What does the script do? Defaults to "Train a model".
 
     Raises:
-        ValueError: If model or split supplied are not available 
+        ValueError: If model or split supplied are not available
 
     Returns:
         Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if  successful.
     """
     models_available = avail_models()
     splits_available = get_avail_splits()
-    
+
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
     # admin
+    parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument(
-        "-ex", "--exp_no", type=int, help="Experiment number (e.g. 10)", required=True
+        "model_name",
+        type=str,
+        help=f"Model name from one of the implemented models: {models_available}",
+    )
+    parser.add_argument(
+        "split",
+        type=str,
+        help=f"The class split, one of:  {', '.join(splits_available)}",
     )
     parser.add_argument(
         "-r", "--recover", action="store_true", help="Recover from last checkpoint"
@@ -178,21 +188,16 @@ def take_args(
         help="The run id to use (especially when also usign recover)",
     )
     parser.add_argument(
-        "-mn",
-        "--model_name",
+        "-p",
+        "--project",
         type=str,
-        help=f"Model name from one of the implemented models: {models_available}",
-        required=True,
-    )
-    parser.add_argument(
-        "-p", "--project", type=str, default=None, help="wandb project name"
+        default=PROJECT,
+        help=f"wandb project name, if not {PROJECT}",
     )
     parser.add_argument(
         "-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}"
     )
-    parser.add_argument(
-        "-sp", "--split", type=str, help="The class split (e.g. asl100)", required=True
-    )
+
     parser.add_argument(
         "-ee",
         "--enum_exp",
@@ -205,21 +210,10 @@ def take_args(
         action="store_true",
         help="enumerate the checkpoint dir num (for output)",
     )
-    # TODO: maybe add tags for wandb as parameters
     parser.add_argument(
         "-t", "--tags", nargs="+", type=str, help="Additional wandb tags"
     )
-
-    # overides
     parser.add_argument("-c", "--config_path", help="path to config .ini file")
-    parser.add_argument("-nf", "--num_frames", type=int, help="video length")
-    parser.add_argument("-fs", "--frame_size", type=int, help="width, height")
-    parser.add_argument("-bs", "--batch_size", type=int, help="data_loader")
-    parser.add_argument(
-        "-us", "--update_per_step", type=int, help="gradient accumulation"
-    )
-    parser.add_argument("-ms", "--max_steps", type=int, help="gradient accumulation")
-    parser.add_argument("-me", "--max_epoch", type=int, help="mixumum training epoch")
 
     if return_parser_only:
         return parser
@@ -307,7 +301,7 @@ def take_args(
         if value is not None:
             clean_dict[key] = value
 
-    #NOTE: these tags are redundant
+    # NOTE: these tags are redundant
     tags = [
         args.split,
         args.model_name,
