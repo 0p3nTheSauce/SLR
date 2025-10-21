@@ -116,7 +116,7 @@ def norm_vals(model_name: str) -> Dict[str, tuple[float, float, float]]:
 	if model_name not in norm_dict:
 		raise ValueError(f"Model {model_name} not recognized. Available models: {list(norm_dict.keys())}")
 
-	return norm_dict.get(model_name, None)
+	return norm_dict[model_name]
 	
 
 __all__ = [

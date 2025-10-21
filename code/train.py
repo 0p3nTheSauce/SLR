@@ -8,17 +8,11 @@ from pathlib import Path
 #local imports
 import wandb
 from video_dataset import VideoDataset
-from configs import load_config, print_config, take_args
+from configs import load_config, print_config, take_args, ENTITY, LABEL_SUFFIX
 from stopping import EarlyStopper
 from models import get_model, norm_vals
 from utils import wandb_manager, set_seed
 
-
-
-ENTITY= 'ljgoodall2001-rhodes-university'
-# PROJECT = 'WLASL - SLR'
-PROJECT = 'WLASL-100'
-PROJECT_BASE = 'WLASL'
 
 def setup_data(mean, std, config):
 	
@@ -37,16 +31,11 @@ def setup_data(mean, std, config):
 	
  
 	label_path = Path(config.admin['labels'])
- 
-	# train_instances = os.path.join(config.admin['labels'], 'train_instances_fixed_frange_bboxes_len.json')
-	# val_instances = os.path.join(config.admin['labels'],'val_instances_fixed_frange_bboxes_len.json' )
-	# train_classes = os.path.join(config.admin['labels'], 'train_classes_fixed_frange_bboxes_len.json')
-	# val_classes = os.path.join(config.admin['labels'],'val_classes_fixed_frange_bboxes_len.json' )
 	
-	train_instances = label_path / 'train_instances_fixed_frange_bboxes_len.json'
-	val_instances = label_path / 'val_instances_fixed_frange_bboxes_len.json'
-	train_classes = label_path / 'train_classes_fixed_frange_bboxes_len.json'
-	val_classes = label_path / 'val_classes_fixed_frange_bboxes_len.json'
+	train_instances = label_path / f'train_instances_{LABEL_SUFFIX}'
+	val_instances = label_path / f'val_instances_{LABEL_SUFFIX}'
+	train_classes = label_path / f'train_classes_{LABEL_SUFFIX}'
+	val_classes = label_path / f'val_classes_{LABEL_SUFFIX}'
 
 	dataset = VideoDataset(config.admin['root'],train_instances, train_classes,
 		transforms=train_transforms, num_frames=config.data['num_frames'])
@@ -98,7 +87,9 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 	#setup data
 	label_path = Path(config.admin['labels'])
  
-	train_instances = label_path / 'train_instances_fixed_frange_bboxes_len.json'
+	#TODO: substitute for setup_data function
+ 
+	train_instances = label_path / f'train_instances_{LABEL_SUFFIX}.json'
 	val_instances = label_path / 'val_instances_fixed_frange_bboxes_len.json'
 	train_classes = label_path / 'train_classes_fixed_frange_bboxes_len.json'
 	val_classes = label_path / 'val_classes_fixed_frange_bboxes_len.json'
