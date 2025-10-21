@@ -1,16 +1,16 @@
+from typing import Optional
 import torch  # type: ignore
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import LRScheduler
 from pathlib import Path
-
-# local imports
 import wandb
-from video_dataset import VideoDataset
-from configs import load_config, print_config, take_args, ENTITY, LABEL_SUFFIX
+# local imports
 
-# import configs
+from video_dataset import VideoDataset
+from configs import load_config, print_config, take_args, LABEL_SUFFIX
 from stopping import EarlyStopper
 from models import get_model, norm_vals
 from utils import wandb_manager, set_seed
@@ -80,6 +80,19 @@ def setup_data(mean, std, config):
     dataloaders = {"train": dataloader, "val": val_dataloader}
 
     return dataloaders, num_classes
+
+
+def get_scheduler(
+    optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
+) -> LRScheduler:
+    """Get learning rate scheduler based on config."""
+    if sched_conf is None:
+        # Identity scheduler - multiplies LR by 1.0 (no change)
+        return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
+
+    return optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf.get("eta_min", 0)
+    )
 
 
 def train_loop(
@@ -353,7 +366,6 @@ def main():
             if "run_id" in config["admin"]:
                 run_id = config["admin"]["run_id"]
             else:
-                # run_id = get_run_id(run_name, ENTITY, project)
                 run_id = wandb_manager.get_run_id(
                     run_name,
                     entity,
@@ -368,22 +380,27 @@ def main():
             run = wandb.init(
                 entity=entity,
                 project=project,
-                id=run_id,
-                resume="must",
                 name=run_name,
                 tags=tags,
                 config=config,
+                id=run_id,
+                resume="must",
             )
         else:
             print(f"Starting new run with name: {run_name}")
             run = wandb.init(
-                entity=ENTITY, project=project, name=run_name, tags=tags, config=config
+                entity=entity,
+                project=project,
+                name=run_name,
+                tags=tags,
+                config=config
             )
         print(f"Run ID: {run.id}")
         print(f"Run name: {run.name}")  # Human-readable name
         print(f"Run path: {run.path}")  # entity/project/run_id format
 
         train_loop(model_name, run, recover=admin["recover"])
+        run.finish()
     else:
         print("Training cancelled")
 
