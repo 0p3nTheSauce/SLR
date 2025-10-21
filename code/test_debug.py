@@ -1,21 +1,17 @@
 from stopping import EarlyStopper
 import wandb
 import matplotlib.pyplot as plt
-# import pytest
 import random
-# @pytest.fixture
-
 from utils import print_dict
 import time
 import subprocess
 import argparse
-from pathlib import Path
-import re  
+from pathlib import Path 
 import json
 import test
-from collections import Counter, defaultdict
+from collections import Counter
 from typing import Optional
-
+from functools import partial
 
 
 def plot_simulated_training(x_range, f):
@@ -86,9 +82,9 @@ def test_early_stopping(mode='min'):
 	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None)
 	x_range = []
 	x = 0
-	f = lambda x: sim_loss(x)
+	f = partial(sim_loss)
 	if mode == 'max':
-		f = lambda x: sim_acc(x)
+		f = partial(sim_acc)
 	max_epoch = 300
 	score=0
 	while not stopper.stop and x < max_epoch:
@@ -174,9 +170,9 @@ def simulate_wandb_run(mode='min',entity='ljgoodall2001-rhodes-university',
 	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=run)
 	x_range = []
 	x = 0
-	f = lambda x: sim_loss(x)
+	f = partial(sim_loss)
 	if mode == 'max':
-		f = lambda x: sim_acc(x)
+		f = partial(sim_acc)
 	max_epoch = 300
 	score=0
 	while not stopper.stop and x < max_epoch:
@@ -407,7 +403,6 @@ def frame_shuffling():
 	# Create a 2D tensor
 	tensor = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 	# tensor = torch.rand(8, 3, 4, 4)
-	t = len(tensor)
 	# Shuffle rows
 	shuffled_indices = torch.randperm(tensor.size(0))
 	# shuffled_tensor = tensor[:, :, shuffled_indices, :, :]
@@ -420,7 +415,6 @@ def frame_shuffling():
 	print(shuffled_tensor)
 	print(tensor.shape == shuffled_tensor.shape)
  
-	og_idxs = torch.arange(tensor.size(0))
 	inv_permutation = shuffled_indices
 	print("Inverse permutation indices:")
 	print(inv_permutation)
@@ -532,15 +526,15 @@ def test_sub():
 
 
 def test_safe_index():
-	l = [1,2,3]
+	lst = [1,2,3]
 	i = random.randint(-4, 4)
-	while len(l) > 0:
-		if abs(i) < len(l):
-			print(f'{i} in range for len(l) = {len(l)}')
-			print(f'l.pop({i}) = {l.pop(i)}')
+	while len(lst) > 0:
+		if abs(i) < len(lst):
+			print(f'{i} in range for len(l) = {len(lst)}')
+			print(f'l.pop({i}) = {lst.pop(i)}')
 		else:
-			print(f'{i} out of range for len(l) = {len(l)}')
-		i = random.randint(-len(l) - 1, len(l) + 1)
+			print(f'{i} out of range for len(l) = {len(lst)}')
+		i = random.randint(-len(lst) - 1, len(lst) + 1)
 
 def test_wait_for_completion():
     from quewing import gpu_manager

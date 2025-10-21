@@ -1,4 +1,4 @@
-from typing import Optional, Dict
+from typing import Dict
 import torch
 #locals
 from .pytorch_mvit import MViTv2S_basic, MViTv1B_basic

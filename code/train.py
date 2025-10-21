@@ -1,5 +1,4 @@
 import torch # type: ignore
-import json
 from torchvision.transforms import v2
 from torch.utils.data import DataLoader
 import torch.nn as nn
@@ -8,7 +7,8 @@ from pathlib import Path
 #local imports
 import wandb
 from video_dataset import VideoDataset
-from configs import load_config, print_config, take_args, ENTITY, LABEL_SUFFIX
+from configs import load_config, print_config, take_args,  ENTITY, LABEL_SUFFIX
+# import configs
 from stopping import EarlyStopper
 from models import get_model, norm_vals
 from utils import wandb_manager, set_seed
@@ -56,7 +56,7 @@ def setup_data(mean, std, config):
 	
  
  
-def train_loop(model_name, wandb_run, load=None, save_every=5,
+def train_loop(model_name: str, wandb_run, load=None, save_every=5,
 								 recover=False, seed=None):
 	
 	if seed is not None:
@@ -307,9 +307,9 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 				# Save best model
 				if epoch_loss < best_val_score:
 					best_val_score = epoch_loss
-					model_name = save_path / 'best.pth'
-					torch.save(model.state_dict(), model_name)
-					print(f'New best model saved: {model_name} (Loss: {epoch_loss:.2f}%)')
+					check_name = save_path / 'best.pth'
+					torch.save(model.state_dict(), check_name)
+					print(f'New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)')
 			
 				# Step scheduler with validation loss
 				scheduler.step() 
@@ -339,12 +339,8 @@ def train_loop(model_name, wandb_run, load=None, save_every=5,
 
 
 def main():
-	with open('./wlasl_implemented_info.json') as f:
-		info = json.load(f)
-	available_splits = info['splits']
-	model_info = info['models']
 	
-	maybe_args = take_args(splits_available=available_splits)
+	maybe_args = take_args()
 	if isinstance(maybe_args, tuple):
 		arg_dict, tags, project, entity = maybe_args
 	else:
@@ -357,11 +353,12 @@ def main():
 	proceed = input("Confirm: y/n: ")
 	if proceed.lower() == 'y':
 		admin = config['admin']
-		model_specifcs = model_info[admin['model']]
-		run_id = config['admin']['run_id'] if 'run_id' in config['admin'] else None
-			
+		model_name = admin['model_name']
+		run_id = admin['run_id'] if 'run_id' in admin else None
+		
+  
 		#setup wandb run
-		run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
+		run_name = f"{model_name}_{admin['split']}_exp{admin['exp_no']}"
 		if admin['recover']:
 			if 'run_id' in config['admin']:
 				run_id = config['admin']['run_id']
@@ -401,7 +398,7 @@ def main():
 		print(f"Run path: {run.path}")  # entity/project/run_id format
 		
 
-		train_loop(model_specifcs, run, recover=admin['recover'])
+		train_loop(model_name, run, recover=admin['recover'])
 	else:
 		print("Training cancelled")
 	

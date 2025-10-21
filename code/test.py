@@ -11,16 +11,14 @@ from torch.utils.data import DataLoader
 import tqdm
 from train import get_model
 from pathlib import Path
-import configs
 import utils
 import gc
 from argparse import ArgumentParser
-from utils import ask_nicely
 
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals
-from configs import get_avail_splits, LABEL_SUFFIX, CLASSES_PATH
+from configs import LABEL_SUFFIX, CLASSES_PATH
 #################################### Utilities #################################
 
 
