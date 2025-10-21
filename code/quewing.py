@@ -116,7 +116,7 @@ class que:
 
         dic.update(
             {
-                "model": admin["model"],
+                "model": admin["model_name"],
                 "exp_no": admin["exp_no"],
                 "split": admin["split"],
                 "config_path": admin["config_path"],
@@ -560,8 +560,7 @@ class worker:
             raise ValueError(
                 f"Tried to read next run from {self.temp_path} but it was empty"
             )
-
-        model_specifcs = info["model_info"]
+            
         config = info["config"]
         entity = info["entity"]
         project = info["project"]
@@ -570,7 +569,7 @@ class worker:
         admin = config["admin"]
 
         # setup wandb run
-        run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
+        run_name = f"{admin['model_name']}_{admin['split']}_exp{admin['exp_no']}"
 
         if admin["recover"]:
             if "run_id" in info:
@@ -602,7 +601,7 @@ class worker:
         self.print_v(f"Run name: {run.name}")  # Human-readable name
         self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
 
-        train_loop(model_specifcs, run, recover=admin["recover"])
+        train_loop(admin['model_name'], run, recover=admin["recover"])
         run.finish()
 
         # write at end to avoid overwriting a run

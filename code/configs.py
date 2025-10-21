@@ -18,7 +18,7 @@ PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
 # - data
 LABELS_PATH = "preprocessed/labels"
-LABEL_SUFFIX = "_fixed_frange_bboxes_len.json"
+LABEL_SUFFIX = "fixed_frange_bboxes_len.json"
 CLASSES_PATH = "./info/wlasl_class_list.json"
 WLASL_ROOT = "../data/WLASL"
 RAW_DIR = "WLASL2000"
