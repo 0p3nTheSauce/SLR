@@ -1,21 +1,17 @@
 from stopping import EarlyStopper
 import wandb
 import matplotlib.pyplot as plt
-# import pytest
 import random
-# @pytest.fixture
-
 from utils import print_dict
 import time
 import subprocess
 import argparse
-from pathlib import Path
-import re  
+from pathlib import Path 
 import json
 import test
-from collections import Counter, defaultdict
+from collections import Counter
 from typing import Optional
-
+from functools import partial
 
 
 def plot_simulated_training(x_range, f):
@@ -86,9 +82,9 @@ def test_early_stopping(mode='min'):
 	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None)
 	x_range = []
 	x = 0
-	f = lambda x: sim_loss(x)
+	f = partial(sim_loss)
 	if mode == 'max':
-		f = lambda x: sim_acc(x)
+		f = partial(sim_acc)
 	max_epoch = 300
 	score=0
 	while not stopper.stop and x < max_epoch:
@@ -174,9 +170,9 @@ def simulate_wandb_run(mode='min',entity='ljgoodall2001-rhodes-university',
 	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=run)
 	x_range = []
 	x = 0
-	f = lambda x: sim_loss(x)
+	f = partial(sim_loss)
 	if mode == 'max':
-		f = lambda x: sim_acc(x)
+		f = partial(sim_acc)
 	max_epoch = 300
 	score=0
 	while not stopper.stop and x < max_epoch:
@@ -400,17 +396,6 @@ def merge_seen_ex():
 	d4 = {}
 	print_dict(merge_seen(d3, d4))
 
-def test_use_rudid():
-	from experiments.scripts.quewing import wait_for_run_completion
-	run_id = input("Enter run ID: ")
-	info = wait_for_run_completion(
-		entity = 'ljgoodall2001-rhodes-university',
-		project = 'WLASL-100',
-		check_interval = 5,
-	 verbose=True,
-	 run_id=run_id,
-	 max_retries=5
-	)
 	
 def frame_shuffling():
 	import torch
@@ -418,7 +403,6 @@ def frame_shuffling():
 	# Create a 2D tensor
 	tensor = torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
 	# tensor = torch.rand(8, 3, 4, 4)
-	t = len(tensor)
 	# Shuffle rows
 	shuffled_indices = torch.randperm(tensor.size(0))
 	# shuffled_tensor = tensor[:, :, shuffled_indices, :, :]
@@ -431,7 +415,6 @@ def frame_shuffling():
 	print(shuffled_tensor)
 	print(tensor.shape == shuffled_tensor.shape)
  
-	og_idxs = torch.arange(tensor.size(0))
 	inv_permutation = shuffled_indices
 	print("Inverse permutation indices:")
 	print(inv_permutation)
@@ -530,212 +513,39 @@ def test_shuffle():
 		
 		print("\nAll tests passed!")
 
-def test__sum_model():
-  from test import _sum_model
-  d = {
-	  "004": {
-		"best": {
-		  "test set": {
-			"top_k_average_per_class_acc": {
-			  "top1": 0.5343333333333333,
-			  "top5": 0.82,
-			  "top10": 0.895
-			},
-			"top_k_per_instance_acc": {
-			  "top1": 0.5387596899224806,
-			  "top5": 0.8217054263565892,
-			  "top10": 0.8992248062015504
-			}
-		  }
-		},
-		"checkpoint_154": {
-		  "test set": {
-			"top_k_average_per_class_acc": {
-			  "top1": 0.5965,
-			  "top5": 0.8516666666666666,
-			  "top10": 0.8916666666666666
-			},
-			"top_k_per_instance_acc": {
-			  "top1": 0.5891472868217055,
-			  "top5": 0.8488372093023255,
-			  "top10": 0.8914728682170543
-			}
-		  }
-		}
-	  },
-	  "005": {
-		"checkpoint_118": {
-		  "test set": {
-			"top_k_average_per_class_acc": {
-			  "top1": 0.48899999999999993,
-			  "top5": 0.8083333333333332,
-			  "top10": 0.8758333333333332
-			},
-			"top_k_per_instance_acc": {
-			  "top1": 0.49224806201550386,
-			  "top5": 0.8062015503875969,
-			  "top10": 0.875968992248062
-			}
-		  }
-		},
-		"best": {
-		  "test set": {
-			"top_k_average_per_class_acc": {
-			  "top1": 0.45699999999999996,
-			  "top5": 0.7583333333333333,
-			  "top10": 0.8658333333333332
-			},
-			"top_k_per_instance_acc": {
-			  "top1": 0.46124031007751937,
-			  "top5": 0.7596899224806202,
-			  "top10": 0.8682170542635659
-			}
-		  }
-		}
-	  }
-	}
-  print(type(d))
-
 def test_sub():
-	with subprocess.Popen(['ping', 'google.com'], 
-					  stdout=subprocess.PIPE, 
-					  stderr=subprocess.PIPE, 
-					  text=True) as proc:
-		for line in proc.stdout:
-			print(f"Received: {line.strip()}")
-
-def test_send():
-	from quewing import print_tmux
-	print_tmux(
-		"hello",
-		"worker",
-		"que_training"
-	)
-
-def test_shelly():
-	import cmd
-
-	class MyShell(cmd.Cmd):
-		intro = 'Welcome! Type help or ? to list commands.\n'
-		prompt = '> '
-
-		def do_greet(self, arg):
-			"""Greet someone: greet <name>"""
-			print(f'Hello, {arg}!')
-		
-		def do_quit(self, arg):
-			"""Exit the application"""
-			return True
-
-	
-	MyShell().cmdloop()
-
-def test_shelly2():
-	import cmd
-	from quewing import que, join_session
-	
-	class QueShell(cmd.Cmd):
-		intro = 'Queue Management Shell. Type help or ? to list commands.\n'
-		prompt = '(que) > '
-		
-		def __init__(self, runs_path: str, implemented_path: str, verbose: bool = True):
-			super().__init__()
-			self.que = que(runs_path, implemented_path, verbose)
-		
-		def do_create(self, arg):
-			"""Create a new run and add it to the queue"""
-			self.que.create_run()
-			self.que.save_state()
-		
-		def do_join_session(self, arg):
-			"""Join a tmux session: join_session <wndw_name> <sesh_name>"""
-			args = arg.split()
-			res = join_session(args[0], args[1])
-			if res:
-				self.que.print_v("success")
-   
-		def do_next(self, arg):
-			"""Get the next run from the queue"""
-			next_run = self.que.get_next_run()
-			if next_run:
-				print(f"Next run: {self.que.get_config(next_run)}")
-				self.que.save_state()
-		
-		def do_list(self, arg):
-			"""List all configs in the queue"""
-			self.que.list_configs()
-		
-		def do_remove(self, arg):
-			"""Remove a run from the queue: remove [to_run|old_runs] [index]"""
-			args = arg.split()
-			loc = args[0] if len(args) > 0 else None
-			idx = int(args[1]) if len(args) > 1 else None
-			self.que.remove_run(loc, idx)
-			self.que.save_state()
-		
-		def do_return_old(self, arg):
-			"""Return old runs back to the queue: return_old [num_from_end]"""
-			num = int(arg) if arg.strip() else None
-			self.que.return_old(num)
-			self.que.save_state()
-		
-		def do_shuffle(self, arg):
-			"""Shuffle/reorder runs in the queue"""
-			self.que.shuffle_configs()
-			self.que.save_state()
-		
-		def do_clear(self, arg):
-			"""Clear runs: clear [past] [future]"""
-			past = 'past' in arg.lower()
-			future = 'future' in arg.lower()
-			self.que.clear_runs(past, future)
-			self.que.save_state()
-		
-		def do_save(self, arg):
-			"""Manually save the current state"""
-			self.que.save_state()
-		
-		def do_quit(self, arg):
-			"""Exit the shell"""
-			print("Goodbye!")
-			return True
-		
-		def do_exit(self, arg):
-			"""Exit the shell"""
-			return self.do_quit(arg)
+    with subprocess.Popen(['ping', 'google.com', '-c', '4'],  # Limit to 4 pings
+                      stdout=subprocess.PIPE, 
+                      stderr=subprocess.PIPE, 
+                      text=True) as proc:
+        stdout, stderr = proc.communicate()
+        if stdout:
+            for line in stdout.splitlines():
+                print(f"Received: {line.strip()}")
 
 
-
-	from quewing import RUN_PATH, IMP_PATH
-	QueShell(
-		runs_path=RUN_PATH,
-		implemented_path=IMP_PATH
-	 ).cmdloop()
 
 def test_safe_index():
-	l = [1,2,3]
+	lst = [1,2,3]
 	i = random.randint(-4, 4)
-	while len(l) > 0:
-		if abs(i) < len(l):
-			print(f'{i} in range for len(l) = {len(l)}')
-			print(f'l.pop({i}) = {l.pop(i)}')
+	while len(lst) > 0:
+		if abs(i) < len(lst):
+			print(f'{i} in range for len(l) = {len(lst)}')
+			print(f'l.pop({i}) = {lst.pop(i)}')
 		else:
-			print(f'{i} out of range for len(l) = {len(l)}')
-		i = random.randint(-len(l) - 1, len(l) + 1)
+			print(f'{i} out of range for len(l) = {len(lst)}')
+		i = random.randint(-len(lst) - 1, len(lst) + 1)
 
 def test_wait_for_completion():
     from quewing import gpu_manager
     
     print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
 
-def test_test_run():
-	with open('queRuns.json') as f:
-		all_runs = json.load(f)
 
-	old_runs = all_runs['old_runs']
-
-	test.test_run(old_runs[0])
+def test_get_avail_splits():
+    from configs import get_avail_splits
+    print(get_avail_splits())
 
 
 if __name__ == "__main__":
-	test_test_run()
+	test_get_avail_splits()

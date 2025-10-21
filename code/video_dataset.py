@@ -10,7 +10,6 @@ from video_transforms import correct_num_frames
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
 
-
 def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
     """
     Resize frame so person bounding box diagonal equals target_diagonal

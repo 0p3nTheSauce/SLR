@@ -1026,7 +1026,7 @@ class queShell(cmdLib.Cmd):
 
 		try:
 			maybe_args = configs.take_args(
-				self.que.imp_splits, list(self.que.imp_models.keys()), args
+				self.que.imp_splits, args
 			)
 		except (SystemExit, ValueError) as _:
 			print("Create cancelled (incorrect arguments)")
@@ -1158,7 +1158,7 @@ if __name__ == "__main__":
 	# 	print(e.stderr)
 	# place lock on queRuns.json
 
-	lock = FileLock(f"{RUN_PATH}.lock", timout=1)
+	lock = FileLock(f"{RUN_PATH}.lock", timeout=1)
 	try:
 		with lock:
 			print(f"Acquired lock on {RUN_PATH}")
