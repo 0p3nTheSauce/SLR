@@ -1,26 +1,42 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List
-import json
+from typing import Dict, Any, List, Optional
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
 
-from typing import Optional
+# locals
+from models import avail_models
 
 # TODO: make configs the sole source of these constants
 
-
+# constants
+# - wandb
 ENTITY = "ljgoodall2001-rhodes-university"
-# PROJECT = 'WLASL - SLR'
 PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
-RUNS_PATH = "./runs/"
-IMP_PATH = "./info/wlasl_implemented_info.json"
+# - data
+LABELS_PATH = "preprocessed/labels"
+LABEL_SUFFIX = "_fixed_frange_bboxes_len.json"
+CLASSES_PATH = "./info/wlasl_class_list.json"
+WLASL_ROOT = "../data/WLASL"
+RAW_DIR = "WLASL2000"
+SPLIT_DIR = "splits"
+# - training
+RUNS_PATH = "./runs"
 
 
-def load_config(arg_dict: Dict, verbose: bool=False) -> Dict:
+def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
+    ppd = Path(pre_proc_dir)
+    if not ppd.exists() or not ppd.is_dir():
+        raise ValueError(
+            f"Invalied preprocessed directory: {pre_proc_dir}, must exist and be directory"
+        )
+    return list(map(lambda x: x.name, ppd.iterdir()))
+
+
+def load_config(arg_dict: Dict, verbose: bool = False) -> Dict:
     """Load config from flat file and merge with command line args"""
     conf_path = Path(arg_dict["config_path"])
     if not conf_path.exists():
@@ -97,51 +113,6 @@ def parse_ini_config(ini_file: str | Path) -> Dict[str, Any]:
     return wandb_config
 
 
-def print_config_old(config_dict, title="Training"):
-    """
-    Print configuration dictionary in a more readable format.
-
-    Args:
-                    config_dict (dict): Dictionary containing configuration sections
-                    title: 'Testing' or 'Training'
-    """
-    # Extract admin info for header
-    admin = config_dict.get("admin", {})
-    model = admin.get("model", "Unknown Model")
-    split = admin.get("split", "unknown")
-
-    # Print header
-    print(f"{title} {model} on split {split}")
-
-    # Print admin section in formatted way
-    if "admin" in config_dict:
-        print(f"              Experiment no: {admin.get('exp_no', 'N/A')}")
-        print(f"              Raw videos at: {admin.get('root', 'N/A')}")
-        print(f"              Labels at: {admin.get('labels', 'N/A')}")
-        print(f"              Saving files to: {admin.get('save_path', 'N/A')}")
-        if title == "Training":
-            print(f"              Recovering: {admin.get('recovering', False)}")
-        print(f"              Config: {admin.get('config_path', 'N/A')}")
-        print()
-
-    # Print other sections in organized format
-    sections_order = ["training", "optimizer", "scheduler", "data", "model_params"]
-
-    for section in sections_order:
-        if section in config_dict:
-            print(f"{section.upper()}:")
-            section_data = config_dict[section]
-
-            # Calculate max key length for alignment
-            max_key_len = (
-                max(len(str(k)) for k in section_data.keys()) if section_data else 0
-            )
-
-            for key, value in section_data.items():
-                print(f"    {key:<{max_key_len}} : {value}")
-            print()
-
-
 def print_config(config_dict):
     """
     Print configuration dictionary in a more readable format.
@@ -166,13 +137,11 @@ def print_config(config_dict):
 
 
 def take_args(
-    splits_available: List[str],
-    models_available: List[str],
     sup_args: Optional[List[str]] = None,
     return_parser_only: bool = False,
     make_dirs: bool = False,
     prog: Optional[str] = None,
-    desc: str = "Train a model"
+    desc: str = "Train a model",
 ) -> Optional[tuple | argparse.ArgumentParser]:
     """Retrieve arguments for new trainign run
 
@@ -186,18 +155,27 @@ def take_args(
         desc (str, optional): What does the script do? Defaults to "Train a model".
 
     Raises:
-        ValueError: If model or split supplied are not available 
+        ValueError: If model or split supplied are not available
 
     Returns:
         Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if  successful.
     """
-    
-    
+    models_available = avail_models()
+    splits_available = get_avail_splits()
+
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
     # admin
+    parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument(
-        "-ex", "--exp_no", type=int, help="Experiment number (e.g. 10)", required=True
+        "model_name",
+        type=str,
+        help=f"Model name from one of the implemented models: {models_available}",
+    )
+    parser.add_argument(
+        "split",
+        type=str,
+        help=f"The class split, one of:  {', '.join(splits_available)}",
     )
     parser.add_argument(
         "-r", "--recover", action="store_true", help="Recover from last checkpoint"
@@ -210,21 +188,16 @@ def take_args(
         help="The run id to use (especially when also usign recover)",
     )
     parser.add_argument(
-        "-m",
-        "--model",
+        "-p",
+        "--project",
         type=str,
-        help=f"One of the implemented models: {models_available}",
-        required=True,
-    )
-    parser.add_argument(
-        "-p", "--project", type=str, default=None, help="wandb project name"
+        default=PROJECT,
+        help=f"wandb project name, if not {PROJECT}",
     )
     parser.add_argument(
         "-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}"
     )
-    parser.add_argument(
-        "-sp", "--split", type=str, help="The class split (e.g. asl100)", required=True
-    )
+
     parser.add_argument(
         "-ee",
         "--enum_exp",
@@ -237,21 +210,10 @@ def take_args(
         action="store_true",
         help="enumerate the checkpoint dir num (for output)",
     )
-    # TODO: maybe add tags for wandb as parameters
     parser.add_argument(
         "-t", "--tags", nargs="+", type=str, help="Additional wandb tags"
     )
-
-    # overides
     parser.add_argument("-c", "--config_path", help="path to config .ini file")
-    parser.add_argument("-nf", "--num_frames", type=int, help="video length")
-    parser.add_argument("-fs", "--frame_size", type=int, help="width, height")
-    parser.add_argument("-bs", "--batch_size", type=int, help="data_loader")
-    parser.add_argument(
-        "-us", "--update_per_step", type=int, help="gradient accumulation"
-    )
-    parser.add_argument("-ms", "--max_steps", type=int, help="gradient accumulation")
-    parser.add_argument("-me", "--max_epoch", type=int, help="mixumum training epoch")
 
     if return_parser_only:
         return parser
@@ -266,9 +228,9 @@ def take_args(
             f"Sorry {args.split} not processed yet.\n\
 			Currently available: {splits_available}"
         )
-    if args.model not in models_available:
+    if args.model_name not in models_available:
         raise ValueError(
-            f"Sorry {args.model} not implemented yet.\n\
+            f"Sorry {args.model_name} not implemented yet.\n\
 			Currently available: {models_available}"
         )
 
@@ -277,11 +239,10 @@ def take_args(
     if args.project is None:
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
 
-    # args.model = model
     args.exp_no = exp_no
-    args.root = "../data/WLASL/WLASL2000"
-    args.labels = f"./preprocessed/labels/{args.split}"
-    output = Path(f"runs/{args.split}/{args.model}_exp{exp_no}")
+    args.root = WLASL_ROOT + "/" + RAW_DIR
+    args.labels = f"{LABELS_PATH}/{args.split}"
+    output = Path(f"{RUNS_PATH}/{args.split}/{args.model_name}_exp{exp_no}")
 
     # recovering
     if not args.recover and output.exists():  # fresh run
@@ -326,7 +287,7 @@ def take_args(
 
     # Set config path
     if args.config_path is None:
-        args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
+        args.config_path = f"./configfiles/{args.split}/{args.model_name}_{exp_no}.ini"
 
     # Load config
     arg_dict = vars(args)
@@ -340,9 +301,10 @@ def take_args(
         if value is not None:
             clean_dict[key] = value
 
+    # NOTE: these tags are redundant
     tags = [
         args.split,
-        args.model,
+        args.model_name,
         f"exp-{exp_no}",
     ]
     if args.recover:
@@ -357,20 +319,14 @@ def take_args(
 
 
 def main():
-    with open("./info/wlasl_implemented_info.json", "r") as f:
-        info = json.load(f)
-
-    model_info = info["models"]
-
-    available_model = model_info.keys()
-    available_splits = info["splits"]
     try:
         # maybe_args = take_args(available_splits,available_model,
         #                  sup_args=['-x', '5', '-m', 'S3D', '-sp', 'asl100'])
-        maybe_args = take_args(available_splits, available_model, sup_args=["-h"])
-    except SystemExit as e:
+        # maybe_args = take_args(sup_args=["-h"])
+        maybe_args = take_args()
+    except Exception as e:
         maybe_args = None
-        print(f"Parsing failed with exit code: {e.code}")
+        print(f"Parsing failed with error: {e}")
 
     if isinstance(maybe_args, tuple):
         arg_dict, tags, project, entity = maybe_args

@@ -1,19 +1,14 @@
 import json
-
-# import os
 import torch
 import tqdm
 from ultralytics import YOLO  # type: ignore (have a feeling this will bork the system)
-
-# from torchcodec.decoders import VideoDecoder #this thing causes too many problems
 import cv2
-
 from argparse import ArgumentParser
 from pathlib import Path
 
 # local imports
 from utils import load_rgb_frames_from_video
-
+from configs import WLASL_ROOT, SPLIT_DIR, RAW_DIR, LABELS_PATH
 
 def correct_bbox(bbox, frame_shape):
     # bbox is a list of [x1, y1, x2, y2]
@@ -402,10 +397,6 @@ def check_paths(
 
 
 if __name__ == "__main__":
-    def_root = "../data/WLASL"
-    def_split_dir = "splits"
-    def_raw_dir = "WLASL2000"
-    def_output_dir = "preprocessed/labels"
     parser = ArgumentParser(description="preprocess.py")
     parser.add_argument(
         "-as",
@@ -418,29 +409,29 @@ if __name__ == "__main__":
         "-rt",
         "--root",
         type=str,
-        help=f"WLASL root if not {def_root}",
-        default=def_root,
+        help=f"WLASL root if not {WLASL_ROOT}",
+        default=WLASL_ROOT,
     )
     parser.add_argument(
         "-sd",
         "--split_dir",
         type=str,
-        help=f"Split directory if not {def_split_dir}",
-        default=def_split_dir,
+        help=f"Split directory if not {SPLIT_DIR}",
+        default=SPLIT_DIR,
     )
     parser.add_argument(
         "-rd",
         "--raw_dir",
         type=str,
-        help=f"Video directory if not {def_raw_dir}",
-        default=def_raw_dir,
+        help=f"Video directory if not {RAW_DIR}",
+        default=RAW_DIR,
     )
     parser.add_argument(
         "-od",
         "--output_dir",
         type=str,
-        help=f"Output directory if not {def_output_dir}",
-        default=def_output_dir,
+        help=f"Output directory if not {LABELS_PATH}",
+        default=LABELS_PATH,
     )
     parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
     args = parser.parse_args()
