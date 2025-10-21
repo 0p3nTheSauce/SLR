@@ -143,11 +143,9 @@ def take_args(
     prog: Optional[str] = None,
     desc: str = "Train a model",
 ) -> Optional[tuple | argparse.ArgumentParser]:
-    """Retrieve arguments for new trainign run
+    """Retrieve arguments for new training run
 
     Args:
-        splits_available (List[str]): Implemented datastet splits
-        models_available (List[str]): implemented architectures
         sup_args (Optional[List[str]], optional): Supply arguments instead of taking from command line. Defaults to None.
         return_parser_only (bool, optional): Give the parser instead of arguments. Defaults to False.
         make_dirs (bool, optional): Make output and checkpoint dirs. Defaults to False.
@@ -155,11 +153,12 @@ def take_args(
         desc (str, optional): What does the script do? Defaults to "Train a model".
 
     Raises:
-        ValueError: If model or split supplied are not available
+        ValueError: If model or split supplied are not available, or if recovering and save path is invalid.
 
     Returns:
-        Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if  successful.
+        Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if successful.
     """
+    
     models_available = avail_models()
     splits_available = get_avail_splits()
 
@@ -197,7 +196,6 @@ def take_args(
     parser.add_argument(
         "-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}"
     )
-
     parser.add_argument(
         "-ee",
         "--enum_exp",
@@ -260,7 +258,7 @@ def take_args(
 
         if ans.lower() == "c":
             return
-
+    
     # saving
     save_path = output / "checkpoints"
     # if not args.recover and args.enum_chck:
@@ -279,7 +277,13 @@ def take_args(
 
         if ans.lower() == "c":
             return
-
+    elif args.recover:
+        if not save_path.exists() or not save_path.is_dir():
+            raise ValueError(
+                f"Cannot recover, {save_path} does not exist or is not a directory"
+            )
+        if len([f for f in save_path.iterdir() if f.is_file()]) == 0:
+            raise ValueError(f"Cannot recover, {save_path} is empty")
     else:
         args.save_path = save_path
 
