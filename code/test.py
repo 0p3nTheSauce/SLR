@@ -444,14 +444,9 @@ def test_run(
     return results
 
 
-##############################   Multi-run Testing  ######################################
-
-
-
-
-
-
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="test.py")
-   
+    with open('./wlasl_implemented_info.json') as f:
+            info = json.load(f)
+    parser.add_argument()
