@@ -1,4 +1,3 @@
-from typing import List
 import json
 import torch
 import tqdm
@@ -10,7 +9,6 @@ from pathlib import Path
 # local imports
 from utils import load_rgb_frames_from_video
 from configs import WLASL_ROOT, SPLIT_DIR, RAW_DIR, LABELS_PATH
-
 
 def correct_bbox(bbox, frame_shape):
     # bbox is a list of [x1, y1, x2, y2]

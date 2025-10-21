@@ -1,13 +1,13 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List
-import json
+from typing import Dict, Any, List, Optional
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
+#locals
 from models import avail_models
-from typing import Optional
+
 
 # TODO: make configs the sole source of these constants
 
@@ -134,7 +134,7 @@ def print_config(config_dict):
 
 
 def take_args(
-    splits_available: List[str],
+
     sup_args: Optional[List[str]] = None,
     return_parser_only: bool = False,
     make_dirs: bool = False,
@@ -159,6 +159,7 @@ def take_args(
         Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if  successful.
     """
     models_available = avail_models()
+    splits_available = get_avail_splits()
     
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
@@ -177,10 +178,10 @@ def take_args(
         help="The run id to use (especially when also usign recover)",
     )
     parser.add_argument(
-        "-m",
-        "--model",
+        "-mn",
+        "--model_name",
         type=str,
-        help=f"One of the implemented models: {models_available}",
+        help=f"Model name from one of the implemented models: {models_available}",
         required=True,
     )
     parser.add_argument(
@@ -233,9 +234,9 @@ def take_args(
             f"Sorry {args.split} not processed yet.\n\
 			Currently available: {splits_available}"
         )
-    if args.model not in models_available:
+    if args.model_name not in models_available:
         raise ValueError(
-            f"Sorry {args.model} not implemented yet.\n\
+            f"Sorry {args.model_name} not implemented yet.\n\
 			Currently available: {models_available}"
         )
 
@@ -244,11 +245,10 @@ def take_args(
     if args.project is None:
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
 
-    # args.model = model
     args.exp_no = exp_no
-    args.root = "../data/WLASL/WLASL2000"
-    args.labels = f"./preprocessed/labels/{args.split}"
-    output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
+    args.root = WLASL_ROOT + "/" + RAW_DIR
+    args.labels = f"{LABELS_PATH}/{args.split}"
+    output = Path(f"{RUNS_PATH}/{args.split}/{args.model_name}_exp{exp_no}")
 
     # recovering
     if not args.recover and output.exists():  # fresh run
@@ -293,7 +293,7 @@ def take_args(
 
     # Set config path
     if args.config_path is None:
-        args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
+        args.config_path = f"./configfiles/{args.split}/{args.model_name}_{exp_no}.ini"
 
     # Load config
     arg_dict = vars(args)
@@ -307,9 +307,10 @@ def take_args(
         if value is not None:
             clean_dict[key] = value
 
+    #NOTE: these tags are redundant
     tags = [
         args.split,
-        args.model,
+        args.model_name,
         f"exp-{exp_no}",
     ]
     if args.recover:
@@ -324,17 +325,14 @@ def take_args(
 
 
 def main():
-    with open("./info/wlasl_implemented_info.json", "r") as f:
-        info = json.load(f)
-
-    available_splits = info["splits"]
     try:
         # maybe_args = take_args(available_splits,available_model,
         #                  sup_args=['-x', '5', '-m', 'S3D', '-sp', 'asl100'])
-        maybe_args = take_args(available_splits, sup_args=["-h"])
-    except SystemExit as e:
+        # maybe_args = take_args(sup_args=["-h"])
+        maybe_args = take_args()
+    except Exception as e:
         maybe_args = None
-        print(f"Parsing failed with exit code: {e.code}")
+        print(f"Parsing failed with error: {e}")
 
     if isinstance(maybe_args, tuple):
         arg_dict, tags, project, entity = maybe_args
