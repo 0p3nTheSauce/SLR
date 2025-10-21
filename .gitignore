@@ -11,6 +11,8 @@ code/experiments/
 code/media/
 code/weights/
 code/wandb
-code/queRuns.json
-code/queTemp.json
+queRuns.json
+queRuns.json.lock
+queTemp.json
+queLogs.log
 .vscode/
