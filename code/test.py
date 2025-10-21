@@ -20,6 +20,7 @@ from utils import ask_nicely
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals
+from configs import get_avail_splits, LABEL_SUFFIX, CLASSES_PATH
 #################################### Utilities #################################
 
 
@@ -302,8 +303,8 @@ def _get_test_loader(
 
     test_transforms = v2.Compose([v2.CenterCrop(frame_size), final_t])
 
-    instances = labels / f"{set}_instances_fixed_frange_bboxes_len.json"
-    classes = labels / f"{set}_classes_fixed_frange_bboxes_len.json"
+    instances = labels / f"{set}_instances_{LABEL_SUFFIX}"
+    classes = labels / f"{set}_classes_{LABEL_SUFFIX}"
 
     tset = VideoDataset(
         root,
@@ -330,8 +331,7 @@ def test_run(
     plot: bool = False,
     disp: bool = False,
     seed: int = 42,
-    classes_path: str = "./info/wlasl_class_list.json",
-    root: Union[str, Path] = "" 
+    classes_path: str = CLASSES_PATH,
 ) -> Optional[Dict]:
     utils.set_seed(seed)
 
@@ -406,9 +406,8 @@ def test_run(
             verbose=False,
             save_path=output / fname,
         )
-        results[set_name] = {
-            "top-k": topk_res,
-        }
+        results[set_name] = topk_res
+
 
         if plot:
             fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
@@ -447,6 +446,5 @@ def test_run(
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="test.py")
-    with open('./wlasl_implemented_info.json') as f:
-            info = json.load(f)
+    
     parser.add_argument()

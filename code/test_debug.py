@@ -520,114 +520,16 @@ def test_shuffle():
 		print("\nAll tests passed!")
 
 def test_sub():
-	with subprocess.Popen(['ping', 'google.com'], 
-					  stdout=subprocess.PIPE, 
-					  stderr=subprocess.PIPE, 
-					  text=True) as proc:
-		if proc is not None:
-			for line in proc.stdout:
-				print(f"Received: {line.strip()}")
+    with subprocess.Popen(['ping', 'google.com', '-c', '4'],  # Limit to 4 pings
+                      stdout=subprocess.PIPE, 
+                      stderr=subprocess.PIPE, 
+                      text=True) as proc:
+        stdout, stderr = proc.communicate()
+        if stdout:
+            for line in stdout.splitlines():
+                print(f"Received: {line.strip()}")
 
 
-def test_shelly():
-	import cmd
-
-	class MyShell(cmd.Cmd):
-		intro = 'Welcome! Type help or ? to list commands.\n'
-		prompt = '> '
-
-		def do_greet(self, arg):
-			"""Greet someone: greet <name>"""
-			print(f'Hello, {arg}!')
-		
-		def do_quit(self, arg):
-			"""Exit the application"""
-			return True
-
-	
-	MyShell().cmdloop()
-
-def test_shelly2():
-	import cmd
-	from quewing import que, join_session
-	
-	class QueShell(cmd.Cmd):
-		intro = 'Queue Management Shell. Type help or ? to list commands.\n'
-		prompt = '(que) > '
-		
-		def __init__(self, runs_path: str, implemented_path: str, verbose: bool = True):
-			super().__init__()
-			self.que = que(runs_path, implemented_path, verbose)
-		
-		def do_create(self, arg):
-			"""Create a new run and add it to the queue"""
-			self.que.create_run()
-			self.que.save_state()
-		
-		def do_join_session(self, arg):
-			"""Join a tmux session: join_session <wndw_name> <sesh_name>"""
-			args = arg.split()
-			res = join_session(args[0], args[1])
-			if res:
-				self.que.print_v("success")
-   
-		def do_next(self, arg):
-			"""Get the next run from the queue"""
-			next_run = self.que.get_next_run()
-			if next_run:
-				print(f"Next run: {self.que.get_config(next_run)}")
-				self.que.save_state()
-		
-		def do_list(self, arg):
-			"""List all configs in the queue"""
-			self.que.list_configs()
-		
-		def do_remove(self, arg):
-			"""Remove a run from the queue: remove [to_run|old_runs] [index]"""
-			args = arg.split()
-			loc = args[0] if len(args) > 0 else None
-			idx = int(args[1]) if len(args) > 1 else None
-			self.que.remove_run(loc, idx)
-			self.que.save_state()
-		
-		def do_return_old(self, arg):
-			"""Return old runs back to the queue: return_old [num_from_end]"""
-			num = int(arg) if arg.strip() else None
-			self.que.return_old(num)
-			self.que.save_state()
-		
-		def do_shuffle(self, arg):
-			"""Shuffle/reorder runs in the queue"""
-			self.que.shuffle_configs()
-			self.que.save_state()
-		
-		def do_clear(self, arg):
-			"""Clear runs: clear [past] [future]"""
-			past = 'past' in arg.lower()
-			future = 'future' in arg.lower()
-			self.que.clear_runs(past, future)
-			self.que.save_state()
-		
-		def do_save(self, arg):
-			"""Manually save the current state"""
-			self.que.save_state()
-		
-		def do_quit(self, arg):
-			"""Exit the shell"""
-			print("Goodbye!")
-			return True
-		
-		def do_exit(self, arg):
-			"""Exit the shell"""
-			return self.do_quit(arg)
-
-
-
-	from quewing import RUN_PATH, IMP_PATH
-	QueShell(
-		runs_path=RUN_PATH,
-		implemented_path=IMP_PATH
-	 ).cmdloop()
 
 def test_safe_index():
 	l = [1,2,3]
@@ -645,14 +547,11 @@ def test_wait_for_completion():
     
     print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
 
-def test_test_run():
-	with open('queRuns.json') as f:
-		all_runs = json.load(f)
 
-	old_runs = all_runs['old_runs']
-
-	test.test_run(old_runs[0])
+def test_get_avail_splits():
+    from configs import get_avail_splits
+    print(get_avail_splits())
 
 
 if __name__ == "__main__":
-	test_test_run()
+	test_get_avail_splits()

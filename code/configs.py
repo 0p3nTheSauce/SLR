@@ -11,14 +11,27 @@ from typing import Optional
 
 # TODO: make configs the sole source of these constants
 
-
+#constants 
+# - wandb
 ENTITY = "ljgoodall2001-rhodes-university"
-# PROJECT = 'WLASL - SLR'
 PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
-RUNS_PATH = "./runs/"
-IMP_PATH = "./info/wlasl_implemented_info.json"
+# - data
+LABELS_PATH = "preprocessed/labels"
+LABEL_SUFFIX = "_fixed_frange_bboxes_len.json"
+CLASSES_PATH = "./info/wlasl_class_list.json"
+WLASL_ROOT = "../data/WLASL"
+RAW_DIR = "WLASL2000"
+SPLIT_DIR = "splits"
+# - training
+RUNS_PATH = "./runs"
 
+
+def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
+    ppd = Path(pre_proc_dir)
+    if not ppd.exists() or not ppd.is_dir():
+        raise ValueError(f"Invalied preprocessed directory: {pre_proc_dir}, must exist and be directory")
+    return list(map(lambda x: x.name, ppd.iterdir()))
 
 def load_config(arg_dict: Dict, verbose: bool=False) -> Dict:
     """Load config from flat file and merge with command line args"""
@@ -235,7 +248,7 @@ def take_args(
     args.exp_no = exp_no
     args.root = "../data/WLASL/WLASL2000"
     args.labels = f"./preprocessed/labels/{args.split}"
-    output = Path(f"runs/{args.split}/{args.model}_exp{exp_no}")
+    output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
 
     # recovering
     if not args.recover and output.exists():  # fresh run
