@@ -579,15 +579,14 @@ class worker:
                 f"Tried to read next run from {self.temp_path} but it was empty"
             )
             
-        config = info["config"]
         entity = info["entity"]
         project = info["project"]
         tags = info["tags"]
 
-        admin = config["admin"]
+        admin = info["admin"]
 
         # setup wandb run
-        run_name = f"{admin['model_name']}_{admin['split']}_exp{admin['exp_no']}"
+        run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
 
         if admin["recover"]:
             if "run_id" in info:
@@ -606,20 +605,20 @@ class worker:
                 resume="must",
                 name=run_name,
                 tags=tags,
-                config=config,
+                config=info,
             )
         else:
             self.print_v(f"Starting new run with name: {run_name}")
             self.print_v(f"Starting new run with name: {run_name}")
             run = wandb.init(
-                entity=entity, project=project, name=run_name, tags=tags, config=config
+                entity=entity, project=project, name=run_name, tags=tags, config=info
             )
 
         self.print_v(f"Run ID: {run.id}")
         self.print_v(f"Run name: {run.name}")  # Human-readable name
         self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
 
-        train_loop(admin['model_name'], run, recover=admin["recover"])
+        train_loop(admin['model'], run, recover=admin["recover"])
         run.finish()
 
         # write at end to avoid overwriting a run
@@ -879,7 +878,7 @@ class daemon:
     def worker_log(self, args: Optional[list[str]] = None) -> subprocess.Popen:
         """Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
 
-        cmd = [self.worker.exec_path, self.wr_name]
+        cmd = [self.worker.exec_path, self.wr_name, 'work']
         if args:
             cmd.extend(args)
 
