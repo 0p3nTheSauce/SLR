@@ -103,28 +103,31 @@ def get_scheduler2(
 		# Identity scheduler - multiplies LR by 1.0 (no change)
 		return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
 
+	warmup_epochs = sched_conf.get('warmup_epochs', 0)
+	if 'warmup_epochs' in sched_conf:
+		warmup_scheduler = optim.lr_scheduler.LinearLR(
+			optimizer,
+			start_factor=sched_conf['start_factor'], 
+			end_factor=sched_conf['end_factor'],
+			total_iters=sched_conf['warmup_epochs']
+		)
+	else:
+		warmup_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
+ 
 	if sched_conf["type"] == "CosineAnnealingLR":
-		if 'warmup_epochs' in sched_conf:
-			warmup_scheduler = optim.lr_scheduler.LinearLR(
-				optimizer,
-    			start_factor=sched_conf['start_factor'], 
-				end_factor=sched_conf['end_factor'],
-				total_iters=sched_conf['warmup_epochs']
-			)
-			cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-				optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
-			)
-			return optim.lr_scheduler.SequentialLR(
-				optimizer,
-				schedulers=[warmup_scheduler, cosine_scheduler],
-				milestones=[sched_conf['warmup_epochs']]
-			)
-		else:
-			return optim.lr_scheduler.CosineAnnealingLR(
-				optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
-			)
+		
+		cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
+			optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
+		)
+		return optim.lr_scheduler.SequentialLR(
+			optimizer,
+			schedulers=[warmup_scheduler, cosine_scheduler],
+			milestones=[warmup_epochs]
+		)
+
 	else:
 		raise ValueError(f"Scheduler type {sched_conf['type']} not recognized.")
+
 
 def train_loop(
 	model_name: str, 
