@@ -47,6 +47,42 @@ def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
         )
     return list(map(lambda x: x.name, ppd.iterdir()))
 
+def _schedular_precheck(config: Dict[str, Any]) -> None:
+    """Fail early if scheduler config is invalid. 
+
+    Args:
+        config (Dict[str, Any]): Entire training config dictionary.
+
+    Raises:
+        ValueError: If scheduler type not specified
+        ValueError: If scheduler type invalid
+        ValueError: If warmup_epochs negative
+        ValueError: If start_factor and end_factor not specified for warmup
+        ValueError: If start_factor and end_factor invalid
+    """
+    sched_info = config["training"].get("scheduler", {})
+    if "type" not in sched_info:
+        raise ValueError("Scheduler type must be specified in config under scheduler.type")
+    
+    valid_types = [
+        'CosineAnnealingLR',
+        'CosineAnnealingWarmRestarts',
+    ]
+    
+    if sched_info["type"] not in valid_types:
+        raise ValueError(
+            f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
+        )
+        
+    if 'warmup_epochs' in sched_info:
+        if sched_info["warmup_epochs"] < 0:
+            raise ValueError("warmup_epochs must be non-negative")
+        if "start_factor" not in sched_info or "end_factor" not in sched_info:
+            raise ValueError("Both start_factor and end_factor must be specified for warmup")
+        if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
+            raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
+
+
 
 def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
     """Load config from flat file and merge with command line args
@@ -80,6 +116,7 @@ def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
             print(k)
         raise e
     ndict = EarlyStopper.config_precheck(ndict)
+    _schedular_precheck(ndict)
     return ndict
 
 
