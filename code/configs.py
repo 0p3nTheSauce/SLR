@@ -1,7 +1,7 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
@@ -28,6 +28,18 @@ RUNS_PATH = "./runs"
 
 
 def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
+    """Get the available splits from preprocessed labels directory
+
+    Args:
+        pre_proc_dir (str, optional): The root directory for preprocessed labels. Defaults to LABELS_PATH.
+
+    Raises:
+        ValueError: If preprocessed directory is invalid.
+
+    Returns:
+        List[str]: List of available splits.
+    """
+    
     ppd = Path(pre_proc_dir)
     if not ppd.exists() or not ppd.is_dir():
         raise ValueError(
@@ -36,8 +48,20 @@ def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
     return list(map(lambda x: x.name, ppd.iterdir()))
 
 
-def load_config(admin: Dict) -> Dict:
-    """Load config from flat file and merge with command line args"""
+def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
+    """Load config from flat file and merge with command line args
+
+    Args:
+        admin (Dict[str, Any]): Admin args from command line
+
+    Raises:
+        ValueError: If config path not found
+        KeyError: Various issues with config file
+
+    Returns:
+        Dict[str, Any]: _description_
+    """
+    
     conf_path = Path(admin["config_path"])
     if not conf_path.exists():
         raise ValueError(f"{conf_path} not found")
@@ -66,8 +90,7 @@ def _convert_type(value: str) -> Any:
     except (ValueError, SyntaxError):
         return value
 
-
-def parse_ini_config(ini_file: str | Path) -> Dict[str, Any]:
+def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
     """Parse .ini file for wandb config"""
     config = configparser.ConfigParser()
     config.read(ini_file)
@@ -80,7 +103,6 @@ def parse_ini_config(ini_file: str | Path) -> Dict[str, Any]:
             wandb_config[section][key] = _convert_type(value)
 
     return wandb_config
-
 
 def print_config(config_dict):
     """
