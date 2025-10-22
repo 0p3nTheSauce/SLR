@@ -360,7 +360,7 @@ def main():
 	else:
 		print(f"Need tuple not: {type(maybe_args)}")
 		return
-	config = load_config(arg_dict, verbose=True)
+	config = load_config(arg_dict)
 
 	print_config(config)
 

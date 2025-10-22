@@ -97,16 +97,17 @@ class que:
         """Return reference to the specified list"""
         return self.to_run if loc == TO_RUN else self.old_runs
 
-    def run_sum(self, run: dict) -> dict:
+    def run_sum(self, run: dict, exc: Optional[List[str]] = None) -> dict:
         """Extract key details from a run configuration.
 
         Args:
-                        run: Dictionary containing run configuration with admin details
+            run: Dictionary containing run configuration with admin details
+            exc: Optional list of keys to exclude from the summary
 
         Returns:
-                        Dictionary with model, exp_no, split, and config_path
+            Dictionary with model, exp_no, split, and config_path
         """
-        admin = run["config"]["admin"]
+        admin = run["admin"]
 
         dic = {}
 
@@ -115,12 +116,17 @@ class que:
 
         dic.update(
             {
-                "model_name": admin["model_name"],
-                "exp_no": admin["exp_no"],
+                "model": admin["model"],
                 "split": admin["split"],
+                "exp_no": admin["exp_no"],
                 "config_path": admin["config_path"],
             }
         )
+        
+        if exc:
+            for key in exc:
+                if key in dic:
+                    dic.pop(key)
 
         return dic
 
@@ -183,8 +189,8 @@ class que:
 
         r_str += (
             f"{r_info['model']:<{stats['max_model']}}  "
-            f"Exp: {r_info['exp_no']:<{stats['max_exp']}}  "
             f"Split: {r_info['split']:<{stats['max_split']}}  "
+            f"Exp: {r_info['exp_no']:<{stats['max_exp']}}  "
             f"Config: {r_info['config_path']}"
         )
 
@@ -262,8 +268,16 @@ class que:
 
         return conf_list
 
-    
 
+    def _is_dup_exp(self, new_run: dict) -> bool:
+        """Check if new_run already exists in to_run or old_runs"""
+        exc = ['run_id', 'config_path']
+        new_sum = self.run_sum(new_run, exc)
+
+        for run in self.to_run + self.old_runs:
+            if self.run_sum(run, exc) == new_sum:
+                return True
+        return False
 
     def create_run(
         self,
@@ -286,12 +300,17 @@ class que:
         """
 
         try:
-            config = configs.load_config(arg_dict, verbose=True)
+            config = configs.load_config(arg_dict)
         except ValueError:
             print(f"{arg_dict['config_path']} not found")
             self.print_v("Training cancelled")
             return
-
+        
+        if self._is_dup_exp(config):
+            print(f"Duplicate run detected: {self.run_str(self.run_sum(config))}")
+            self.print_v("Training cancelled")
+            return
+                
         if ask:
             configs.print_config(config)
 
