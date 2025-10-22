@@ -36,68 +36,15 @@ def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
     return list(map(lambda x: x.name, ppd.iterdir()))
 
 
-def load_config(arg_dict: Dict, verbose: bool = False) -> Dict:
-    """Load config from flat file and merge with command line args"""
-    conf_path = Path(arg_dict["config_path"])
-    if not conf_path.exists():
-        raise ValueError(f"{conf_path} not found")
-    config = parse_ini_config(arg_dict["config_path"])
-
-    finished_keys = []
-
-    if verbose:
-        print()
-    # update existing sections
-    for key, value in arg_dict.items():
-        if value is None:
-            finished_keys.append(key)
-            continue
-        # print(f'{key}: {value}')
-        for section in config.keys():  # config is nested
-            if key in config[section]:
-                if verbose:
-                    print(f"Overide:\n config[{section}][{key}] = {value}")
-                config[section][key] = value
-                finished_keys.append(key)
-                if verbose:
-                    print(f"Becomes: \n config[{section}][{key}] = {value}")
-
-    # update unset section
-    not_finished = [key for key in arg_dict.keys() if key not in finished_keys]
-    admin = {}
-    for key in not_finished:
-        admin[key] = arg_dict[key]
-        if verbose:
-            print(f"Added: conf[admin][{key}] = {arg_dict[key]}")
-    config["admin"] = admin
-    if verbose:
-        print()
-
-    # want to add equivalent batch size
-    try:
-        config["training"]["batch_size_equivalent"] = (
-            config["training"]["batch_size"] * config["training"]["update_per_step"]
-        )
-    except KeyError as e:
-        print(f"Warning: issue with config: {e}")
-        print("available keys: ")
-        for k in config.keys():
-            print(k)
-        raise e
-    config = EarlyStopper.config_precheck(config)
-
-    # return post_process(config, verbose)
-    return config
-
-def load_config2(admin: Dict, verbose: bool = False) -> Dict:
+def load_config(admin: Dict) -> Dict:
     """Load config from flat file and merge with command line args"""
     conf_path = Path(admin["config_path"])
     if not conf_path.exists():
         raise ValueError(f"{conf_path} not found")
     config = parse_ini_config(admin["config_path"])
-    ndict = {'admin': admin}
+    ndict = {"admin": admin}
     ndict.update(config)
-     # want to add equivalent batch size
+    # want to add equivalent batch size
     try:
         ndict["training"]["batch_size_equivalent"] = (
             ndict["training"]["batch_size"] * ndict["training"]["update_per_step"]
@@ -110,7 +57,7 @@ def load_config2(admin: Dict, verbose: bool = False) -> Dict:
         raise e
     ndict = EarlyStopper.config_precheck(ndict)
     return ndict
-    
+
 
 def _convert_type(value: str) -> Any:
     """Convert string values to appropriate types"""
@@ -141,7 +88,7 @@ def print_config(config_dict):
 
     Args:
                     config_dict (dict): Dictionary containing configuration sections
-                    title: 'Testing' or 'Training'
+
     """
 
     for section in config_dict.keys():
@@ -180,14 +127,13 @@ def take_args(
     Returns:
         Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if successful.
     """
-    
+
     models_available = avail_models()
     splits_available = get_avail_splits()
 
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
     # admin
-    parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument(
         "model",
         type=str,
@@ -198,6 +144,7 @@ def take_args(
         type=str,
         help=f"The class split, one of:  {', '.join(splits_available)}",
     )
+    parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument(
         "-r", "--recover", action="store_true", help="Recover from last checkpoint"
     )
@@ -280,7 +227,7 @@ def take_args(
 
         if ans.lower() == "c":
             return
-    
+
     # saving
     save_path = output / "checkpoints"
     # if not args.recover and args.enum_chck:
@@ -342,22 +289,21 @@ def take_args(
 
 
 # def print_wandb_config(config):
-def str_dict(dic: Dict[str, Any], disp:bool = False) -> str:
+def str_dict(dic: Dict[str, Any], disp: bool = False) -> str:
     """Print dictionary in a more readable format.
 
     Args:
         dic (Dict[str, Any]): Dictionary to print
     """
     maxl_k = max([len(key) for key in dic.keys()])
-    st = '{\n'
+    st = "{\n"
     for key in dic.keys():
         st += f"\t{key:<{maxl_k}} : {dic[key]}\n"
-    st += '}'
+    st += "}"
     if disp:
         print(st)
     return st
-    
-    
+
 
 def main():
     try:
@@ -373,9 +319,9 @@ def main():
         arg_dict, tags, project, entity = maybe_args
     else:
         return
-    str_dict(arg_dict, disp=True)
-    # config = load_config(arg_dict, verbose=True)
-    # print_config(config)
+    # str_dict(arg_dict, disp=True)
+    config = load_config(arg_dict)
+    print_config(config)
 
     # print_dict(config)
 
