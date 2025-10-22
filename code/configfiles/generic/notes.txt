@@ -24,3 +24,11 @@
     kncock in performance (1.98 -> 2.22)
 
     conclusion: inconclusive, vary eps by less
+
+
+
+
+
+
+#Misc
+-added type in scheduler as an after effect
