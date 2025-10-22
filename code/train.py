@@ -103,6 +103,17 @@ def get_scheduler2(
 		# Identity scheduler - multiplies LR by 1.0 (no change)
 		return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
 
+	# if 'warmup_epochs' in sched_conf:
+	# 	warmup_scheduler = optim.lr_scheduler.LinearLR(
+	# 		optimizer,
+	# 		start_factor=sched_conf['start_factor'], 
+	# 		end_factor=sched_conf['end_factor'],
+	# 		total_iters=sched_conf['warmup_epochs']
+	# 	)
+	# else:
+	# 	warmup_scheduler
+
+
 	if sched_conf["type"] == "CosineAnnealingLR":
 		if 'warmup_epochs' in sched_conf:
 			warmup_scheduler = optim.lr_scheduler.LinearLR(
