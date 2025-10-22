@@ -44,6 +44,7 @@ def store_Data(path: Path, data: dict):
     with open(path, "w") as file:
         json.dump(data, file, indent=4)
 
+
 class que:
     def __init__(
         self,
@@ -122,7 +123,7 @@ class que:
                 "config_path": admin["config_path"],
             }
         )
-        
+
         if exc:
             for key in exc:
                 if key in dic:
@@ -268,10 +269,9 @@ class que:
 
         return conf_list
 
-
     def _is_dup_exp(self, new_run: dict) -> bool:
         """Check if new_run already exists in to_run or old_runs"""
-        exc = ['run_id', 'config_path']
+        exc = ["run_id", "config_path"]
         new_sum = self.run_sum(new_run, exc)
 
         for run in self.to_run + self.old_runs:
@@ -305,12 +305,12 @@ class que:
             print(f"{arg_dict['config_path']} not found")
             self.print_v("Training cancelled")
             return
-        
+
         if self._is_dup_exp(config):
             print(f"Duplicate run detected: {self.run_str(self.run_sum(config))}")
             self.print_v("Training cancelled")
             return
-                
+
         if ask:
             configs.print_config(config)
 
@@ -327,9 +327,9 @@ class que:
             proceed = True
 
         if proceed:
-            config['entity'] = entity
-            config['project'] = project
-            config['tags'] = tags
+            config["entity"] = entity
+            config["project"] = project
+            config["tags"] = tags
             self.to_run.append(config)
             self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
         else:
@@ -578,7 +578,7 @@ class worker:
             raise ValueError(
                 f"Tried to read next run from {self.temp_path} but it was empty"
             )
-            
+
         entity = info["entity"]
         project = info["project"]
         tags = info["tags"]
@@ -609,7 +609,6 @@ class worker:
             )
         else:
             self.print_v(f"Starting new run with name: {run_name}")
-            self.print_v(f"Starting new run with name: {run_name}")
             run = wandb.init(
                 entity=entity, project=project, name=run_name, tags=tags, config=info
             )
@@ -618,7 +617,7 @@ class worker:
         self.print_v(f"Run name: {run.name}")  # Human-readable name
         self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
 
-        train_loop(admin['model'], run, recover=admin["recover"])
+        train_loop(admin["model"], run, recover=admin["recover"])
         run.finish()
 
         # write at end to avoid overwriting a run
@@ -878,7 +877,7 @@ class daemon:
     def worker_log(self, args: Optional[list[str]] = None) -> subprocess.Popen:
         """Non-blocking start which prints worker output to LOG_PATH, and passes the process"""
 
-        cmd = [self.worker.exec_path, self.wr_name, 'work']
+        cmd = [self.worker.exec_path, self.wr_name, "work"]
         if args:
             cmd.extend(args)
 
