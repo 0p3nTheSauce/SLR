@@ -89,6 +89,28 @@ def load_config(arg_dict: Dict, verbose: bool = False) -> Dict:
     # return post_process(config, verbose)
     return config
 
+def load_config2(admin: Dict, verbose: bool = False) -> Dict:
+    """Load config from flat file and merge with command line args"""
+    conf_path = Path(admin["config_path"])
+    if not conf_path.exists():
+        raise ValueError(f"{conf_path} not found")
+    config = parse_ini_config(admin["config_path"])
+    ndict = {'admin': admin}
+    ndict.update(config)
+     # want to add equivalent batch size
+    try:
+        ndict["training"]["batch_size_equivalent"] = (
+            ndict["training"]["batch_size"] * ndict["training"]["update_per_step"]
+        )
+    except KeyError as e:
+        print(f"Warning: issue with config: {e}")
+        print("available keys: ")
+        for k in config.keys():
+            print(k)
+        raise e
+    ndict = EarlyStopper.config_precheck(ndict)
+    return ndict
+    
 
 def _convert_type(value: str) -> Any:
     """Convert string values to appropriate types"""
@@ -167,7 +189,7 @@ def take_args(
     # admin
     parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument(
-        "model_name",
+        "model",
         type=str,
         help=f"Model name from one of the implemented models: {models_available}",
     )
@@ -226,9 +248,9 @@ def take_args(
             f"Sorry {args.split} not processed yet.\n\
 			Currently available: {splits_available}"
         )
-    if args.model_name not in models_available:
+    if args.model not in models_available:
         raise ValueError(
-            f"Sorry {args.model_name} not implemented yet.\n\
+            f"Sorry {args.model} not implemented yet.\n\
 			Currently available: {models_available}"
         )
 
@@ -240,7 +262,7 @@ def take_args(
     args.exp_no = exp_no
     args.root = WLASL_ROOT + "/" + RAW_DIR
     args.labels = f"{LABELS_PATH}/{args.split}"
-    output = Path(f"{RUNS_PATH}/{args.split}/{args.model_name}_exp{exp_no}")
+    output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
 
     # recovering
     if not args.recover and output.exists():  # fresh run
@@ -291,7 +313,7 @@ def take_args(
 
     # Set config path
     if args.config_path is None:
-        args.config_path = f"./configfiles/{args.split}/{args.model_name}_{exp_no}.ini"
+        args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
 
     # Load config
     arg_dict = vars(args)
@@ -308,7 +330,7 @@ def take_args(
     # NOTE: these tags are redundant
     tags = [
         args.split,
-        args.model_name,
+        args.model,
         f"exp-{exp_no}",
     ]
     if args.recover:
@@ -320,7 +342,22 @@ def take_args(
 
 
 # def print_wandb_config(config):
+def str_dict(dic: Dict[str, Any], disp:bool = False) -> str:
+    """Print dictionary in a more readable format.
 
+    Args:
+        dic (Dict[str, Any]): Dictionary to print
+    """
+    maxl_k = max([len(key) for key in dic.keys()])
+    st = '{\n'
+    for key in dic.keys():
+        st += f"\t{key:<{maxl_k}} : {dic[key]}\n"
+    st += '}'
+    if disp:
+        print(st)
+    return st
+    
+    
 
 def main():
     try:
@@ -336,10 +373,9 @@ def main():
         arg_dict, tags, project, entity = maybe_args
     else:
         return
-
-    config = load_config(arg_dict, verbose=True)
-    print_config(config)
-    print("\n" * 2)
+    str_dict(arg_dict, disp=True)
+    # config = load_config(arg_dict, verbose=True)
+    # print_config(config)
 
     # print_dict(config)
 

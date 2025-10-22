@@ -44,7 +44,6 @@ def store_Data(path: Path, data: dict):
     with open(path, "w") as file:
         json.dump(data, file, indent=4)
 
-
 class que:
     def __init__(
         self,
@@ -116,7 +115,7 @@ class que:
 
         dic.update(
             {
-                "model": admin["model_name"],
+                "model_name": admin["model_name"],
                 "exp_no": admin["exp_no"],
                 "split": admin["split"],
                 "config_path": admin["config_path"],
@@ -263,6 +262,9 @@ class que:
 
         return conf_list
 
+    
+
+
     def create_run(
         self,
         arg_dict: dict,
@@ -306,14 +308,11 @@ class que:
             proceed = True
 
         if proceed:
-            info = {
-                "config": config,
-                "entity": entity,
-                "project": project,
-                "tags": tags,
-            }
-            self.to_run.append(info)
-            self.print_v(f"Added new run: {self.run_str(self.run_sum(info))}")
+            config['entity'] = entity
+            config['project'] = project
+            config['tags'] = tags
+            self.to_run.append(config)
+            self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
         else:
             self.print_v("Training cancelled by user")
 

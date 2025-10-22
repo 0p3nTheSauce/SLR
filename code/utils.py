@@ -13,6 +13,93 @@ import random
 
 from typing import Callable, Optional
 
+def reformat_runs():
+    
+    import json
+    with open('newRuns.json', 'r') as f:
+        # old_runs = json.load(f)
+        all_runs = json.load(f)
+        old_runs = all_runs['old_runs']
+        nold_runs = []
+        for dic in old_runs:
+            newd = {}
+            newd['admin'] = dic['admin']
+            for key, value in dic.items():
+                print(f'key {key}')
+                if key == 'config':
+                    nconfig = {}
+                    for k2, v2 in dic['config'].items():
+                        if k2 == 'model_name':
+                            nconfig['model'] = v2
+                        else:
+                            nconfig[k2] = v2
+                    newd['config'] = nconfig
+                elif key == 'admin':
+                    continue
+                else:
+                    newd[key] = value
+            nold_runs.append(newd)
+        all_runs['old_runs'] = nold_runs        
+    
+    with open('newRuns.json', 'w') as f:
+        json.dump(all_runs, f, indent=4)
+
+
+def reformat_runs_1():
+    
+    import json
+    with open('newRuns.json', 'r') as f:
+        # old_runs = json.load(f)
+        all_runs = json.load(f)
+        old_runs = all_runs['old_runs']
+        nold_runs = []
+        for dic in old_runs:
+            newd = {}
+            for key, value in dic.items():
+                print(f'key {key}')
+                if key == 'admin':
+                    nadmin = {}
+                    for k2, v2 in dic['admin'].items():
+                        if k2 == 'model_name':
+                            nadmin['model'] = v2
+                        else:
+                            nadmin[k2] = v2
+                    newd['admin'] = nadmin
+                else:
+                    newd[key] = value
+            nold_runs.append(newd)
+        all_runs['old_runs'] = nold_runs        
+    
+    with open('newRuns.json', 'w') as f:
+        json.dump(all_runs, f, indent=4)
+                    
+def reformat_runs_0():
+    #we want to convert the runs folder to new format, by removing the model info dict
+    #and unpacking the config dict to top level
+    import json
+    with open('queRuns.json', 'r') as f:
+        # old_runs = json.load(f)
+        all_runs = json.load(f)
+        old_runs = all_runs['old_runs']
+        nold_runs = []
+        for dic in old_runs:
+            newd = {}
+            for key, value in dic.items():
+                print(f'key {key}')
+                if key == 'model_info':
+                    continue
+                elif key == 'config':
+                    for k2, v2 in dic[key].items():
+                        newd[k2] = v2
+                else:
+                    newd[key] = value
+            nold_runs.append(newd)
+        all_runs['old_runs'] = nold_runs        
+    
+    with open('newRuns.json', 'w') as f:
+        json.dump(all_runs, f, indent=4)
+
+
 
 #############  Seed ###################
 
@@ -24,9 +111,7 @@ def set_seed(seed=42):
 	torch.backends.cudnn.deterministic = True
 	torch.backends.cudnn.benchmark = False
 
-
 ############## wandb ##################
-
 class wandb_manager:
 	@classmethod
 	def get_run_id(
@@ -82,9 +167,6 @@ class wandb_manager:
 	def validate_runId(cls, run_id: str, entity: str, project: str) -> bool:
 		return cls.run_present(run_id, cls.list_runs(entity, project))
 
-
-
-
 ############### Input ##################
 
 def ask_nicely(message: str,
@@ -105,8 +187,6 @@ def ask_nicely(message: str,
 			passed=False
 	return ans
 
-
-
 ############# pretty printing ##############
 
 def print_dict(diction):
@@ -123,16 +203,11 @@ def string_nested_dict(diction):
 		ans += str(diction)
 	return ans
 
-
-
 ################# Loading #####################
-
   
 def load_rgb_frames_from_video(video_path : str, start : int, end : int
                               , all : bool =False) -> torch.Tensor:
   return cv_to_torch(cv_load(video_path, start, end, all))
-
-
 
 def cv_load(video_path:str|Path, start:int, end:int, all:bool=False):
   video_path = Path(video_path)  
@@ -153,10 +228,7 @@ def cv_load(video_path:str|Path, start:int, end:int, all:bool=False):
   else:
     raise ValueError(f"No frames were loaded for file {video_path}")
 
-
-
 ################## Saving #####################
-
 
 def save_video(frames, path, fps=30):
   '''Arguments:
@@ -279,9 +351,7 @@ def visualise_frames(frames,num, size=(5,5), adapt=False, output=None):
       plt.savefig(output / f'frame{i}.png')
     plt.show()
   
-
 ################### Conversions #####################
-
     
 def torch_to_cv(frames: torch.Tensor) -> np.ndarray:
   '''convert 4D torch tensor (T C H W) uint8 to opencv format'''
@@ -308,9 +378,7 @@ def cv_to_torch(frames):
   torch_frames = torch_frames.permute(0,3,1,2)
   return torch_frames
   
-
 ####################     Plotting utilities  ####################
-
 
 def plot_from_lists(train_loss, val_loss=None, 
                           title='Training Loss Curve',
@@ -348,8 +416,6 @@ def plot_from_lists(train_loss, val_loss=None,
   if show:
     plt.show()
 
-
-
 ##################### Misc ###################################
 
 def extract_num(fname):
@@ -384,7 +450,6 @@ def is_removable(f:Path,rem_files:list[str]) -> bool:
     if f.name.endswith(r):
       return True
   return False 
-
 
 def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=False, rem_files= []):
   for path in paths:
@@ -473,7 +538,6 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
 
 def is_empty(path):
   return not any(Path(path).iterdir())
-
     
 def clean_experiments(path, ask=False, rem_empty=False, rem_files=[]):
   path_obj = Path(path)
@@ -517,7 +581,6 @@ def enum_dir(path:str|Path, make:bool=False, decimals:int=3):
     path.mkdir(parents=True, exist_ok=True)
   return path
 
-
 def main():
   #TODO: the output for empty runs has an issue
   parser = ArgumentParser(description='utils.py')
@@ -533,4 +596,6 @@ def main():
  
 
 if __name__ == '__main__':
-  main()
+#   main()
+    reformat_runs()
+  
