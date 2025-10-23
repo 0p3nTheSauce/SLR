@@ -404,7 +404,7 @@ def main():
 	proceed = input("Confirm: y/n: ")
 	if proceed.lower() == "y":
 		admin = config["admin"]
-		model_name = admin["model_name"]
+		model_name = admin["model"]
 		run_id = admin["run_id"] if "run_id" in admin else None
 
 		# setup wandb run

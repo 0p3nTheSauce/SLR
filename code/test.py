@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple, Dict, Literal, List
+from typing import Optional, Union, Tuple, Dict, Literal, List, Any
 
 import torch
 import json
@@ -322,7 +322,7 @@ def _get_test_loader(
 
 
 def test_run(
-    config: Dict,
+    config: Dict[str, Any],
     perm: Optional[torch.Tensor] = None,
     test_val: bool = False,
     check: str = "best.pth",
@@ -331,14 +331,13 @@ def test_run(
     seed: int = 42,
     classes_path: str = CLASSES_PATH,
 ) -> Optional[Dict]:
+    
+    
     utils.set_seed(seed)
 
-
-    main_conf = config["config"]
-    admin = main_conf["admin"]
-    model_name = config["model_info"]
-    data = main_conf["data"]
-
+    admin = config["admin"]
+    model_name = admin["model"]
+    data = config["data"]
 
     model_norms = norm_vals(model_name)
     results = {}
@@ -440,9 +439,23 @@ def test_run(
 
     return results
 
+def find_best_checkpnt():
+    with open("queRuns.json", "r") as f:
+        all_runs = json.load(f)
 
+    old_runs = all_runs['old_runs']
+    last_old = old_runs[-1]
+    test_run(
+        config=last_old,
+        plot=True,
+        disp=True
+    )
+    
+    
+    
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="test.py")
     
     parser.add_argument()
+    
