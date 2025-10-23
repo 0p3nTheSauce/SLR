@@ -14,7 +14,7 @@ import torch
 # locals
 import configs
 import utils
-from train import train_loop, wandb_manager
+from training import train_loop, wandb_manager
 
 # constants
 SESH_NAME = "que_training"
