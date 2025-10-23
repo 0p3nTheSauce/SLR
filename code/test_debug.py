@@ -514,14 +514,14 @@ def test_shuffle():
 		print("\nAll tests passed!")
 
 def test_sub():
-    with subprocess.Popen(['ping', 'google.com', '-c', '4'],  # Limit to 4 pings
-                      stdout=subprocess.PIPE, 
-                      stderr=subprocess.PIPE, 
-                      text=True) as proc:
-        stdout, stderr = proc.communicate()
-        if stdout:
-            for line in stdout.splitlines():
-                print(f"Received: {line.strip()}")
+	with subprocess.Popen(['ping', 'google.com', '-c', '4'],  # Limit to 4 pings
+					  stdout=subprocess.PIPE, 
+					  stderr=subprocess.PIPE, 
+					  text=True) as proc:
+		stdout, stderr = proc.communicate()
+		if stdout:
+			for line in stdout.splitlines():
+				print(f"Received: {line.strip()}")
 
 
 
@@ -537,15 +537,32 @@ def test_safe_index():
 		i = random.randint(-len(lst) - 1, len(lst) + 1)
 
 def test_wait_for_completion():
-    from quewing import gpu_manager
-    
-    print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
+	from quewing import gpu_manager
+	
+	print(gpu_manager.wait_for_completion(verbose=True, check_interval=5, confirm_interval=1))
 
 
 def test_get_avail_splits():
-    from configs import get_avail_splits
-    print(get_avail_splits())
+	from configs import get_avail_splits
+	print(get_avail_splits())
+
+def reformet():
+	#reformat queRuns so that entity, project, tags, and run_id, are encaplusated in a wandb dictionary
+	with open('queRuns.json', 'r') as f:
+		all_runs = json.load(f)
+	old_runs = all_runs['old_runs']
+	for run in old_runs:
+		wandb_info = {
+			'entity': run.pop('entity'),
+			'project': run.pop('project'),
+			'tags': run.pop('tags'),
+			'run_id': run.pop('run_id')
+		}
+		run['wandb'] = wandb_info
+	with open('queRuns.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
 
 
 if __name__ == "__main__":
-	test_get_avail_splits()
+	# test_get_avail_splits()
+	reformet()
