@@ -97,36 +97,41 @@ def get_scheduler(
 
 def get_scheduler2(
 	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
-):
+) -> LRScheduler:
 	"""Get learning rate scheduler based on config."""
 	if sched_conf is None:
 		# Identity scheduler - multiplies LR by 1.0 (no change)
 		return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
 
-	
-
+	warmup_epochs = sched_conf.get('warmup_epochs', 0)
+	if warmup_epochs > 0:
+		warmup_scheduler = optim.lr_scheduler.LinearLR(
+			optimizer,
+			start_factor=sched_conf['start_factor'], 
+			end_factor=sched_conf['end_factor'],
+			total_iters=sched_conf['warmup_epochs']
+		)
+	else:
+		warmup_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
+ 
 	if sched_conf["type"] == "CosineAnnealingLR":
-		if 'warmup_epochs' in sched_conf:
-			warmup_scheduler = optim.lr_scheduler.LinearLR(
-				optimizer,
-    			start_factor=sched_conf['start_factor'], 
-				end_factor=sched_conf['end_factor'],
-				total_iters=sched_conf['warmup_epochs']
-			)
-			cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-				optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
-			)
-			return optim.lr_scheduler.SequentialLR(
-				optimizer,
-				schedulers=[warmup_scheduler, cosine_scheduler],
-				milestones=[sched_conf['warmup_epochs']]
-			)
-		else:
-			return optim.lr_scheduler.CosineAnnealingLR(
-				optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
-			)
+		
+		scheduler = optim.lr_scheduler.CosineAnnealingLR(
+			optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
+		)
+	elif sched_conf["type"] == "CosineAnnealingWarmRestarts":
+		scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+			optimizer, T_0=sched_conf["t0"], T_mult=sched_conf["tmult"], eta_min=sched_conf["eta_min"]
+		)
+
 	else:
 		raise ValueError(f"Scheduler type {sched_conf['type']} not recognized.")
+
+	return optim.lr_scheduler.SequentialLR(
+			optimizer,
+			schedulers=[warmup_scheduler, scheduler],
+			milestones=[warmup_epochs]
+		)
 
 def train_loop(
 	model_name: str, 
