@@ -16,7 +16,7 @@ from argparse import ArgumentParser
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model
-from configs import LABEL_SUFFIX, CLASSES_PATH
+from configs import LABEL_SUFFIX
 #################################### Utilities #################################
 
 
@@ -319,6 +319,13 @@ def _get_test_loader(
 	)
 
 
+def collect_results(res_p:Path):
+	with open(res_p, "r") as f:
+		res = json.load(f)
+	return res
+		
+	
+
 def test_run(
 	config: Dict[str, Any],
 	perm: Optional[torch.Tensor] = None,
@@ -331,9 +338,29 @@ def test_run(
 	disp: bool = False,
 	save: bool = True,
 	seed: int = 42,
-	classes_path: str = CLASSES_PATH,
+	re_test: bool = False,
 ) -> Optional[Dict[str, Any]]:
+	"""Perform testing of a model according to the provided configuration.
+
+	Args:
+		config (Dict[str, Any]): Run config file.
+		perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+		test_val (bool, optional): Test on the val set. Defaults to False.
+		test_test (bool, optional): Test on the test set. Defaults to True.
+		check (str, optional): Checkpoint name. Defaults to "best.pth".
+		br_graph (bool, optional): Create bar graph. Defaults to False.
+		cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+		heatmap (bool, optional): Create heatmap. Defaults to False.
+		disp (bool, optional): Display plots. Defaults to False.
+		save (bool, optional): Save results and plots. Defaults to True.
+		seed (int, optional): Testing random seed. Defaults to 42.
+		re_test (bool, optional): Test even if results already saved. Defaults to False.
+
+	Returns:
+		Optional[Dict[str, Any]]: Results if correct parameters.
+	"""
 	
+ 
 	utils.set_seed(seed)
 
 	admin = config["admin"]
@@ -346,9 +373,9 @@ def test_run(
 	save_path = Path(admin["save_path"])
 
 	output = save_path.parent / "results"
+
 	if save:
 		output.mkdir(exist_ok=True)
-
  
 	tloaders = {}
 	
@@ -405,24 +432,34 @@ def test_run(
 	for set_name, tloader in tloaders.items():
 		print(f"Testing on {set_name} set")
 		fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
-		save2 = output / fname if save else None		
+		save2 = output / fname 
+		load = save2.exists() and not re_test	
+
+		if load:
+			print(f"loading from: {save2}")
+			with open(save2, 'r') as f:
+				topk_res = json.load(f)
+			results[set_name] = topk_res
+			continue
+		else:
+			save2 = None if not save else save2
+			if save2:
+				print(f"Saving to: {save2}")
+			topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
+				model=model,
+				test_loader=tloader,
+				seed=seed,
+				verbose=False,
+				save_path=save2,
+			)
+			results[set_name] = topk_res
+			heatmap, br_graph, cf_matrix = False, False, False  # skip plots if loading
    
-		topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
-			model=model,
-			test_loader=tloader,
-			seed=seed,
-			verbose=False,
-			save_path=save2,
-		)
-		results[set_name] = topk_res
-
-
 		if heatmap:
 			fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
 			save2 = output / fname if save else None		
 			plot_heatmap(
 				report=cls_report,
-				classes_path=classes_path,
 				title=f"{set_name.capitalize()} set Classification Report",
 				save_path=save2,
 				disp=disp,
@@ -433,7 +470,6 @@ def test_run(
 			save2 = output / fname if save else None
 			plot_bar_graph(
 				report=cls_report,
-				classes_path=classes_path,
 				title=f"{set_name.capitalize()} set Classification Report",
 				save_path=save2,
 				disp=disp,
@@ -448,7 +484,6 @@ def test_run(
 			plot_confusion_matrix(
 				y_true=all_targets,
 				y_pred=all_preds,
-				classes_path=classes_path,
 				title=f"{set_name.capitalize()} set Confusion Matrix",
 				save_path=save2,
 				disp=disp,
@@ -456,23 +491,17 @@ def test_run(
 
 	return results
 
-def find_best_checkpnt():
+##################### Multiple-run testing utility #########################
+
+
+def find_best_checkpnt(run_idx: int):
 	with open("queRuns.json", "r") as f:
 		all_runs = json.load(f)
 
 	old_runs = all_runs['old_runs']
-	for run in old_runs:
-		utils.print_dict(run['admin'])
-		res = test_run(
-			config = run,
-			save=False,
-			disp=True,
-			test_val=True,
-			test_test=True,
-		)
-		utils.print_dict(res)
-		print("\n\n")
-	
+	run = old_runs[run_idx]
+	save_path = Path(run['admin']['save_path'])
+	print(f"Looking in: {save_path}")
 	
 	
 

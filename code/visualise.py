@@ -6,9 +6,12 @@ import seaborn as sns
 import numpy as np
 from typing import Dict, Optional, Callable, List, Union
 from pathlib import Path
+#locals
+from configs import CLASSES_PATH
 # Set style for better-looking plots
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
+
 
 def load_results(filepath: str) -> Dict:
 	"""Load results from JSON file."""
@@ -17,7 +20,7 @@ def load_results(filepath: str) -> Dict:
 
 def plot_heatmap(
     report: Dict[str, Dict[str, float]],
-    classes_path: Union[str, Path],
+    classes_path: Union[str, Path] = CLASSES_PATH,
     title: str = "Classification Report Heatmap",
     save_path: Optional[Union[str, Path]] = None,
     disp: bool = True,
@@ -70,7 +73,7 @@ def plot_heatmap(
 
 def plot_bar_graph(
     report: Dict[str, Dict[str, float]],
-    classes_path: Union[str, Path],
+    classes_path: Union[str, Path] = CLASSES_PATH ,
     title: str = "Classification Report - Per Class Metrics",
     save_path: Optional[Union[str, Path]] = None,
     disp: bool = True,
@@ -145,7 +148,7 @@ def plot_bar_graph(
 def plot_confusion_matrix(
     y_true: Union[np.ndarray, List[int]],
     y_pred: Union[np.ndarray, List[int]],
-    classes_path: Optional[Union[str, Path]] = None,
+    classes_path: Optional[Union[str, Path]] = CLASSES_PATH,
     num_classes: int = 100,
     title: str = "Confusion Matrix",
     size: tuple[int, int] = (10, 8),
