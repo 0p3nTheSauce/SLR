@@ -276,7 +276,7 @@ def train_loop(
 			accumulated_steps = 0
 			optimizer.zero_grad()
 
-			for batch_idx, item in enumerate(dataloaders[phase]):
+			for item in dataloaders[phase]:
 				data, target = item["frames"], item["label_num"]
 				data, target = data.to(device), target.to(device)
 				batch_size = data.size(0)
