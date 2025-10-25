@@ -82,20 +82,7 @@ def setup_data(mean, std, config):
 
 	return dataloaders, num_classes
 
-
 def get_scheduler(
-	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
-) -> LRScheduler:
-	"""Get learning rate scheduler based on config."""
-	if sched_conf is None:
-		# Identity scheduler - multiplies LR by 1.0 (no change)
-		return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
-
-	return optim.lr_scheduler.CosineAnnealingLR(
-		optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf.get("eta_min", 0)
-	)
-
-def get_scheduler2(
 	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
 ) -> LRScheduler:
 	"""Get learning rate scheduler based on config."""
@@ -115,7 +102,6 @@ def get_scheduler2(
 		warmup_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
  
 	if sched_conf["type"] == "CosineAnnealingLR":
-		
 		scheduler = optim.lr_scheduler.CosineAnnealingLR(
 			optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
 		)
@@ -175,7 +161,6 @@ def train_loop(
 
 	steps = 0
 	epoch = 0
-	# best_val_score=0.0
 	best_val_score = float("inf")
 
 	param_groups = [
@@ -254,7 +239,6 @@ def train_loop(
 
 	# train it
 	while epoch < config.training["max_epoch"] and not stopper.stop:
-		# print(f"Step {steps}/{config.training['max_steps']}")
 		print(f"Epoch {epoch}/{config.training['max_epoch']}")
 		print("-" * 10)
 
@@ -266,7 +250,7 @@ def train_loop(
 			else:
 				model.eval()
 
-			# Reset matrics for this phase
+			# Reset metrics for this phase
 			running_loss = 0.0
 			running_corrects = 0
 			total_samples = 0
@@ -363,7 +347,7 @@ def train_loop(
 				# Step scheduler with validation loss
 				scheduler.step()
 
-				print(f"Best validation loss so far: {best_val_score:.2f}%")
+				print(f"Best validation loss so far: {best_val_score:.2f}")
 
 		# Save checkpoint
 		if (
