@@ -161,7 +161,9 @@ def train_loop(
 
 	steps = 0
 	epoch = 0
-	best_val_score = float("inf")
+	best_val_loss = float("inf")
+	best_val_acc = float("-inf")
+ 
 
 	param_groups = [
 		{
@@ -224,7 +226,7 @@ def train_loop(
 			stopper.load_state_dict(checkpoint["stopper_state_dict"])
 			epoch = checkpoint["epoch"] + 1
 			steps = checkpoint["steps"]
-			best_val_score = checkpoint["best_val_score"]
+			best_val_loss = checkpoint["best_val_score"]
 
 			print(f"Resuming from epoch {epoch}, steps {steps}")
 			print(f"Loaded model from {load}")
@@ -335,20 +337,31 @@ def train_loop(
 
 			# Validation specific logic
 			if phase == "val":
+				
 				# Save best model
-				if epoch_loss < best_val_score:
-					best_val_score = epoch_loss
+				if epoch_loss < best_val_loss:
+					best_val_loss = epoch_loss
 					check_name = save_path / "best.pth"
 					torch.save(model.state_dict(), check_name)
 					print(
 						f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)"
 					)
 
-				# Step scheduler with validation loss
+				if epoch_acc > best_val_acc:
+					best_val_acc = epoch_acc
+
+				wandb_run.log(
+					{
+						f"Best/{phase.capitalize()}_loss": epoch_loss,
+						f"Best/{phase.capitalize()}_acc": epoch_acc,
+						"Epoch": epoch,
+					}
+				)	
+
 				scheduler.step()
 
-				print(f"Best validation loss so far: {best_val_score:.2f}")
-
+				print(f"Best validation loss so far: {best_val_loss:.2f}")
+				print(f"Best validation acc so far: {best_val_acc:.2f}")
 		# Save checkpoint
 		if (
 			epoch % save_every == 0
@@ -361,7 +374,7 @@ def train_loop(
 				"model_state_dict": model.state_dict(),
 				"optimizer_state_dict": optimizer.state_dict(),
 				"scheduler_state_dict": scheduler.state_dict(),
-				"best_val_score": best_val_score,
+				"best_val_score": best_val_loss,
 				"stopper_state_dict": stopper.state_dict(),
 			}
 			checkpoint_path = save_path / f"checkpoint_{str(epoch).zfill(3)}.pth"
