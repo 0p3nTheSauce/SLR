@@ -28,6 +28,23 @@ def cleanup_memory():
         torch.cuda.synchronize()
     gc.collect()
 
+#################################### Helper classes #############################
+
+class top_k:
+    
+    def __init__(self,
+                 per: str,     
+                 top1: float,
+                 top5: float,
+                 top10: float) -> None:
+        possible_pers = ["top_k_average_per_class_acc", "top_k_per_instance_acc"]
+        if per not in possible_pers:
+            raise ValueError(f'per not one of available metric: {possible_pers}')
+        self.per = per    
+        self.top1 = top1
+        self.top5 = top5
+        self.top10 = top10
+
 
 ##############################   Individual-run testing   ######################################
 
@@ -507,9 +524,18 @@ def find_best_checkpnt(run_idx: int):
     run = old_runs[run_idx]
     save_path = Path(run["admin"]["save_path"])
     print(f"Looking in: {save_path}")
+    checkpnts = sorted([p for p in save_path.iterdir()])
+    reses = {}
+    for c in checkpnts:
+        print(c.name)
+        test_run(
+            config=run,
+            test_val=True,
+            check=c.name,
+        )
+        
+    
 
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="test.py")
-
-    parser.add_argument()
+    find_best_checkpnt(0)
