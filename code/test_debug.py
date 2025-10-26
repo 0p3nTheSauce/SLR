@@ -562,7 +562,16 @@ def reformet():
 	with open('queRuns.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
+def test_shuffle2():
+    from video_transforms import Shuffle
+    perm = Shuffle.create_permutation(16, 42)
+    # print(perm)
+    Shuffle.shannon_entropy(perm)
+    print("claude:")
+    print(Shuffle.shannon_entropy2(perm))
+
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
-	reformet()
+	# reformet()
+	test_shuffle2()

@@ -12,7 +12,6 @@ import tqdm
 from pathlib import Path
 import utils
 import gc
-from argparse import ArgumentParser
 
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
@@ -36,8 +35,9 @@ class top_k:
                  per: str,     
                  top1: float,
                  top5: float,
-                 top10: float) -> None:
-        possible_pers = ["top_k_average_per_class_acc", "top_k_per_instance_acc"]
+                 top10: float, 
+                 perm: Optional[torch.Tensor]) -> None:
+        possible_pers = ["class", "instance"]
         if per not in possible_pers:
             raise ValueError(f'per not one of available metric: {possible_pers}')
         self.per = per    
