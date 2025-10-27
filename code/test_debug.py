@@ -565,7 +565,7 @@ def reformet():
 def test_shuffle2():
     from video_transforms import Shuffle
     perm = Shuffle.create_permutation(16, 42)
-    # print(perm)
+    print(perm)
     Shuffle.shannon_entropy(perm)
     print("claude:")
     print(Shuffle.shannon_entropy2(perm))
