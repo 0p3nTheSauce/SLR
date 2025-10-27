@@ -564,11 +564,16 @@ def reformet():
 
 def test_shuffle2():
     from video_transforms import Shuffle
-    perm = Shuffle.create_permutation(16, 42)
-    print(perm)
+    import torch
+    # perm = Shuffle.create_permutation(4, 42)
+    perm = torch.tensor([3, 0, 1, 2])
+    print(f"original: {perm}")
     Shuffle.shannon_entropy(perm)
-    print("claude:")
-    print(Shuffle.shannon_entropy2(perm))
+    print()
+    Shuffle.shannon_entropy2(perm)
+    print()
+    print(Shuffle.position_entropy(perm))
+
 
 
 if __name__ == "__main__":

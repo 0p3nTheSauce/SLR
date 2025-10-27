@@ -1,5 +1,5 @@
 import torch
-from typing import Callable
+from typing import Callable, Literal
 import random
 import utils
 import time
@@ -201,7 +201,7 @@ class Shuffle(Transform):
         return torch.randperm(num_frames)
     
     @staticmethod
-    def shannon_entropy(perm: torch.Tensor) -> float:
+    def shannon_entropy(perm: torch.Tensor, unit:Literal['bit', 'nat', 'dit'] = 'bit') -> float:
         perml = list(map(int, perm.numpy()))
         
         p_len = len(perml)
@@ -209,55 +209,74 @@ class Shuffle(Transform):
         for i in range(p_len-1):
             diff = perml[i+1] - perml[i]
             if diff < 0:
-                diff += p_len-1
+                diff += p_len
             diffs[i] = diff
 
-        diffs[p_len-1] = perml[0] - perml[p_len-1]
+        diff = perml[0] - perml[p_len-1]
+        if diff < 0:
+            diff += p_len
+        
+        diffs[p_len-1] = diff
         
         hist = [0] * p_len
         
-        for i in range(p_len):
-            for d in diffs:
-                if d == i:
-                    hist[i] += 1
+        for d in diffs:
+            hist[d] += 1
                     
         print(diffs)
         normed = [d / p_len for d in hist if d > 0]
         print(normed)
         e = 0
+        
+        def log_func(unit):
+            if unit == 'bit':
+                return lambda x: math.log(x, 2)
+            elif unit == 'nat':
+                return lambda x: math.log(x)
+            else:
+                return lambda x: math.log(x, 10)
+            
+        log = log_func(unit)            
+            
         for n in normed:
-            e += -n * (math.log(n))
+            e += -n * log(n)
         print(f"E: {e}")
         return e
 
     @staticmethod
-    def shannon_entropy2(perm: torch.Tensor) -> float:
-        """
-        Calculate the Shannon entropy of a permutation tensor.
+    def shannon_entropy2(perm: torch.Tensor):
+        plen = perm.shape[0]
+        diffs = torch.zeros(plen, dtype=torch.long)
+        # print(diffs)
+        for i in range(-1, plen-1):
+            diff = perm[i+1] - perm[i]
+            if diff < 0:
+                diff += plen
+            diffs[i] = diff    
         
-        Args:
-            perm: A tensor representing a permutation or probability distribution
+        print(diffs)
             
-        Returns:
-            Shannon entropy value (in bits if using log2, nats if using log)
-        """
-        # Flatten the tensor to 1D if needed
-        perm_flat = perm.flatten()
+        hist = torch.bincount(diffs, minlength=plen).float()
+            
+        normed = hist / plen
+        normed_no0 = normed[normed > 0]
+        print(normed_no0)
+        entropy = -torch.sum(normed_no0 * torch.log2(normed_no0))
+        print(f"E: {entropy.item()}")
+
+    @staticmethod
+    def position_entropy(perm: torch.Tensor):
+        sorted_perm = torch.argsort(perm)
+        print(sorted_perm)
+        print(torch.arange(len(perm)))
+        displacements = torch.abs(torch.arange(len(perm)) - sorted_perm)
+        print(displacements)
+        hist = torch.bincount(displacements).float()
+        print(hist)
+        normed = hist / len(perm)
+        normed_no0 = normed[normed > 0]
         
-        
-        # print(leng)
-        
-        # Normalize to get probability distribution (if not already normalized)
-        probs = perm_flat / perm_flat.sum()
-        
-        # Remove zero probabilities to avoid log(0)
-        probs = probs[probs > 0]
-        
-        # Calculate Shannon entropy: H = -sum(p * log(p))
-        # Using log2 gives entropy in bits, log gives nats
-        entropy = -torch.sum(probs * torch.log(probs))
-        
-        return entropy.item()
+        return -torch.sum(normed_no0 * torch.log2(normed_no0)).item()
 
 if __name__ == "__main__":
     vid = "./media/00333.mp4"
