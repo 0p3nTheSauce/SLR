@@ -203,18 +203,29 @@ class Shuffle(Transform):
     @staticmethod
     def shannon_entropy(perm: torch.Tensor) -> float:
         perml = list(map(int, perm.numpy()))
+        
         p_len = len(perml)
         diffs = [0] * p_len  
         for i in range(p_len-1):
             diff = perml[i+1] - perml[i]
             if diff < 0:
-                diff += (p_len-1)
+                diff += p_len-1
             diffs[i] = diff
-                
-            
+
         diffs[p_len-1] = perml[0] - perml[p_len-1]
-        print(p_len)
-        print(perml)
+        
+        hist = [0] * p_len
+        
+        for i in range(p_len):
+            for d in diffs:
+                if d == i:
+                    hist[i] += 1
+                    
+        nhist = [0.0] * p_len
+        
+        for i, n in enumerate(hist):
+            nhist[i] = n / p_len
+        
         print(diffs)
         normed = [d / p_len for d in diffs]
         print(normed)
@@ -238,6 +249,9 @@ class Shuffle(Transform):
         # Flatten the tensor to 1D if needed
         perm_flat = perm.flatten()
         
+        
+        # print(leng)
+        
         # Normalize to get probability distribution (if not already normalized)
         probs = perm_flat / perm_flat.sum()
         
@@ -246,7 +260,7 @@ class Shuffle(Transform):
         
         # Calculate Shannon entropy: H = -sum(p * log(p))
         # Using log2 gives entropy in bits, log gives nats
-        entropy = -torch.sum(probs * torch.log2(probs))
+        entropy = -torch.sum(probs * torch.log(probs))
         
         return entropy.item()
 
