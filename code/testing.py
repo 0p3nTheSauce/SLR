@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple, Dict, Literal, List
+from typing import Optional, Union, Tuple, Dict, Literal, List, Any
 
 import torch
 import json
@@ -9,16 +9,14 @@ from video_transforms import Shuffle
 from video_dataset import VideoDataset
 from torch.utils.data import DataLoader
 import tqdm
-from train import get_model
 from pathlib import Path
 import utils
 import gc
-from argparse import ArgumentParser
 
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
-from models import norm_vals
-from configs import LABEL_SUFFIX, CLASSES_PATH
+from models import norm_vals, get_model
+from configs import LABEL_SUFFIX
 #################################### Utilities #################################
 
 
@@ -28,6 +26,24 @@ def cleanup_memory():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
     gc.collect()
+
+#################################### Helper classes #############################
+
+class top_k:
+    
+    def __init__(self,
+                 per: str,     
+                 top1: float,
+                 top5: float,
+                 top10: float, 
+                 perm: Optional[torch.Tensor]) -> None:
+        possible_pers = ["class", "instance"]
+        if per not in possible_pers:
+            raise ValueError(f'per not one of available metric: {possible_pers}')
+        self.per = per    
+        self.top1 = top1
+        self.top5 = top5
+        self.top10 = top10
 
 
 ##############################   Individual-run testing   ######################################
@@ -156,18 +172,20 @@ def test_topk_clsrep(
     seed: Optional[int] = None,
     verbose: bool = False,
     save_path: Optional[Union[str, Path]] = None,
-) -> Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]:
+) -> Tuple[
+    Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]
+]:
     """Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
     Args:
-            model (torch.nn.Module): Initialised model to test.
-            test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
-            seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
-            verbose (bool, optional): Verbose output. Defaults to False.
-            save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
+                    model (torch.nn.Module): Initialised model to test.
+                    test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
+                    seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
+                    verbose (bool, optional): Verbose output. Defaults to False.
+                    save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
 
     Returns:
-            Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
+                    Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
     """
     if seed is not None:
         utils.set_seed(seed)
@@ -321,34 +339,82 @@ def _get_test_loader(
     )
 
 
+def collect_results(res_p: Path):
+    with open(res_p, "r") as f:
+        res = json.load(f)
+    return res
+
+
+def load_info(dirp: Path, checkname: str):
+    resd = {}
+    fnames = list(dirp.glob(f"{checkname}_*.json"))
+    print('here')
+    for fn in fnames:
+        with open(fn, "r") as f:
+            resd[fn.name.replace(".json", "")] = json.load(f)
+    return resd
+
+
 def test_run(
-    config: Dict,
+    config: Dict[str, Any],
     perm: Optional[torch.Tensor] = None,
     test_val: bool = False,
+    test_test: bool = True,
     check: str = "best.pth",
-    plot: bool = False,
+    br_graph: bool = False,
+    cf_matrix: bool = False,
+    heatmap: bool = False,
     disp: bool = False,
+    save: bool = True,
     seed: int = 42,
-    classes_path: str = CLASSES_PATH,
-) -> Optional[Dict]:
+    re_test: bool = False,
+) -> Dict[str, Any]:
+    """Perform testing of a model according to the provided configuration.
+
+    Args:
+            config (Dict[str, Any]): Run config file.
+            perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+            test_val (bool, optional): Test on the val set. Defaults to False.
+            test_test (bool, optional): Test on the test set. Defaults to True.
+            check (str, optional): Checkpoint name. Defaults to "best.pth".
+            br_graph (bool, optional): Create bar graph. Defaults to False.
+            cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+            heatmap (bool, optional): Create heatmap. Defaults to False.
+            disp (bool, optional): Display plots. Defaults to False.
+            save (bool, optional): Save results and plots. Defaults to True.
+            seed (int, optional): Testing random seed. Defaults to 42.
+            re_test (bool, optional): Test even if results already saved. Defaults to False.
+
+    Returns:
+            Optional[Dict[str, Any]]: Results if correct parameters.
+    """
+
     utils.set_seed(seed)
 
-
-    main_conf = config["config"]
-    admin = main_conf["admin"]
-    model_name = config["model_info"]
-    data = main_conf["data"]
-
+    admin = config["admin"]
+    model_name = admin["model"]
+    data = config["data"]
 
     model_norms = norm_vals(model_name)
     results = {}
 
     save_path = Path(admin["save_path"])
-    output = save_path.parent / "results"
-    output.mkdir(exist_ok=True)
 
-    tloaders = {
-        "test": _get_test_loader(
+    output = save_path.parent / "results"
+
+    if output.exists() and not re_test:
+        return load_info(output, check.replace('.pth', ''))
+
+    if save:
+        output.mkdir(exist_ok=True)
+
+    tloaders = {}
+
+    if not test_test and not test_val:
+        return results
+
+    if test_test:
+        tloaders["test"] = _get_test_loader(
             perm,
             model_norms,
             data["frame_size"],
@@ -357,7 +423,6 @@ def test_run(
             Path(admin["labels"]),
             "test",
         )
-    }
 
     if test_val:
         tloaders["val"] = _get_test_loader(
@@ -370,11 +435,12 @@ def test_run(
             "val",
         )
 
-    test_loader = tloaders["test"]
-    assert isinstance(test_loader.dataset, VideoDataset), (
+    keys = list(tloaders.keys())
+    gen_loader = tloaders[keys[0]]
+    assert isinstance(gen_loader.dataset, VideoDataset), (
         "This function uses a custom dataset"
     )
-    num_classes = len(set(test_loader.dataset.classes))
+    num_classes = len(set(gen_loader.dataset.classes))
 
     model = get_model(model_name, num_classes, drop_p=0.0)
 
@@ -397,52 +463,79 @@ def test_run(
     for set_name, tloader in tloaders.items():
         print(f"Testing on {set_name} set")
         fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
+        save2 = output / fname
+        save2 = None if not save else save2
+
         topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
             model=model,
             test_loader=tloader,
             seed=seed,
             verbose=False,
-            save_path=output / fname,
+            save_path=save2,
         )
-        results[set_name] = topk_res
+        results[fname.replace(".json", "")] = topk_res
+        heatmap, br_graph, cf_matrix = False, False, False  # skip plots if loading
 
-
-        if plot:
+        if heatmap:
             fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
+            save2 = output / fname if save else None
             plot_heatmap(
                 report=cls_report,
-                classes_path=classes_path,
                 title=f"{set_name.capitalize()} set Classification Report",
-                save_path=output / fname,
+                save_path=save2,
                 disp=disp,
             )
 
+        if br_graph:
             fname = check_path.name.replace(".pth", f"_{set_name}-bargraph.png")
+            save2 = output / fname if save else None
             plot_bar_graph(
                 report=cls_report,
-                classes_path=classes_path,
                 title=f"{set_name.capitalize()} set Classification Report",
-                save_path=output / fname,
+                save_path=save2,
                 disp=disp,
             )
+
+        if cf_matrix:
             fname = check_path.name.replace(".pth", f"_{set_name}-confmat.png")
-            assert isinstance(test_loader.dataset, VideoDataset), (
+            save2 = output / fname if save else None
+            assert isinstance(gen_loader.dataset, VideoDataset), (
                 "This function uses a custom dataset"
             )
             plot_confusion_matrix(
                 y_true=all_targets,
                 y_pred=all_preds,
-                classes_path=classes_path,
                 title=f"{set_name.capitalize()} set Confusion Matrix",
-                save_path=output / fname,
+                save_path=save2,
                 disp=disp,
             )
 
     return results
 
 
+##################### Multiple-run testing utility #########################
+
+
+def find_best_checkpnt(run_idx: int):
+    with open("queRuns.json", "r") as f:
+        all_runs = json.load(f)
+
+    old_runs = all_runs["old_runs"]
+    run = old_runs[run_idx]
+    save_path = Path(run["admin"]["save_path"])
+    print(f"Looking in: {save_path}")
+    checkpnts = sorted([p for p in save_path.iterdir()])
+    reses = {}
+    for c in checkpnts:
+        print(c.name)
+        test_run(
+            config=run,
+            test_val=True,
+            check=c.name,
+        )
+        
+    
+
 
 if __name__ == "__main__":
-    parser = ArgumentParser(description="test.py")
-    
-    parser.add_argument()
+    find_best_checkpnt(0)
