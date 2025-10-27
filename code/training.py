@@ -82,20 +82,7 @@ def setup_data(mean, std, config):
 
 	return dataloaders, num_classes
 
-
 def get_scheduler(
-	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
-) -> LRScheduler:
-	"""Get learning rate scheduler based on config."""
-	if sched_conf is None:
-		# Identity scheduler - multiplies LR by 1.0 (no change)
-		return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
-
-	return optim.lr_scheduler.CosineAnnealingLR(
-		optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf.get("eta_min", 0)
-	)
-
-def get_scheduler2(
 	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
 ) -> LRScheduler:
 	"""Get learning rate scheduler based on config."""
@@ -115,7 +102,6 @@ def get_scheduler2(
 		warmup_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
  
 	if sched_conf["type"] == "CosineAnnealingLR":
-		
 		scheduler = optim.lr_scheduler.CosineAnnealingLR(
 			optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
 		)
@@ -175,8 +161,9 @@ def train_loop(
 
 	steps = 0
 	epoch = 0
-	# best_val_score=0.0
-	best_val_score = float("inf")
+	best_val_loss = float("inf")
+	best_val_acc = float("-inf")
+ 
 
 	param_groups = [
 		{
@@ -239,7 +226,7 @@ def train_loop(
 			stopper.load_state_dict(checkpoint["stopper_state_dict"])
 			epoch = checkpoint["epoch"] + 1
 			steps = checkpoint["steps"]
-			best_val_score = checkpoint["best_val_score"]
+			best_val_loss = checkpoint["best_val_score"]
 
 			print(f"Resuming from epoch {epoch}, steps {steps}")
 			print(f"Loaded model from {load}")
@@ -254,7 +241,6 @@ def train_loop(
 
 	# train it
 	while epoch < config.training["max_epoch"] and not stopper.stop:
-		# print(f"Step {steps}/{config.training['max_steps']}")
 		print(f"Epoch {epoch}/{config.training['max_epoch']}")
 		print("-" * 10)
 
@@ -266,7 +252,7 @@ def train_loop(
 			else:
 				model.eval()
 
-			# Reset matrics for this phase
+			# Reset metrics for this phase
 			running_loss = 0.0
 			running_corrects = 0
 			total_samples = 0
@@ -276,7 +262,7 @@ def train_loop(
 			accumulated_steps = 0
 			optimizer.zero_grad()
 
-			for batch_idx, item in enumerate(dataloaders[phase]):
+			for item in dataloaders[phase]:
 				data, target = item["frames"], item["label_num"]
 				data, target = data.to(device), target.to(device)
 				batch_size = data.size(0)
@@ -351,20 +337,31 @@ def train_loop(
 
 			# Validation specific logic
 			if phase == "val":
+				
 				# Save best model
-				if epoch_loss < best_val_score:
-					best_val_score = epoch_loss
+				if epoch_loss < best_val_loss:
+					best_val_loss = epoch_loss
 					check_name = save_path / "best.pth"
 					torch.save(model.state_dict(), check_name)
 					print(
 						f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)"
 					)
 
-				# Step scheduler with validation loss
+				if epoch_acc > best_val_acc:
+					best_val_acc = epoch_acc
+
+				wandb_run.log(
+					{
+						f"Best/{phase.capitalize()}_loss": epoch_loss,
+						f"Best/{phase.capitalize()}_acc": epoch_acc,
+						"Epoch": epoch,
+					}
+				)	
+
 				scheduler.step()
 
-				print(f"Best validation loss so far: {best_val_score:.2f}%")
-
+				print(f"Best validation loss so far: {best_val_loss:.2f}")
+				print(f"Best validation acc so far: {best_val_acc:.2f}")
 		# Save checkpoint
 		if (
 			epoch % save_every == 0
@@ -377,7 +374,7 @@ def train_loop(
 				"model_state_dict": model.state_dict(),
 				"optimizer_state_dict": optimizer.state_dict(),
 				"scheduler_state_dict": scheduler.state_dict(),
-				"best_val_score": best_val_score,
+				"best_val_score": best_val_loss,
 				"stopper_state_dict": stopper.state_dict(),
 			}
 			checkpoint_path = save_path / f"checkpoint_{str(epoch).zfill(3)}.pth"
@@ -404,7 +401,7 @@ def main():
 	proceed = input("Confirm: y/n: ")
 	if proceed.lower() == "y":
 		admin = config["admin"]
-		model_name = admin["model_name"]
+		model_name = admin["model"]
 		run_id = admin["run_id"] if "run_id" in admin else None
 
 		# setup wandb run

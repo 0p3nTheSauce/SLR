@@ -14,7 +14,7 @@ import torch
 # locals
 import configs
 import utils
-from train import train_loop, wandb_manager
+from training import train_loop, wandb_manager
 
 # constants
 SESH_NAME = "que_training"
@@ -327,9 +327,13 @@ class que:
             proceed = True
 
         if proceed:
-            config["entity"] = entity
-            config["project"] = project
-            config["tags"] = tags
+
+            config['wandb'] = {
+                'entity': entity,
+                'project': project,
+                'tags': tags
+            }
+                        
             self.to_run.append(config)
             self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
         else:
@@ -578,11 +582,12 @@ class worker:
             raise ValueError(
                 f"Tried to read next run from {self.temp_path} but it was empty"
             )
-
-        entity = info["entity"]
-        project = info["project"]
-        tags = info["tags"]
-
+            
+        wandb_info = info['wandb']
+        entity = wandb_info['entity']
+        project = wandb_info['project']
+        tags = wandb_info['tags']
+        
         admin = info["admin"]
 
         # setup wandb run

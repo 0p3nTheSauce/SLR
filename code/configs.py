@@ -154,6 +154,8 @@ def print_config(config_dict):
         print(f"{section.upper()}:")
         section_data = config_dict[section]
 
+
+
         # Calculate max key length for alignment
         max_key_len = (
             max(len(str(k)) for k in section_data.keys()) if section_data else 0
@@ -162,6 +164,20 @@ def print_config(config_dict):
         for key, value in section_data.items():
             print(f"    {key:<{max_key_len}} : {value}")
         print()
+
+# def print_config2(config_dict: Dict[str, Any]) -> None:
+#     """Print configuration dictionary in a more readable format.
+
+#     Args:
+#         config_dict (Dict[str, Any]): Dictionary containing configuration
+#     sections
+#     """
+#     for section in config_dict.keys():
+#         print(f"{section.upper()}:")
+#         section_data = config_dict[section]
+        
+        
+    
 
 
 def take_args(

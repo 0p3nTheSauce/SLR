@@ -8,7 +8,7 @@ from typing import Optional
 import statistics
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as ts
-
+import math
 
 def bench_mark_enhanced(
     data,
@@ -178,56 +178,74 @@ def pad_frames(frames, target_length):
 
 
 class Shuffle(Transform):
-    """Shuffle frames with a random seed each time"""
+  """Shuffle frames with a random seed each time"""
+  def __init__(self, permutation):
+    super().__init__()
+    self.permutation = permutation
+      
+  def _transform(self, inpt, params):
+    dim = 0
+    assert inpt.dim() == 4, "Input tensor must be 4D (T, C, H, W)"
+    assert inpt.size(0) == len(self.permutation), "Permutation length must match number of frames"
+    assert inpt.size(1) == 3, "Input tensor must have 3 channels (C=3)"
+    return inpt.index_select(dim, self.permutation)
+    
+  @staticmethod
+  def create_permutation(num_frames:int, seed:Optional[int]=None) -> torch.Tensor:
+    """Create a random permutation for given number of frames"""
+    if seed is not None:
+      torch.manual_seed(seed)
+    return torch.randperm(num_frames)
+  
+# class Shuffle(Transform):
+#     """Shuffle frames with a random seed each time"""
+#     def __init__(self, permutation):
+#         super().__init__()
+#         self.permutation = permutation
+      
+#     def _transform(self, inpt, params):
+#         dim = 0
+#         assert inpt.dim() == 4, "Input tensor must be 4D (T, C, H, W)"
+#         assert inpt.size(0) == len(self.permutation), "Permutation length must match number of frames"
+#         assert inpt.size(1) == 3, "Input tensor must have 3 channels (C=3)"
+#         return inpt.index_select(dim, self.permutation)
+    
+#     @staticmethod
+#     def create_permutation(num_frames, seed=None):
+#         """Create a random permutation for given number of frames"""
+#         if seed is not None:
+#             torch.manual_seed(seed)
+#         return torch.randperm(num_frames)
 
-    def __init__(self, permutation):
-        super().__init__()
-        self.permutation = permutation
-
-    def _transform(self, inpt, params):
-        dim = 0
-        assert inpt.dim() == 4, "Input tensor must be 4D (T, C, H, W)"
-        assert inpt.size(0) == len(self.permutation), (
-            "Permutation length must match number of frames"
-        )
-        assert inpt.size(1) == 3, "Input tensor must have 3 channels (C=3)"
-        return inpt.index_select(dim, self.permutation)
-
-    @staticmethod
-    def create_permutation(num_frames: int, seed: Optional[int] = None) -> torch.Tensor:
-        """Create a random permutation for given number of frames"""
-        if seed is not None:
-            torch.manual_seed(seed)
-        return torch.randperm(num_frames)
-
-if __name__ == "__main__":
-    vid = "./media/00333.mp4"
-    frames = utils.load_rgb_frames_from_video(vid, 0, 0, all=True)
-    print(frames.shape)
-    utils.watch_video(frames, title="Original")
-
-    # shuffled_indices = torch.randperm(frames.size(0))
-    shuffled_indices = Shuffle.create_permutation(frames.size(0), seed=42)
-    t = ts.Compose(
-        [
-            ts.Lambda(lambda x: x.permute(0, 2, 1, 3, 4)),  # T C H W -> C T H W
-            Shuffle(shuffled_indices),
-        ]
-    )
-
-    f2 = t(frames.unsqueeze(0)).squeeze(0)
-    print(f2.shape)
-    f2 = f2.permute(1, 0, 2, 3)
-    print(f2.shape)
-    utils.watch_video(f2, title="Shuffled")
-
-    # rand = torch.rand(100, 3, 224, 224)
-    # print(rand.shape)
-    # t1 = ts.Compose([
-    #   ts.Lambda(lambda x: x.unsqueeze(0)), #add batch dim
-    #   ConsistentFrameShuffle(seed=42),
-    #   ts.Lambda(lambda x: x.squeeze(0)) #remove batch dim
-    # ])
-    # f3 = t1(rand)
-    # print(f3.shape)
-    # # utils.watch_video(f4)
+    
+if __name__ =='__main__':
+  vid = './media/00333.mp4'
+  frames = utils.load_rgb_frames_from_video(vid, 0, 0, all=True)
+  print(frames.shape)
+  utils.watch_video(frames, title='Original')
+  
+  # shuffled_indices = torch.randperm(frames.size(0))
+  shuffled_indices = Shuffle.create_permutation(frames.size(0), seed=42)
+  t = ts.Compose([
+    ts.Lambda(lambda x: x.permute(0, 2, 1, 3, 4)), #T C H W -> C T H W
+    Shuffle(shuffled_indices)
+  ])
+  
+  f2 = t(frames.unsqueeze(0)).squeeze(0)
+  print(f2.shape)
+  f2 = f2.permute(1,0,2,3)
+  print(f2.shape)
+  utils.watch_video(f2, title='Shuffled')
+  
+  
+  
+  # rand = torch.rand(100, 3, 224, 224)
+  # print(rand.shape)
+  # t1 = ts.Compose([
+  #   ts.Lambda(lambda x: x.unsqueeze(0)), #add batch dim
+  #   ConsistentFrameShuffle(seed=42),
+  #   ts.Lambda(lambda x: x.squeeze(0)) #remove batch dim
+  # ])
+  # f3 = t1(rand)
+  # print(f3.shape)
+  # # utils.watch_video(f4)
