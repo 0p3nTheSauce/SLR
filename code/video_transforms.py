@@ -221,13 +221,8 @@ class Shuffle(Transform):
                 if d == i:
                     hist[i] += 1
                     
-        nhist = [0.0] * p_len
-        
-        for i, n in enumerate(hist):
-            nhist[i] = n / p_len
-        
         print(diffs)
-        normed = [d / p_len for d in diffs]
+        normed = [d / p_len for d in hist if d > 0]
         print(normed)
         e = 0
         for n in normed:
