@@ -266,6 +266,11 @@ class Shuffle(Transform):
 
     @staticmethod
     def position_entropy(perm: torch.Tensor):
+        #this does not work very effectively, because shifting the 
+        #permutation to the right by 1, produces a large entropy, 
+        #while conceptually, the video likely remains unchanged
+        
+        
         sorted_perm = torch.argsort(perm)
         print(sorted_perm)
         print(torch.arange(len(perm)))
