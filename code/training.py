@@ -10,77 +10,38 @@ import wandb
 from wandb.sdk.wandb_run import Run
 # local imports
 
-from video_dataset import VideoDataset
-from configs import load_config, print_config, take_args, LABEL_SUFFIX
+from video_dataset import VideoDataset, get_data_loader, TrainSet, TestSet
+from configs import load_config, print_config, take_args, set_seed, LABEL_SUFFIX
 from stopping import EarlyStopper
 from models import get_model, norm_vals
-from utils import wandb_manager, set_seed
+from utils import wandb_manager
 
 
 def setup_data(mean, std, config):
-	final_transform = v2.Compose(
-		[
-			v2.Lambda(lambda x: x.float() / 255.0),
-			v2.Normalize(mean=mean, std=std),
-			v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
-		]
-	)
-
-	# setup dataset
-	train_transforms = v2.Compose(
-		[
-			v2.RandomCrop(config.data["frame_size"]),
-			v2.RandomHorizontalFlip(),
-			final_transform,
-		]
-	)
-	test_transforms = v2.Compose(
-		[v2.CenterCrop(config.data["frame_size"]), final_transform]
-	)
-
-	label_path = Path(config.admin["labels"])
-
-	train_instances = label_path / f"train_instances_{LABEL_SUFFIX}"
-	val_instances = label_path / f"val_instances_{LABEL_SUFFIX}"
-	train_classes = label_path / f"train_classes_{LABEL_SUFFIX}"
-	val_classes = label_path / f"val_classes_{LABEL_SUFFIX}"
-
-	dataset = VideoDataset(
+	train_info = TrainSet(set_name="train", batch_size=config.training["batch_size"])
+	val_info = TestSet(set_name="val")
+	train_loader, num_t_classes = get_data_loader(
+		mean,
+		std,
+		config.data["frame_size"],
+		config.data["num_frames"],
 		config.admin["root"],
-		train_instances,
-		train_classes,
-		transforms=train_transforms,
-		num_frames=config.data["num_frames"],
+		Path(config.admin["labels"]),
+		train_info,
 	)
-	dataloader = DataLoader(
-		dataset,
-		batch_size=config.training["batch_size"],
-		shuffle=True,
-		num_workers=2,
-		pin_memory=True,
-	)
-	num_classes = len(set(dataset.classes))
-
-	val_dataset = VideoDataset(
+	val_loader, num_v_classes = get_data_loader(
+		mean,
+		std,
+		config.data["frame_size"],
+		config.data["num_frames"],
 		config.admin["root"],
-		val_instances,
-		val_classes,
-		transforms=test_transforms,
-		num_frames=config.data["num_frames"],
+		Path(config.admin["labels"]),
+		val_info,
 	)
-	val_dataloader = DataLoader(
-		val_dataset,
-		batch_size=config.training["batch_size"],
-		shuffle=True,
-		num_workers=2,
-		pin_memory=False,
-	)
-	val_classes = len(set(val_dataset.classes))
-	assert num_classes == val_classes
-
-	dataloaders = {"train": dataloader, "val": val_dataloader}
-
-	return dataloaders, num_classes
+	assert num_t_classes == num_v_classes, f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
+	dataloaders = {"train": train_loader, "val": val_loader}
+	return dataloaders, num_t_classes
+ 
 
 def get_scheduler(
 	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None

@@ -1,14 +1,19 @@
-from torch.utils.data import Dataset
-import os
+from torch.utils.data import Dataset, DataLoader
+# import os
 import json
 import torch
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Tuple, Literal, TypedDict, Union
+from torchvision.transforms import v2
+from video_transforms import Shuffle
+
 # local imports
 from utils import load_rgb_frames_from_video, crop_frames
 from video_transforms import correct_num_frames
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
+from configs import LABEL_SUFFIX
+
 
 def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
     """
@@ -53,7 +58,7 @@ class VideoDataset(Dataset):
         resize: bool=False,
     ) -> None:
         """root is the path to the root directory where the video files are located."""
-        if os.path.exists(root) is False:
+        if not root.exists():
             raise FileNotFoundError(f"Root directory {root} does not exist.")
         else:
             self.root = root
@@ -72,8 +77,8 @@ class VideoDataset(Dataset):
             self.classes = json.load(f)
 
     def __manual_load__(self, item):
-        video_path = os.path.join(self.root, item["video_id"] + ".mp4")
-        if os.path.exists(video_path) is False:
+        video_path =self.root / (item["video_id"] + ".mp4")
+        if video_path.exists() is False:
             raise FileNotFoundError(f"Video file {video_path} does not exist.")
 
         frames = load_rgb_frames_from_video(
@@ -107,7 +112,88 @@ class VideoDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+################################## Helper functions #######################################
 
+class TrainSet(TypedDict):
+    set_name: Literal["train"]
+    batch_size: int
+    
+class TestSet(TypedDict):
+    set_name: Literal["test", "val"]
+
+
+def get_data_loader(
+    mean: Tuple[float, float, float],
+    std: Tuple[float, float, float],
+    frame_size: int,
+    num_frames: int,
+    root: Path,
+    labels: Path,
+    set_type: Union[TrainSet, TestSet],
+    shuffle: bool=False,    
+    label_suffix: str = LABEL_SUFFIX
+                    ):
+    
+    if shuffle:
+        maybe_shuffle_t = Shuffle(num_frames)
+    else:
+        maybe_shuffle_t = v2.Lambda(lambda x: x)
+
+    final_transform = v2.Compose(
+        [
+            maybe_shuffle_t,
+            v2.Lambda(lambda x: x.float() / 255.0),
+            v2.Normalize(mean=mean, std=std),
+            v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+        ]
+    )
+
+    if set_type["set_name"] == "train":
+        transform = v2.Compose(
+            [
+                v2.RandomCrop(frame_size),
+                v2.RandomHorizontalFlip(),
+                final_transform,
+            ]
+	    )
+    else:
+        transform = v2.Compose(
+            [v2.CenterCrop(frame_size), final_transform]
+        )
+        
+    instances = labels / f"{set_type['set_name']}_instances_{label_suffix}"
+    classes = labels / f"{set_type['set_name']}_classes_{label_suffix}"
+    
+    dataset = VideoDataset(
+        root,
+        instances,
+        classes,
+        num_frames=num_frames,
+        transforms=transform,
+    )
+    num_classes = len(set(dataset.classes))
+    
+    if set_type["set_name"] == "train":
+        dataloader = DataLoader(
+            dataset,
+            batch_size=set_type["batch_size"],
+            shuffle=True,
+            num_workers=2,
+            pin_memory=True,
+        )
+    else:
+        dataloader = DataLoader(
+            dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=2,
+            pin_memory=False,
+            drop_last=False,
+        )
+        
+    return dataloader, num_classes
+    
+    
 if __name__ == "__main__":
     # test_crop()
     # prep_train() #--run to preprocess the training data
