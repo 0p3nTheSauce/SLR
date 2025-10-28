@@ -10,13 +10,12 @@ from video_dataset import VideoDataset
 from torch.utils.data import DataLoader
 import tqdm
 from pathlib import Path
-import utils
 import gc
 
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model
-from configs import LABEL_SUFFIX
+from configs import set_seed, LABEL_SUFFIX
 #################################### Utilities #################################
 
 
@@ -75,9 +74,7 @@ def test_model(model, test_loader):
     return accuracy, report, all_preds, all_targets
 
 
-def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
-    if seed is not None:
-        utils.set_seed(0)
+def test_top_k(model, test_loader, verbose=False, save_path=None):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -169,7 +166,6 @@ def test_top_k(model, test_loader, seed=None, verbose=False, save_path=None):
 def test_topk_clsrep(
     model: torch.nn.Module,
     test_loader: DataLoader[VideoDataset],
-    seed: Optional[int] = None,
     verbose: bool = False,
     save_path: Optional[Union[str, Path]] = None,
 ) -> Tuple[
@@ -187,8 +183,6 @@ def test_topk_clsrep(
     Returns:
                     Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
     """
-    if seed is not None:
-        utils.set_seed(seed)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -295,16 +289,16 @@ def test_topk_clsrep(
 
 
 def _get_test_loader(
-    perm: Optional[torch.Tensor],
     model_norms: Dict,
     frame_size: int,
     num_frames: int,
     root: Path,
     labels: Path,
     set: Literal["test", "val"],
+    shuffle: bool=False,
 ) -> DataLoader[VideoDataset]:
-    if perm:
-        maybe_shuffle_t = Shuffle(perm)
+    if shuffle:
+        maybe_shuffle_t = Shuffle(num_frames)
     else:
         maybe_shuffle_t = v2.Lambda(lambda x: x)
 
@@ -357,7 +351,7 @@ def load_info(dirp: Path, checkname: str):
 
 def test_run(
     config: Dict[str, Any],
-    perm: Optional[torch.Tensor] = None,
+    shuffle: bool = False,
     test_val: bool = False,
     test_test: bool = True,
     check: str = "best.pth",
@@ -366,7 +360,6 @@ def test_run(
     heatmap: bool = False,
     disp: bool = False,
     save: bool = True,
-    seed: int = 42,
     re_test: bool = False,
 ) -> Dict[str, Any]:
     """Perform testing of a model according to the provided configuration.
@@ -382,14 +375,13 @@ def test_run(
             heatmap (bool, optional): Create heatmap. Defaults to False.
             disp (bool, optional): Display plots. Defaults to False.
             save (bool, optional): Save results and plots. Defaults to True.
-            seed (int, optional): Testing random seed. Defaults to 42.
             re_test (bool, optional): Test even if results already saved. Defaults to False.
 
     Returns:
             Optional[Dict[str, Any]]: Results if correct parameters.
     """
 
-    utils.set_seed(seed)
+    set_seed()
 
     admin = config["admin"]
     model_name = admin["model"]
@@ -415,24 +407,24 @@ def test_run(
 
     if test_test:
         tloaders["test"] = _get_test_loader(
-            perm,
             model_norms,
             data["frame_size"],
             data["num_frames"],
             Path(admin["root"]),
             Path(admin["labels"]),
             "test",
+            shuffle=shuffle
         )
 
     if test_val:
         tloaders["val"] = _get_test_loader(
-            perm,
             model_norms,
             data["frame_size"],
             data["num_frames"],
             Path(admin["root"]),
             Path(admin["labels"]),
             "val",
+            shuffle=shuffle
         )
 
     keys = list(tloaders.keys())
@@ -455,7 +447,7 @@ def test_run(
     else:
         model.load_state_dict(checkpoint["model_state_dict"])
 
-    if perm is not None:
+    if shuffle:
         suffix = "-top-k_shuffled.json"
     else:
         suffix = "-top-k.json"
@@ -469,7 +461,6 @@ def test_run(
         topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
             model=model,
             test_loader=tloader,
-            seed=seed,
             verbose=False,
             save_path=save2,
         )
@@ -525,7 +516,6 @@ def find_best_checkpnt(run_idx: int):
     save_path = Path(run["admin"]["save_path"])
     print(f"Looking in: {save_path}")
     checkpnts = sorted([p for p in save_path.iterdir()])
-    reses = {}
     for c in checkpnts:
         print(c.name)
         test_run(

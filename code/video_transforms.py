@@ -1,5 +1,5 @@
 import torch
-from typing import Callable, Literal
+from typing import Callable
 import random
 import utils
 import time
@@ -8,7 +8,7 @@ from typing import Optional
 import statistics
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as ts
-import math
+
 
 def bench_mark_enhanced(
     data,
@@ -178,73 +178,31 @@ def pad_frames(frames, target_length):
 
 
 class Shuffle(Transform):
-    """Shuffle frames with a random seed each time"""
+    """Shuffle frames using the configs defined seed"""
 
-    def __init__(self, permutation):
+    def __init__(self, num_frames: int, perm: Optional[torch.Tensor]=None):
         super().__init__()
-        self.permutation = permutation
-
+        self.num_frames = num_frames
+        if perm is None:
+            self.permutation = self.create_permutation()
+        else:
+            self.permutation = perm
+        
     def _transform(self, inpt, params):
         dim = 0
         assert inpt.dim() == 4, "Input tensor must be 4D (T, C, H, W)"
-        assert inpt.size(0) == len(self.permutation), (
+        assert inpt.size(0) == self.num_frames, (
             "Permutation length must match number of frames"
         )
         assert inpt.size(1) == 3, "Input tensor must have 3 channels (C=3)"
         return inpt.index_select(dim, self.permutation)
 
-    @staticmethod
-    def create_permutation(num_frames: int, seed: Optional[int] = None) -> torch.Tensor:
+    def create_permutation(self) -> torch.Tensor:
         """Create a random permutation for given number of frames"""
-        if seed is not None:
-            torch.manual_seed(seed)
-        return torch.randperm(num_frames)
-    
-    @staticmethod
-    def shannon_entropy(perm: torch.Tensor, unit:Literal['bit', 'nat', 'dit'] = 'bit') -> float:
-        perml = list(map(int, perm.numpy()))
-        
-        p_len = len(perml)
-        diffs = [0] * p_len  
-        for i in range(p_len-1):
-            diff = perml[i+1] - perml[i]
-            if diff < 0:
-                diff += p_len
-            diffs[i] = diff
-
-        diff = perml[0] - perml[p_len-1]
-        if diff < 0:
-            diff += p_len
-        
-        diffs[p_len-1] = diff
-        
-        hist = [0] * p_len
-        
-        for d in diffs:
-            hist[d] += 1
-                    
-        print(diffs)
-        normed = [d / p_len for d in hist if d > 0]
-        print(normed)
-        e = 0
-        
-        def log_func(unit):
-            if unit == 'bit':
-                return lambda x: math.log(x, 2)
-            elif unit == 'nat':
-                return lambda x: math.log(x)
-            else:
-                return lambda x: math.log(x, 10)
-            
-        log = log_func(unit)            
-            
-        for n in normed:
-            e += -n * log(n)
-        print(f"E: {e}")
-        return e
+        return torch.randperm(self.num_frames)
 
     @staticmethod
-    def shannon_entropy2(perm: torch.Tensor):
+    def shannon_entropy(perm: torch.Tensor):
         plen = perm.shape[0]
         diffs = torch.zeros(plen, dtype=torch.long)
         # print(diffs)
@@ -264,24 +222,7 @@ class Shuffle(Transform):
         entropy = -torch.sum(normed_no0 * torch.log2(normed_no0))
         print(f"E: {entropy.item()}")
 
-    @staticmethod
-    def position_entropy(perm: torch.Tensor):
-        #this does not work very effectively, because shifting the 
-        #permutation to the right by 1, produces a large entropy, 
-        #while conceptually, the video likely remains unchanged
-        
-        
-        sorted_perm = torch.argsort(perm)
-        print(sorted_perm)
-        print(torch.arange(len(perm)))
-        displacements = torch.abs(torch.arange(len(perm)) - sorted_perm)
-        print(displacements)
-        hist = torch.bincount(displacements).float()
-        print(hist)
-        normed = hist / len(perm)
-        normed_no0 = normed[normed > 0]
-        
-        return -torch.sum(normed_no0 * torch.log2(normed_no0)).item()
+
 
 if __name__ == "__main__":
     vid = "./media/00333.mp4"
@@ -290,11 +231,11 @@ if __name__ == "__main__":
     utils.watch_video(frames, title="Original")
 
     # shuffled_indices = torch.randperm(frames.size(0))
-    shuffled_indices = Shuffle.create_permutation(frames.size(0), seed=42)
+    
     t = ts.Compose(
         [
             ts.Lambda(lambda x: x.permute(0, 2, 1, 3, 4)),  # T C H W -> C T H W
-            Shuffle(shuffled_indices),
+            Shuffle(frames.size(0)),
         ]
     )
 
