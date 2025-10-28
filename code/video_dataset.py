@@ -153,8 +153,7 @@ def get_data_loader(
     Returns:
         Tuple[DataLoader[VideoDataset], int]: Dataloader and number of classes.
     """
-    
-    
+
     if shuffle:
         maybe_shuffle_t = Shuffle(num_frames)
     else:

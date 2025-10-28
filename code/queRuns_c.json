@@ -37,6 +37,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -44,14 +45,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-021"
-            ],
-            "run_id": "4240hs43"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-021"
+                ],
+                "run_id": "4240hs43"
+            }
         },
         {
             "admin": {
@@ -90,6 +93,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -97,14 +101,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-020"
-            ],
-            "run_id": "j1m1c1qs"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-020"
+                ],
+                "run_id": "j1m1c1qs"
+            }
         },
         {
             "admin": {
@@ -143,6 +149,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -150,14 +157,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-019"
-            ],
-            "run_id": "plviroao"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-019"
+                ],
+                "run_id": "plviroao"
+            }
         },
         {
             "admin": {
@@ -196,6 +205,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -203,14 +213,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-018"
-            ],
-            "run_id": "ysg9tmr9"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-018"
+                ],
+                "run_id": "ysg9tmr9"
+            }
         },
         {
             "admin": {
@@ -249,6 +261,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -256,14 +269,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-017"
-            ],
-            "run_id": "nk7ius3q"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-017"
+                ],
+                "run_id": "nk7ius3q"
+            }
         },
         {
             "admin": {
@@ -302,6 +317,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -309,14 +325,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-016"
-            ],
-            "run_id": "usq1y605"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-016"
+                ],
+                "run_id": "usq1y605"
+            }
         },
         {
             "admin": {
@@ -358,14 +376,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-015"
-            ],
-            "run_id": "hfmbz6ai"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-015"
+                ],
+                "run_id": "hfmbz6ai"
+            }
         },
         {
             "admin": {
@@ -404,6 +424,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -411,14 +432,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-014"
-            ],
-            "run_id": "o9p6nj1z"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-014"
+                ],
+                "run_id": "o9p6nj1z"
+            }
         },
         {
             "admin": {
@@ -457,6 +480,7 @@
                 "drop_p": 0.5
             },
             "scheduler": {
+                "type": "CosineAnnealingLR",
                 "tmax": 100,
                 "eta_min": 1e-05
             },
@@ -464,14 +488,16 @@
                 "num_frames": 32,
                 "frame_size": 224
             },
-            "entity": "ljgoodall2001-rhodes-university",
-            "project": "WLASL-100",
-            "tags": [
-                "asl100",
-                "S3D",
-                "exp-013"
-            ],
-            "run_id": "osxx0zki"
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-013"
+                ],
+                "run_id": "osxx0zki"
+            }
         }
     ],
     "to_run": []
