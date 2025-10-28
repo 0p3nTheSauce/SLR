@@ -297,6 +297,22 @@ def _get_test_loader(
     set: Literal["test", "val"],
     shuffle: bool=False,
 ) -> DataLoader[VideoDataset]:
+    """Get the test set dataloaders
+
+    Args:
+        model_norms (Dict): Model specific normalisation values, with keys 'mean' and 'std'
+        frame_size (int): Length of Square frame.
+        num_frames (int): Number of frames.
+        root (Path): Path to the directory where the video files are located.
+        labels (Path): Path to the directory where the preprocessed label files are located.
+        set (Literal['test', 'val']): Select the desired split. 
+        shuffle (bool, optional): Whether to shuffle frames. Defaults to False.
+
+    Returns:
+        DataLoader[VideoDataset]: Test set dataloader
+    """
+    
+    
     if shuffle:
         maybe_shuffle_t = Shuffle(num_frames)
     else:
