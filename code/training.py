@@ -24,7 +24,7 @@ def setup_data(mean, std, config):
 		std,
 		config.data["frame_size"],
 		config.data["num_frames"],
-		config.admin["root"],
+		Path(config.admin["root"]),
 		Path(config.admin["labels"]),
 		train_info,
 	)
@@ -33,7 +33,7 @@ def setup_data(mean, std, config):
 		std,
 		config.data["frame_size"],
 		config.data["num_frames"],
-		config.admin["root"],
+		Path(config.admin["root"]),
 		Path(config.admin["labels"]),
 		val_info,
 	)
