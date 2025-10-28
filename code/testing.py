@@ -1,12 +1,9 @@
-from typing import Optional, Union, Tuple, Dict, Literal, List, Any
+from typing import Optional, Union, Tuple, Dict, List, Any
 
 import torch
 import json
 from sklearn.metrics import accuracy_score, classification_report
 import numpy as np
-from torchvision.transforms import v2
-from video_transforms import Shuffle
-from video_dataset import VideoDataset
 from torch.utils.data import DataLoader
 import tqdm
 from pathlib import Path
@@ -15,7 +12,8 @@ import gc
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model
-from configs import set_seed, LABEL_SUFFIX
+from configs import set_seed
+from video_dataset import VideoDataset, get_data_loader, TestSet
 #################################### Utilities #################################
 
 
@@ -288,67 +286,6 @@ def test_topk_clsrep(
     return topk_res, cls_report, all_targets, all_preds
 
 
-def _get_test_loader(
-    model_norms: Dict,
-    frame_size: int,
-    num_frames: int,
-    root: Path,
-    labels: Path,
-    set: Literal["test", "val"],
-    shuffle: bool=False,
-) -> DataLoader[VideoDataset]:
-    """Get the test set dataloaders
-
-    Args:
-        model_norms (Dict): Model specific normalisation values, with keys 'mean' and 'std'
-        frame_size (int): Length of Square frame.
-        num_frames (int): Number of frames.
-        root (Path): Path to the directory where the video files are located.
-        labels (Path): Path to the directory where the preprocessed label files are located.
-        set (Literal['test', 'val']): Select the desired split. 
-        shuffle (bool, optional): Whether to shuffle frames. Defaults to False.
-
-    Returns:
-        DataLoader[VideoDataset]: Test set dataloader
-    """
-    
-    
-    if shuffle:
-        maybe_shuffle_t = Shuffle(num_frames)
-    else:
-        maybe_shuffle_t = v2.Lambda(lambda x: x)
-
-    final_t = v2.Compose(
-        [
-            maybe_shuffle_t,
-            v2.Lambda(lambda x: x.float() / 255.0),
-            v2.Normalize(mean=model_norms["mean"], std=model_norms["std"]),
-            v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
-        ]
-    )
-
-    test_transforms = v2.Compose([v2.CenterCrop(frame_size), final_t])
-
-    instances = labels / f"{set}_instances_{LABEL_SUFFIX}"
-    classes = labels / f"{set}_classes_{LABEL_SUFFIX}"
-
-    tset = VideoDataset(
-        root,
-        instances,
-        classes,
-        num_frames=num_frames,
-        transforms=test_transforms,
-    )
-    return DataLoader(
-        tset,
-        batch_size=1,
-        shuffle=False,
-        num_workers=2,
-        pin_memory=False,
-        drop_last=False,
-    )
-
-
 def collect_results(res_p: Path):
     with open(res_p, "r") as f:
         res = json.load(f)
@@ -422,24 +359,28 @@ def test_run(
         return results
 
     if test_test:
-        tloaders["test"] = _get_test_loader(
-            model_norms,
+        set_type = TestSet(set_name="test")
+        tloaders["test"] = get_data_loader(
+            model_norms['mean'],
+            model_norms['std'],
             data["frame_size"],
             data["num_frames"],
             Path(admin["root"]),
             Path(admin["labels"]),
-            "test",
+            set_type,
             shuffle=shuffle
         )
 
     if test_val:
-        tloaders["val"] = _get_test_loader(
-            model_norms,
+        set_type = TestSet(set_name="val")
+        tloaders["val"] = get_data_loader(
+            model_norms['mean'],
+            model_norms['std'],
             data["frame_size"],
             data["num_frames"],
             Path(admin["root"]),
             Path(admin["labels"]),
-            "val",
+            set_type,
             shuffle=shuffle
         )
 

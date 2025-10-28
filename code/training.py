@@ -1,7 +1,5 @@
-from typing import Optional, Dict, Union
+from typing import Optional, Union
 import torch  # type: ignore
-from torchvision.transforms import v2
-from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LRScheduler
@@ -10,11 +8,12 @@ import wandb
 from wandb.sdk.wandb_run import Run
 # local imports
 
-from video_dataset import VideoDataset, get_data_loader, TrainSet, TestSet
-from configs import load_config, print_config, take_args, set_seed, LABEL_SUFFIX
+from video_dataset import get_data_loader, TrainSet, TestSet
+from configs import load_config, print_config, take_args, set_seed
 from stopping import EarlyStopper
 from models import get_model, norm_vals
 from utils import wandb_manager
+
 
 
 def setup_data(mean, std, config):
