@@ -10,9 +10,10 @@ from pathlib import Path
 import json
 import test
 from collections import Counter
-from typing import Optional
+from typing import Optional, Literal
 from functools import partial
-
+import math
+import torch
 
 def plot_simulated_training(x_range, f):
 	x = x_range
@@ -439,11 +440,11 @@ def frame_shuffling2():
 	# utils.visualise_frames(frames, num_frames)
 
 	# shuffled_indices = torch.randperm(frames.size(0))
-	shuffled_indices = Shuffle.create_permutation(frames.size(0), seed=42)
+	shuflr = Shuffle(frames.size(0))
 	print("Shuffled indices:")
-	print(shuffled_indices)
+	print(shuflr.permutation)
 	t = ts.Compose([
-		Shuffle(shuffled_indices)
+		shuflr
 	])
 
 	f2 = t(frames)
@@ -472,7 +473,7 @@ def test_shuffle():
 		
 		# Test 1: Create a specific permutation and test
 		custom_perm = torch.tensor([2, 0, 4, 1, 3])
-		shuffle_transform = Shuffle(custom_perm)
+		shuffle_transform = Shuffle(len(custom_perm), perm=custom_perm)
 		shuffled = shuffle_transform(test_tensor)
 		
 		print("\nShuffled with custom permutation [2, 0, 4, 1, 3]:")
@@ -483,11 +484,11 @@ def test_shuffle():
 		assert torch.allclose(shuffled[:, 0, 0, 0], expected), "Custom permutation test failed"
 		
 		# Test 2: Test with random permutation (fixed seed for reproducibility)
-		random_perm = Shuffle.create_permutation(num_frames, seed=42)
-		shuffle_transform_random = Shuffle(random_perm)
+		# random_perm = Shuffle.create_permutation(num_frames, seed=42)
+		shuffle_transform_random = Shuffle(num_frames)
 		shuffled_random = shuffle_transform_random(test_tensor)
 		
-		print(f"\nShuffled with random permutation {random_perm.tolist()}:")
+		print(f"\nShuffled with random permutation {shuffle_transform_random.permutation.tolist()}:")
 		print(shuffled_random[:, 0, 0, 0])
 		
 		# Test 3: Verify that the original tensor is unchanged (transform should not modify in place)
@@ -561,6 +562,67 @@ def reformet():
 		run['wandb'] = wandb_info
 	with open('queRuns.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
+  
+  
+def position_entropy(perm: torch.Tensor):
+	#this does not work very effectively, because shifting the 
+	#permutation to the right by 1, produces a large entropy, 
+	#while conceptually, the video likely remains unchanged      
+	sorted_perm = torch.argsort(perm)
+	print(sorted_perm)
+	print(torch.arange(len(perm)))
+	displacements = torch.abs(torch.arange(len(perm)) - sorted_perm)
+	print(displacements)
+	hist = torch.bincount(displacements).float()
+	print(hist)
+	normed = hist / len(perm)
+	normed_no0 = normed[normed > 0]
+	
+	return -torch.sum(normed_no0 * torch.log2(normed_no0)).item()
+
+
+def _get_log_func(unit):
+	if unit == 'bit':
+		return lambda x: math.log(x, 2)
+	elif unit == 'nat':
+		return lambda x: math.log(x)
+	else:
+		return lambda x: math.log(x, 10)
+
+
+def shannon_entropy(perm: torch.Tensor, unit:Literal['bit', 'nat', 'dit'] = 'bit') -> float:
+	perml = list(map(int, perm.numpy()))
+	
+	p_len = len(perml)
+	diffs = [0] * p_len  
+	for i in range(p_len-1):
+		diff = perml[i+1] - perml[i]
+		if diff < 0:
+			diff += p_len
+		diffs[i] = diff
+
+	diff = perml[0] - perml[p_len-1]
+	if diff < 0:
+		diff += p_len
+	
+	diffs[p_len-1] = diff
+	
+	hist = [0] * p_len
+	
+	for d in diffs:
+		hist[d] += 1
+				
+	print(diffs)
+	normed = [d / p_len for d in hist if d > 0]
+	print(normed)
+	e = 0
+		
+	log = _get_log_func(unit)            
+		
+	for n in normed:
+		e += -n * log(n)
+	print(f"E: {e}")
+	return e
 
 def test_shuffle2():
     from video_transforms import Shuffle
@@ -568,11 +630,11 @@ def test_shuffle2():
     # perm = Shuffle.create_permutation(4, 42)
     perm = torch.tensor([3, 0, 1, 2])
     print(f"original: {perm}")
+    shannon_entropy(perm)
+    print()
     Shuffle.shannon_entropy(perm)
     print()
-    Shuffle.shannon_entropy2(perm)
-    print()
-    print(Shuffle.position_entropy(perm))
+    print(position_entropy(perm))
 
 
 
