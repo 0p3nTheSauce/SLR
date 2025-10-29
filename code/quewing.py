@@ -29,6 +29,12 @@ TO_RUN = "to_run"
 OLD_RUNS = "old_runs"
 # List for argparse choices
 QUE_LOCATIONS = [TO_RUN, OLD_RUNS]
+SYNONYMS = {
+            'new': 'to_run',
+            'tr': 'to_run',
+            'old': 'old_runs',
+            'or': 'old_runs',
+        }
 QueLocation: TypeAlias = Literal["to_run", "old_runs"]
 
 
@@ -385,29 +391,50 @@ class que:
         self,
         o_loc: QueLocation,
         n_loc: QueLocation,
-        o_idx: int,
+        oi_idx: int,
+        of_idx: Optional[int] = None
     ):
         """Moves a run between locations in que (at beginning)
 
         Args:
                         o_loc (QueLocation): Old location
                         n_loc (QueLocation): New location
-                        o_idx (int): Old index
+                        oi_idx (int): Old initial index
+                        of_idx (int): Old final index, if specifying a range.
         """
 
         old_location = self.fetch_state(o_loc)
-
-        if abs(o_idx) < len(old_location):
-            run = old_location.pop(o_idx)
-        else:
-            print(
-                f"{o_idx} out of range for len({o_loc}) - 1 = {len(old_location) - 1}"
-            )
-            return
-
         new_location = self.fetch_state(n_loc)
-        new_location.insert(0, run)
+    
+    
+        if of_idx is None:
 
+            if abs(oi_idx) < len(old_location):
+                run = old_location.pop(oi_idx)
+            else:
+                print(
+                    f"{oi_idx} is out of range. Length of {o_loc} is only: {len(old_location)}"
+                )
+                return
+
+            new_location.insert(0, run)
+            
+        else:
+            
+            if abs(oi_idx) < len(old_location) and abs(of_idx) < len(old_location): 
+                tomv = []
+                for i in range(oi_idx, of_idx+1):    
+                    tomv.append(old_location.pop(oi_idx))
+            else:
+                print(
+                    f"Range: {oi_idx} - {of_idx} is an invalid range. Length of {o_loc} is: {len(old_location)}"
+                )
+                return 
+            
+            for run in tomv:
+                new_location.insert(0, run)
+                    
+        
         self.print_v("Successfully added\n")
 
         self.list_runs(n_loc, disp=self.verbose)
@@ -1023,7 +1050,7 @@ class queShell(cmdLib.Cmd):
             return
 
         self.que.move(
-            parsed_args.o_location, parsed_args.n_location, parsed_args.o_index
+            parsed_args.o_location, parsed_args.n_location, parsed_args.oi_index, parsed_args.of_index
         )
 
     def do_create(self, arg):
@@ -1048,6 +1075,23 @@ class queShell(cmdLib.Cmd):
 
     # helper functions
 
+    def _apply_synonyms(self, parsed_args):
+        """Apply synonyms to location arguments"""
+        
+        if hasattr(parsed_args, 'o_location'):
+            parsed_args.o_location = SYNONYMS.get(
+                parsed_args.o_location.lower(), 
+                parsed_args.o_location
+            )
+        
+        if hasattr(parsed_args, 'n_location'):
+            parsed_args.n_location = SYNONYMS.get(
+                parsed_args.n_location.lower(), 
+                parsed_args.n_location
+            )
+        
+        return parsed_args
+
     def _parse_args_or_cancel(self, cmd: str, arg: str) -> Optional[argparse.Namespace]:
         """Parse arguments or return None if parsing fails/is cancelled"""
         args = shlex.split(arg)
@@ -1055,7 +1099,7 @@ class queShell(cmdLib.Cmd):
         # assert isinstance(parser, argparse.ArgumentParser), f"{cmd} cannot use this generic parser"
         if parser:
             try:
-                return parser.parse_args(args)
+                return self._apply_synonyms(parser.parse_args(args))
             except (SystemExit, ValueError):
                 print(f"{cmd} cancelled")
                 return None
@@ -1085,15 +1129,22 @@ class queShell(cmdLib.Cmd):
         return None
 
     def _get_move_parser(self) -> argparse.ArgumentParser:
+        avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys()) 
         parser = argparse.ArgumentParser(
             description="Moves a run between locations in que", prog="move"
         )
         parser.add_argument(
-            "o_location", choices=QUE_LOCATIONS, help="Original location."
+            "o_location", choices=avail_locs, help="Original location"
         )
-        parser.add_argument("n_location", choices=QUE_LOCATIONS, help="New location.")
+        parser.add_argument("n_location", choices=avail_locs, help="New location")
         parser.add_argument(
-            "o_index", type=int, help="Old position of run in original location"
+            "oi_index", type=int, help="Index of run in original location"
+        )
+        parser.add_argument(
+            "-of",
+            "--of_index",
+            type=int, help="Final original index if specifying a range",
+            required=False, default=None
         )
         return parser
 
