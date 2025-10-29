@@ -517,6 +517,7 @@ class tmux_manager:
             print("join_session ran into an error when spawning the worker process: ")
             print(e.stderr)
             return None
+        
     def switch_to_window(self):
         tmux_cmd = ["tmux", "select-window", "-t", f"{self.sesh_name}:{self.wr_name}"]
         try:
@@ -527,12 +528,16 @@ class tmux_manager:
             )
             print(e.stderr)
 
-    def send(self, cmd: str):  # use with caution
+    def send(self, cmd: str, wndw: str):  # use with caution
+        avail_wndws = [self.dn_name, self.wr_name]
+        if wndw not in avail_wndws:
+            print(f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}")
+            return None
         tmux_cmd = [
             "tmux",
             "send-keys",
             "-t",
-            f"{self.sesh_name}:{self.wr_name}",
+            f"{self.sesh_name}:{wndw}",
             cmd,
             "Enter",
         ]
@@ -954,7 +959,7 @@ class daemon:
             self.print_v("Finished idling, bye")
 
     def monitor_log(self):
-        self.tmux_man.send(f"tail -f {self.worker.log_path}")
+        self.tmux_man.send(f"tail -f {self.worker.log_path}", self.wr_name)
 
     def worker_here(self, args: Optional[list[str]] = None) -> None:
         """Blocking start which prints worker output in daemon terminal"""
@@ -1003,9 +1008,8 @@ class queShell(cmdLib.Cmd):
         dn_name: str = DN_NAME,
         wr_name: str = WR_NAME,
         sesh_name: str = SESH_NAME,
-        run_path: str = RUN_PATH,
-        temp_path: str = TMP_PATH,
         exec_path: str = WR_PATH,
+        run_path: str = RUN_PATH,
         verbose: bool = True,
         auto_save: bool = True,
     ) -> None:
@@ -1019,6 +1023,7 @@ class queShell(cmdLib.Cmd):
             self.tmux_avail = False
         else:
             self.tmux_avail = True
+        self.exec_path = exec_path
         self.auto_save = auto_save
 
     # queShell based
@@ -1139,6 +1144,14 @@ class queShell(cmdLib.Cmd):
             return 
         
         self.tmux_man.join_session(parsed_args.window)
+
+    def do_daemon(self, arg):
+        """Start the daemon with the given setting"""
+        parsed_args = self._parse_args_or_cancel("daemon", arg)
+        if parsed_args is None:
+            return 
+        
+        # self.tmux_man.send(f"{{parsed_args.setting}", self.tmux_man.dn_name)
 
     # helper functions
 
