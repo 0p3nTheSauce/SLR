@@ -77,7 +77,7 @@ class que:
     def save_state(self):
         all_runs = {OLD_RUNS: self.old_runs, TO_RUN: self.to_run}
         store_Data(self.runs_path, all_runs)
-        self.print_v(f"Saved state to {self.runs_path}")
+        # self.print_v(f"Saved state to {self.runs_path}")
 
     def load_state(self, all_runs: Optional[dict] = None) -> dict:
         """Loads state from queRuns.json, or dictionary, returns all_runs"""
@@ -90,7 +90,7 @@ class que:
             data = retrieve_Data(self.runs_path)
             self.old_runs = data.get(OLD_RUNS, [])
             self.to_run = data.get(TO_RUN, [])
-            self.print_v(f"Loaded state from {self.runs_path}")
+            # self.print_v(f"Loaded state from {self.runs_path}")
         else:
             self.print_v(
                 f"No existing state found at {self.runs_path}. Starting fresh."
@@ -451,16 +451,12 @@ class tmux_manager:
         self.dn_name = dn_name
         self.sesh_name = sesh_name
 
+    def setup_tmux_session(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
+        """Create the que_training tmux session is set up, with windows daemon and worker
 
-    def setup_tmux_session(self) \
-        -> Optional[list[subprocess.CompletedProcess[bytes]]]:
-        '''Initialises a tmux session with a window for the daemon and worker processes
-
-            Returns:
-                result: list outputs from subprocess.run
-            Raises:
-                subprocess.CalledProcessError
-        '''
+        Returns:
+            Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
+        """
     
         create_sesh_cmd = [
             'tmux', 'new-session', '-d', '-s', self.sesh_name, # -d for detach 
@@ -488,14 +484,12 @@ class tmux_manager:
             return
         return [o1, o2]
   
-    def check_tmux_session(self):
-        '''Verify that the tmux training session is set up
- 
-            Returns:
-                result: list outputs from subprocess.run
-            Raises:
-                subprocess.CalledProcessError
-        '''
+    def check_tmux_session(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
+        """Verify that the que_training tmux session is set up, with windows daemon and worker
+
+        Returns:
+            Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
+        """
         window_names = [self.dn_name, self.wr_name]
         results = []
         for win_name in window_names:
@@ -510,14 +504,19 @@ class tmux_manager:
                 return
         return results
 
-    def join_session(self):
-        tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}:{self.wr_name}"]
+    def join_session(self, wndw: str):
+        avail_wndws = [self.dn_name, self.wr_name]
+        if wndw not in avail_wndws:
+            print(f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}")
+            return None
+        
+        tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}:{wndw}"]
         try:
-            _ = subprocess.run(tmux_cmd, check=True)
+            return subprocess.run(tmux_cmd, check=True)
         except subprocess.CalledProcessError as e:
             print("join_session ran into an error when spawning the worker process: ")
             print(e.stderr)
-
+            return None
     def switch_to_window(self):
         tmux_cmd = ["tmux", "select-window", "-t", f"{self.sesh_name}:{self.wr_name}"]
         try:
@@ -1012,15 +1011,14 @@ class queShell(cmdLib.Cmd):
     ) -> None:
         super().__init__()
         self.que = que(run_path, verbose)
-        self.daemon = daemon(
-            name=dn_name,
-            wr_name=wr_name,
-            sesh=sesh_name,
-            runs_path=run_path,
-            temp_path=temp_path,
-            exec_path=exec_path,
-            q=self.que,
-        )
+        self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=dn_name, sesh_name=sesh_name)
+        check = self.tmux_man.check_tmux_session()
+        if check is None:
+            check = self.tmux_man.setup_tmux_session()
+        if check is None:
+            self.tmux_avail = False
+        else:
+            self.tmux_avail = True
         self.auto_save = auto_save
 
     # queShell based
@@ -1131,7 +1129,16 @@ class queShell(cmdLib.Cmd):
 
         self.que.create_run(arg_dict, tags, project, entity)
 
-    # daemon based functions
+    # process based functions
+
+    #tmux
+    def do_attach(self, arg):
+        """Attaches to one of the validated tmux sessions"""
+        parsed_args = self._parse_args_or_cancel("attach", arg)
+        if parsed_args is None:
+            return 
+        
+        self.tmux_man.join_session(parsed_args.window)
 
     # helper functions
 
@@ -1186,6 +1193,9 @@ class queShell(cmdLib.Cmd):
             "quit": self._get_quit_parser,
             "shuffle": self._get_shuffle_parser,
             "move": self._get_move_parser,
+            "attach": self._get_attach_parser,
+            "daemon": self._get_daemon_parser,
+            "worker": self._get_worker_parser
         }
 
         if cmd in parsers:
@@ -1218,6 +1228,17 @@ class queShell(cmdLib.Cmd):
         )
         return parser
     
+    def _get_attach_parser(self) -> argparse.ArgumentParser:
+        """Get parser for attach command"""
+        parser = argparse.ArgumentParser(
+            description="Attach to the daemon or worker tmux session"
+        )
+        parser.add_argument(
+            'window',
+            choices=['worker', 'daemon'],
+            help='Tmux window to attach to'
+        )
+        return parser
 
     def _get_move_parser(self) -> argparse.ArgumentParser:
         """Get parser for move command"""
