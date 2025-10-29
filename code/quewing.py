@@ -451,6 +451,65 @@ class tmux_manager:
         self.dn_name = dn_name
         self.sesh_name = sesh_name
 
+
+    def setup_tmux_session(self) \
+        -> Optional[list[subprocess.CompletedProcess[bytes]]]:
+        '''Initialises a tmux session with a window for the daemon and worker processes
+
+            Returns:
+                result: list outputs from subprocess.run
+            Raises:
+                subprocess.CalledProcessError
+        '''
+    
+        create_sesh_cmd = [
+            'tmux', 'new-session', '-d', '-s', self.sesh_name, # -d for detach 
+            '-n', f'{self.dn_name}'
+        ]
+        create_wWndw_cmd = [ #daemon window created in first command
+            'tmux', 'new-window', '-t', self.sesh_name, '-n', self.wr_name
+        ]
+  
+        try:
+            o1 = subprocess.run(create_sesh_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(
+                "setup_tmux_session ran into an error when creating the session and daemon window: "
+            )
+            print(e.stderr)
+            return
+        try:  
+            o2 = subprocess.run(create_wWndw_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(
+                "setup_tmux_session ran into an error when creating the worker window: "
+            )
+            print(e.stderr)
+            return
+        return [o1, o2]
+  
+    def check_tmux_session(self):
+        '''Verify that the tmux training session is set up
+ 
+            Returns:
+                result: list outputs from subprocess.run
+            Raises:
+                subprocess.CalledProcessError
+        '''
+        window_names = [self.dn_name, self.wr_name]
+        results = []
+        for win_name in window_names:
+            tmux_cmd = ['tmux', 'has-session', '-t', f'{self.sesh_name}:{win_name}']
+            try:
+                results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
+            except subprocess.CalledProcessError as e:
+                print(
+                    f"check_tmux_session ran into an error when checking the {win_name} window: "
+                )
+                print(e.stderr)
+                return
+        return results
+
     def join_session(self):
         tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}:{self.wr_name}"]
         try:
