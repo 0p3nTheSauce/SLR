@@ -938,7 +938,8 @@ class daemon:
 class queShell(cmdLib.Cmd):
     intro = "queShell: Type help or ? to list commands.\n"
     prompt = "(que)$ "
-
+    avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys()) 
+    
     def __init__(
         self,
         dn_name: str = DN_NAME,
@@ -1090,6 +1091,12 @@ class queShell(cmdLib.Cmd):
                 parsed_args.n_location
             )
         
+        if hasattr(parsed_args, 'location'):
+            parsed_args.location = SYNONYMS.get(
+                parsed_args.location.lower(), 
+                parsed_args.location
+            )
+        
         return parsed_args
 
     def _parse_args_or_cancel(self, cmd: str, arg: str) -> Optional[argparse.Namespace]:
@@ -1127,16 +1134,41 @@ class queShell(cmdLib.Cmd):
             # assert isinstance(parser, argparse.ArgumentParser), f"{cmd} parser invalid"
             return parser
         return None
+    
+    def _get_daemon_parser(self) -> argparse.ArgumentParser:
+        """Get parser for daemon command"""
+        parser = argparse.ArgumentParser(
+            description="Start the que daemon with a given setting", prog="daemon"
+        )
+        parser.add_argument(
+            'setting',
+            choices=['sWatch', 'sMonitor','monitorO', 'idle', 'idle_log'],
+            help='Operation of daemon'
+        )
+        return parser
+    
+    def _get_worker_parser(self) -> argparse.ArgumentParser:
+        """Get parser for worker command"""
+        parser = argparse.ArgumentParser(
+            description="Start the que worker with a given setting", prog="worker"
+        )
+        parser.add_argument(
+            'setting',
+            choices=['work', 'idle', 'idle_log', 'idle_gpu'],
+            help='Operation of daemon'
+        )
+        return parser
+    
 
     def _get_move_parser(self) -> argparse.ArgumentParser:
-        avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys()) 
+        """Get parser for move command"""
         parser = argparse.ArgumentParser(
             description="Moves a run between locations in que", prog="move"
         )
         parser.add_argument(
-            "o_location", choices=avail_locs, help="Original location"
+            "o_location", choices=self.avail_locs, help="Original location"
         )
-        parser.add_argument("n_location", choices=avail_locs, help="New location")
+        parser.add_argument("n_location", choices=self.avail_locs, help="New location")
         parser.add_argument(
             "oi_index", type=int, help="Index of run in original location"
         )
@@ -1153,7 +1185,7 @@ class queShell(cmdLib.Cmd):
             description="Repositions a run from the que", prog="shuffle"
         )
         parser.add_argument(
-            "location", choices=QUE_LOCATIONS, help="Location of the run"
+            "location", choices=self.avail_locs, help="Location of the run"
         )
         parser.add_argument(
             "o_index", type=int, help="Original position of run in location"
@@ -1166,7 +1198,7 @@ class queShell(cmdLib.Cmd):
             description="Remove a run from future or past runs", prog="remove"
         )
         parser.add_argument(
-            "location", choices=QUE_LOCATIONS, help="Location of the run"
+            "location", choices=self.avail_locs, help="Location of the run"
         )
         parser.add_argument("index", type=int, help="Position of run in location")
         return parser
@@ -1177,7 +1209,7 @@ class queShell(cmdLib.Cmd):
         )
         parser.add_argument(
             "location",
-            choices=[TO_RUN, OLD_RUNS],
+            choices=self.avail_locs,
             help="Location of the run",
         )
         return parser
@@ -1187,7 +1219,7 @@ class queShell(cmdLib.Cmd):
             description="Summarise to a list of runs, in a given location", prog="list"
         )
         parser.add_argument(
-            "location", choices=QUE_LOCATIONS, help="Location of the run"
+            "location", choices=self.avail_locs, help="Location of the run"
         )
 
         return parser
@@ -1214,10 +1246,10 @@ if __name__ == "__main__":
     lock = FileLock(f"{RUN_PATH}.lock", timeout=1)
     try:
         with lock:
-            print(f"Acquired lock on {RUN_PATH}")
+            # print(f"Acquired lock on {RUN_PATH}")
             queShell().cmdloop()
     except TimeoutError:
         print(f"Error: {RUN_PATH} is currently in used by another user")
         sys.exit(1)
-    finally:
-        print(f"Released lock on {RUN_PATH}")
+    
+        # print(f"Released lock on {RUN_PATH}")

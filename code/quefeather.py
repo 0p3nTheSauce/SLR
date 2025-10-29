@@ -63,6 +63,7 @@ class queFeather:
             print(z.shape)
         else:
             print('huh?')
+            
 def main():
     parser = argparse.ArgumentParser(prog='quefeather.py')
     subparsers = parser.add_subparsers(dest='mode', help='Operation mode', required=True)
