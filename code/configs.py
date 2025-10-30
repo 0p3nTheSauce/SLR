@@ -184,20 +184,6 @@ def print_config(config_dict):
 			print(f"    {key:<{max_key_len}} : {value}")
 		print()
 
-# def print_config2(config_dict: Dict[str, Any]) -> None:
-#     """Print configuration dictionary in a more readable format.
-
-#     Args:
-#         config_dict (Dict[str, Any]): Dictionary containing configuration
-#     sections
-#     """
-#     for section in config_dict.keys():
-#         print(f"{section.upper()}:")
-#         section_data = config_dict[section]
-		
-		
-	
-
 
 def take_args(
 	sup_args: Optional[List[str]] = None,
@@ -231,11 +217,13 @@ def take_args(
 	parser.add_argument(
 		"model",
 		type=str,
+		choices=models_available,
 		help=f"Model name from one of the implemented models: {models_available}",
 	)
 	parser.add_argument(
 		"split",
 		type=str,
+		choices=splits_available,
 		help=f"The class split, one of:  {', '.join(splits_available)}",
 	)
 	parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
@@ -355,8 +343,6 @@ def take_args(
 	# Set config path
 	if args.config_path is None:
 		args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
-	else:
-		print(args.config_path)
  
 	# Load config
 	arg_dict = vars(args)
