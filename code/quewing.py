@@ -528,7 +528,16 @@ class tmux_manager:
             )
             print(e.stderr)
 
-    def send(self, cmd: str, wndw: str):  # use with caution
+    def send(self, cmd: str, wndw: str) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
+        """Send a command to the given window
+
+        Args:
+            cmd (str): The command as you would type in the terminal
+            wndw (str): The tmux window
+
+        Returns:
+            Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
+        """
         avail_wndws = [self.dn_name, self.wr_name]
         if wndw not in avail_wndws:
             print(f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}")
@@ -542,7 +551,7 @@ class tmux_manager:
             "Enter",
         ]
         try:
-            subprocess.run(tmux_cmd, check=True)
+            return subprocess.run(tmux_cmd, check=True)
         except subprocess.CalledProcessError as e:
             print("Send ran into an error when spawning the worker process: ")
             print(e.stderr)
@@ -1145,13 +1154,21 @@ class queShell(cmdLib.Cmd):
         
         self.tmux_man.join_session(parsed_args.window)
 
-    def do_daemon(self, arg):
-        """Start the daemon with the given setting"""
-        parsed_args = self._parse_args_or_cancel("daemon", arg)
-        if parsed_args is None:
-            return 
+    # def do_daemon(self, arg):
+    #     """Start the daemon with the given setting"""
+    #     parsed_args = self._parse_args_or_cancel("daemon", arg)
+    #     if parsed_args is None:
+    #         return 
         
-        # self.tmux_man.send(f"{{parsed_args.setting}", self.tmux_man.dn_name)
+    #     self.tmux_man.send(f"{self.exec_path} daemon {parsed_args.setting}", self.tmux_man.dn_name)
+
+    # def do_worker(self, arg):
+    #     """Start the worker with the given setting"""
+    #     parsed_args = self._parse_args_or_cancel("worker", arg)
+    #     if parsed_args is None:
+    #         return 
+        
+    #     self.tmux_man.send(f"{self.exec_path} worker {parsed_args.setting}", self.tmux_man.wr_name)
 
     # helper functions
 
