@@ -1,3 +1,4 @@
+#!/home/luke/miniconda3/envs/wlasl/bin/python
 from pathlib import Path
 import argparse
 import json
@@ -700,7 +701,7 @@ class worker:
 
         info = retrieve_Data(self.temp_path)
 
-        if not info or "run_id" in info.keys():
+        if not info:
             # empty temp file
             raise ValueError(
                 f"Tried to read next run from {self.temp_path} but it was empty"
@@ -749,9 +750,11 @@ class worker:
         run.finish()
 
         # write at end to avoid overwriting a run
-        run_info = {"run_id": run.id, "run_name": run.name, "run_project": project}
+        wandb_info["run_id"] = run.id
+        info["wandb"] = wandb_info
+        
         self.print_v("writing my id to temp file")
-        store_Data(self.temp_path, run_info)
+        store_Data(self.temp_path, info)
 
     def idle(
         self,
