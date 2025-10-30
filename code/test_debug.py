@@ -636,9 +636,20 @@ def test_shuffle2():
     print()
     print(position_entropy(perm))
 
-
+def test_tmux_man():
+    from quewing import tmux_manager
+    
+    tman = tmux_manager()
+    
+    print(tman.exec_path)
+    
+    tman._send("./quefeather.py -h", "worker")
+    
+    tman.join_session("worker")
+    
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
 	# reformet()
-	test_shuffle2()
+	# test_shuffle2()
+	test_tmux_man()
