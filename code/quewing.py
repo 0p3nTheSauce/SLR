@@ -916,16 +916,9 @@ class daemon:
             self.worker_here()
 
             # retrieve run_id
-            info = retrieve_Data(self.temp_path)
+            fin_run = retrieve_Data(self.temp_path)
 
-            if "run_id" in info:
-                run_id = info["run_id"]
-            else:
-                run_id = "Unknown"
-
-            next_run["run_id"] = run_id
-
-            self.que.store_old_run(next_run)
+            self.que.store_old_run(fin_run)
 
     def start_n_monitor(self):
         """Start process and use existing tmux monitoring"""
@@ -956,16 +949,9 @@ class daemon:
                 if self.stp_on_fail:
                     break
             # retrieve run_id
-            info = retrieve_Data(self.temp_path)
+            fin_run = retrieve_Data(self.temp_path)
 
-            if "run_id" in info:
-                run_id = info["run_id"]
-            else:
-                run_id = "Unknown"
-
-            next_run["run_id"] = run_id
-
-            self.que.store_old_run(next_run)
+            self.que.store_old_run(fin_run)
 
     def start_idle(self):
         """Start process in this terminal and watch"""
