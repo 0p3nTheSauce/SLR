@@ -2,7 +2,7 @@ import configparser
 import argparse
 import ast
 from typing import Dict, Any, List, Optional, Union
-from utils import enum_dir, ask_nicely
+from utils import enum_dir, ask_nicely, print_dict
 from stopping import EarlyStopper
 from pathlib import Path
 import torch
@@ -75,7 +75,11 @@ def _schedular_precheck(config: Dict[str, Any]) -> None:
 		ValueError: If start_factor and end_factor not specified for warmup
 		ValueError: If start_factor and end_factor invalid
 	"""
-	sched_info = config["training"].get("scheduler", {})
+	sched_info = config.get("scheduler", None)
+
+	if sched_info is None:
+		return
+ 
 	if "type" not in sched_info:
 		raise ValueError("Scheduler type must be specified in config under scheduler.type")
 	
@@ -351,7 +355,9 @@ def take_args(
 	# Set config path
 	if args.config_path is None:
 		args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
-
+	else:
+		print(args.config_path)
+ 
 	# Load config
 	arg_dict = vars(args)
 	clean_dict = {}

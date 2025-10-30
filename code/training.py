@@ -186,7 +186,11 @@ def train_loop(
 			stopper.load_state_dict(checkpoint["stopper_state_dict"])
 			epoch = checkpoint["epoch"] + 1
 			steps = checkpoint["steps"]
-			best_val_loss = checkpoint["best_val_score"]
+			# best_val_loss = checkpoint["best_val_score"]
+			if "best_val_loss" in checkpoint:
+				best_val_loss = checkpoint["best_val_loss"]
+			if "best_val_acc" in checkpoint:
+				best_val_acc = checkpoint["best_val_acc"]
 
 			print(f"Resuming from epoch {epoch}, steps {steps}")
 			print(f"Loaded model from {load}")
@@ -303,25 +307,27 @@ def train_loop(
 					best_val_loss = epoch_loss
 					check_name = save_path / "best.pth"
 					torch.save(model.state_dict(), check_name)
+					print(f"Best validation loss so far: {best_val_loss:.2f}")
 					print(
 						f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)"
 					)
 
 				if epoch_acc > best_val_acc:
 					best_val_acc = epoch_acc
+					print(f"Best validation acc so far: {best_val_acc:.2f}")
 
 				wandb_run.log(
 					{
-						f"Best/{phase.capitalize()}_loss": epoch_loss,
-						f"Best/{phase.capitalize()}_acc": epoch_acc,
+						f"Best/{phase.capitalize()}_loss": best_val_loss,
+						f"Best/{phase.capitalize()}_acc": best_val_acc,
 						"Epoch": epoch,
 					}
 				)	
 
 				scheduler.step()
 
-				print(f"Best validation loss so far: {best_val_loss:.2f}")
-				print(f"Best validation acc so far: {best_val_acc:.2f}")
+				
+				
 		# Save checkpoint
 		if (
 			epoch % save_every == 0
@@ -334,8 +340,10 @@ def train_loop(
 				"model_state_dict": model.state_dict(),
 				"optimizer_state_dict": optimizer.state_dict(),
 				"scheduler_state_dict": scheduler.state_dict(),
-				"best_val_score": best_val_loss,
+				"best_val_loss": best_val_loss,
+				"best_val_acc": best_val_acc,
 				"stopper_state_dict": stopper.state_dict(),
+
 			}
 			checkpoint_path = save_path / f"checkpoint_{str(epoch).zfill(3)}.pth"
 

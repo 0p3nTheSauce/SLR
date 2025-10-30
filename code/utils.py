@@ -3,7 +3,7 @@ import torch
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-# from torchcodec.decoders import VideoDecoder
+import json
 import re
 from pathlib import Path
 import shutil
@@ -95,7 +95,7 @@ def ask_nicely(message: str,
 
 ############# pretty printing ##############
 
-def print_dict(diction):
+def print_dicto(diction):
 	print(string_nested_dict(diction))
 	
 def string_nested_dict(diction):
@@ -108,6 +108,9 @@ def string_nested_dict(diction):
 	else:
 		ans += str(diction)
 	return ans
+
+def print_dict(diction):
+    print(json.dumps(diction, indent=4))
 
 ################# Loading #####################
 	
