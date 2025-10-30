@@ -625,31 +625,43 @@ def shannon_entropy(perm: torch.Tensor, unit:Literal['bit', 'nat', 'dit'] = 'bit
 	return e
 
 def test_shuffle2():
-    from video_transforms import Shuffle
-    import torch
-    # perm = Shuffle.create_permutation(4, 42)
-    perm = torch.tensor([3, 0, 1, 2])
-    print(f"original: {perm}")
-    shannon_entropy(perm)
-    print()
-    Shuffle.shannon_entropy(perm)
-    print()
-    print(position_entropy(perm))
-
+	from video_transforms import Shuffle
+	import torch
+	# perm = Shuffle.create_permutation(4, 42)
+	perm = torch.tensor([3, 0, 1, 2])
+	print(f"original: {perm}")
+	shannon_entropy(perm)
+	print()
+	Shuffle.shannon_entropy(perm)
+	print()
+	print(position_entropy(perm))
+	
+def test_shuffle3():
+	from video_transforms import Shuffle
+	from configs import set_seed
+	set_seed()
+	num_frames = 16
+	for i in range(10):
+		s1 = Shuffle(num_frames)
+		perm1 = map(str, s1.permutation.numpy())
+		print(f"Perm {i+1}: [{', '.join(perm1)}]")
+		print(f"Shannon entropy: {Shuffle.shannon_entropy(s1.permutation)}")
+		print()
+  
 def test_tmux_man():
-    from quewing import tmux_manager
-    
-    tman = tmux_manager()
-    
-    print(tman.exec_path)
-    
-    tman._send("./quefeather.py -h", "worker")
-    
-    tman.join_session("worker")
-    
+	from quewing import tmux_manager
+	
+	tman = tmux_manager()
+	
+	print(tman.exec_path)
+	
+	tman._send("./quefeather.py -h", "worker")
+	
+	tman.join_session("worker")
+	
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
 	# reformet()
-	# test_shuffle2()
-	test_tmux_man()
+	test_shuffle3()
+	# test_tmux_man()

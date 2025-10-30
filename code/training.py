@@ -19,7 +19,7 @@ from utils import wandb_manager
 def setup_data(mean, std, config):
 	train_info = TrainSet(set_name="train", batch_size=config.training["batch_size"])
 	val_info = TestSet(set_name="val")
-	train_loader, num_t_classes = get_data_loader(
+	train_loader, num_t_classes, _, _  = get_data_loader(
 		mean,
 		std,
 		config.data["frame_size"],
@@ -28,7 +28,7 @@ def setup_data(mean, std, config):
 		Path(config.admin["labels"]),
 		train_info,
 	)
-	val_loader, num_v_classes = get_data_loader(
+	val_loader, num_v_classes, _, _ = get_data_loader(
 		mean,
 		std,
 		config.data["frame_size"],

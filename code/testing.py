@@ -354,13 +354,14 @@ def test_run(
         output.mkdir(exist_ok=True)
 
     tloaders = {}
-
+    mperm_info = {}
+    
     if not test_test and not test_val:
         return results
 
     if test_test:
         set_type = TestSet(set_name="test")
-        tloaders["test"] = get_data_loader(
+        tloaders["test"], _, m_permt, m_sh_et = get_data_loader(
             model_norms['mean'],
             model_norms['std'],
             data["frame_size"],
@@ -370,10 +371,11 @@ def test_run(
             set_type,
             shuffle=shuffle
         )
+        mperm_info["test"] = (m_permt, m_sh_et)
 
     if test_val:
         set_type = TestSet(set_name="val")
-        tloaders["val"] = get_data_loader(
+        tloaders["val"], _, m_permv, m_sh_ev = get_data_loader(
             model_norms['mean'],
             model_norms['std'],
             data["frame_size"],
@@ -383,6 +385,7 @@ def test_run(
             set_type,
             shuffle=shuffle
         )
+        mperm_info["val"] = (m_permv, m_sh_ev)
 
     keys = list(tloaders.keys())
     gen_loader = tloaders[keys[0]]
@@ -413,14 +416,23 @@ def test_run(
         print(f"Testing on {set_name} set")
         fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
         save2 = output / fname
-        save2 = None if not save else save2
-
+        
         topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
             model=model,
             test_loader=tloader,
             verbose=False,
-            save_path=save2,
         )
+     
+        m_perm, m_sh_e = mperm_info[set_name]
+        if m_perm is not None:
+            topk_res["perm"] = m_perm
+            topk_res["shannon_entropy"] = m_sh_e 
+        
+        if save:
+            with open(save2, "w") as f:
+                json.dump(topk_res, f, indent=4)
+            
+        
         results[fname.replace(".json", "")] = topk_res
         heatmap, br_graph, cf_matrix = False, False, False  # skip plots if loading
 

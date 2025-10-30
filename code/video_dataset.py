@@ -4,7 +4,7 @@ from torch.utils.data import Dataset, DataLoader
 import json
 import torch
 from pathlib import Path
-from typing import Callable, Optional, Dict, Tuple, Literal, TypedDict, Union
+from typing import Callable, Optional, Tuple, Literal, TypedDict, Union, List
 from torchvision.transforms import v2
 from video_transforms import Shuffle
 
@@ -136,7 +136,7 @@ def get_data_loader(
     set_type: Union[TrainSet, TestSet],
     shuffle: bool = False,
     label_suffix: str = LABEL_SUFFIX,
-) -> Tuple[DataLoader[VideoDataset], int]:
+) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     """Get test, validation and training dataloaders
 
     Args:
@@ -156,8 +156,13 @@ def get_data_loader(
 
     if shuffle:
         maybe_shuffle_t = Shuffle(num_frames)
+        perm = maybe_shuffle_t.permutation
+        sh_e = Shuffle.shannon_entropy(perm)
+        perm = list(map(int, perm.numpy()))
     else:
         maybe_shuffle_t = v2.Lambda(lambda x: x)
+        perm = None
+        sh_e = None
 
     final_transform = v2.Compose(
         [
@@ -209,7 +214,7 @@ def get_data_loader(
             drop_last=False,
         )
 
-    return dataloader, num_classes
+    return dataloader, num_classes, perm, sh_e
 
 
 if __name__ == "__main__":
