@@ -443,16 +443,18 @@ class que:
 class tmux_manager:
     def __init__(
         self,
-        wr_name: str,
-        dn_name: str,
-        sesh_name: str,
-        exec_path: str,
+        wr_name: str = WR_NAME,
+        dn_name: str = DN_NAME,
+        sesh_name: str = SESH_NAME,
+        exec_path: str = WR_PATH,
     ) -> None:
         self.wr_name = wr_name
         self.dn_name = dn_name
         self.sesh_name = sesh_name
-        self.exec_path = Path(exec_path)
-        if (not self.exec_path.exists()) or (not self.exec_path.is_file()):
+        self.exec_path = exec_path
+        
+        ep = Path(exec_path)
+        if (not ep.exists()) or (not ep.is_file()):
             raise ValueError(f"Executable: {exec_path} does not exist")
 
     def setup_tmux_session(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
@@ -574,7 +576,7 @@ class tmux_manager:
             Optional[subprocess.CompletedProcess[bytes]]: The output of the completed process if successful, otherwise None.
         """
         if mode == self.dn_name or mode == self.wr_name:
-            return self._send(f"{self.exec_path} {mode} {setting}", self.dn_name)
+            return self._send(f"{self.exec_path} {mode} {setting}", mode)
         else:
             raise ValueError(f"Unknown mode: {mode}")
         
