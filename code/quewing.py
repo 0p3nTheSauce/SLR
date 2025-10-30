@@ -446,10 +446,14 @@ class tmux_manager:
         wr_name: str,
         dn_name: str,
         sesh_name: str,
+        exec_path: str,
     ) -> None:
         self.wr_name = wr_name
         self.dn_name = dn_name
         self.sesh_name = sesh_name
+        self.exec_path = Path(exec_path)
+        if (not self.exec_path.exists()) or (not self.exec_path.is_file()):
+            raise ValueError(f"Executable: {exec_path} does not exist")
 
     def setup_tmux_session(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
         """Create the que_training tmux session is set up, with windows daemon and worker
@@ -528,7 +532,7 @@ class tmux_manager:
             )
             print(e.stderr)
 
-    def send(self, cmd: str, wndw: str) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
+    def _send(self, cmd: str, wndw: str) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
         """Send a command to the given window
 
         Args:
@@ -555,7 +559,25 @@ class tmux_manager:
         except subprocess.CalledProcessError as e:
             print("Send ran into an error when spawning the worker process: ")
             print(e.stderr)
+            
+    def start(self, mode: str, setting: str) -> Optional[subprocess.CompletedProcess[bytes]]:
+        """Wrapper for send, specialised to starting the worker or daemon
 
+        Args:
+            mode (str): The mode for quefeather (worker or daemon)
+            setting (str): The setting for the given mode (e.g. sMonitor)
+
+        Raises:
+            ValueError: If mode is not the same as the initialised self variable
+
+        Returns:
+            Optional[subprocess.CompletedProcess[bytes]]: The output of the completed process if successful, otherwise None.
+        """
+        if mode == self.dn_name or mode == self.wr_name:
+            return self._send(f"{self.exec_path} {mode} {setting}", self.dn_name)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+        
 
 class gpu_manager:
     @classmethod
@@ -851,7 +873,7 @@ class daemon:
         if tm:
             self.tmux_man = tm
         else:
-            self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=name, sesh_name=sesh)
+            self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=name, sesh_name=sesh, exec_path=exec_path)
         self.verbose = verbose
         self.stp_on_fail = stp_on_fail
 
@@ -968,7 +990,7 @@ class daemon:
             self.print_v("Finished idling, bye")
 
     def monitor_log(self):
-        self.tmux_man.send(f"tail -f {self.worker.log_path}", self.wr_name)
+        self.tmux_man._send(f"tail -f {self.worker.log_path}", self.wr_name)
 
     def worker_here(self, args: Optional[list[str]] = None) -> None:
         """Blocking start which prints worker output in daemon terminal"""
@@ -1024,15 +1046,14 @@ class queShell(cmdLib.Cmd):
     ) -> None:
         super().__init__()
         self.que = que(run_path, verbose)
-        self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=dn_name, sesh_name=sesh_name)
+        self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=dn_name, sesh_name=sesh_name, exec_path=exec_path)
         check = self.tmux_man.check_tmux_session()
         if check is None:
             check = self.tmux_man.setup_tmux_session()
         if check is None:
-            self.tmux_avail = False
-        else:
-            self.tmux_avail = True
-        self.exec_path = exec_path
+            raise ValueError("Failed to start tmux manager, exiting")
+        self.dn_name = dn_name
+        self.wr_name = wr_name
         self.auto_save = auto_save
 
     # queShell based
@@ -1154,21 +1175,21 @@ class queShell(cmdLib.Cmd):
         
         self.tmux_man.join_session(parsed_args.window)
 
-    # def do_daemon(self, arg):
-    #     """Start the daemon with the given setting"""
-    #     parsed_args = self._parse_args_or_cancel("daemon", arg)
-    #     if parsed_args is None:
-    #         return 
+    def do_daemon(self, arg):
+        """Start the daemon with the given setting"""
+        parsed_args = self._parse_args_or_cancel("daemon", arg)
+        if parsed_args is None:
+            return 
         
-    #     self.tmux_man.send(f"{self.exec_path} daemon {parsed_args.setting}", self.tmux_man.dn_name)
+        self.tmux_man.start(self.dn_name, parsed_args.setting)
 
-    # def do_worker(self, arg):
-    #     """Start the worker with the given setting"""
-    #     parsed_args = self._parse_args_or_cancel("worker", arg)
-    #     if parsed_args is None:
-    #         return 
+    def do_worker(self, arg):
+        """Start the worker with the given setting"""
+        parsed_args = self._parse_args_or_cancel("worker", arg)
+        if parsed_args is None:
+            return 
         
-    #     self.tmux_man.send(f"{self.exec_path} worker {parsed_args.setting}", self.tmux_man.wr_name)
+        self.tmux_man.start(self.wr_name, parsed_args.setting)
 
     # helper functions
 
@@ -1242,7 +1263,7 @@ class queShell(cmdLib.Cmd):
         parser.add_argument(
             'setting',
             choices=['sWatch', 'sMonitor','monitorO', 'idle', 'idle_log'],
-            help='Operation of daemon'
+            help='Operation of daemon:  worker here, worker in seperate window, tail log file, worker idle here, worker idle and log'
         )
         return parser
     
@@ -1254,7 +1275,7 @@ class queShell(cmdLib.Cmd):
         parser.add_argument(
             'setting',
             choices=['work', 'idle', 'idle_log', 'idle_gpu'],
-            help='Operation of daemon'
+            help='Operation of worker: do its main job, idle here, idle in log, idle on GPU'
         )
         return parser
     
