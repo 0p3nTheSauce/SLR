@@ -13,7 +13,7 @@ from utils import load_rgb_frames_from_video, crop_frames
 from video_transforms import correct_num_frames
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
-from configs import LABEL_SUFFIX
+from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits 
 
 
 def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
@@ -125,7 +125,25 @@ class TrainSet(TypedDict):
 class TestSet(TypedDict):
     set_name: Literal["test", "val"]
 
-
+class DataSetInfo(TypedDict):
+    root: Path
+    labels: Path
+    label_suff: str
+    set_name: Literal["train", "test", "val"]
+    
+def get_wlasl_info(split: str, set_name: Literal["train", "test", "val"]) -> DataSetInfo:
+    avail_sp = get_avail_splits()
+    if split not in avail_sp:
+        raise ValueError(f"Supplied split: {split} not one of available splits: {', '.join(avail_sp)}")
+    
+    return {
+        "root": Path(WLASL_ROOT) / RAW_DIR, 
+        "labels": Path(LABELS_PATH) / split,
+        "label_suff": LABEL_SUFFIX,
+        "set_name": set_name  
+    }
+    
+    
 def get_data_loader(
     mean: Tuple[float, float, float],
     std: Tuple[float, float, float],
