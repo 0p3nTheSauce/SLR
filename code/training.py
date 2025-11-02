@@ -36,7 +36,8 @@ def setup_data(mean, std, config):
 		std,
 		config.data["frame_size"],
 		config.data["num_frames"],
-		set_info=val_info
+		set_info=val_info,
+		batch_size=1
 	)
 	assert num_t_classes == num_v_classes, f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
 	dataloaders = {"train": train_loader, "val": val_loader}
@@ -185,8 +186,10 @@ def train_loop(
 			checkpoint = torch.load(load, map_location=device)
 			model.load_state_dict(checkpoint["model_state_dict"])
 			optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-			scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-			stopper.load_state_dict(checkpoint["stopper_state_dict"])
+			if "scheduler_state_dict" in checkpoint:
+				scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+			if "stopper_state_dict" in checkpoint:
+				stopper.load_state_dict(checkpoint["stopper_state_dict"])
 			epoch = checkpoint["epoch"] + 1
 			steps = checkpoint["steps"]
 			# best_val_loss = checkpoint["best_val_score"]
