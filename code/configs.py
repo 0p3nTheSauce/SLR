@@ -312,6 +312,7 @@ def take_args(
 
 	# saving
 	save_path = output / "checkpoints"
+	args.save_path = save_path
 	# if not args.recover and args.enum_chck:
 	if not args.recover and save_path.exists():
 		if not args.enum_chck:
@@ -338,7 +339,7 @@ def take_args(
 	else:
 		args.save_path = save_path
 
-	args.save_path = str(save_path)
+	args.save_path = str(args.save_path)
 
 	# Set config path
 	if args.config_path is None:

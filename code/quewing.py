@@ -957,7 +957,7 @@ class daemon:
 			raise ValueError(f"Tried to read info from {self.temp_path} but found nothing")
 			
 		self.que.to_run.insert(0, info)		
-				
+		self.que.save_state()
 		self.print_v(f"Recovering in mode: {o_setting}\n")
     
 		if o_setting == 'sWatch':
