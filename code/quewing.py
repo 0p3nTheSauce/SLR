@@ -15,6 +15,7 @@ import torch
 # locals
 import configs
 import utils
+from utils import gpu_manager
 from training import train_loop, wandb_manager
 
 # constants
@@ -589,96 +590,6 @@ class tmux_manager:
 		else:
 			raise ValueError(f"Unknown mode: {mode}")
 		
-
-class gpu_manager:
-	@classmethod
-	def get_gpu_memory_usage(cls, gpu_id=0):
-		"""Get GPU memory usage across all processes"""
-
-		result = subprocess.run(
-			[
-				"nvidia-smi",
-				f"--id={gpu_id}",
-				"--query-gpu=memory.used,memory.total",
-				"--format=csv,noheader,nounits",
-			],
-			capture_output=True,
-			text=True,
-		)
-		used, total = map(float, result.stdout.strip().split(","))
-
-		return used / 1024, total / 1024  # In GB
-
-	@classmethod
-	def wait_for_completion(
-		cls,
-		check_interval: int = 3600,  # 1 hour
-		confirm_interval: int = 60,  # 1 minute
-		num_checks: int = 5,  # confirm consistency over 5 minutes
-		verbose: bool = False,
-		gpu_id: int = 0,
-		max_util_gb: float = 1.0,  # Maximum memory usage in GB
-	) -> bool:
-		"""Wait for GPU memory to be free before proceeding
-
-		Args:
-				check_interval (int, optional): Wait period before checking again. Defaults to 3600 (1 hour).
-				confirm_interval (int, optional): Wait period before checking again when confirming. Defaults to 60 (1 minute).
-				num_checks: (int, optional): Confirm consistency over how many checks. Defaults to 5 (5 minutes).
-				gpu_id (int, optional): CUDA GPU. Defaults to 0.
-				max_util_gb (float, optional): Threshold GPU usage to trigger waiting. Defaults to 1.0 (GB).
-
-		Returns:
-				bool: Whether monitoring was killed by the user.
-		"""
-		assert torch.cuda.is_available(), "CUDA is not available"
-
-		used, total = cls.get_gpu_memory_usage(gpu_id)
-
-		proceed = used > max_util_gb  # Fixed logic
-
-		while proceed:
-			if verbose:
-				print()
-				print(
-					f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
-				)
-				print(f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-			try:
-				time.sleep(check_interval)
-				used, _ = cls.get_gpu_memory_usage(gpu_id)
-			except KeyboardInterrupt:
-				print()
-				print("Monitoring interrupted by user")
-				return False
-
-			if used <= max_util_gb and cls._confirm_usage(
-				confirm_interval, num_checks, gpu_id, max_util_gb
-			):
-				break
-
-		if verbose:
-			print()
-			print(
-				f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
-			)
-
-		return True
-
-	@classmethod
-	def _confirm_usage(
-		cls,
-		confirm_interval: int = 60,  # 1 minute
-		num_checks: int = 5,  # confirm consistency over 5 minutes
-		gpu_id: int = 0,
-		max_util_gb: float = 1.0,
-	) -> bool:
-		for _ in range(num_checks):
-			used, _ = cls.get_gpu_memory_usage(gpu_id)
-			if used > max_util_gb:
-				return False
-			time.sleep(confirm_interval)
-		return True
 
 
 class worker:
