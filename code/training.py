@@ -9,7 +9,7 @@ import wandb
 from wandb.sdk.wandb_run import Run
 # local imports
 
-from video_dataset import get_data_loader, TrainSet, TestSet
+from video_dataset import get_data_loader, get_wlasl_info
 from configs import load_config, print_config, take_args, set_seed
 from stopping import EarlyStopper
 from models import get_model, norm_vals
@@ -18,25 +18,25 @@ from utils import wandb_manager
 
 
 def setup_data(mean, std, config):
-	train_info = TrainSet(set_name="train", batch_size=config.training["batch_size"])
-	val_info = TestSet(set_name="val")
+    #NOTE: update for other datasets
+	train_info = get_wlasl_info(config.admin["split"], set_name='train')
+	val_info = get_wlasl_info(config.admin["split"], set_name='val')
+
+ 
 	train_loader, num_t_classes, _, _  = get_data_loader(
 		mean,
 		std,
 		config.data["frame_size"],
 		config.data["num_frames"],
-		Path(config.admin["root"]),
-		Path(config.admin["labels"]),
-		train_info,
+		set_info=train_info,
+		batch_size=config.training['batch_size']
 	)
 	val_loader, num_v_classes, _, _ = get_data_loader(
 		mean,
 		std,
 		config.data["frame_size"],
 		config.data["num_frames"],
-		Path(config.admin["root"]),
-		Path(config.admin["labels"]),
-		val_info,
+		set_info=val_info
 	)
 	assert num_t_classes == num_v_classes, f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
 	dataloaders = {"train": train_loader, "val": val_loader}
