@@ -149,11 +149,10 @@ def get_data_loader(
     std: Tuple[float, float, float],
     frame_size: int,
     num_frames: int,
-    root: Path,
-    labels: Path,
-    set_type: Union[TrainSet, TestSet],
+    set_info: DataSetInfo,
     shuffle: bool = False,
-    label_suffix: str = LABEL_SUFFIX,
+    batch_size: Optional[int] = None
+    
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     """Get test, validation and training dataloaders
 
@@ -191,7 +190,7 @@ def get_data_loader(
         ]
     )
 
-    if set_type["set_name"] == "train":
+    if set_info["set_name"] == "train":
         transform = v2.Compose(
             [
                 v2.RandomCrop(frame_size),
@@ -202,11 +201,11 @@ def get_data_loader(
     else:
         transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
 
-    instances = labels / f"{set_type['set_name']}_instances_{label_suffix}"
-    classes = labels / f"{set_type['set_name']}_classes_{label_suffix}"
+    instances = set_info['labels'] / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
+    classes = set_info['labels'] / f"{set_info['set_name']}_classes_{set_info['label_suff']}"
 
     dataset = VideoDataset(
-        root,
+        set_info['root'],
         instances,
         classes,
         num_frames=num_frames,
@@ -214,10 +213,10 @@ def get_data_loader(
     )
     num_classes = len(set(dataset.classes))
 
-    if set_type["set_name"] == "train":
+    if set_info["set_name"] == "train":
         dataloader = DataLoader(
             dataset,
-            batch_size=set_type["batch_size"],
+            batch_size=batch_size,
             shuffle=True,
             num_workers=2,
             pin_memory=True,
