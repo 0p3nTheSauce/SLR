@@ -1,6 +1,7 @@
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 import torch  # type: ignore
 import torch.nn as nn
+from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.optim.lr_scheduler import LRScheduler
 from pathlib import Path
@@ -85,7 +86,9 @@ def train_loop(
 	load: Optional[Union[Path, str]]=None,
 	save_every: int = 5,
 	recover: bool = False,
-	seed: Optional[int] =None
+	seed: Optional[int] =None,
+	verbose: bool = False
+	
 ) -> None:
 	"""Train loop for video classification model.
 
@@ -260,6 +263,7 @@ def train_loop(
 						if steps % 10 == 0:
 							avg_acc_loss = accumulated_loss / accumulated_steps
 							current_acc = 100.0 * running_corrects / total_samples
+
 							print(
 								f"Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, "
 								f"Current Accuracy: {current_acc:.2f}%"
@@ -354,7 +358,78 @@ def train_loop(
 	print("Finished training successfully")
 	# wandb_run.finish()
 
+def do_train(model: nn.Module,
+             dataloader: DataLoader,
+             optimizer: optim.Optimizer,
+             device: torch.device,
+             loss_func: nn.Module,
+             updates_per_step: int,
+             wandb_run: Run,
+             steps: int,
+            verbose: bool):
+	model.train()
+	
+	# Reset metrics for this phase
+	running_loss = 0.0
+	running_corrects = 0
+	total_samples = 0
 
+	# for gradient accumulation
+	accumulated_loss = 0.0
+	accumulated_steps = 0
+	optimizer.zero_grad()
+
+	for item in dataloader:
+		data, target = item["frames"], item["label_num"]
+		data, target = data.to(device), target.to(device)
+		batch_size = data.size(0)
+		total_samples += batch_size
+  
+		model_output = model(data)
+  
+		loss = loss_func(model_output, target)
+		running_loss += loss.item()
+		_, predicted = model_output.max(1)
+		running_corrects += predicted.eq(target).sum().item()
+  
+		scaled_loss = loss / updates_per_step
+		scaled_loss.backward()
+  
+		accumulated_loss += loss.item()
+		accumulated_steps += 1
+  
+		#gradient accumulation
+		if accumulated_steps == updates_per_step:
+			optimizer.step()
+			optimizer.zero_grad()
+			steps += 1
+   
+			#Print progress every few steps
+			if steps % 10 == 0:
+				avg_acc_loss = accumulated_loss / accumulated_steps
+				current_acc = 100.0 * running_corrects / total_samples
+	
+
+				print(
+					f"Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, "
+					f"Current Accuracy: {current_acc:.2f}%"
+				)
+	
+				wandb_run.log(
+					{
+						"Loss/Train_Step": avg_acc_loss,
+						"Accuracy/Train_Step": current_acc,
+						"Step": steps,
+					}
+				)
+
+			accumulated_steps = 0
+			accumulated_loss = 0.0
+   
+	#calculate epoch metrics 
+	epoch_loss = running_loss / total_samples
+	epoch_acc = 100.0 * running_corrects / total_samples
+   
 def main():
 	maybe_args = take_args()
 	if isinstance(maybe_args, tuple):

@@ -658,10 +658,215 @@ def test_tmux_man():
 	tman._send("./quefeather.py -h", "worker")
 	
 	tman.join_session("worker")
+
+def test_loss():
+	loss_func = torch.nn.CrossEntropyLoss(reduce=None)
 	
+	input_t = torch.rand(5,3)
+	target = torch.rand(5, 3)
+	print(input_t)
+	print(target)
+	loss = loss_func(input_t, target)
+	print(loss)
+	print(loss.item())
+	
+def test_loss2():
+	# Create some dummy data
+	import torch
+	import torch.nn as nn
+
+	# Create some dummy data
+	batch_size = 4
+	num_classes = 3
+
+	# Predictions and targets
+	predictions = torch.randn(batch_size, num_classes)
+	targets = torch.tensor([0, 1, 2, 1])
+
+	print("Predictions shape:", predictions.shape)
+	print("Targets:", targets)
+	print("\n" + "="*60)
+
+	# Test with NO arguments (default behavior)
+	print("\n1. Testing with NO arguments (default):")
+	criterion_default = nn.CrossEntropyLoss()
+	loss_default = criterion_default(predictions, targets)
+	print(f"Loss (no args): {loss_default.item()}")
+
+	# Test with explicit reduction='mean'
+	print("\n2. Testing with explicit reduction='mean':")
+	criterion_mean = nn.CrossEntropyLoss(reduction='mean')
+	loss_mean = criterion_mean(predictions, targets)
+	print(f"Loss (reduction='mean'): {loss_mean.item()}")
+
+	# Test with reduction='sum'
+	print("\n3. Testing with reduction='sum':")
+	criterion_sum = nn.CrossEntropyLoss(reduction='sum')
+	loss_sum = criterion_sum(predictions, targets)
+	print(f"Loss (reduction='sum'): {loss_sum.item()}")
+
+	# Test with reduction='none' (get individual losses)
+	print("\n4. Testing with reduction='none':")
+	criterion_none = nn.CrossEntropyLoss(reduction='none')
+	losses_individual = criterion_none(predictions, targets)
+	print(f"Individual losses: {losses_individual}")
+	print(f"Manual mean of individual losses: {losses_individual.mean().item()}")
+	print(f"Manual sum of individual losses: {losses_individual.sum().item()}")
+
+	print("\n" + "="*60)
+	print("\nVERIFICATION:")
+	print(f"loss_default (no args) = {loss_default.item():.6f}")
+	print(f"loss_mean (explicit) = {loss_mean.item():.6f}")
+	print(f"loss_sum / batch_size = {loss_sum.item() / batch_size:.6f}")
+	print(f"losses_individual.mean() = {losses_individual.mean().item():.6f}")
+	print(f"losses_individual.sum() = {losses_individual.sum().item():.6f}")
+
+	print("\n" + "="*60)
+	print("\nCONCLUSION:")
+	if abs(loss_default.item() - loss_mean.item()) < 1e-6:
+		print("✓ Default (no args) is the SAME as reduction='mean'")
+		
+	if abs(loss_mean.item() - losses_individual.mean().item()) < 1e-6:
+		print("✓ With reduction='mean', loss.item() returns the MEAN loss per sample")
+		print(f"✓ This equals: {loss_mean.item():.6f}")
+	else:
+		print("✗ Something unexpected happened")
+
+	if abs(loss_sum.item() - losses_individual.sum().item()) < 1e-6:
+		print("✓ With reduction='sum', loss.item() returns the SUM of all losses")
+		print(f"✓ This equals: {loss_sum.item():.6f}")
+		
+	print("\n" + "="*60)
+	print("\nSo when you multiply loss.item() by batch_size:")
+	print(f"loss.item() * batch_size = {loss_mean.item():.6f} * {batch_size} = {loss_mean.item() * batch_size:.6f}")
+	print(f"This converts the mean back to a sum for accumulation purposes!")
+
+def test_loss3():
+	import torch
+	import torch.nn as nn
+	import torch.nn.functional as F
+	import numpy as np
+
+	print("="*70)
+	print("CROSS ENTROPY LOSS: STEP BY STEP")
+	print("="*70)
+
+	# Example: 3-class classification problem
+	# Suppose we're classifying images as: cat=0, dog=1, bird=2
+
+	logits = torch.tensor([[2.0, 1.0, 0.1]])  # Model's raw outputs (logits)
+	target = torch.tensor([0])  # True class is 0 (cat)
+
+	print("\n📊 SETUP:")
+	print(f"Logits (raw model output): {logits[0].tolist()}")
+	print(f"True class: {target.item()} (cat)")
+	print(f"Classes: 0=cat, 1=dog, 2=bird")
+
+	print("\n" + "="*70)
+	print("STEP 1: Convert logits to probabilities using Softmax")
+	print("="*70)
+
+	# Manual softmax calculation
+	exp_logits = torch.exp(logits[0])
+	print(f"\nexp(logits) = {exp_logits.tolist()}")
+
+	sum_exp = exp_logits.sum()
+	print(f"sum(exp(logits)) = {sum_exp.item():.4f}")
+
+	probabilities = exp_logits / sum_exp
+	print(f"\nProbabilities = exp(logits) / sum(exp(logits))")
+	print(f"P(cat)  = {probabilities[0].item():.4f}")
+	print(f"P(dog)  = {probabilities[1].item():.4f}")
+	print(f"P(bird) = {probabilities[2].item():.4f}")
+	print(f"Sum = {probabilities.sum().item():.4f} (should be 1.0)")
+
+	# Verify with PyTorch's softmax
+	softmax_probs = F.softmax(logits[0], dim=0)
+	print(f"\n✓ PyTorch softmax matches: {torch.allclose(probabilities, softmax_probs)}")
+
+	print("\n" + "="*70)
+	print("STEP 2: Calculate -log(probability of correct class)")
+	print("="*70)
+
+	correct_class_prob = probabilities[target.item()]
+	print(f"\nProbability of correct class (cat): {correct_class_prob.item():.4f}")
+
+	manual_loss = -torch.log(correct_class_prob)
+	print(f"Loss = -log({correct_class_prob.item():.4f}) = {manual_loss.item():.4f}")
+
+	print("\n" + "="*70)
+	print("STEP 3: Verify with PyTorch's CrossEntropyLoss")
+	print("="*70)
+
+	criterion = nn.CrossEntropyLoss()
+	pytorch_loss = criterion(logits, target)
+	print(f"\nPyTorch CrossEntropyLoss: {pytorch_loss.item():.4f}")
+	print(f"Our manual calculation:    {manual_loss.item():.4f}")
+	print(f"✓ Match: {torch.allclose(manual_loss, pytorch_loss)}")
+
+	print("\n" + "="*70)
+	print("INTUITION: What different losses mean")
+	print("="*70)
+
+	test_cases = [
+		(torch.tensor([[5.0, 0.0, 0.0]]), "Very confident and CORRECT"),
+		(torch.tensor([[2.0, 1.0, 0.1]]), "Moderately confident and CORRECT"),
+		(torch.tensor([[0.5, 0.4, 0.1]]), "Low confidence but CORRECT"),
+		(torch.tensor([[0.0, 5.0, 0.0]]), "Very confident but WRONG"),
+		(torch.tensor([[1.0, 1.0, 1.0]]), "Completely uncertain (equal probs)"),
+	]
+
+	for logits_test, description in test_cases:
+		loss = criterion(logits_test, target)
+		probs = F.softmax(logits_test[0], dim=0)
+		print(f"\n{description}")
+		print(f"  Probs: cat={probs[0].item():.3f}, dog={probs[1].item():.3f}, bird={probs[2].item():.3f}")
+		print(f"  Loss: {loss.item():.4f}")
+
+	print("\n" + "="*70)
+	print("KEY INSIGHTS")
+	print("="*70)
+	print("""
+	1. Cross entropy = -log(probability of correct class)
+	2. Lower loss = model is more confident in correct answer
+	3. Loss → 0 as probability → 1 (perfect prediction)
+	4. Loss → ∞ as probability → 0 (terrible prediction)
+	5. PyTorch's CrossEntropyLoss combines softmax + negative log likelihood
+	6. You give it raw logits (not probabilities) and it handles softmax internally
+	""")
+
+	print("\n" + "="*70)
+	print("BONUS: Multi-sample batch example")
+	print("="*70)
+
+	# Batch of 3 samples
+	batch_logits = torch.tensor([
+		[2.0, 1.0, 0.1],  # Sample 1: predict cat
+		[0.5, 3.0, 0.2],  # Sample 2: predict dog
+		[0.1, 0.2, 4.0],  # Sample 3: predict bird
+	])
+	batch_targets = torch.tensor([0, 1, 2])  # All correct!
+
+	batch_loss = criterion(batch_logits, batch_targets)
+	print(f"\nBatch logits shape: {batch_logits.shape}")
+	print(f"Batch targets: {batch_targets.tolist()}")
+	print(f"Mean loss across batch: {batch_loss.item():.4f}")
+
+	# Calculate individual losses
+	individual_losses = []
+	for i in range(3):
+		loss = criterion(batch_logits[i:i+1], batch_targets[i:i+1])
+		individual_losses.append(loss.item())
+		print(f"  Sample {i+1} loss: {loss.item():.4f}")
+
+	print(f"\nManual mean: {np.mean(individual_losses):.4f}")
+	print(f"PyTorch mean: {batch_loss.item():.4f}")
+	print(f"✓ Match: {abs(np.mean(individual_losses) - batch_loss.item()) < 1e-6}")
+
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
 	# reformet()
-	test_shuffle3()
+	# test_shuffle3()
+	test_loss3()
 	# test_tmux_man()
