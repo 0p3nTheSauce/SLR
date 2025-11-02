@@ -742,6 +742,13 @@ class worker:
                 entity=entity, project=project, name=run_name, tags=tags, config=info
             )
 
+        #save run_id for recovering
+        wandb_info["run_id"] = run.id
+        info["wandb"] = wandb_info
+        
+        self.print_v("writing my id to temp file")
+        store_Data(self.temp_path, info)
+        
         self.print_v(f"Run ID: {run.id}")
         self.print_v(f"Run name: {run.name}")  # Human-readable name
         self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
@@ -749,12 +756,7 @@ class worker:
         train_loop(admin["model"], run, recover=admin["recover"])
         run.finish()
 
-        # write at end to avoid overwriting a run
-        wandb_info["run_id"] = run.id
-        info["wandb"] = wandb_info
         
-        self.print_v("writing my id to temp file")
-        store_Data(self.temp_path, info)
 
     def idle(
         self,
@@ -1018,6 +1020,12 @@ class daemon:
         return subprocess.Popen(
             cmd, stdout=open(self.worker.log_path, "w"), stderr=subprocess.STDOUT
         )
+
+    def recover(self, setting: str):
+        """Recover from a run failure, by loading the last run from Temp"""
+        av_set = ['watch', 'monitor']
+        
+        
 
 
 class queShell(cmdLib.Cmd):
