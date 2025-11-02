@@ -13,7 +13,7 @@ import gc
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model
 from configs import set_seed
-from video_dataset import VideoDataset, get_data_loader, TestSet
+from video_dataset import VideoDataset, get_data_loader, get_wlasl_info
 from models import avail_models
 from configs import get_avail_splits, load_config, WLASL_ROOT, RAW_DIR, LABELS_PATH, RUNS_PATH
 from utils import print_dict
@@ -363,30 +363,27 @@ def test_run(
 		return results
 
 	if test_test:
-		set_type = TestSet(set_name="test")
+		
 		tloaders["test"], _, m_permt, m_sh_et = get_data_loader(
 			model_norms['mean'],
 			model_norms['std'],
 			data["frame_size"],
 			data["num_frames"],
-			Path(admin["root"]),
-			Path(admin["labels"]),
-			set_type,
-			shuffle=shuffle
+			set_info=get_wlasl_info(admin["split"], set_name='test'),
+			shuffle=shuffle,
+			batch_size=1
 		)
 		mperm_info["test"] = (m_permt, m_sh_et)
 
 	if test_val:
-		set_type = TestSet(set_name="val")
 		tloaders["val"], _, m_permv, m_sh_ev = get_data_loader(
 			model_norms['mean'],
 			model_norms['std'],
 			data["frame_size"],
 			data["num_frames"],
-			Path(admin["root"]),
-			Path(admin["labels"]),
-			set_type,
-			shuffle=shuffle
+			set_info=get_wlasl_info(admin["split"], set_name='val'),
+			shuffle=shuffle,
+			batch_size=1
 		)
 		mperm_info["val"] = (m_permv, m_sh_ev)
 

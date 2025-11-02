@@ -1,5 +1,6 @@
-- hframe_hwd (S3D 13) got the highest score so far
-
+- hframe_hwd (S3D 13) Original
+    best val loss: 1.85474 
+    best val acc: 
 - hframe_hwd1 (S3D 14) increased the backbone_init_lr (of hframe_hwd)
     by x10 (1e-5 -> 1e-4) and suffered a noticeable knock in
     performance (1.98 -> 2.3 val loss)
@@ -25,7 +26,8 @@
 
     conclusion: inconclusive, vary eps by less
 
-
+- hframe_hwd_leps2 (S3D 18) was the same as hframe_hwd, but decreased 
+    the adam eps by x1000000 (1e-3 -> 1e-7), 
 
 
 
