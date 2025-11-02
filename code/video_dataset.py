@@ -143,7 +143,7 @@ def get_wlasl_info(split: str, set_name: Literal["train", "test", "val"]) -> Dat
         "set_name": set_name  
     }
     
-    
+#NOTE: This is probably uneccessary, and should just be, get dataset or something
 def get_data_loader(
     mean: Tuple[float, float, float],
     std: Tuple[float, float, float],
@@ -224,7 +224,7 @@ def get_data_loader(
     else:
         dataloader = DataLoader(
             dataset,
-            batch_size=1,
+            batch_size=batch_size,
             shuffle=False,
             num_workers=2,
             pin_memory=False,
