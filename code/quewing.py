@@ -122,8 +122,8 @@ class que:
 
 		dic = {}
 
-		if "run_id" in run:
-			dic["run_id"] = run["run_id"]
+		if "run_id" in run['wandb']:
+			dic["run_id"] = run['wandb']["run_id"]
 
 		dic.update(
 			{
