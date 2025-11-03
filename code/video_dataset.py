@@ -117,14 +117,6 @@ class VideoDataset(Dataset):
 ################################## Helper functions #######################################
 
 
-class TrainSet(TypedDict):
-    set_name: Literal["train"]
-    batch_size: int
-
-
-class TestSet(TypedDict):
-    set_name: Literal["test", "val"]
-
 class DataSetInfo(TypedDict):
     root: Path
     labels: Path

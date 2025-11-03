@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 import wandb
 import time
 import subprocess
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, Any
 
 
 
@@ -205,6 +205,25 @@ def string_nested_dict(diction):
 	else:
 		ans += str(diction)
 	return ans
+
+
+def str_dict(dic: Dict[str, Any], disp: bool = False) -> str:
+	"""Print dictionary in a more readable format.
+
+	Args:
+		dic (Dict[str, Any]): Dictionary to print
+	"""
+	maxl_k = max([len(key) for key in dic.keys()])
+	st = "{\n"
+	for key in dic.keys():
+		st += f"\t{key:<{maxl_k}} : {dic[key]}\n"
+	st += "}"
+	if disp:
+		print(st)
+	return st
+
+
+
 
 def print_dict(diction):
     print(json.dumps(diction, indent=4))
