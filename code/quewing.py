@@ -23,21 +23,25 @@ SESH_NAME = "que_training"
 DN_NAME = "daemon"
 WR_NAME = "worker"
 MR_NAME = "monitor"
+QUE_DIR = "./que/"
 WR_PATH = "./quefeather.py"
-TMP_PATH = "./queTemp.json"
-RUN_PATH = "./queRuns.json"
-LOG_PATH = "./queLogs.log"
-TO_RUN = "to_run"
-OLD_RUNS = "old_runs"
+TMP_PATH = QUE_DIR + "Temp.json"
+RUN_PATH = QUE_DIR + "Runs.json"
+LOG_PATH = QUE_DIR + "Logs.log"
+TO_RUN = "to_run" #havent run yet
+CUR_RUN = "cur_run" #busy running 
+OLD_RUNS = "old_runs" #run already
 # List for argparse choices
-QUE_LOCATIONS = [TO_RUN, OLD_RUNS]
+QUE_LOCATIONS = [TO_RUN,CUR_RUN,OLD_RUNS]
 SYNONYMS = {
 			'new': 'to_run',
 			'tr': 'to_run',
+			'cur': 'cur_run',
+			'busy': 'cur_run',
 			'old': 'old_runs',
 			'or': 'old_runs',
 		}
-QueLocation: TypeAlias = Literal["to_run", "old_runs"]
+QueLocation: TypeAlias = Literal["to_run","cur_run", "old_runs"]
 
 
 def retrieve_Data(path: Path) -> dict:
@@ -64,6 +68,7 @@ class que:
 		self.imp_splits = configs.get_avail_splits()
 		self.verbose = verbose
 		self.old_runs = []
+		self.cur_run = {}
 		self.to_run = []
 		self.auto_save = auto_save
 		self.load_state()
