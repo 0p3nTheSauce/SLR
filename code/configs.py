@@ -370,7 +370,17 @@ def take_args(
 
 class AdminInfo(TypedDict):
 	model: str
+	split: str
+	exp_no: str
+	recover: bool
+	config_path: str
+	save_path: str
 
+class TrainingInfo(TypedDict):
+	batch_size: int
+	update_per_step: int
+	max_epoch: int
+	
 
 
 def main():
