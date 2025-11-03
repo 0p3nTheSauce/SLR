@@ -1,4 +1,17 @@
-from typing import Dict, Any
+from typing import Dict, Any, TypedDict, List, Tuple, Union ,Literal, Optional
+
+class StopperOff(TypedDict):
+    on: Literal[False]
+
+class StopperOn(TypedDict):
+    on: Literal[True]
+    metric: Tuple[str, str]
+    mode: str
+    patience: int
+    min_delta: float
+
+
+
 class EarlyStopper:
     """Early stopping utility for training processes.
     Monitors a specified metric and stops training if no improvement is seen for a defined number of epochs (patience).
@@ -12,20 +25,6 @@ class EarlyStopper:
       min_delta (float): Minimum change in the monitored metric to qualify as an improvement.
       wandb_run: Optional wandb run object for logging.
       on (bool): Whether early stopping is enabled. Defaults to True.
-
-    Attributes:
-      on (bool): Whether early stopping is enabled.
-      phase (str): Phase of the metric being monitored (e.g., 'val').
-      metric (str): Name of the metric being monitored (e.g., 'loss').
-      mode (str): Mode of operation ('min' or 'max').
-      patience (int): Number of epochs to wait for improvement.
-      min_delta (float): Minimum change in the metric to consider as an improvement.
-      curr_epoch (int): Current epoch number.
-      best_score (float): Best score observed so far.
-      best_epoch (int): Epoch at which the best score was observed.
-      counter (int): Counter for epochs without improvement.
-      wandb_run: Optional wandb run object for logging.
-      stop (bool): Flag indicating whether to stop training.
 
     Methods:
       step(score): Updates the early stopping state based on the current score.
@@ -45,7 +44,7 @@ class EarlyStopper:
 
     def __init__(
         self,
-        arg_dict=None,
+        arg_dict: Optional[Union[StopperOn, StopperOff]]=None,
         metric=("val", "loss"),
         mode="min",
         patience=20,
@@ -118,6 +117,19 @@ class EarlyStopper:
                 self.wandb_run.log({"Patience count": self.counter})
             self.curr_epoch += 1
 
+
+    # @staticmethod
+    # def config_precheck2(config: Union[StopperOn, StopperOff]) -> None:
+        
+    #     if type(config) is StopperOn:
+    #         return
+    #     else:
+    #         if config["metric"] not in EarlyStopper.available_metrics:
+                 
+        
+
+        
+        
     # for interface with configs.py
     @staticmethod
     def config_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -134,7 +146,7 @@ class EarlyStopper:
             ValueError: Min delta is negative.
 
         Returns:
-            Dict[str, Any]: Validated, possibly modified, training config dictionary. 
+            Dict[str, Any]: Validated, possibly modified, training config dictionary.
         """
         if "early_stopping" not in config["training"]:
             config["training"]["early_stopping"] = {"on": False}  # switch off
@@ -186,3 +198,5 @@ class EarlyStopper:
     def load_state_dict(self, state_dict):
         for key, value in state_dict.items():
             setattr(self, key, value)
+
+
