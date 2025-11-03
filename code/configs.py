@@ -1,8 +1,8 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List, Optional, Union
-from utils import enum_dir, ask_nicely, print_dict
+from typing import Dict, Any, List, Optional, Union, TypedDict
+from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper
 from pathlib import Path
 import torch
@@ -101,8 +101,6 @@ def _schedular_precheck(config: Dict[str, Any]) -> None:
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
 
-
-
 def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 	"""Load config from flat file and merge with command line args
 
@@ -137,7 +135,6 @@ def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 	ndict = EarlyStopper.config_precheck(ndict)
 	_schedular_precheck(ndict)
 	return ndict
-
 
 def _convert_type(value: str) -> Any:
 	"""Convert string values to appropriate types"""
@@ -371,21 +368,9 @@ def take_args(
 	return clean_dict, tags, args.project, args.entity
 
 
-# def print_wandb_config(config):
-def str_dict(dic: Dict[str, Any], disp: bool = False) -> str:
-	"""Print dictionary in a more readable format.
+class AdminInfo(TypedDict):
+	model: str
 
-	Args:
-		dic (Dict[str, Any]): Dictionary to print
-	"""
-	maxl_k = max([len(key) for key in dic.keys()])
-	st = "{\n"
-	for key in dic.keys():
-		st += f"\t{key:<{maxl_k}} : {dic[key]}\n"
-	st += "}"
-	if disp:
-		print(st)
-	return st
 
 
 def main():
