@@ -1,4 +1,4 @@
-from typing import Optional, Union, Callable
+from typing import Optional, Union, Callable, cast, Dict, Any
 import torch  # type: ignore
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -11,25 +11,23 @@ from wandb.sdk.wandb_run import Run
 
 from video_dataset import get_data_loader, get_wlasl_info
 from configs import load_config, print_config, take_args, set_seed
-from stopping import EarlyStopper,  StopperOn
+from stopping import EarlyStopper, StopperOn
 from models import get_model, norm_vals
 from utils import wandb_manager
 
 
-
 def setup_data(mean, std, config):
-    #NOTE: update for other datasets
-	train_info = get_wlasl_info(config.admin["split"], set_name='train')
-	val_info = get_wlasl_info(config.admin["split"], set_name='val')
+	# NOTE: update for other datasets
+	train_info = get_wlasl_info(config.admin["split"], set_name="train")
+	val_info = get_wlasl_info(config.admin["split"], set_name="val")
 
- 
-	train_loader, num_t_classes, _, _  = get_data_loader(
+	train_loader, num_t_classes, _, _ = get_data_loader(
 		mean,
 		std,
 		config.data["frame_size"],
 		config.data["num_frames"],
 		set_info=train_info,
-		batch_size=config.training['batch_size']
+		batch_size=config.training["batch_size"],
 	)
 	val_loader, num_v_classes, _, _ = get_data_loader(
 		mean,
@@ -37,12 +35,14 @@ def setup_data(mean, std, config):
 		config.data["frame_size"],
 		config.data["num_frames"],
 		set_info=val_info,
-		batch_size=1
+		batch_size=1,
 	)
-	assert num_t_classes == num_v_classes, f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
+	assert num_t_classes == num_v_classes, (
+		f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
+	)
 	dataloaders = {"train": train_loader, "val": val_loader}
 	return dataloaders, num_t_classes
- 
+
 
 def get_scheduler(
 	optimizer: optim.Optimizer, sched_conf: Optional[dict] = None
@@ -52,63 +52,68 @@ def get_scheduler(
 		# Identity scheduler - multiplies LR by 1.0 (no change)
 		return optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
 
-	warmup_epochs = sched_conf.get('warmup_epochs', 0)
+	warmup_epochs = sched_conf.get("warmup_epochs", 0)
 	if warmup_epochs > 0:
 		warmup_scheduler = optim.lr_scheduler.LinearLR(
 			optimizer,
-			start_factor=sched_conf['start_factor'], 
-			end_factor=sched_conf['end_factor'],
-			total_iters=sched_conf['warmup_epochs']
+			start_factor=sched_conf["start_factor"],
+			end_factor=sched_conf["end_factor"],
+			total_iters=sched_conf["warmup_epochs"],
 		)
 	else:
-		warmup_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
- 
+		warmup_scheduler = optim.lr_scheduler.LambdaLR(
+			optimizer, lr_lambda=lambda epoch: 1.0
+		)
+
 	if sched_conf["type"] == "CosineAnnealingLR":
 		scheduler = optim.lr_scheduler.CosineAnnealingLR(
 			optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
 		)
 	elif sched_conf["type"] == "CosineAnnealingWarmRestarts":
 		scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-			optimizer, T_0=sched_conf["t0"], T_mult=sched_conf["tmult"], eta_min=sched_conf["eta_min"]
+			optimizer,
+			T_0=sched_conf["t0"],
+			T_mult=sched_conf["tmult"],
+			eta_min=sched_conf["eta_min"],
 		)
 
 	else:
 		raise ValueError(f"Scheduler type {sched_conf['type']} not recognized.")
 
 	return optim.lr_scheduler.SequentialLR(
-			optimizer,
-			schedulers=[warmup_scheduler, scheduler],
-			milestones=[warmup_epochs]
-		)
+		optimizer, schedulers=[warmup_scheduler, scheduler], milestones=[warmup_epochs]
+	)
 
-def get_stopper(arg_dict: Optional[StopperOn] = None, wandb_run: Optional[Run] = None) -> EarlyStopper:
-    if arg_dict is None:
-        return EarlyStopper(on=False)
-    else:
-        return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run)
+
+def get_stopper(
+	arg_dict: Optional[StopperOn] = None, wandb_run: Optional[Run] = None
+) -> EarlyStopper:
+	if arg_dict is None:
+		return EarlyStopper(on=False)
+	else:
+		return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run)
+
 
 def train_loop(
-	model_name: str, 
-	wandb_run: Run, 
-	load: Optional[Union[Path, str]]=None,
+	model_name: str,
+	wandb_run: Run,
+	load: Optional[Union[Path, str]] = None,
 	save_every: int = 5,
 	recover: bool = False,
-	seed: Optional[int] =None,
-	
+	seed: Optional[int] = None,
 ) -> None:
 	"""Train loop for video classification model.
 
 	Args:
-		model_name (str): Name of the model to train.
-		wandb_run (Run): Wandb run instance for logging, and config.
-		load (Optional[Union[Path, str]], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
-		save_every (int, optional): Period of saving (epochs). Defaults to 5.
-		recover (bool, optional): Continue from a failed run. Defaults to False.
-		seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
+			model_name (str): Name of the model to train.
+			wandb_run (Run): Wandb run instance for logging, and config.
+			load (Optional[Union[Path, str]], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
+			save_every (int, optional): Period of saving (epochs). Defaults to 5.
+			recover (bool, optional): Continue from a failed run. Defaults to False.
+			seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
 
 	"""
-	
-	
+
 	if seed is not None:
 		set_seed(seed)
 
@@ -132,7 +137,6 @@ def train_loop(
 	epoch = 0
 	best_val_loss = float("inf")
 	best_val_acc = float("-inf")
- 
 
 	param_groups = [
 		{
@@ -182,7 +186,9 @@ def train_loop(
 		"val": {"loss": 0.0, "acc": 0.0},
 		"train": {"loss": 0.0, "acc": 0.0},
 	}
-	stopper = get_stopper(arg_dict=config.get("early_stopping", None), wandb_run=wandb_run)
+	stopper = get_stopper(
+		arg_dict=config.get("early_stopping", None), wandb_run=wandb_run
+	)
 
 	if load:
 		load_path = Path(load)
@@ -312,7 +318,6 @@ def train_loop(
 
 			# Validation specific logic
 			if phase == "val":
-				
 				# Save best model
 				if epoch_loss < best_val_loss:
 					best_val_loss = epoch_loss
@@ -333,12 +338,10 @@ def train_loop(
 						f"Best/{phase.capitalize()}_acc": best_val_acc,
 						"Epoch": epoch,
 					}
-				)	
+				)
 
 				scheduler.step()
 
-				
-				
 		# Save checkpoint
 		if (
 			epoch % save_every == 0
@@ -354,7 +357,6 @@ def train_loop(
 				"best_val_loss": best_val_loss,
 				"best_val_acc": best_val_acc,
 				"stopper_state_dict": stopper.state_dict(),
-
 			}
 			checkpoint_path = save_path / f"checkpoint_{str(epoch).zfill(3)}.pth"
 
@@ -365,17 +367,20 @@ def train_loop(
 	print("Finished training successfully")
 	# wandb_run.finish()
 
-def do_train(model: nn.Module,
-             dataloader: DataLoader,
-             optimizer: optim.Optimizer,
-             device: torch.device,
-             loss_func: nn.Module,
-             updates_per_step: int,
-             wandb_run: Run,
-             steps: int,
-            verbose: bool):
+
+def do_train(
+	model: nn.Module,
+	dataloader: DataLoader,
+	optimizer: optim.Optimizer,
+	device: torch.device,
+	loss_func: nn.Module,
+	updates_per_step: int,
+	wandb_run: Run,
+	steps: int,
+	verbose: bool,
+):
 	model.train()
-	
+
 	# Reset metrics for this phase
 	running_loss = 0.0
 	running_corrects = 0
@@ -391,37 +396,36 @@ def do_train(model: nn.Module,
 		data, target = data.to(device), target.to(device)
 		batch_size = data.size(0)
 		total_samples += batch_size
-  
+
 		model_output = model(data)
-  
+
 		loss = loss_func(model_output, target)
 		running_loss += loss.item()
 		_, predicted = model_output.max(1)
 		running_corrects += predicted.eq(target).sum().item()
-  
+
 		scaled_loss = loss / updates_per_step
 		scaled_loss.backward()
-  
+
 		accumulated_loss += loss.item()
 		accumulated_steps += 1
-  
-		#gradient accumulation
+
+		# gradient accumulation
 		if accumulated_steps == updates_per_step:
 			optimizer.step()
 			optimizer.zero_grad()
 			steps += 1
-   
-			#Print progress every few steps
+
+			# Print progress every few steps
 			if steps % 10 == 0:
 				avg_acc_loss = accumulated_loss / accumulated_steps
 				current_acc = 100.0 * running_corrects / total_samples
-	
 
 				print(
 					f"Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, "
 					f"Current Accuracy: {current_acc:.2f}%"
 				)
-	
+
 				wandb_run.log(
 					{
 						"Loss/Train_Step": avg_acc_loss,
@@ -432,71 +436,69 @@ def do_train(model: nn.Module,
 
 			accumulated_steps = 0
 			accumulated_loss = 0.0
-   
-	#calculate epoch metrics 
+
+	# calculate epoch metrics
 	epoch_loss = running_loss / total_samples
 	epoch_acc = 100.0 * running_corrects / total_samples
-   
+
+
 def main():
 	maybe_args = take_args()
 	if isinstance(maybe_args, tuple):
-		arg_dict, tags, project, entity = maybe_args
+		admin, wandb_info = maybe_args
 	else:
 		print(f"Need tuple not: {type(maybe_args)}")
 		return
-	config = load_config(arg_dict)
-
+	config = load_config(admin)
+	
+	#confirm config
 	print_config(config)
-
 	proceed = input("Confirm: y/n: ")
-	if proceed.lower() == "y":
-		admin = config["admin"]
-		model_name = admin["model"]
-		run_id = admin["run_id"] if "run_id" in admin else None
-
-		# setup wandb run
-		run_name = f"{model_name}_{admin['split']}_exp{admin['exp_no']}"
-		if admin["recover"]:
-			if "run_id" in config["admin"]:
-				run_id = config["admin"]["run_id"]
-			else:
-				run_id = wandb_manager.get_run_id(
-					run_name,
-					entity,
-					project,
-					idx=-1,  # last if same name
-				)
-			if run_id is None:
-				print("Run id not found automatically, pass as arg instead")
-				return
-
-			print(f"Resuming run with ID: {run_id}")
-			run = wandb.init(
-				entity=entity,
-				project=project,
-				name=run_name,
-				tags=tags,
-				config=config,
-				id=run_id,
-				resume="must",
-			)
-		else:
-			print(f"Starting new run with name: {run_name}")
-			run = wandb.init(
-				entity=entity,
-				project=project,
-				name=run_name,
-				tags=tags,
-				config=config
-			)
-		print(f"Run ID: {run.id}")
-		print(f"Run name: {run.name}")  # Human-readable name
-		print(f"Run path: {run.path}")  # entity/project/run_id format
-
-		train_loop(model_name, run, recover=admin["recover"])
-		run.finish()
-	else:
+	if proceed.lower() != "y":
 		print("Training cancelled")
+		return
+	
+	# setup wandb run
+	run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
+	if admin["recover"]:
+		if wandb_info['run_id'] is not None:
+			run_id = wandb_info['run_id']
+		else:
+			run_id = wandb_manager.get_run_id(
+				run_name,
+				wandb_info['entity'],
+				wandb_info['project'],
+				idx=-1,  # last if same name
+			)
+		if run_id is None:
+			print("Run id not found automatically, pass as arg instead")
+			return
+
+		print(f"Resuming run with ID: {run_id}")
+		config = cast(Dict[str, Any], config)
+		run = wandb.init(
+			entity=wandb_info['entity'],
+			project=wandb_info['project'],
+			name=run_name,
+			tags=wandb_info['tags'],
+			config=config,
+			id=run_id,
+			resume="must",
+		)
+	else:
+		print(f"Starting new run with name: {run_name}")
+		#cast to reguler dict for wandb init
+		config = cast(Dict[str, Any], config)
+		run = wandb.init(
+			entity=wandb_info['entity'], project=wandb_info['project'], name=run_name, tags=wandb_info['tags'], config=config
+		)
+	print(f"Run ID: {run.id}")
+	print(f"Run name: {run.name}")  # Human-readable name
+	print(f"Run path: {run.path}")  # entity/project/run_id format
+
+	train_loop(admin['model'], run, recover=admin["recover"])
+	run.finish()
+
 
 
 if __name__ == "__main__":
