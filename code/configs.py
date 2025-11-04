@@ -101,13 +101,12 @@ def _schedular_precheck(config: Dict[str, Any]) -> None:
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
 
-def _get_stopper(config: Dict[str, Any]) -> Union[StopperOn, StopperOff]:
+def _stopper_precheck(config: Dict[str, Any]) -> None:
 	if "early_stopping" not in config["training"]:
-		return {"on": False}  # switch off
+		return
 	else:
 		es_info = config["training"]["early_stopping"]
-		EarlyStopper.config_precheck2(es_info)
-		return es_info
+		EarlyStopper.config_precheck(es_info)
 
 def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 	"""Load config from flat file and merge with command line args
@@ -140,7 +139,7 @@ def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 		for k in config.keys():
 			print(k)
 		raise e
-	ndict = EarlyStopper.config_precheck(ndict)
+	_stopper_precheck(ndict)
 	_schedular_precheck(ndict)
 	return ndict
 

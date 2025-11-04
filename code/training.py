@@ -85,6 +85,7 @@ def get_stopper(arg_dict: Optional[StopperOn] = None, wandb_run: Optional[Run] =
     if arg_dict is None:
         return EarlyStopper(arg_dict={"on":False})
     else:
+        return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run)
 
 def train_loop(
 	model_name: str, 
@@ -178,12 +179,11 @@ def train_loop(
 		save_path.mkdir(parents=True, exist_ok=True)
 
 	# early stopping setup
-	es_info = config.training["early_stopping"]
 	stopping_metrics = {
 		"val": {"loss": 0.0, "acc": 0.0},
 		"train": {"loss": 0.0, "acc": 0.0},
 	}
-	stopper = EarlyStopper(arg_dict=es_info, wandb_run=wandb_run)
+	stopper = get_stopper(arg_dict=config.training.get("early_stopping", None), wandb_run=wandb_run)
 
 	if load:
 		load_path = Path(load)
