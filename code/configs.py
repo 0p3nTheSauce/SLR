@@ -131,9 +131,11 @@ def print_config(config_dict):
 		max_key_len = (
 			max(len(str(k)) for k in section_data.keys()) if section_data else 0
 		)
-
-		for key, value in section_data.items():
-			print(f"    {key:<{max_key_len}} : {value}")
+		if isinstance(section_data, dict):
+			for key, value in section_data.items():
+				print(f"    {key:<{max_key_len}} : {value}")
+		else:
+			print(section_data)
 		print()
 
 ###################### Config generation ###############################
@@ -209,31 +211,13 @@ def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
 def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
     """Convert raw config to typed ExperimentInfo"""
     
-    # Required sections with type conversion
-    admin = AdminInfo(
-        model=config['admin']['model'],
-        dataset=config['admin']['dataset'],
-        split=config['admin']['split'],
-        exp_no=config['admin']['exp_no'],
-        recover=config['admin'].getboolean('recover', False),
-        config_path=config['admin']['config_path'],
-        save_path=config['admin']['save_path']
-    )
-    
-    training = TrainingInfo(
-        batch_size=config['training'].getint('batch_size'),
-        update_per_step=config['training'].getint('update_per_step'),
-        batch_size_equivalent=config['training'].getint('batch_size_equivalent'),
-        max_epoch=config['training'].getint('max_epoch')
-    )
-    
     # Optional sections with None default
     scheduler = None
     if 'scheduler' in config:
         scheduler = SchedulerInfo(
             type=config['scheduler']['type'],
-            tmax=config['scheduler'].getint('tmax'),
-            eta_min=config['scheduler'].getfloat('eta_min')
+            tmax=config['scheduler']['tmax'],
+            eta_min=config['scheduler']['eta_min']
         )
     
     wandb = None
@@ -241,8 +225,8 @@ def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
         wandb = WandbInfo(
             entity=config['wandb']['entity'],
             project=config['wandb']['project'],
-            tags=config['wandb'].get('tags', ''),  # Convert string to list
-            run_id=config['wandb'].get('run_id')
+            tags=config['wandb']['tags'],  # Convert string to list
+            run_id=config['wandb']['run_id']
         )
     
     early_stopping = None
@@ -250,13 +234,13 @@ def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
         early_stopping = StopperOn(
             metric=config['early_stopping']['metric'],  # Convert to list/tuple
             mode=config['early_stopping']['mode'],
-            patience=config['early_stopping'].getint('patience'),
-            min_delta=config['early_stopping'].getfloat('min_delta')
+            patience=config['early_stopping']['patience'],
+            min_delta=config['early_stopping']['min_delta']
         )
     
     return ExperimentInfo(
-        admin=admin,
-        training=training,
+        admin=AdminInfo(**config['admin']),
+        training=TrainingInfo(**config['training']),
         optimizer=OptimizerInfo(**config['optimizer']),  # Shorthand if keys match exactly
         model_params=Model_paramsInfo(**config['model_params']),
         data=DataInfo(**config['data']),
@@ -265,18 +249,18 @@ def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
         early_stopping=early_stopping
     )
 
-def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
+def load_config(admin: Dict[str, Any]) -> ExperimentInfo:
 	"""Load config from flat file and merge with command line args
 
 	Args:
 		admin (Dict[str, Any]): Admin args from command line
 
 	Raises:
-		ValueError: If config path not found
+		ValueError: If config path not found, or there are issues with the config
 		KeyError: Various issues with config file
 
 	Returns:
-		Dict[str, Any]: _description_
+		ExperimentInfo: Dictionary containing all required information for a run
 	"""
 	
 	conf_path = Path(admin["config_path"])
@@ -301,11 +285,8 @@ def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 
 	_stopper_precheck(e_info.get('early_stopping'))
 	_schedular_precheck(e_info.get('scheduler'))
-	return ndict
-
-
-
-
+ 
+	return e_info
 
 def take_args(
 	sup_args: Optional[List[str]] = None,
@@ -420,8 +401,7 @@ def take_args(
 		args.project = f"{PROJECT_BASE}-{args.split[3:]}"
 
 	args.exp_no = exp_no
-	args.root = WLASL_ROOT + "/" + RAW_DIR
-	args.labels = f"{LABELS_PATH}/{args.split}"
+
 	output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
 
 	# recovering
@@ -499,66 +479,9 @@ def take_args(
 	if args.tags is not None:
 		tags.extend(args.tags)
 
+
+	#NOTE: it may be better here to just merge into wandb category
 	return clean_dict, tags, args.project, args.entity
-
-
-
-
-ex: ExperimentInfo = {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "021",
-                "recover": False,
-                "config_path": "./configfiles/generic/hframe_hwd_leps5.ini",
-                "save_path": "runs/asl100/S3D_exp021/checkpoints",
-                "dataset": "WLASL"
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 0.0001,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5
-            },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
-                    "asl100",
-                    "S3D",
-                    "exp-021"
-                ],
-                "run_id": "7i3y8aqj"
-            }
-        }
 
 def main():
 	try:
