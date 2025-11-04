@@ -675,8 +675,6 @@ class worker:
 		train_loop(admin["model"], run, recover=admin["recover"])
 		run.finish()
 
-		
-
 	def idle(
 		self,
 		message: str,
