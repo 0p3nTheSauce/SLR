@@ -3,7 +3,7 @@ import argparse
 import ast
 from typing import Dict, Any, List, Optional, Union, TypedDict
 from utils import enum_dir, ask_nicely
-from stopping import EarlyStopper
+from stopping import EarlyStopper, StopperOff, StopperOn
 from pathlib import Path
 import torch
 import numpy as np
@@ -100,6 +100,14 @@ def _schedular_precheck(config: Dict[str, Any]) -> None:
 			raise ValueError("Both start_factor and end_factor must be specified for warmup")
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
+
+def _get_stopper(config: Dict[str, Any]) -> Union[StopperOn, StopperOff]:
+	if "early_stopping" not in config["training"]:
+		return {"on": False}  # switch off
+	else:
+		es_info = config["training"]["early_stopping"]
+		EarlyStopper.config_precheck2(es_info)
+		return es_info
 
 def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 	"""Load config from flat file and merge with command line args
