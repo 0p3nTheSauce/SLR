@@ -1,13 +1,9 @@
 from typing import Dict, Any, TypedDict, List, Tuple, Union ,Literal, Optional
 from wandb.sdk.wandb_run import Run
-class StopperOff(TypedDict):
-    """Dictionary of required parameters for the Stopper to be initialised in 'off' state"""
-    on: Literal[False]
 
 class StopperOn(TypedDict):
     """Dictionary of required parameters for the Stopper to be initialised in 'on' state"""
-    on: Literal[True]
-    metric: Tuple[str, str]
+    metric: Union[Tuple[str, str], List[str]]
     mode: str
     patience: int
     min_delta: float
@@ -72,8 +68,8 @@ class EarlyStopper:
 
     def __init__(
         self,
-        arg_dict: Optional[Union[StopperOn, StopperOff]]=None,
-        metric: Tuple[str, str]=("val", "loss"),
+        arg_dict: Optional[StopperOn]=None,
+        metric: Union[Tuple[str, str], List[str]]=("val", "loss"),
         mode: str ="min",
         patience: int =20,
         min_delta: float=0.01,
@@ -83,31 +79,25 @@ class EarlyStopper:
         """Initialize the EarlyStopper."""
         
         if arg_dict:  # coming straight from configs.py
-            self.on = arg_dict.get("on", True)
+            # self.on = arg_dict.get("on", True)
+            self.on = True
             metric = arg_dict.get("metric", metric)
             mode = arg_dict.get("mode", mode)
             patience = arg_dict.get("patience", patience)
             min_delta = arg_dict.get("min_delta", min_delta)
         else:
             self.on = on
+            
+        if isinstance(metric, list):
+            metric = (metric[0], metric[1])
 
-        if metric not in self.available_metrics:
-            raise ValueError(
-                f"Invalid metric: {metric}. Available metrics: {self.available_metrics}"
-            )
-        if mode not in self.available_modes:
-            raise ValueError(
-                f"Invalid mode: {mode}. Available modes: {self.available_modes}"
-            )
-        if patience <= 0:
-                raise ValueError(
-                    f"Patience must be a positive integer, got {patience}"
-                )
-        if min_delta < 0:
-            raise ValueError(
-                f"Min delta must be non-negative, got {min_delta}"
-            )
-        
+        check_dict: StopperOn = {
+            'metric': metric,
+            'mode': mode,
+            'patience': patience,
+            'min_delta': min_delta
+        }
+        self.config_precheck(check_dict)
         
         self.phase = metric[0]
         self.metric = metric[1]
@@ -162,27 +152,24 @@ class EarlyStopper:
         self.curr_epoch += 1
 
     @staticmethod
-    def config_precheck(config: Union[StopperOn, StopperOff]) -> None:
+    def config_precheck(config: StopperOn) -> None:
         
-        if "metric" not in config:
-            return
-        else:
-            if config["metric"] not in EarlyStopper.available_metrics:
-                raise ValueError(
-                    f"Invalid metric: {config['metric']}. Available metrics: {EarlyStopper.available_metrics}"
-                )
-            if config['mode'] not in EarlyStopper.available_modes:
-                raise ValueError(
-                    f"Invalid mode: {config['mode']}. Available modes: {EarlyStopper.available_modes}"
-                )
-            if config["patience"] <= 0:
-                raise ValueError(
-                    f"Patience must be a positive integer, got {config['patience']}"
-                )
-            if config["min_delta"] < 0:
-                raise ValueError(
-                    f"Min delta must be non-negative, got {config['min_delta']}"
-                )
+        if config["metric"] not in EarlyStopper.available_metrics:
+            raise ValueError(
+                f"Invalid metric: {config['metric']}. Available metrics: {EarlyStopper.available_metrics}"
+            )
+        if config['mode'] not in EarlyStopper.available_modes:
+            raise ValueError(
+                f"Invalid mode: {config['mode']}. Available modes: {EarlyStopper.available_modes}"
+            )
+        if config["patience"] <= 0:
+            raise ValueError(
+                f"Patience must be a positive integer, got {config['patience']}"
+            )
+        if config["min_delta"] < 0:
+            raise ValueError(
+                f"Min delta must be non-negative, got {config['min_delta']}"
+            )
 
     def state_dict(self) -> StopperState:
         """Return the current state as a dictionary.

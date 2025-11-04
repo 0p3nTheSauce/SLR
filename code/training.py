@@ -11,7 +11,7 @@ from wandb.sdk.wandb_run import Run
 
 from video_dataset import get_data_loader, get_wlasl_info
 from configs import load_config, print_config, take_args, set_seed
-from stopping import EarlyStopper, StopperOff, StopperOn
+from stopping import EarlyStopper,  StopperOn
 from models import get_model, norm_vals
 from utils import wandb_manager
 
@@ -83,7 +83,7 @@ def get_scheduler(
 
 def get_stopper(arg_dict: Optional[StopperOn] = None, wandb_run: Optional[Run] = None) -> EarlyStopper:
     if arg_dict is None:
-        return EarlyStopper(arg_dict={"on":False})
+        return EarlyStopper(on=False)
     else:
         return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run)
 

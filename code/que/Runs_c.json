@@ -15,15 +15,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -54,6 +45,15 @@
                     "exp-021"
                 ],
                 "run_id": "7i3y8aqj"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -71,15 +71,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -110,6 +101,15 @@
                     "exp-020"
                 ],
                 "run_id": "j1m1c1qs"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -127,15 +127,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -166,6 +157,15 @@
                     "exp-019"
                 ],
                 "run_id": "plviroao"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -183,15 +183,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -222,6 +213,15 @@
                     "exp-018"
                 ],
                 "run_id": "ysg9tmr9"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -239,15 +239,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -278,6 +269,15 @@
                     "exp-017"
                 ],
                 "run_id": "nk7ius3q"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -295,15 +295,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -334,6 +325,15 @@
                     "exp-016"
                 ],
                 "run_id": "usq1y605"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -351,15 +351,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -385,6 +376,15 @@
                     "exp-015"
                 ],
                 "run_id": "hfmbz6ai"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -402,15 +402,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -441,6 +432,15 @@
                     "exp-014"
                 ],
                 "run_id": "r9xw23wo"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -458,15 +458,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -497,6 +488,15 @@
                     "exp-013"
                 ],
                 "run_id": "1ooh1h8z"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         },
         {
@@ -514,15 +514,6 @@
                 "batch_size": 4,
                 "update_per_step": 2,
                 "max_epoch": 200,
-                "early_stopping": {
-                    "metric": [
-                        "val",
-                        "loss"
-                    ],
-                    "mode": "min",
-                    "patience": 50,
-                    "min_delta": 0.01
-                },
                 "batch_size_equivalent": 8
             },
             "optimizer": {
@@ -553,6 +544,15 @@
                     "exp-014"
                 ],
                 "run_id": "o9p6nj1z"
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
             }
         }
     ],

@@ -3,7 +3,7 @@ import argparse
 import ast
 from typing import Dict, Any, List, Optional, Union, TypedDict
 from utils import enum_dir, ask_nicely
-from stopping import EarlyStopper, StopperOff, StopperOn
+from stopping import EarlyStopper, StopperOn
 from pathlib import Path
 import torch
 import numpy as np
@@ -28,6 +28,59 @@ SPLIT_DIR = "splits"
 # - training/testing
 RUNS_PATH = "./runs"
 SEED = 42
+
+####################### Typed Dictionaries #############################
+class AdminInfo(TypedDict):
+	model: str
+	dataset: str
+	split: str
+	exp_no: str
+	recover: bool
+	config_path: str
+	save_path: str
+
+class TrainingInfo(TypedDict):
+	batch_size: int
+	update_per_step: int
+	batch_size_equivalent: int
+	max_epoch: int
+
+class OptimizerInfo(TypedDict):
+	eps: float
+	backbone_init_lr: float
+	backbone_weight_decay: float
+	classifier_init_lr: float
+	classifier_weight_decay: float
+
+class Model_paramsInfo(TypedDict):
+	drop_p: float
+
+class SchedulerInfo(TypedDict):
+	type: str
+	tmax: int
+	eta_min: float
+
+class DataInfo(TypedDict):
+	num_frames: int
+	frame_size: int
+
+class WandbInfo(TypedDict):
+	entity: str
+	project: str
+	tags: List[str]
+	run_id: Optional[str]
+    
+class ExperimentInfo(TypedDict):
+    admin: AdminInfo
+    training: TrainingInfo
+    optimizer: OptimizerInfo
+    model_params: Model_paramsInfo
+    data: DataInfo
+    scheduler: Optional[SchedulerInfo]
+    wandb: Optional[WandbInfo]
+    early_stopping: Optional[StopperOn]
+
+####################### Utility functions ##############################
 
 def set_seed(seed: int=SEED):
 	"""Set the random seed across multiple environments, as well as use torch deterministic settings. 
@@ -62,27 +115,46 @@ def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
 		)
 	return list(map(lambda x: x.name, ppd.iterdir()))
 
-def _schedular_precheck(config: Dict[str, Any]) -> None:
+def print_config(config_dict):
+	"""
+	Print configuration dictionary in a more readable format.
+
+	Args:
+					config_dict (dict): Dictionary containing configuration sections
+
+	"""
+	for section in config_dict.keys():
+		print(f"{section.upper()}:")
+		section_data = config_dict[section]
+
+		# Calculate max key length for alignment
+		max_key_len = (
+			max(len(str(k)) for k in section_data.keys()) if section_data else 0
+		)
+
+		for key, value in section_data.items():
+			print(f"    {key:<{max_key_len}} : {value}")
+		print()
+
+###################### Config generation ###############################
+
+def _schedular_precheck(sched_info: Optional[SchedulerInfo]) -> None:
 	"""Fail early if scheduler config is invalid. 
 
 	Args:
 		config (Dict[str, Any]): Entire training config dictionary.
 
 	Raises:
-		ValueError: If scheduler type not specified
 		ValueError: If scheduler type invalid
 		ValueError: If warmup_epochs negative
 		ValueError: If start_factor and end_factor not specified for warmup
 		ValueError: If start_factor and end_factor invalid
 	"""
-	sched_info = config.get("scheduler", None)
 
 	if sched_info is None:
 		return
  
-	if "type" not in sched_info:
-		raise ValueError("Scheduler type must be specified in config under scheduler.type")
-	
+	#these have already been implemented
 	valid_types = [
 		'CosineAnnealingLR',
 		'CosineAnnealingWarmRestarts',
@@ -101,12 +173,97 @@ def _schedular_precheck(config: Dict[str, Any]) -> None:
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
 
-def _stopper_precheck(config: Dict[str, Any]) -> None:
-	if "early_stopping" not in config["training"]:
-		return
-	else:
-		es_info = config["training"]["early_stopping"]
-		EarlyStopper.config_precheck(es_info)
+
+
+def _stopper_precheck(config: Optional[StopperOn]) -> None:
+	"""Fail early if stopper is invalid
+
+	Args:
+		config (Optional[StopperOn]): _description_
+	"""
+	if config:
+		EarlyStopper.config_precheck(config)
+		
+
+def _convert_type(value: str) -> Any:
+	"""Convert string values to appropriate types"""
+	try:
+		return ast.literal_eval(value)
+	except (ValueError, SyntaxError):
+		return value
+
+def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
+	"""Parse .ini file for wandb config"""
+	config = configparser.ConfigParser()
+	config.read(ini_file)
+
+	# Nested structure
+	wandb_config = {}
+	for section in config.sections():
+		wandb_config[section] = {}
+		for key, value in config[section].items():
+			wandb_config[section][key] = _convert_type(value)
+
+	return wandb_config
+
+def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
+    """Convert raw config to typed ExperimentInfo"""
+    
+    # Required sections with type conversion
+    admin = AdminInfo(
+        model=config['admin']['model'],
+        dataset=config['admin']['dataset'],
+        split=config['admin']['split'],
+        exp_no=config['admin']['exp_no'],
+        recover=config['admin'].getboolean('recover', False),
+        config_path=config['admin']['config_path'],
+        save_path=config['admin']['save_path']
+    )
+    
+    training = TrainingInfo(
+        batch_size=config['training'].getint('batch_size'),
+        update_per_step=config['training'].getint('update_per_step'),
+        batch_size_equivalent=config['training'].getint('batch_size_equivalent'),
+        max_epoch=config['training'].getint('max_epoch')
+    )
+    
+    # Optional sections with None default
+    scheduler = None
+    if 'scheduler' in config:
+        scheduler = SchedulerInfo(
+            type=config['scheduler']['type'],
+            tmax=config['scheduler'].getint('tmax'),
+            eta_min=config['scheduler'].getfloat('eta_min')
+        )
+    
+    wandb = None
+    if 'wandb' in config:
+        wandb = WandbInfo(
+            entity=config['wandb']['entity'],
+            project=config['wandb']['project'],
+            tags=config['wandb'].get('tags', ''),  # Convert string to list
+            run_id=config['wandb'].get('run_id')
+        )
+    
+    early_stopping = None
+    if 'early_stopping' in config:
+        early_stopping = StopperOn(
+            metric=config['early_stopping']['metric'],  # Convert to list/tuple
+            mode=config['early_stopping']['mode'],
+            patience=config['early_stopping'].getint('patience'),
+            min_delta=config['early_stopping'].getfloat('min_delta')
+        )
+    
+    return ExperimentInfo(
+        admin=admin,
+        training=training,
+        optimizer=OptimizerInfo(**config['optimizer']),  # Shorthand if keys match exactly
+        model_params=Model_paramsInfo(**config['model_params']),
+        data=DataInfo(**config['data']),
+        scheduler=scheduler,
+        wandb=wandb,
+        early_stopping=early_stopping
+    )
 
 def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 	"""Load config from flat file and merge with command line args
@@ -139,54 +296,15 @@ def load_config(admin: Dict[str, Any]) -> Dict[str, Any]:
 		for k in config.keys():
 			print(k)
 		raise e
-	_stopper_precheck(ndict)
-	_schedular_precheck(ndict)
+
+	e_info = _to_exp_info(ndict)
+
+	_stopper_precheck(e_info.get('early_stopping'))
+	_schedular_precheck(e_info.get('scheduler'))
 	return ndict
 
-def _convert_type(value: str) -> Any:
-	"""Convert string values to appropriate types"""
-	try:
-		return ast.literal_eval(value)
-	except (ValueError, SyntaxError):
-		return value
-
-def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
-	"""Parse .ini file for wandb config"""
-	config = configparser.ConfigParser()
-	config.read(ini_file)
-
-	# Nested structure
-	wandb_config = {}
-	for section in config.sections():
-		wandb_config[section] = {}
-		for key, value in config[section].items():
-			wandb_config[section][key] = _convert_type(value)
-
-	return wandb_config
-
-def print_config(config_dict):
-	"""
-	Print configuration dictionary in a more readable format.
-
-	Args:
-					config_dict (dict): Dictionary containing configuration sections
-
-	"""
-
-	for section in config_dict.keys():
-		print(f"{section.upper()}:")
-		section_data = config_dict[section]
 
 
-
-		# Calculate max key length for alignment
-		max_key_len = (
-			max(len(str(k)) for k in section_data.keys()) if section_data else 0
-		)
-
-		for key, value in section_data.items():
-			print(f"    {key:<{max_key_len}} : {value}")
-		print()
 
 
 def take_args(
@@ -231,6 +349,15 @@ def take_args(
 		help=f"The class split, one of:  {', '.join(splits_available)}",
 	)
 	parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
+	parser.add_argument(
+		'-ds',
+		'--dataset',
+		type=str,
+		choices=['WLASL'],
+		help="Not implemented yet",
+		default='WLASL'
+	)
+ 
 	parser.add_argument(
 		"-r", "--recover", action="store_true", help="Recover from last checkpoint"
 	)
@@ -375,20 +502,63 @@ def take_args(
 	return clean_dict, tags, args.project, args.entity
 
 
-class AdminInfo(TypedDict):
-	model: str
-	split: str
-	exp_no: str
-	recover: bool
-	config_path: str
-	save_path: str
 
-class TrainingInfo(TypedDict):
-	batch_size: int
-	update_per_step: int
-	batch_size_equivalent: int
-	max_epoch: int
 
+ex: ExperimentInfo = {
+            "admin": {
+                "model": "S3D",
+                "split": "asl100",
+                "exp_no": "021",
+                "recover": False,
+                "config_path": "./configfiles/generic/hframe_hwd_leps5.ini",
+                "save_path": "runs/asl100/S3D_exp021/checkpoints",
+                "dataset": "WLASL"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 0.0001,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingLR",
+                "tmax": 100,
+                "eta_min": 1e-05
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-021"
+                ],
+                "run_id": "7i3y8aqj"
+            }
+        }
 
 def main():
 	try:
