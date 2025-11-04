@@ -2,7 +2,7 @@
 from pathlib import Path
 import argparse
 import json
-from typing import Optional, List, Literal, TypeAlias, Tuple, Dict
+from typing import Optional, List, Literal, TypeAlias, Tuple, Dict, Union, Any, cast
 import subprocess
 import time
 import cmd as cmdLib
@@ -14,6 +14,7 @@ import torch
 
 # locals
 import configs
+from configs import ExperimentInfo, CompletedExpInfo,  WandbInfo, AdminInfo
 import utils
 from utils import gpu_manager
 from training import train_loop, wandb_manager
@@ -42,16 +43,16 @@ SYNONYMS = {
 			'or': 'old_runs',
 		}
 QueLocation: TypeAlias = Literal["to_run","cur_run", "old_runs"]
+QueRun: TypeAlias = Union[ExperimentInfo, CompletedExpInfo]
 
-
-def retrieve_Data(path: Path) -> dict:
+def retrieve_Data(path: Path) -> Any:
 	"""Retrieves data from a given path."""
 	with open(path, "r") as file:
 		data = json.load(file)
 	return data
 
 
-def store_Data(path: Path, data: dict):
+def store_Data(path: Path, data: Any):
 	"""Stores data to a given path."""
 	with open(path, "w") as file:
 		json.dump(data, file, indent=4)
@@ -113,7 +114,7 @@ class que:
 		"""Return reference to the specified list"""
 		return self.to_run if loc == TO_RUN else self.old_runs
 
-	def run_sum(self, run: dict, exc: Optional[List[str]] = None) -> dict:
+	def run_sum(self, run: QueRun, exc: Optional[List[str]] = None) -> dict:
 		"""Extract key details from a run configuration.
 
 		Args:
@@ -127,7 +128,7 @@ class que:
 
 		dic = {}
 
-		if "run_id" in run['wandb']:
+		if 'wandb' in run and run['wandb'] is not None:
 			dic["run_id"] = run['wandb']["run_id"]
 
 		dic.update(
@@ -147,7 +148,7 @@ class que:
 		return dic
 
 	def get_runs_info(
-		self, run_confs: List[Dict]
+		self, run_confs: List[QueRun]
 	) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
 		"""Get summarised run info, and stats for printing
 
@@ -212,7 +213,7 @@ class que:
 
 		return r_str
 
-	def get_next_run(self) -> Optional[dict]:
+	def get_next_run(self) -> Optional[ExperimentInfo]:
 		"""Retrieves the next run from the que, and saves state"""
 		self.load_state()
 		if self.to_run:
@@ -224,7 +225,7 @@ class que:
 			self.print_v("No runs in the queue.")
 			return
 
-	def store_old_run(self, old_run: Dict):
+	def store_old_run(self, old_run: CompletedExpInfo):
 		"""Saves run to OLD_RUNS, and save state"""
 		self.load_state()
 		self.old_runs.insert(0, old_run)
@@ -284,7 +285,7 @@ class que:
 
 		return conf_list
 
-	def _is_dup_exp(self, new_run: dict) -> bool:
+	def _is_dup_exp(self, new_run: Union[ExperimentInfo, CompletedExpInfo]) -> bool:
 		"""Check if new_run already exists in to_run or old_runs"""
 		exc = ["run_id", "config_path"]
 		new_sum = self.run_sum(new_run, exc)
@@ -296,10 +297,8 @@ class que:
 
 	def create_run(
 		self,
-		arg_dict: dict,
-		tags: list[str],
-		project: str,
-		entity: str,
+		arg_dict: AdminInfo,
+		wandb_dict: WandbInfo,
 		ask: bool = True,
 	) -> None:
 		"""Create and add a new training run entry
@@ -343,12 +342,8 @@ class que:
 
 		if proceed:
 
-			config['wandb'] = {
-				'entity': entity,
-				'project': project,
-				'tags': tags
-			}
-						
+			config = cast(CompletedExpInfo, config | {'wandb': wandb_dict})	
+   			
 			self.to_run.append(config)
 			self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
 		else:
@@ -813,7 +808,7 @@ class daemon:
 		if self.verbose:
 			print(message)
 
-	def seperator(self, run: Dict) -> str:
+	def seperator(self, run: QueRun) -> str:
 		sep = ""
 		r_str = self.que.run_str(self.que.run_sum(run))
 
@@ -1102,12 +1097,12 @@ class queShell(cmdLib.Cmd):
 			return
 
 		if isinstance(maybe_args, tuple):
-			arg_dict, tags, project, entity = maybe_args
+			admin_info, wandb_info = maybe_args
 		else:
 			print("Create cancelled (by user)")
 			return
 
-		self.que.create_run(arg_dict, tags, project, entity)
+		self.que.create_run(admin_info,wandb_info)
 
 	# process based functions
 
