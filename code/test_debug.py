@@ -865,26 +865,27 @@ def test_loss3():
 
 
 def reformet2():
-	with open('queRuns.json', 'r') as f:
+	with open('./que/Runs.json', 'r') as f:
 		all_runs = json.load(f)
 		
 	old_runs = all_runs['old_runs']
 	# print(len(old_runs))
 	# print(all(['run_id' in run['wandb'] for run in old_runs]))
 	for i, run in enumerate(old_runs):
-		if 'run_id' in run:
-			_ = run.pop('run_id')
+		stoping = run['training'].pop('early_stopping', None)
+		if stoping:
+			run['early_stopping'] = stoping
+		# _ = run.pop('run_id')
 		old_runs[i] = run
 
 	all_runs['old_runs'] = old_runs
-	with open('queRuns.json', 'w') as f:
+	with open('./que/Runs.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 			
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
-	# reformet2()
+	reformet2()
 	# test_shuffle3()
 	# test_loss3()
 	# test_tmux_man()
-	pass
