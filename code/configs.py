@@ -386,8 +386,8 @@ class AdminInfo(TypedDict):
 class TrainingInfo(TypedDict):
 	batch_size: int
 	update_per_step: int
+	batch_size_equivalent: int
 	max_epoch: int
-	
 
 
 def main():

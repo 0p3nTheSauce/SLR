@@ -94,7 +94,6 @@ def train_loop(
 	save_every: int = 5,
 	recover: bool = False,
 	seed: Optional[int] =None,
-	verbose: bool = False
 	
 ) -> None:
 	"""Train loop for video classification model.
@@ -183,7 +182,7 @@ def train_loop(
 		"val": {"loss": 0.0, "acc": 0.0},
 		"train": {"loss": 0.0, "acc": 0.0},
 	}
-	stopper = get_stopper(arg_dict=config.training.get("early_stopping", None), wandb_run=wandb_run)
+	stopper = get_stopper(arg_dict=config.get("early_stopping", None), wandb_run=wandb_run)
 
 	if load:
 		load_path = Path(load)
