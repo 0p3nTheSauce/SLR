@@ -872,10 +872,16 @@ def reformet2():
 	# print(len(old_runs))
 	# print(all(['run_id' in run['wandb'] for run in old_runs]))
 	for i, run in enumerate(old_runs):
-		stoping = run['training'].pop('early_stopping', None)
-		if stoping:
-			run['early_stopping'] = stoping
-		# _ = run.pop('run_id')
+		sched = run.pop('scheduler', None)
+		wand = run.pop('wandb', None)
+		stop = run.pop('early_stopping', None)
+		if sched:
+			run['scheduler'] = sched
+		if stop:
+			run['early_stopping'] = stop
+		if wand:
+			run['wandb'] = wand
+  
 		old_runs[i] = run
 
 	all_runs['old_runs'] = old_runs
