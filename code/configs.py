@@ -1,7 +1,7 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List, Optional, Union, TypedDict
+from typing import Dict, Any, List, Optional, Union, TypedDict, Tuple
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper, StopperOn
 from pathlib import Path
@@ -69,16 +69,18 @@ class WandbInfo(TypedDict):
 	project: str
 	tags: List[str]
 	run_id: Optional[str]
-    
+	
 class ExperimentInfo(TypedDict):
-    admin: AdminInfo
-    training: TrainingInfo
-    optimizer: OptimizerInfo
-    model_params: Model_paramsInfo
-    data: DataInfo
-    scheduler: Optional[SchedulerInfo]
+	admin: AdminInfo
+	training: TrainingInfo
+	optimizer: OptimizerInfo
+	model_params: Model_paramsInfo
+	data: DataInfo
+	scheduler: Optional[SchedulerInfo]
+	early_stopping: Optional[StopperOn]
+ 
+class CompletedExpInfo(ExperimentInfo):
     wandb: Optional[WandbInfo]
-    early_stopping: Optional[StopperOn]
 
 ####################### Utility functions ##############################
 
@@ -209,47 +211,44 @@ def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
 	return wandb_config
 
 def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
-    """Convert raw config to typed ExperimentInfo"""
-    
-    # Optional sections with None default
-    scheduler = None
-    if 'scheduler' in config:
-        scheduler = SchedulerInfo(
-            type=config['scheduler']['type'],
-            tmax=config['scheduler']['tmax'],
-            eta_min=config['scheduler']['eta_min']
-        )
-    
-    wandb = None
-    if 'wandb' in config:
-        wandb = WandbInfo(
-            entity=config['wandb']['entity'],
-            project=config['wandb']['project'],
-            tags=config['wandb']['tags'],  # Convert string to list
-            run_id=config['wandb']['run_id']
-        )
-    
-    early_stopping = None
-    if 'early_stopping' in config:
-        early_stopping = StopperOn(
-            metric=config['early_stopping']['metric'],  # Convert to list/tuple
-            mode=config['early_stopping']['mode'],
-            patience=config['early_stopping']['patience'],
-            min_delta=config['early_stopping']['min_delta']
-        )
-    
-    return ExperimentInfo(
-        admin=AdminInfo(**config['admin']),
-        training=TrainingInfo(**config['training']),
-        optimizer=OptimizerInfo(**config['optimizer']),  # Shorthand if keys match exactly
-        model_params=Model_paramsInfo(**config['model_params']),
-        data=DataInfo(**config['data']),
-        scheduler=scheduler,
-        wandb=wandb,
-        early_stopping=early_stopping
-    )
+	"""Convert raw config to typed ExperimentInfo"""
+	
+	# Optional sections with None default
+	scheduler = None
+	if 'scheduler' in config:
+		scheduler = SchedulerInfo(
+			type=config['scheduler']['type'],
+			tmax=config['scheduler']['tmax'],
+			eta_min=config['scheduler']['eta_min']
+		)
+	
+	early_stopping = None
+	if 'early_stopping' in config:
+		early_stopping = StopperOn(
+			metric=config['early_stopping']['metric'],  # Convert to list/tuple
+			mode=config['early_stopping']['mode'],
+			patience=config['early_stopping']['patience'],
+			min_delta=config['early_stopping']['min_delta']
+		)
+	
+	return ExperimentInfo(
+		admin=AdminInfo(**config['admin']),
+		training=TrainingInfo(**config['training']),
+		optimizer=OptimizerInfo(**config['optimizer']),  # Shorthand if keys match exactly
+		model_params=Model_paramsInfo(**config['model_params']),
+		data=DataInfo(**config['data']),
+		scheduler=scheduler,
+		early_stopping=early_stopping
+	)
 
-def load_config(admin: Dict[str, Any]) -> ExperimentInfo:
+def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:
+	"""Add equivalent batch size"""
+	conf["training"]["batch_size_equivalent"] = (
+		conf["training"]["batch_size"] * conf["training"]["update_per_step"]
+	)
+	return conf
+
+def load_config(admin: AdminInfo) -> ExperimentInfo:
 	"""Load config from flat file and merge with command line args
 
 	Args:
@@ -266,20 +265,11 @@ def load_config(admin: Dict[str, Any]) -> ExperimentInfo:
 	conf_path = Path(admin["config_path"])
 	if not conf_path.exists():
 		raise ValueError(f"{conf_path} not found")
+
 	config = parse_ini_config(admin["config_path"])
+	config = _add_eq_bs(config)
 	ndict = {"admin": admin}
 	ndict.update(config)
-	# want to add equivalent batch size
-	try:
-		ndict["training"]["batch_size_equivalent"] = (
-			ndict["training"]["batch_size"] * ndict["training"]["update_per_step"]
-		)
-	except KeyError as e:
-		print(f"Warning: issue with config: {e}")
-		print("available keys: ")
-		for k in config.keys():
-			print(k)
-		raise e
 
 	e_info = _to_exp_info(ndict)
 
@@ -288,29 +278,16 @@ def load_config(admin: Dict[str, Any]) -> ExperimentInfo:
  
 	return e_info
 
-def take_args(
-	sup_args: Optional[List[str]] = None,
-	return_parser_only: bool = False,
-	make_dirs: bool = False,
-	prog: Optional[str] = None,
-	desc: str = "Train a model",
-) -> Optional[tuple | argparse.ArgumentParser]:
-	"""Retrieve arguments for new training run
+def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> argparse.ArgumentParser:
+	"""Get parser for a training configuration
 
 	Args:
-		sup_args (Optional[List[str]], optional): Supply arguments instead of taking from command line. Defaults to None.
-		return_parser_only (bool, optional): Give the parser instead of arguments. Defaults to False.
-		make_dirs (bool, optional): Make output and checkpoint dirs. Defaults to False.
-		prog (Optional[str], optional): Script name. Defaults to configs.py.
-		desc (str, optional): What does the script do? Defaults to "Train a model".
-
-	Raises:
-		ValueError: If model or split supplied are not available, or if recovering and save path is invalid.
+		prog (Optional[str], optional): Script name, (e.g. train.py). Defaults to None.
+		desc (str, optional): Program desctiption. Defaults to "Train a model".
 
 	Returns:
-		Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if successful.
+		argparse.ArgumentParser: Parser which takes training arguments
 	"""
-
 	models_available = avail_models()
 	splits_available = get_avail_splits()
 
@@ -376,8 +353,30 @@ def take_args(
 	)
 	parser.add_argument("-c", "--config_path", help="path to config .ini file")
 
-	if return_parser_only:
-		return parser
+	return parser
+
+#NOTE: Seperate into having seperate function for train parser
+def take_args(
+	sup_args: Optional[List[str]] = None,
+	make_dirs: bool = False,
+) -> Optional[Tuple[AdminInfo, WandbInfo]]:
+	"""Retrieve arguments for new training run
+
+	Args:
+		sup_args (Optional[List[str]], optional): Supply arguments instead of taking from command line. Defaults to None.
+		make_dirs (bool, optional): Make output and checkpoint dirs. Defaults to False.
+
+	Raises:
+		ValueError: If model or split supplied are not available, or if recovering and save path is invalid.
+
+	Returns:
+		Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if successful.
+	"""
+
+	models_available = avail_models()
+	splits_available = get_avail_splits()
+
+	parser = get_train_parser()
 
 	if sup_args:
 		args = parser.parse_args(sup_args)
@@ -479,9 +478,18 @@ def take_args(
 	if args.tags is not None:
 		tags.extend(args.tags)
 
+	wandb_info = WandbInfo(entity=args.entity, project=args.project, tags=tags, run_id=args.run_id)
+	admin_info = AdminInfo(
+		model=args.model,
+		dataset=args.dataset,
+		split=args.split,
+		exp_no=args.exp_no,
+		recover=args.recover,
+		config_path=args.config_path,
+		save_path=args.save_path
+	)
 
-	#NOTE: it may be better here to just merge into wandb category
-	return clean_dict, tags, args.project, args.entity
+	return admin_info, wandb_info
 
 def main():
 	try:
@@ -494,11 +502,11 @@ def main():
 		print(f"Parsing failed with error: {e}")
 
 	if isinstance(maybe_args, tuple):
-		arg_dict, tags, project, entity = maybe_args
+		admin_info, wandb_info = maybe_args
 	else:
 		return
 	# str_dict(arg_dict, disp=True)
-	config = load_config(arg_dict)
+	config = load_config(admin_info)
 	print_config(config)
 
 	# print_dict(config)

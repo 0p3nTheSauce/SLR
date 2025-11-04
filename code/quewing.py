@@ -1186,8 +1186,7 @@ class queShell(cmdLib.Cmd):
 	def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
 		"""Get argument parser for a given command"""
 		parsers = {
-			"create": lambda: configs.take_args(
-				return_parser_only=True,
+			"create": configs.get_train_parser(
 				prog="create",
 				desc="Create a new training run",
 			),
