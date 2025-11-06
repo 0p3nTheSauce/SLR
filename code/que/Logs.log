@@ -1,37 +1,53 @@
 wandb: Currently logged in as: ljgoodall2001 (ljgoodall2001-rhodes-university) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
-wandb: setting up run gugwqpkl
+wandb: setting up run gtvg7ouw
 wandb: Tracking run with wandb version 0.22.2
-wandb: Run data is saved locally in /home/luke/Code/SLR/code/wandb/run-20251106_160010-gugwqpkl
+wandb: Run data is saved locally in /home/luke/Code/SLR/code/wandb/run-20251106_161829-gtvg7ouw
 wandb: Run `wandb offline` to turn off syncing.
 wandb: Syncing run S3D_asl100_exp021
 wandb: ⭐️ View project at https://wandb.ai/ljgoodall2001-rhodes-university/WLASL-100
-wandb: 🚀 View run at https://wandb.ai/ljgoodall2001-rhodes-university/WLASL-100/runs/gugwqpkl
+wandb: 🚀 View run at https://wandb.ai/ljgoodall2001-rhodes-university/WLASL-100/runs/gtvg7ouw
 The worker sais: 
 Starting new run with name: S3D_asl100_exp021
 writing my id to temp file
-Run ID: gugwqpkl
+Run ID: gtvg7ouw
 Run name: S3D_asl100_exp021
-Run path: ljgoodall2001-rhodes-university/WLASL-100/gugwqpkl
+Run path: ljgoodall2001-rhodes-university/WLASL-100/gtvg7ouw
 Epoch 0/200
 ----------
-Step 10: Accumulated Loss: 5.9821, Current Accuracy: 0.00%
-Step 20: Accumulated Loss: 4.5986, Current Accuracy: 0.62%
-Step 30: Accumulated Loss: 5.1906, Current Accuracy: 1.25%
-Step 40: Accumulated Loss: 5.4862, Current Accuracy: 1.88%
-Step 50: Accumulated Loss: 5.1471, Current Accuracy: 1.75%
-Step 60: Accumulated Loss: 5.1869, Current Accuracy: 2.29%
-Step 70: Accumulated Loss: 4.8622, Current Accuracy: 2.14%
-Step 80: Accumulated Loss: 4.4530, Current Accuracy: 1.88%
-Step 90: Accumulated Loss: 5.0326, Current Accuracy: 2.08%
-Step 100: Accumulated Loss: 4.4857, Current Accuracy: 2.50%
-Step 110: Accumulated Loss: 4.5539, Current Accuracy: 2.73%
-Step 120: Accumulated Loss: 4.1586, Current Accuracy: 2.81%
-Step 130: Accumulated Loss: 4.7886, Current Accuracy: 3.08%
-Step 140: Accumulated Loss: 4.3843, Current Accuracy: 3.12%
-Step 150: Accumulated Loss: 3.6281, Current Accuracy: 3.25%
-Step 160: Accumulated Loss: 4.6630, Current Accuracy: 3.59%
-Step 170: Accumulated Loss: 4.2265, Current Accuracy: 3.75%
-Step 180: Accumulated Loss: 4.5142, Current Accuracy: 3.89%
-TRAIN - Epoch 1:
-  Loss: 4.7963
-  Accuracy: 3.88% (56/1442)
+Step 10: Accumulated Loss: 5.8813, Current Accuracy: 1.25%
+Step 20: Accumulated Loss: 5.6484, Current Accuracy: 1.25%
+Step 30: Accumulated Loss: 4.9108, Current Accuracy: 1.25%
+Step 40: Accumulated Loss: 4.7846, Current Accuracy: 0.94%
+Step 50: Accumulated Loss: 4.8815, Current Accuracy: 1.00%
+Step 60: Accumulated Loss: 5.0729, Current Accuracy: 1.46%
+Traceback (most recent call last):
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 129, in <module>
+    main()
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 126, in main
+    qf.run(args.setting, args)
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 20, in run
+    self.run_worker(args, kwargs)
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 62, in run_worker
+    wr.work()
+  File "/home/luke/Code/SLR/code/quewing.py", line 788, in work
+    train_loop(admin["model"], run, recover=admin["recover"])
+  File "/home/luke/Code/SLR/code/training.py", line 267, in train_loop
+    accumulated_loss += loss.item()
+KeyboardInterrupt
+Traceback (most recent call last):
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 129, in <module>
+    main()
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 126, in main
+    qf.run(args.setting, args)
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 20, in run
+    self.run_worker(args, kwargs)
+  File "/home/luke/Code/SLR/code/./quefeather.py", line 62, in run_worker
+    wr.work()
+  File "/home/luke/Code/SLR/code/quewing.py", line 788, in work
+    train_loop(admin["model"], run, recover=admin["recover"])
+  File "/home/luke/Code/SLR/code/training.py", line 267, in train_loop
+    accumulated_loss += loss.item()
+KeyboardInterrupt
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mS3D_asl100_exp021[0m at: [34mhttps://wandb.ai/ljgoodall2001-rhodes-university/WLASL-100/runs/gtvg7ouw[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20251106_161829-gtvg7ouw/logs[0m
