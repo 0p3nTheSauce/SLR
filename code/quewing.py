@@ -37,7 +37,6 @@ WR_NAME = "worker"
 MR_NAME = "monitor"
 QUE_DIR = "./que/"
 WR_PATH = "./quefeather.py"
-TMP_PATH = QUE_DIR + "Temp.json"
 RUN_PATH = QUE_DIR + "Runs.json"
 LOG_PATH = QUE_DIR + "Logs.log"
 TO_RUN = "to_run"  # havent run yet
@@ -175,7 +174,7 @@ class que:
 			self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
 			self._save_Que()
 
-	def get_run(self, loc: QueLocation, idx: int) -> QueRun:
+	def _get_run(self, loc: QueLocation, idx: int) -> QueRun:
 		"""Get a specified run from the given location
 
 		Args:
@@ -186,7 +185,13 @@ class que:
 						QueRun: The specified run config
 		"""
 		to_get = self.fetch_state(loc)
+		if len(to_get) < abs(idx):
+			raise ValueError(f"The provided index: {idx} is out of range for the given location: {loc}")
 		return to_get.pop(idx)
+
+	def get_cur_run(self) -> CompletedExpInfo:
+		return self._get_run('cur_run', 0)
+
 
 	@classmethod
 	def get_config(cls, next_run: QueRun) -> str:
@@ -709,15 +714,15 @@ class worker:
 	def __init__(
 		self,
 		exec_path: str = WR_PATH,
-		temp_path: str = TMP_PATH,
+		runs_path: str = RUN_PATH,
 		log_path: str = LOG_PATH,
 		wr_name: str = WR_NAME,
 		sesh_name: str = SESH_NAME,
 		debug: bool = True,
 		verbose: bool = True,
 	):
-		self.temp_path = Path(temp_path)
 		self.exec_path = exec_path
+		self.que = que(runs_path=runs_path, verbose=verbose)
 		self.log_path = log_path
 		self.wr_name = wr_name
 		self.sesh_name = sesh_name
@@ -731,7 +736,8 @@ class worker:
 	def work(self):
 		gpu_manager.wait_for_completion()
 
-		info = retrieve_Data(self.temp_path)
+		#get the next run
+		info = self.que.get_run('cur_run', 0)
 
 		if not info:
 			# empty temp file
@@ -881,7 +887,6 @@ class daemon:
 		wr_name: str = WR_NAME,
 		sesh: str = SESH_NAME,
 		runs_path: str = RUN_PATH,
-		temp_path: str = TMP_PATH,
 		exec_path: str = WR_PATH,
 		verbose: bool = True,
 		wr: Optional[worker] = None,
@@ -893,13 +898,11 @@ class daemon:
 		self.wr_name = wr_name
 		self.sesh = sesh
 		self.runs_path = Path(runs_path)
-		self.temp_path = Path(temp_path)
 		if wr:
 			self.worker = wr
 		else:
 			self.worker = worker(
 				exec_path=exec_path,
-				temp_path=temp_path,
 				wr_name=wr_name,
 				sesh_name=sesh,
 			)
@@ -1277,7 +1280,10 @@ class queShell(cmdLib.Cmd):
 
 		ext_args = None if len(add_args) == 0 else add_args
 
+		#make sure que is consistent before and after starting daemon
+		self.do_save('')
 		self.tmux_man.start(self.dn_name, parsed_args.setting, ext_args=ext_args)
+		self.do_load('')
 
 	def do_worker(self, arg):
 		"""Start the worker with the given setting"""
