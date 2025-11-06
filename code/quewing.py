@@ -2,19 +2,30 @@
 from pathlib import Path
 import argparse
 import json
-from typing import Optional, List, Literal, TypeAlias, Tuple, Dict, Union, Any, cast
+from typing import (
+	Optional,
+	List,
+	Literal,
+	TypeAlias,
+	Tuple,
+	Dict,
+	Union,
+	Any,
+	TypedDict,
+	cast,
+)
 import subprocess
 import time
 import cmd as cmdLib
 import shlex
-from filelock import FileLock
+from filelock import FileLock, Timeout
 import sys
 import wandb
 import torch
 
 # locals
 import configs
-from configs import ExperimentInfo, CompletedExpInfo,  WandbInfo, AdminInfo
+from configs import ExperimentInfo, CompletedExpInfo, WandbInfo, AdminInfo
 import utils
 from utils import gpu_manager
 from training import train_loop, wandb_manager
@@ -29,21 +40,28 @@ WR_PATH = "./quefeather.py"
 TMP_PATH = QUE_DIR + "Temp.json"
 RUN_PATH = QUE_DIR + "Runs.json"
 LOG_PATH = QUE_DIR + "Logs.log"
-TO_RUN = "to_run" #havent run yet
-CUR_RUN = "cur_run" #busy running 
-OLD_RUNS = "old_runs" #run already
+TO_RUN = "to_run"  # havent run yet
+CUR_RUN = "cur_run"  # busy running
+OLD_RUNS = "old_runs"  # run already
 # List for argparse choices
-QUE_LOCATIONS = [TO_RUN,CUR_RUN,OLD_RUNS]
+QUE_LOCATIONS = [TO_RUN, CUR_RUN, OLD_RUNS]
 SYNONYMS = {
-			'new': 'to_run',
-			'tr': 'to_run',
-			'cur': 'cur_run',
-			'busy': 'cur_run',
-			'old': 'old_runs',
-			'or': 'old_runs',
-		}
-QueLocation: TypeAlias = Literal["to_run","cur_run", "old_runs"]
+	"new": "to_run",
+	"tr": "to_run",
+	"cur": "cur_run",
+	"busy": "cur_run",
+	"old": "old_runs",
+	"or": "old_runs",
+}
+QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs"]
 QueRun: TypeAlias = Union[ExperimentInfo, CompletedExpInfo]
+
+
+class AllRuns(TypedDict):
+	old_runs: List[QueRun]
+	cur_run: List[QueRun]
+	to_run: List[QueRun]
+
 
 def retrieve_Data(path: Path) -> Any:
 	"""Retrieves data from a given path."""
@@ -57,26 +75,122 @@ def store_Data(path: Path, data: Any):
 	with open(path, "w") as file:
 		json.dump(data, file, indent=4)
 
-#NOTE: at some point it might be nice to do away with the temp file
+
+class QueEmpty(Exception):
+	"""No runs available"""
+
+	pass
+
+
+class QueBusy(Exception):
+	"""There is already a run (likely for cur_run)"""
+
+	pass
+
+
+# NOTE: at some point it might be nice to do away with the temp file
 class que:
 	def __init__(
-		self,
-		runs_path: str | Path,
-		verbose: bool = True,
-		auto_save: bool = False
+		self, runs_path: str | Path, verbose: bool = True, auto_save: bool = False
 	) -> None:
-		self.runs_path = Path(runs_path)
-		self.imp_splits = configs.get_avail_splits()
-		self.verbose = verbose
-		self.old_runs = []
-		self.cur_run = {}
-		self.to_run = []
-		self.auto_save = auto_save
+		self.runs_path: Path = Path(runs_path)
+		self.lock_file: Path = Path(f"{runs_path}.lock")
+		self.lock: FileLock = FileLock(self.lock_file, timeout=30)
+		self.imp_splits: List[str] = configs.get_avail_splits()
+		self.verbose: bool = verbose
+		self.old_runs: List[QueRun] = []
+		self.cur_run: List[QueRun] = []
+		self.to_run: List[QueRun] = []
+		self.auto_save: bool = auto_save
 		self.load_state()
 
+	def _load_Que(self):
+		"""Read que from file"""
+		try:
+			with open(self.runs_path, "r") as f:
+				data = json.load(f)
+			self.to_run = data.get(TO_RUN, [])
+			self.cur_run = data.get(CUR_RUN, [])
+			self.old_runs = data.get(OLD_RUNS, [])
+		except FileNotFoundError:
+			self.print_v(
+				f"No existing state found at {self.runs_path}. Starting fresh."
+			)
+			self.to_run = []
+			self.cur_run = []
+			self.old_runs = []
+
+	def _save_Que(self):
+		"""Write que to file"""
+		with open(self.runs_path, "w") as f:
+			all_runs = {
+				TO_RUN: self.to_run,
+				CUR_RUN: self.cur_run,
+				OLD_RUNS: self.old_runs,
+			}
+			json.dump(all_runs, f, indent=4)
+
+	def stash_next_run(self) -> None:
+		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
+
+		Raises:
+						QueEmpty: If to_run is empty
+						QueBusy: If cur_run is full
+						Timeout: If cannot acquire file lock
+		"""
+		with self.lock:
+			self._load_Que()
+
+			# empty to run
+			if len(self.to_run) == 0:
+				raise QueEmpty(f"Can't get next run, no runs in {TO_RUN}")
+
+			# full cur_run
+			if (
+				len(self.cur_run) != 0
+			):  # NOTE at some point it might be possible to have multiple busy operations
+				raise QueBusy(f"Can't stash next run, there is something in {CUR_RUN}")
+
+			next_run = self.to_run.pop(0)
+			self.cur_run.append(next_run)
+			self.print_v(f"Stashed next run: {self.run_str(self.run_sum(next_run))}")
+			self._save_Que()
+
+	def store_fin_run(self):
+		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
+
+		Raises:
+						QueEmpty: If cur_run is empty
+						Timeout: If cannot acquire file lock
+		"""
+		with self.lock:
+			self._load_Que()
+
+			# empty cur_run
+			if len(self.to_run) == 0:
+				raise QueEmpty(f"Can't move run in {CUR_RUN} because it's empty")
+
+			fin_run = self.cur_run.pop(-1)
+			self.old_runs.insert(0, fin_run)
+			self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
+			self._save_Que()
+
+	def get_run(self, loc: QueLocation, idx: int) -> QueRun:
+		"""Get a specified run from the given location
+
+		Args:
+						loc (QueLocation): Location, to_run, cur_run or old_runs
+						idx (int): Index of run in location
+
+		Returns:
+						QueRun: The specified run config
+		"""
+		to_get = self.fetch_state(loc)
+		return to_get.pop(idx)
+
 	@classmethod
-	def get_config(cls, next_run: dict) -> str:
-		admin = next_run["config"]["admin"]
+	def get_config(cls, next_run: QueRun) -> str:
+		admin = next_run["admin"]
 		return admin["config_path"]
 
 	def print_v(self, message: str) -> None:
@@ -85,51 +199,59 @@ class que:
 			print(message)
 
 	def save_state(self):
-		all_runs = {OLD_RUNS: self.old_runs, TO_RUN: self.to_run}
-		store_Data(self.runs_path, all_runs)
-		# self.print_v(f"Saved state to {self.runs_path}")
+		"""Saves state to Runs.jso, with filelock"""
+		with self.lock:
+			self._save_Que()
 
-	def load_state(self, all_runs: Optional[dict] = None) -> dict:
-		"""Loads state from queRuns.json, or dictionary, returns all_runs"""
-		if all_runs:
-			self.old_runs = all_runs[OLD_RUNS]
-			self.to_run = all_runs[TO_RUN]
-			return all_runs
+	def load_state(self) -> None:
+		"""Loads state from Runs.json, with filelock"""
+		with self.lock:
+			self._load_Que()
 
-		if self.runs_path.exists():
-			data = retrieve_Data(self.runs_path)
-			self.old_runs = data.get(OLD_RUNS, [])
-			self.to_run = data.get(TO_RUN, [])
-			# self.print_v(f"Loaded state from {self.runs_path}")
-		else:
-			self.print_v(
-				f"No existing state found at {self.runs_path}. Starting fresh."
-			)
-			self.old_runs = []
-			self.to_run = []
-			data = {OLD_RUNS: [], TO_RUN: []}
-		return data
-
-	def fetch_state(self, loc: QueLocation) -> list:
+	def fetch_state(self, loc: QueLocation) -> List[QueRun]:
 		"""Return reference to the specified list"""
-		return self.to_run if loc == TO_RUN else self.old_runs
+		if loc == TO_RUN:
+			return self.to_run
+		elif loc == CUR_RUN:
+			return self.cur_run
+		else:
+			return self.old_runs
 
-	def run_sum(self, run: QueRun, exc: Optional[List[str]] = None) -> dict:
+	# def get_next_run(self) -> Optional[ExperimentInfo]:
+	# 	"""Retrieves the next run from the que, and saves state"""
+	# 	self.load_state()
+	# 	if self.to_run:
+	# 		next_run = self.to_run.pop(0)
+	# 		self.save_state()
+	# 		self.print_v(f"Retrieved next run: {self.run_str(self.run_sum(next_run))}")
+	# 		return next_run
+	# 	else:
+	# 		self.print_v("No runs in the queue.")
+	# 		return
+
+	# def store_old_run(self, old_run: CompletedExpInfo):
+	# 	"""Saves run to OLD_RUNS, and save state"""
+	# 	self.load_state()
+	# 	self.old_runs.insert(0, old_run)
+	# 	self.save_state()
+	# 	self.print_v("Saved to old_runs")
+
+	def run_sum(self, run: QueRun, exc: Optional[List[str]] = None) -> Dict[str, str]:
 		"""Extract key details from a run configuration.
 
 		Args:
-			run: Dictionary containing run configuration with admin details
-			exc: Optional list of keys to exclude from the summary
+						run: Dictionary containing run configuration with admin details
+						exc: Optional list of keys to exclude from the summary
 
 		Returns:
-			Dictionary with model, exp_no, split, and config_path
+						Dictionary with model, exp_no, split, and config_path
 		"""
 		admin = run["admin"]
 
 		dic = {}
 
-		if 'wandb' in run and run['wandb'] is not None:
-			dic["run_id"] = run['wandb']["run_id"]
+		if "wandb" in run and run["wandb"] is not None:
+			dic["run_id"] = run["wandb"]["run_id"]
 
 		dic.update(
 			{
@@ -153,10 +275,10 @@ class que:
 		"""Get summarised run info, and stats for printing
 
 		Args:
-						run_confs (List[Dict]): A list of run configs (to_run or old_runs)
+																		run_confs (List[Dict]): A list of run configs (to_run or old_runs)
 
 		Returns:
-						Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
+																		Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
 		"""
 
 		runs_info = [self.run_sum(run) for run in run_confs]
@@ -168,7 +290,7 @@ class que:
 
 		stats = {}
 
-		if "run_id" in runs_info[0]:
+		if "run_id" in runs_info[0] and runs_info[0]['run_id'] is not None:
 			max_id = max(len(r["run_id"]) for r in runs_info)
 			stats["max_id"] = max_id
 
@@ -184,11 +306,11 @@ class que:
 		"""Convert a run to summarised string representation
 
 		Args:
-						r_info (Dict): Summarised run info.
-						stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+																		r_info (Dict): Summarised run info.
+																		stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
 
 		Returns:
-						str: Summarised string representation of run info
+																		str: Summarised string representation of run info
 		"""
 
 		if stats is None:
@@ -201,7 +323,7 @@ class que:
 
 		r_str = ""
 
-		if "run_id" in r_info:
+		if "run_id" in r_info and r_info["run_id"] is not None:
 			r_str += f"Run ID: {r_info['run_id']:<{stats['max_id']}}  "
 
 		r_str += (
@@ -213,48 +335,26 @@ class que:
 
 		return r_str
 
-	def get_next_run(self) -> Optional[ExperimentInfo]:
-		"""Retrieves the next run from the que, and saves state"""
-		self.load_state()
-		if self.to_run:
-			next_run = self.to_run.pop(0)
-			self.save_state()
-			self.print_v(f"Retrieved next run: {self.run_str(self.run_sum(next_run))}")
-			return next_run
-		else:
-			self.print_v("No runs in the queue.")
-			return
-
-	def store_old_run(self, old_run: CompletedExpInfo):
-		"""Saves run to OLD_RUNS, and save state"""
-		self.load_state()
-		self.old_runs.insert(0, old_run)
-		self.save_state()
-		self.print_v("Saved to old_runs")
-
 	def clear_runs(self, loc: QueLocation):
 		"""reset the runs queue"""
-		past = loc == OLD_RUNS
-		future = loc == TO_RUN
-		if past:
-			self.old_runs = []
-		if future:
-			self.to_run = []
+		to_clear = self.fetch_state(loc)
 
-		if past or future:
-			self.print_v("Successfully cleared")
+		if len(to_clear) > 0:
+			self.print_v(f"{loc} successfully cleared")
 		else:
-			self.print_v("No runs cleared")
+			self.print_v(f"{loc} already empty")
+
+		to_clear = []
 
 	def list_runs(self, loc: QueLocation, disp: bool = False) -> List[str]:
 		"""Summarise to a list of runs, in a given location
 
 		Args:
-						loc (QueLocation): Location to list
-						disp (bool, optional): Print list, with indexes. Defaults to False.
+																		loc (QueLocation): Location to list
+																		disp (bool, optional): Print list, with indexes. Defaults to False.
 
 		Returns:
-						List[str]: Summarised run info
+																		List[str]: Summarised run info
 		"""
 
 		to_disp = self.fetch_state(loc)
@@ -304,13 +404,13 @@ class que:
 		"""Create and add a new training run entry
 
 		Args:
-						arg_dict (dict): Arguments used by training function
-						tags (list[str]): Wandb tags
-						output (str): Experiment directory
-						save_path (str): Checkpoint directory
-						project (str): Wandb project
-						entity (str): Wandb entity
-						ask (bool, optional): Pre-check run before creation. Defaults to True.
+																		arg_dict (dict): Arguments used by training function
+																		tags (list[str]): Wandb tags
+																		output (str): Experiment directory
+																		save_path (str): Checkpoint directory
+																		project (str): Wandb project
+																		entity (str): Wandb entity
+																		ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
 
 		try:
@@ -341,21 +441,20 @@ class que:
 			proceed = True
 
 		if proceed:
+			config = cast(CompletedExpInfo, config | {"wandb": wandb_dict})
 
-			config = cast(CompletedExpInfo, config | {'wandb': wandb_dict})	
-   			
 			self.to_run.append(config)
 			self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
 		else:
 			self.print_v("Training cancelled by user")
 
-	def remove_run(self, loc: QueLocation, idx: int) -> Optional[dict]:
+	def remove_run(self, loc: QueLocation, idx: int) -> Optional[QueRun]:
 		"""Removes a run from the que
 		Args:
-						loc: TO_RUN or OLD_RUNS
-						idx: index of run
+																		loc: TO_RUN or OLD_RUNS
+																		idx: index of run
 		Returns:
-						rem: the removed run, if successful"""
+																		rem: the removed run, if successful"""
 
 		to_remove = self.fetch_state(loc)
 
@@ -368,9 +467,9 @@ class que:
 	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int):
 		"""Repositions a run from the que
 		Args:
-						loc: TO_RUN or OLD_RUNS
-						o_idx: original index of run
-						n_idx: new index of run
+																		loc: TO_RUN or OLD_RUNS
+																		o_idx: original index of run
+																		n_idx: new index of run
 		"""
 
 		to_shuffle = self.fetch_state(loc)
@@ -396,23 +495,21 @@ class que:
 		o_loc: QueLocation,
 		n_loc: QueLocation,
 		oi_idx: int,
-		of_idx: Optional[int] = None
+		of_idx: Optional[int] = None,
 	):
 		"""Moves a run between locations in que (at beginning)
 
 		Args:
-						o_loc (QueLocation): Old location
-						n_loc (QueLocation): New location
-						oi_idx (int): Old initial index
-						of_idx (int): Old final index, if specifying a range.
+																		o_loc (QueLocation): Old location
+																		n_loc (QueLocation): New location
+																		oi_idx (int): Old initial index
+																		of_idx (int): Old final index, if specifying a range.
 		"""
 
 		old_location = self.fetch_state(o_loc)
 		new_location = self.fetch_state(n_loc)
-	
-	
-		if of_idx is None:
 
+		if of_idx is None:
 			if abs(oi_idx) < len(old_location):
 				run = old_location.pop(oi_idx)
 			else:
@@ -422,23 +519,21 @@ class que:
 				return
 
 			new_location.insert(0, run)
-			
+
 		else:
-			
-			if abs(oi_idx) < len(old_location) and abs(of_idx) < len(old_location): 
+			if abs(oi_idx) < len(old_location) and abs(of_idx) < len(old_location):
 				tomv = []
-				for i in range(oi_idx, of_idx+1):    
+				for i in range(oi_idx, of_idx + 1):
 					tomv.append(old_location.pop(oi_idx))
 			else:
 				print(
 					f"Range: {oi_idx} - {of_idx} is an invalid range. Length of {o_loc} is: {len(old_location)}"
 				)
-				return 
-			
+				return
+
 			for run in tomv:
 				new_location.insert(0, run)
-					
-		
+
 		self.print_v("Successfully added\n")
 
 		self.list_runs(n_loc, disp=self.verbose)
@@ -456,7 +551,7 @@ class tmux_manager:
 		self.dn_name = dn_name
 		self.sesh_name = sesh_name
 		self.exec_path = exec_path
-		
+
 		ep = Path(exec_path)
 		if (not ep.exists()) or (not ep.is_file()):
 			raise ValueError(f"Executable: {exec_path} does not exist")
@@ -465,17 +560,27 @@ class tmux_manager:
 		"""Create the que_training tmux session is set up, with windows daemon and worker
 
 		Returns:
-			Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
+						Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
 		"""
-	
+
 		create_sesh_cmd = [
-			'tmux', 'new-session', '-d', '-s', self.sesh_name, # -d for detach 
-			'-n', f'{self.dn_name}'
+			"tmux",
+			"new-session",
+			"-d",
+			"-s",
+			self.sesh_name,  # -d for detach
+			"-n",
+			f"{self.dn_name}",
 		]
-		create_wWndw_cmd = [ #daemon window created in first command
-			'tmux', 'new-window', '-t', self.sesh_name, '-n', self.wr_name
+		create_wWndw_cmd = [  # daemon window created in first command
+			"tmux",
+			"new-window",
+			"-t",
+			self.sesh_name,
+			"-n",
+			self.wr_name,
 		]
-  
+
 		try:
 			o1 = subprocess.run(create_sesh_cmd, check=True)
 		except subprocess.CalledProcessError as e:
@@ -484,7 +589,7 @@ class tmux_manager:
 			)
 			print(e.stderr)
 			return
-		try:  
+		try:
 			o2 = subprocess.run(create_wWndw_cmd, check=True)
 		except subprocess.CalledProcessError as e:
 			print(
@@ -493,19 +598,21 @@ class tmux_manager:
 			print(e.stderr)
 			return
 		return [o1, o2]
-  
+
 	def check_tmux_session(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
 		"""Verify that the que_training tmux session is set up, with windows daemon and worker
 
 		Returns:
-			Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
+						Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
 		"""
 		window_names = [self.dn_name, self.wr_name]
 		results = []
 		for win_name in window_names:
-			tmux_cmd = ['tmux', 'has-session', '-t', f'{self.sesh_name}:{win_name}']
+			tmux_cmd = ["tmux", "has-session", "-t", f"{self.sesh_name}:{win_name}"]
 			try:
-				results.append(subprocess.run(tmux_cmd, check=True, capture_output=True, text=True))
+				results.append(
+					subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
+				)
 			except subprocess.CalledProcessError as e:
 				print(
 					f"check_tmux_session ran into an error when checking the {win_name} window: "
@@ -517,9 +624,11 @@ class tmux_manager:
 	def join_session(self, wndw: str):
 		avail_wndws = [self.dn_name, self.wr_name]
 		if wndw not in avail_wndws:
-			print(f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}")
+			print(
+				f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}"
+			)
 			return None
-		
+
 		tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}:{wndw}"]
 		try:
 			return subprocess.run(tmux_cmd, check=True)
@@ -527,7 +636,7 @@ class tmux_manager:
 			print("join_session ran into an error when spawning the worker process: ")
 			print(e.stderr)
 			return None
-		
+
 	def switch_to_window(self):
 		tmux_cmd = ["tmux", "select-window", "-t", f"{self.sesh_name}:{self.wr_name}"]
 		try:
@@ -538,19 +647,23 @@ class tmux_manager:
 			)
 			print(e.stderr)
 
-	def _send(self, cmd: str, wndw: str) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
+	def _send(
+		self, cmd: str, wndw: str
+	) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
 		"""Send a command to the given window
 
 		Args:
-			cmd (str): The command as you would type in the terminal
-			wndw (str): The tmux window
+						cmd (str): The command as you would type in the terminal
+						wndw (str): The tmux window
 
 		Returns:
-			Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
+						Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
 		"""
 		avail_wndws = [self.dn_name, self.wr_name]
 		if wndw not in avail_wndws:
-			print(f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}")
+			print(
+				f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}"
+			)
 			return None
 		tmux_cmd = [
 			"tmux",
@@ -565,23 +678,24 @@ class tmux_manager:
 		except subprocess.CalledProcessError as e:
 			print("Send ran into an error when spawning the worker process: ")
 			print(e.stderr)
-			
-	def start(self, mode: str, setting: str, ext_args: Optional[List[str]] = None) -> Optional[subprocess.CompletedProcess[bytes]]:
+
+	def start(
+		self, mode: str, setting: str, ext_args: Optional[List[str]] = None
+	) -> Optional[subprocess.CompletedProcess[bytes]]:
 		"""Wrapper for send, specialised to starting the worker or daemon
 
 		Args:
-			mode (str): The mode for quefeather (worker or daemon)
-			setting (str): The setting for the given mode (e.g. sMonitor)
+						mode (str): The mode for quefeather (worker or daemon)
+						setting (str): The setting for the given mode (e.g. sMonitor)
 
 		Raises:
-			ValueError: If mode is not the same as the initialised self variable
+						ValueError: If mode is not the same as the initialised self variable
 
 		Returns:
-			Optional[subprocess.CompletedProcess[bytes]]: The output of the completed process if successful, otherwise None.
+						Optional[subprocess.CompletedProcess[bytes]]: The output of the completed process if successful, otherwise None.
 		"""
-		add_args = [] if ext_args is None else ext_args		
-  
-  
+		add_args = [] if ext_args is None else ext_args
+
 		if mode == self.dn_name or mode == self.wr_name:
 			cmd = f"{self.exec_path} {mode} {setting}"
 			for arg in add_args:
@@ -589,7 +703,6 @@ class tmux_manager:
 			return self._send(cmd, mode)
 		else:
 			raise ValueError(f"Unknown mode: {mode}")
-		
 
 
 class worker:
@@ -625,12 +738,12 @@ class worker:
 			raise ValueError(
 				f"Tried to read next run from {self.temp_path} but it was empty"
 			)
-			
-		wandb_info = info['wandb']
-		entity = wandb_info['entity']
-		project = wandb_info['project']
-		tags = wandb_info['tags']
-		
+
+		wandb_info = info["wandb"]
+		entity = wandb_info["entity"]
+		project = wandb_info["project"]
+		tags = wandb_info["tags"]
+
 		admin = info["admin"]
 
 		# setup wandb run
@@ -661,13 +774,13 @@ class worker:
 				entity=entity, project=project, name=run_name, tags=tags, config=info
 			)
 
-		#save run_id for recovering
+		# save run_id for recovering
 		wandb_info["run_id"] = run.id
 		info["wandb"] = wandb_info
-		
+
 		self.print_v("writing my id to temp file")
 		store_Data(self.temp_path, info)
-		
+
 		self.print_v(f"Run ID: {run.id}")
 		self.print_v(f"Run name: {run.name}")  # Human-readable name
 		self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
@@ -750,16 +863,16 @@ class daemon:
 	while the worker outputs to a log file.
 
 	Args:
-					name: of own tmux window
-					wr_name: of worker tmux window (monitor)
-					sesh: tmux session name
-					runs_path: to queRuns.json
-					temp_path: to queTemp.json
-					imp_path: to implemented_info.json
-					exec_path: to quefeather.py
-					verbose: speaks to you
-					wr: supply its worker
-					q: supply its que
+																	name: of own tmux window
+																	wr_name: of worker tmux window (monitor)
+																	sesh: tmux session name
+																	runs_path: to queRuns.json
+																	temp_path: to queTemp.json
+																	imp_path: to implemented_info.json
+																	exec_path: to quefeather.py
+																	verbose: speaks to you
+																	wr: supply its worker
+																	q: supply its que
 	"""
 
 	def __init__(
@@ -797,7 +910,9 @@ class daemon:
 		if tm:
 			self.tmux_man = tm
 		else:
-			self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=name, sesh_name=sesh, exec_path=exec_path)
+			self.tmux_man = tmux_manager(
+				wr_name=wr_name, dn_name=name, sesh_name=sesh, exec_path=exec_path
+			)
 		self.verbose = verbose
 		self.stp_on_fail = stp_on_fail
 
@@ -821,36 +936,58 @@ class daemon:
 	def start_n_watch(self):
 		"""Start process in this terminal and watch"""
 		while True:
-			next_run = self.que.get_next_run()
-
-			if next_run is None:
+			# prepare next run (move from to_run -> cur_run)
+			try:
+				self.que.stash_next_run()
+			except QueEmpty:
 				self.print_v("No more runs to execute")
 				break
+			except QueBusy:
+				self.print_v("Cannot overwrite current run")
+				break
+			except Timeout:
+				self.print_v(
+					"Cannot stash next run, file is already held by another process"
+				)
+				break
 
-			self.print_v(self.seperator(next_run))
+			# print seperator
+			run = self.que.get_run("cur_run", 0)
+			self.print_v(self.seperator(run))
 
-			store_Data(self.temp_path, next_run)
-
-			# worker
+			# start worker with process output here
 			self.worker_here()
 
-			# retrieve run_id
-			fin_run = retrieve_Data(self.temp_path)
-
-			self.que.store_old_run(fin_run)
+			# save finished run (move from cur_run -> old_runs)
+			try:
+				self.que.store_fin_run()
+			except QueEmpty:
+				self.print_v("Could not find current run")
+			except Timeout:
+				self.print_v(
+					"Cannot store finished run, file is already held by another process"
+				)
 
 	def start_n_monitor(self):
 		"""Start process and use existing tmux monitoring"""
 		while True:
-			next_run = self.que.get_next_run()
-
-			if next_run is None:
+			# prepare next run (move from to_run -> cur_run)
+			try:
+				self.que.stash_next_run()
+			except QueEmpty:
 				self.print_v("No more runs to execute")
 				break
+			except QueBusy:
+				self.print_v("Cannot overwrite current run")
+				break
+			except Timeout:
+				self.print_v(
+					"Cannot stash next run, file is already held by another process"
+				)
+				break
 
-			self.print_v(self.seperator(next_run))
-
-			store_Data(self.temp_path, next_run)
+			run = self.que.get_run("cur_run", 0)
+			self.print_v(self.seperator(run))
 
 			# Start process in background
 			proc = self.worker_log()
@@ -867,10 +1004,16 @@ class daemon:
 				self.print_v(f"Process failed with return code: {return_code}")
 				if self.stp_on_fail:
 					break
-			# retrieve run_id
-			fin_run = retrieve_Data(self.temp_path)
 
-			self.que.store_old_run(fin_run)
+			# save finished run (move from cur_run -> old_runs)
+			try:
+				self.que.store_fin_run()
+			except QueEmpty:
+				self.print_v("Could not find current run")
+			except Timeout:
+				self.print_v(
+					"Cannot store finished run, file is already held by another process"
+				)
 
 	def start_idle(self):
 		"""Start process in this terminal and watch"""
@@ -940,38 +1083,39 @@ class daemon:
 
 	def recover(self, o_setting: str, run_id: Optional[str] = None):
 		"""Recover from a run failure, by loading the last run from Temp"""
-		av_set = ['sWatch', 'sMonitor']
-		
+		av_set = ["sWatch", "sMonitor"]
+
 		if o_setting not in av_set:
-			raise ValueError(f"Setting: {o_setting} is not one of available settings: {', '.join(av_set)}")	
-  
+			raise ValueError(
+				f"Setting: {o_setting} is not one of available settings: {', '.join(av_set)}"
+			)
+
 		info = retrieve_Data(self.temp_path)
 		if run_id:
-			info['wandb']['run_id'] = run_id
+			info["wandb"]["run_id"] = run_id
 
-		info['admin']['recover'] = True
+		info["admin"]["recover"] = True
 
 		if not info:
-			raise ValueError(f"Tried to read info from {self.temp_path} but found nothing")
-			
-		self.que.to_run.insert(0, info)		
+			raise ValueError(
+				f"Tried to read info from {self.temp_path} but found nothing"
+			)
+
+		self.que.to_run.insert(0, info)
 		self.que.save_state()
 		self.print_v(f"Recovering in mode: {o_setting}\n")
-    
-		if o_setting == 'sWatch':
-			self.start_n_watch()
-		elif o_setting == 'sMonitor':
-			self.start_n_monitor()
-		
-			
 
-		
+		if o_setting == "sWatch":
+			self.start_n_watch()
+		elif o_setting == "sMonitor":
+			self.start_n_monitor()
+
 
 class queShell(cmdLib.Cmd):
 	intro = "queShell: Type help or ? to list commands.\n"
 	prompt = "(que)$ "
-	avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys()) 
-	
+	avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
+
 	def __init__(
 		self,
 		dn_name: str = DN_NAME,
@@ -984,7 +1128,9 @@ class queShell(cmdLib.Cmd):
 	) -> None:
 		super().__init__()
 		self.que = que(run_path, verbose)
-		self.tmux_man = tmux_manager(wr_name=wr_name, dn_name=dn_name, sesh_name=sesh_name, exec_path=exec_path)
+		self.tmux_man = tmux_manager(
+			wr_name=wr_name, dn_name=dn_name, sesh_name=sesh_name, exec_path=exec_path
+		)
 		check = self.tmux_man.check_tmux_session()
 		if check is None:
 			check = self.tmux_man.setup_tmux_session()
@@ -1016,7 +1162,6 @@ class queShell(cmdLib.Cmd):
 
 		if not parsed_args.no_save:
 			self.do_save(arg)
-			self.que.print_v("Changes saved")
 		else:
 			self.que.print_v("Exiting without saving")
 
@@ -1036,10 +1181,12 @@ class queShell(cmdLib.Cmd):
 
 	def do_save(self, arg):
 		"""Save state of que to queRuns.json"""
+		self.que.print_v("Que saved to file")
 		self.que.save_state()
 
 	def do_load(self, arg):  # happens automatically anyway
 		"""Load state of que from queRuns.json"""
+		self.que.print_v("Que loaded from file")
 		self.que.load_state()
 
 	def do_clear(self, arg):
@@ -1081,7 +1228,10 @@ class queShell(cmdLib.Cmd):
 			return
 
 		self.que.move(
-			parsed_args.o_location, parsed_args.n_location, parsed_args.oi_index, parsed_args.of_index
+			parsed_args.o_location,
+			parsed_args.n_location,
+			parsed_args.oi_index,
+			parsed_args.of_index,
 		)
 
 	def do_create(self, arg):
@@ -1100,66 +1250,63 @@ class queShell(cmdLib.Cmd):
 			print("Create cancelled (by user)")
 			return
 
-		self.que.create_run(admin_info,wandb_info)
+		self.que.create_run(admin_info, wandb_info)
 
 	# process based functions
 
-	#tmux
+	# tmux
 	def do_attach(self, arg):
 		"""Attaches to one of the validated tmux sessions"""
 		parsed_args = self._parse_args_or_cancel("attach", arg)
 		if parsed_args is None:
-			return 
-		
+			return
+
 		self.tmux_man.join_session(parsed_args.window)
 
 	def do_daemon(self, arg):
 		"""Start the daemon with the given setting"""
 		parsed_args = self._parse_args_or_cancel("daemon", arg)
 		if parsed_args is None:
-			return 
-		
+			return
+
 		add_args = []
-		if parsed_args.setting == 'recover':
-			add_args.append(f' -os {parsed_args.o_setting}')
+		if parsed_args.setting == "recover":
+			add_args.append(f" -os {parsed_args.o_setting}")
 			if parsed_args.run_id:
-				add_args.append(f' -ri {parsed_args.run_id}')
-  		
+				add_args.append(f" -ri {parsed_args.run_id}")
+
 		ext_args = None if len(add_args) == 0 else add_args
-    
+
 		self.tmux_man.start(self.dn_name, parsed_args.setting, ext_args=ext_args)
-  
+
 	def do_worker(self, arg):
 		"""Start the worker with the given setting"""
 		parsed_args = self._parse_args_or_cancel("worker", arg)
 		if parsed_args is None:
-			return 
-		
+			return
+
 		self.tmux_man.start(self.wr_name, parsed_args.setting)
 
 	# helper functions
 
 	def _apply_synonyms(self, parsed_args):
 		"""Apply synonyms to location arguments"""
-		
-		if hasattr(parsed_args, 'o_location'):
+
+		if hasattr(parsed_args, "o_location"):
 			parsed_args.o_location = SYNONYMS.get(
-				parsed_args.o_location.lower(), 
-				parsed_args.o_location
+				parsed_args.o_location.lower(), parsed_args.o_location
 			)
-		
-		if hasattr(parsed_args, 'n_location'):
+
+		if hasattr(parsed_args, "n_location"):
 			parsed_args.n_location = SYNONYMS.get(
-				parsed_args.n_location.lower(), 
-				parsed_args.n_location
+				parsed_args.n_location.lower(), parsed_args.n_location
 			)
-		
-		if hasattr(parsed_args, 'location'):
+
+		if hasattr(parsed_args, "location"):
 			parsed_args.location = SYNONYMS.get(
-				parsed_args.location.lower(), 
-				parsed_args.location
+				parsed_args.location.lower(), parsed_args.location
 			)
-		
+
 		return parsed_args
 
 	def _parse_args_or_cancel(self, cmd: str, arg: str) -> Optional[argparse.Namespace]:
@@ -1191,7 +1338,7 @@ class queShell(cmdLib.Cmd):
 			"move": self._get_move_parser,
 			"attach": self._get_attach_parser,
 			"daemon": self._get_daemon_parser,
-			"worker": self._get_worker_parser
+			"worker": self._get_worker_parser,
 		}
 
 		if cmd in parsers:
@@ -1199,53 +1346,48 @@ class queShell(cmdLib.Cmd):
 			# assert isinstance(parser, argparse.ArgumentParser), f"{cmd} parser invalid"
 			return parser
 		return None
-	
+
 	def _get_daemon_parser(self) -> argparse.ArgumentParser:
 		"""Get parser for daemon command"""
 		parser = argparse.ArgumentParser(
 			description="Start the que daemon with a given setting", prog="daemon"
 		)
 		parser.add_argument(
-			'setting',
-			choices=['sWatch', 'sMonitor','monitorO', 'idle', 'idle_log'],
-			help='Operation of daemon:  worker here, worker in seperate window, tail log file, worker idle here, worker idle and log'
+			"setting",
+			choices=["sWatch", "sMonitor", "monitorO", "idle", "idle_log"],
+			help="Operation of daemon:  worker here, worker in seperate window, tail log file, worker idle here, worker idle and log",
 		)
 		parser.add_argument(
-			'-re',
-			'--recover',
-			action='store_true',
-			help='Recover from run failure'
+			"-re", "--recover", action="store_true", help="Recover from run failure"
 		)
 		parser.add_argument(
-			'-ri',
-			'--run_id',
+			"-ri",
+			"--run_id",
 			type=str,
-			help='The run id, if needed. Otherwise keeps the run id written to Temp',
-			default=None
+			help="The run id, if needed. Otherwise keeps the run id written to Temp",
+			default=None,
 		)
 		return parser
-	
+
 	def _get_worker_parser(self) -> argparse.ArgumentParser:
 		"""Get parser for worker command"""
 		parser = argparse.ArgumentParser(
 			description="Start the que worker with a given setting", prog="worker"
 		)
 		parser.add_argument(
-			'setting',
-			choices=['work', 'idle', 'idle_log', 'idle_gpu'],
-			help='Operation of worker: do its main job, idle here, idle in log, idle on GPU'
+			"setting",
+			choices=["work", "idle", "idle_log", "idle_gpu"],
+			help="Operation of worker: do its main job, idle here, idle in log, idle on GPU",
 		)
 		return parser
-	
+
 	def _get_attach_parser(self) -> argparse.ArgumentParser:
 		"""Get parser for attach command"""
 		parser = argparse.ArgumentParser(
 			description="Attach to the daemon or worker tmux session"
 		)
 		parser.add_argument(
-			'window',
-			choices=['worker', 'daemon'],
-			help='Tmux window to attach to'
+			"window", choices=["worker", "daemon"], help="Tmux window to attach to"
 		)
 		return parser
 
@@ -1264,8 +1406,10 @@ class queShell(cmdLib.Cmd):
 		parser.add_argument(
 			"-of",
 			"--of_index",
-			type=int, help="Final original index if specifying a range",
-			required=False, default=None
+			type=int,
+			help="Final original index if specifying a range",
+			required=False,
+			default=None,
 		)
 		return parser
 
@@ -1332,13 +1476,14 @@ if __name__ == "__main__":
 	# 	print(e.stderr)
 	# place lock on queRuns.json
 
-	lock = FileLock(f"{RUN_PATH}.lock", timeout=1)
-	try:
-		with lock:
-			# print(f"Acquired lock on {RUN_PATH}")
-			queShell().cmdloop()
-	except TimeoutError:
-		print(f"Error: {RUN_PATH} is currently in used by another user")
-		sys.exit(1)
-	
-		# print(f"Released lock on {RUN_PATH}")
+	# lock = FileLock(f"{RUN_PATH}.lock", timeout=1)
+	# try:
+	#     with lock:
+	#         # print(f"Acquired lock on {RUN_PATH}")
+	#         queShell().cmdloop()
+	# except TimeoutError:
+	#     print(f"Error: {RUN_PATH} is currently in used by another user")
+	#     sys.exit(1)
+
+	# print(f"Released lock on {RUN_PATH}")
+	queShell().cmdloop()
