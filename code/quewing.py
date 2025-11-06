@@ -25,7 +25,7 @@ import torch
 
 # locals
 import configs
-from configs import ExperimentInfo, CompletedExpInfo, WandbInfo, AdminInfo
+from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo
 import utils
 from utils import gpu_manager
 from training import train_loop, wandb_manager
@@ -53,13 +53,12 @@ SYNONYMS = {
 	"or": "old_runs",
 }
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs"]
-QueRun: TypeAlias = Union[ExperimentInfo, CompletedExpInfo]
 
 
 class AllRuns(TypedDict):
-	old_runs: List[QueRun]
-	cur_run: List[QueRun]
-	to_run: List[QueRun]
+	old_runs: List[ExpInfo]
+	cur_run: List[ExpInfo]
+	to_run: List[ExpInfo]
 
 
 def retrieve_Data(path: Path) -> Any:
@@ -97,9 +96,9 @@ class que:
 		self.lock: FileLock = FileLock(self.lock_file, timeout=30)
 		self.imp_splits: List[str] = configs.get_avail_splits()
 		self.verbose: bool = verbose
-		self.old_runs: List[QueRun] = []
-		self.cur_run: List[QueRun] = []
-		self.to_run: List[QueRun] = []
+		self.old_runs: List[ExpInfo] = []
+		self.cur_run: List[ExpInfo] = []
+		self.to_run: List[ExpInfo] = []
 		self.auto_save: bool = auto_save
 		self.load_state()
 
@@ -133,9 +132,9 @@ class que:
 		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
 
 		Raises:
-						QueEmpty: If to_run is empty
-						QueBusy: If cur_run is full
-						Timeout: If cannot acquire file lock
+										QueEmpty: If to_run is empty
+										QueBusy: If cur_run is full
+										Timeout: If cannot acquire file lock
 		"""
 		with self.lock:
 			self._load_Que()
@@ -159,8 +158,8 @@ class que:
 		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
 
 		Raises:
-						QueEmpty: If cur_run is empty
-						Timeout: If cannot acquire file lock
+										QueEmpty: If cur_run is empty
+										Timeout: If cannot acquire file lock
 		"""
 		with self.lock:
 			self._load_Que()
@@ -174,27 +173,52 @@ class que:
 			self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
 			self._save_Que()
 
-	def _get_run(self, loc: QueLocation, idx: int) -> QueRun:
+	def _get_run(self, loc: QueLocation, idx: int) -> ExpInfo:
 		"""Get a specified run from the given location
 
 		Args:
-						loc (QueLocation): Location, to_run, cur_run or old_runs
-						idx (int): Index of run in location
+										loc (QueLocation): Location, to_run, cur_run or old_runs
+										idx (int): Index of run in location
 
 		Returns:
-						QueRun: The specified run config
+										QueRun: The specified run config
 		"""
 		to_get = self.fetch_state(loc)
 		if len(to_get) < abs(idx):
-			raise ValueError(f"The provided index: {idx} is out of range for the given location: {loc}")
+			raise ValueError(
+				f"The provided index: {idx} is out of range for the given location: {loc}"
+			)
 		return to_get.pop(idx)
 
-	def get_cur_run(self) -> CompletedExpInfo:
-		return self._get_run('cur_run', 0)
+	def _set_run(self, loc: QueLocation, idx: int, run: ExpInfo):
+		"""Set a run at a specified location and index
 
+		Args:
+			loc (QueLocation): to_run, cur_run or old_runs
+			idx (int): New index, must be within [-len(loc), len(loc)]
+			run (ExpInfo): Experiment info to add to loc
 
+		Raises:
+			ValueError: If idx not in [-len(loc), len(loc)]
+		"""
+		to_set = self.fetch_state(loc)
+		if len(to_set) < abs(idx):
+			raise ValueError(f'Index: {idx} out of range for len({loc}) = {len(to_set)}')
+		to_set.insert(idx, run)
+  
+	def get_cur_run(self) -> ExpInfo:
+		"""Get the run stored in cur_run (assumes 1)"""
+		try:
+			return self._get_run("cur_run", 0)
+		except ValueError:
+			raise ValueError("Can't get next run because cur_run is empty")
+
+	def set_cur_run(self, run: ExpInfo):
+		"""Set the run in cur_run (assumes 1)"""
+		self._set_run("cur_run", 0, run)
+  
 	@classmethod
-	def get_config(cls, next_run: QueRun) -> str:
+	def get_config(cls, next_run: ExpInfo) -> str:
 		admin = next_run["admin"]
 		return admin["config_path"]
 
@@ -213,7 +237,7 @@ class que:
 		with self.lock:
 			self._load_Que()
 
-	def fetch_state(self, loc: QueLocation) -> List[QueRun]:
+	def fetch_state(self, loc: QueLocation) -> List[ExpInfo]:
 		"""Return reference to the specified list"""
 		if loc == TO_RUN:
 			return self.to_run
@@ -222,40 +246,21 @@ class que:
 		else:
 			return self.old_runs
 
-	# def get_next_run(self) -> Optional[ExperimentInfo]:
-	# 	"""Retrieves the next run from the que, and saves state"""
-	# 	self.load_state()
-	# 	if self.to_run:
-	# 		next_run = self.to_run.pop(0)
-	# 		self.save_state()
-	# 		self.print_v(f"Retrieved next run: {self.run_str(self.run_sum(next_run))}")
-	# 		return next_run
-	# 	else:
-	# 		self.print_v("No runs in the queue.")
-	# 		return
-
-	# def store_old_run(self, old_run: CompletedExpInfo):
-	# 	"""Saves run to OLD_RUNS, and save state"""
-	# 	self.load_state()
-	# 	self.old_runs.insert(0, old_run)
-	# 	self.save_state()
-	# 	self.print_v("Saved to old_runs")
-
-	def run_sum(self, run: QueRun, exc: Optional[List[str]] = None) -> Dict[str, str]:
+	def run_sum(self, run: RunInfo, exc: Optional[List[str]] = None) -> Dict[str, str]:
 		"""Extract key details from a run configuration.
 
 		Args:
-						run: Dictionary containing run configuration with admin details
-						exc: Optional list of keys to exclude from the summary
+										run: Dictionary containing run configuration with admin details
+										exc: Optional list of keys to exclude from the summary
 
 		Returns:
-						Dictionary with model, exp_no, split, and config_path
+										Dictionary with model, exp_no, split, and config_path
 		"""
 		admin = run["admin"]
 
 		dic = {}
 
-		if "wandb" in run and run["wandb"] is not None:
+		if "wandb" in run and run["wandb"]["run_id"] is not None:
 			dic["run_id"] = run["wandb"]["run_id"]
 
 		dic.update(
@@ -275,15 +280,15 @@ class que:
 		return dic
 
 	def get_runs_info(
-		self, run_confs: List[QueRun]
+		self, run_confs: List[ExpInfo]
 	) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
 		"""Get summarised run info, and stats for printing
 
 		Args:
-																		run_confs (List[Dict]): A list of run configs (to_run or old_runs)
+																																		run_confs (List[Dict]): A list of run configs (to_run or old_runs)
 
 		Returns:
-																		Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
+																																		Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
 		"""
 
 		runs_info = [self.run_sum(run) for run in run_confs]
@@ -295,7 +300,7 @@ class que:
 
 		stats = {}
 
-		if "run_id" in runs_info[0] and runs_info[0]['run_id'] is not None:
+		if "run_id" in runs_info[0] and runs_info[0]["run_id"] is not None:
 			max_id = max(len(r["run_id"]) for r in runs_info)
 			stats["max_id"] = max_id
 
@@ -311,11 +316,11 @@ class que:
 		"""Convert a run to summarised string representation
 
 		Args:
-																		r_info (Dict): Summarised run info.
-																		stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+																																		r_info (Dict): Summarised run info.
+																																		stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
 
 		Returns:
-																		str: Summarised string representation of run info
+																																		str: Summarised string representation of run info
 		"""
 
 		if stats is None:
@@ -355,11 +360,11 @@ class que:
 		"""Summarise to a list of runs, in a given location
 
 		Args:
-																		loc (QueLocation): Location to list
-																		disp (bool, optional): Print list, with indexes. Defaults to False.
+																																		loc (QueLocation): Location to list
+																																		disp (bool, optional): Print list, with indexes. Defaults to False.
 
 		Returns:
-																		List[str]: Summarised run info
+																																		List[str]: Summarised run info
 		"""
 
 		to_disp = self.fetch_state(loc)
@@ -390,8 +395,8 @@ class que:
 
 		return conf_list
 
-	def _is_dup_exp(self, new_run: Union[ExperimentInfo, CompletedExpInfo]) -> bool:
-		"""Check if new_run already exists in to_run or old_runs"""
+	def _is_dup_exp(self, new_run: RunInfo) -> bool:
+		"""Check if new_run already exists in to_run or old_runs (ignores run_id and config_path)"""
 		exc = ["run_id", "config_path"]
 		new_sum = self.run_sum(new_run, exc)
 
@@ -409,13 +414,13 @@ class que:
 		"""Create and add a new training run entry
 
 		Args:
-																		arg_dict (dict): Arguments used by training function
-																		tags (list[str]): Wandb tags
-																		output (str): Experiment directory
-																		save_path (str): Checkpoint directory
-																		project (str): Wandb project
-																		entity (str): Wandb entity
-																		ask (bool, optional): Pre-check run before creation. Defaults to True.
+																																		arg_dict (dict): Arguments used by training function
+																																		tags (list[str]): Wandb tags
+																																		output (str): Experiment directory
+																																		save_path (str): Checkpoint directory
+																																		project (str): Wandb project
+																																		entity (str): Wandb entity
+																																		ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
 
 		try:
@@ -446,20 +451,20 @@ class que:
 			proceed = True
 
 		if proceed:
-			config = cast(CompletedExpInfo, config | {"wandb": wandb_dict})
+			config = cast(ExpInfo, config | {"wandb": wandb_dict})
 
 			self.to_run.append(config)
 			self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
 		else:
 			self.print_v("Training cancelled by user")
 
-	def remove_run(self, loc: QueLocation, idx: int) -> Optional[QueRun]:
+	def remove_run(self, loc: QueLocation, idx: int) -> Optional[ExpInfo]:
 		"""Removes a run from the que
 		Args:
-																		loc: TO_RUN or OLD_RUNS
-																		idx: index of run
+																																		loc: TO_RUN or OLD_RUNS
+																																		idx: index of run
 		Returns:
-																		rem: the removed run, if successful"""
+																																		rem: the removed run, if successful"""
 
 		to_remove = self.fetch_state(loc)
 
@@ -472,24 +477,23 @@ class que:
 	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int):
 		"""Repositions a run from the que
 		Args:
-																		loc: TO_RUN or OLD_RUNS
-																		o_idx: original index of run
-																		n_idx: new index of run
+																																		loc: TO_RUN or OLD_RUNS
+																																		o_idx: original index of run
+																																		n_idx: new index of run
 		"""
 
 		to_shuffle = self.fetch_state(loc)
-		if len(to_shuffle) == 0:
-			print(f"{loc} is empty")
-			return
 
-		if abs(o_idx) < len(to_shuffle):
-			srun = to_shuffle.pop(o_idx)
-		else:
-			print(f"{o_idx} out of range for len({loc}) - 1 = {len(to_shuffle) - 1}")
-			return
+		try:
+			srun = self._get_run(loc, o_idx)
+		except ValueError as e:
+			print(f"Warning: {e}")
+			return	
 
-		if not abs(n_idx) <= len(to_shuffle):
-			print(f"Warning: {n_idx} out of range for len({loc}) = {len(to_shuffle)}")
+		try:
+			self._set_run(loc, n_idx, srun)
+		except ValueError as e:
+			print(f"Warning: {e}")
 
 		to_shuffle.insert(n_idx, srun)
 
@@ -505,30 +509,28 @@ class que:
 		"""Moves a run between locations in que (at beginning)
 
 		Args:
-																		o_loc (QueLocation): Old location
-																		n_loc (QueLocation): New location
-																		oi_idx (int): Old initial index
-																		of_idx (int): Old final index, if specifying a range.
+																																		o_loc (QueLocation): Old location
+																																		n_loc (QueLocation): New location
+																																		oi_idx (int): Old initial index
+																																		of_idx (int): Old final index, if specifying a range.
 		"""
 
 		old_location = self.fetch_state(o_loc)
 		new_location = self.fetch_state(n_loc)
 
 		if of_idx is None:
-			if abs(oi_idx) < len(old_location):
-				run = old_location.pop(oi_idx)
-			else:
-				print(
-					f"{oi_idx} is out of range. Length of {o_loc} is only: {len(old_location)}"
-				)
-				return
+			try:
+				run = self._get_run(o_loc, oi_idx)
+			except ValueError as e:
+				print(f"Warning: {e}")
+				return	
 
-			new_location.insert(0, run)
+			self._set_run(n_loc, 0, run)
 
 		else:
 			if abs(oi_idx) < len(old_location) and abs(of_idx) < len(old_location):
 				tomv = []
-				for i in range(oi_idx, of_idx + 1):
+				for _ in range(oi_idx, of_idx + 1):
 					tomv.append(old_location.pop(oi_idx))
 			else:
 				print(
@@ -543,6 +545,11 @@ class que:
 
 		self.list_runs(n_loc, disp=self.verbose)
 
+	def recover_run(self):
+		"""Set the run in cur_run to recover"""
+		info = self.get_cur_run()
+		info['admin']['recover'] = True
+		self.set_cur_run(info)
 
 class tmux_manager:
 	def __init__(
@@ -565,7 +572,7 @@ class tmux_manager:
 		"""Create the que_training tmux session is set up, with windows daemon and worker
 
 		Returns:
-						Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
+										Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
 		"""
 
 		create_sesh_cmd = [
@@ -608,7 +615,7 @@ class tmux_manager:
 		"""Verify that the que_training tmux session is set up, with windows daemon and worker
 
 		Returns:
-						Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
+										Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
 		"""
 		window_names = [self.dn_name, self.wr_name]
 		results = []
@@ -658,11 +665,11 @@ class tmux_manager:
 		"""Send a command to the given window
 
 		Args:
-						cmd (str): The command as you would type in the terminal
-						wndw (str): The tmux window
+										cmd (str): The command as you would type in the terminal
+										wndw (str): The tmux window
 
 		Returns:
-						Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
+										Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
 		"""
 		avail_wndws = [self.dn_name, self.wr_name]
 		if wndw not in avail_wndws:
@@ -690,14 +697,14 @@ class tmux_manager:
 		"""Wrapper for send, specialised to starting the worker or daemon
 
 		Args:
-						mode (str): The mode for quefeather (worker or daemon)
-						setting (str): The setting for the given mode (e.g. sMonitor)
+										mode (str): The mode for quefeather (worker or daemon)
+										setting (str): The setting for the given mode (e.g. sMonitor)
 
 		Raises:
-						ValueError: If mode is not the same as the initialised self variable
+										ValueError: If mode is not the same as the initialised self variable
 
 		Returns:
-						Optional[subprocess.CompletedProcess[bytes]]: The output of the completed process if successful, otherwise None.
+										Optional[subprocess.CompletedProcess[bytes]]: The output of the completed process if successful, otherwise None.
 		"""
 		add_args = [] if ext_args is None else ext_args
 
@@ -736,14 +743,8 @@ class worker:
 	def work(self):
 		gpu_manager.wait_for_completion()
 
-		#get the next run
-		info = self.que.get_run('cur_run', 0)
-
-		if not info:
-			# empty temp file
-			raise ValueError(
-				f"Tried to read next run from {self.temp_path} but it was empty"
-			)
+		# get the next run
+		info = self.que.get_cur_run()
 
 		wandb_info = info["wandb"]
 		entity = wandb_info["entity"]
@@ -772,12 +773,12 @@ class worker:
 				resume="must",
 				name=run_name,
 				tags=tags,
-				config=info,
+				config=cast(Dict[str, Any], info) #cast to regular for wandb,
 			)
 		else:
 			self.print_v(f"Starting new run with name: {run_name}")
 			run = wandb.init(
-				entity=entity, project=project, name=run_name, tags=tags, config=info
+				entity=entity, project=project, name=run_name, tags=tags, config=cast(Dict[str, Any], info) #cast to regular for wandb
 			)
 
 		# save run_id for recovering
@@ -785,7 +786,7 @@ class worker:
 		info["wandb"] = wandb_info
 
 		self.print_v("writing my id to temp file")
-		store_Data(self.temp_path, info)
+		self.que.set_cur_run(info)
 
 		self.print_v(f"Run ID: {run.id}")
 		self.print_v(f"Run name: {run.name}")  # Human-readable name
@@ -869,16 +870,16 @@ class daemon:
 	while the worker outputs to a log file.
 
 	Args:
-																	name: of own tmux window
-																	wr_name: of worker tmux window (monitor)
-																	sesh: tmux session name
-																	runs_path: to queRuns.json
-																	temp_path: to queTemp.json
-																	imp_path: to implemented_info.json
-																	exec_path: to quefeather.py
-																	verbose: speaks to you
-																	wr: supply its worker
-																	q: supply its que
+																																	name: of own tmux window
+																																	wr_name: of worker tmux window (monitor)
+																																	sesh: tmux session name
+																																	runs_path: to queRuns.json
+																																	temp_path: to queTemp.json
+																																	imp_path: to implemented_info.json
+																																	exec_path: to quefeather.py
+																																	verbose: speaks to you
+																																	wr: supply its worker
+																																	q: supply its que
 	"""
 
 	def __init__(
@@ -924,7 +925,7 @@ class daemon:
 		if self.verbose:
 			print(message)
 
-	def seperator(self, run: QueRun) -> str:
+	def seperator(self, run: ExpInfo) -> str:
 		sep = ""
 		r_str = self.que.run_str(self.que.run_sum(run))
 
@@ -955,7 +956,7 @@ class daemon:
 				break
 
 			# print seperator
-			run = self.que.get_run("cur_run", 0)
+			run = self.que.get_cur_run()
 			self.print_v(self.seperator(run))
 
 			# start worker with process output here
@@ -989,7 +990,7 @@ class daemon:
 				)
 				break
 
-			run = self.que.get_run("cur_run", 0)
+			run = self.que.get_cur_run()
 			self.print_v(self.seperator(run))
 
 			# Start process in background
@@ -1093,18 +1094,7 @@ class daemon:
 				f"Setting: {o_setting} is not one of available settings: {', '.join(av_set)}"
 			)
 
-		info = retrieve_Data(self.temp_path)
-		if run_id:
-			info["wandb"]["run_id"] = run_id
-
-		info["admin"]["recover"] = True
-
-		if not info:
-			raise ValueError(
-				f"Tried to read info from {self.temp_path} but found nothing"
-			)
-
-		self.que.to_run.insert(0, info)
+		self.que.recover_run()
 		self.que.save_state()
 		self.print_v(f"Recovering in mode: {o_setting}\n")
 
@@ -1280,10 +1270,10 @@ class queShell(cmdLib.Cmd):
 
 		ext_args = None if len(add_args) == 0 else add_args
 
-		#make sure que is consistent before and after starting daemon
-		self.do_save('')
+		# make sure que is consistent before and after starting daemon
+		self.do_save("")
 		self.tmux_man.start(self.dn_name, parsed_args.setting, ext_args=ext_args)
-		self.do_load('')
+		self.do_load("")
 
 	def do_worker(self, arg):
 		"""Start the worker with the given setting"""
