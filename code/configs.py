@@ -69,8 +69,8 @@ class WandbInfo(TypedDict):
 	project: str
 	tags: List[str]
 	run_id: Optional[str]
-	
-class ExperimentInfo(TypedDict):
+
+class RunInfo(TypedDict):
 	admin: AdminInfo
 	training: TrainingInfo
 	optimizer: OptimizerInfo
@@ -78,9 +78,10 @@ class ExperimentInfo(TypedDict):
 	data: DataInfo
 	scheduler: Optional[SchedulerInfo]
 	early_stopping: Optional[StopperOn]
- 
-class CompletedExpInfo(ExperimentInfo):
-    wandb: Optional[WandbInfo]
+
+class ExpInfo(RunInfo):
+	wandb: WandbInfo #NOTE: make wandb optional?
+
 
 ####################### Utility functions ##############################
 
@@ -210,7 +211,7 @@ def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
 
 	return wandb_config
 
-def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
+def _to_exp_info(config: Dict[str, Any]) -> ExpInfo:
 	"""Convert raw config to typed ExperimentInfo"""
 	
 	# Optional sections with None default
@@ -231,14 +232,15 @@ def _to_exp_info(config: Dict[str, Any]) -> ExperimentInfo:
 			min_delta=config['early_stopping']['min_delta']
 		)
 	
-	return ExperimentInfo(
+	return ExpInfo(
 		admin=AdminInfo(**config['admin']),
 		training=TrainingInfo(**config['training']),
 		optimizer=OptimizerInfo(**config['optimizer']),  # Shorthand if keys match exactly
 		model_params=Model_paramsInfo(**config['model_params']),
 		data=DataInfo(**config['data']),
 		scheduler=scheduler,
-		early_stopping=early_stopping
+		early_stopping=early_stopping,
+		wandb=WandbInfo(**config['wandb'])
 	)
 
 def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:
@@ -248,7 +250,7 @@ def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:
 	)
 	return conf
 
-def load_config(admin: AdminInfo) -> ExperimentInfo:
+def load_config(admin: AdminInfo) -> RunInfo:
 	"""Load config from flat file and merge with command line args
 
 	Args:
@@ -271,12 +273,12 @@ def load_config(admin: AdminInfo) -> ExperimentInfo:
 	ndict = {"admin": admin}
 	ndict.update(config)
 
-	e_info = _to_exp_info(ndict)
+	r_info = _to_exp_info(ndict)
 
-	_stopper_precheck(e_info.get('early_stopping'))
-	_schedular_precheck(e_info.get('scheduler'))
+	_stopper_precheck(r_info.get('early_stopping'))
+	_schedular_precheck(r_info.get('scheduler'))
  
-	return e_info
+	return r_info
 
 def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> argparse.ArgumentParser:
 	"""Get parser for a training configuration
