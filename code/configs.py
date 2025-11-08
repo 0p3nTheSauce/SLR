@@ -57,8 +57,16 @@ class Model_paramsInfo(TypedDict):
 
 class SchedulerInfo(TypedDict):
 	type: str
-	tmax: int
 	eta_min: float
+ 
+class CosAnealInfo(SchedulerInfo):
+	tmax: int
+ 
+class WarmRestartInfo(SchedulerInfo):
+	t0: int
+	tmult: float
+
+
 
 class DataInfo(TypedDict):
 	num_frames: int
@@ -76,7 +84,7 @@ class RunInfo(TypedDict):
 	optimizer: OptimizerInfo
 	model_params: Model_paramsInfo
 	data: DataInfo
-	scheduler: Optional[SchedulerInfo]
+	scheduler: Optional[Union[CosAnealInfo, WarmRestartInfo]]
 	early_stopping: Optional[StopperOn]
 
 class ExpInfo(RunInfo):
@@ -211,18 +219,27 @@ def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
 
 	return wandb_config
 
-def _to_exp_info(config: Dict[str, Any]) -> ExpInfo:
+def _to_exp_info(config: Dict[str, Any]) -> RunInfo:
 	"""Convert raw config to typed ExperimentInfo"""
 	
 	# Optional sections with None default
 	scheduler = None
 	if 'scheduler' in config:
-		scheduler = SchedulerInfo(
-			type=config['scheduler']['type'],
-			tmax=config['scheduler']['tmax'],
-			eta_min=config['scheduler']['eta_min']
-		)
-	
+		if config["scheduler"]['type'] == 'CosineAnnealingLR':
+			scheduler = CosAnealInfo(
+				type=config['scheduler']['type'],
+				tmax=config['scheduler']['tmax'],
+				eta_min=config['scheduler']['eta_min']
+			)
+		elif config["scheduler"]['type'] == 'CosineAnnealingWarmRestarts':
+			scheduler = WarmRestartInfo(
+				type=config['scheduler']['type'],
+				t0=config['scheduler']['t0'],
+				tmult=config['scheduler']['tmult'],
+				eta_min=config['scheduler']['eta_min']
+			)
+			
+			
 	early_stopping = None
 	if 'early_stopping' in config:
 		early_stopping = StopperOn(
@@ -232,15 +249,14 @@ def _to_exp_info(config: Dict[str, Any]) -> ExpInfo:
 			min_delta=config['early_stopping']['min_delta']
 		)
 	
-	return ExpInfo(
+	return RunInfo(
 		admin=AdminInfo(**config['admin']),
 		training=TrainingInfo(**config['training']),
 		optimizer=OptimizerInfo(**config['optimizer']),  # Shorthand if keys match exactly
 		model_params=Model_paramsInfo(**config['model_params']),
 		data=DataInfo(**config['data']),
 		scheduler=scheduler,
-		early_stopping=early_stopping,
-		wandb=WandbInfo(**config['wandb'])
+		early_stopping=early_stopping
 	)
 
 def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:

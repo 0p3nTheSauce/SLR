@@ -109,8 +109,6 @@ class QueBusy(Exception):
 	def __init__(self, message: str = "There is already a run in cur_run"):
 		super().__init__(message)
 
-
-# NOTE: at some point it might be nice to do away with the temp file
 class que:
 	def __init__(
 		self, runs_path: str | Path, verbose: bool = True, auto_save: bool = False
@@ -126,6 +124,20 @@ class que:
 		self.fail_runs: List[FailedExp] = []
 		self.auto_save: bool = auto_save
 		self.load_state()
+
+	def print_v(self, message: str) -> None:
+		"""Prints a message if verbose is True."""
+		if self.verbose:
+			print(message)
+
+	def fetch_state(self, loc: QueLocation) -> List[ExpInfo]:
+		"""Return reference to the specified list"""
+		if loc == TO_RUN:
+			return self.to_run
+		elif loc == CUR_RUN:
+			return self.cur_run
+		else:
+			return self.old_runs
 
 	def _load_Que(self):
 		"""Read que from file"""
@@ -194,71 +206,6 @@ class que:
 			raise QueIdxOOR(loc, idx, len(to_set))
 		to_set.insert(idx, run)
 
-	def stash_next_run(self) -> None:
-		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
-
-		Raises:
-																		QueEmpty: If to_run is empty
-																		QueBusy: If cur_run is full
-																		Timeout: If cannot acquire file lock
-		"""
-		with self.lock:
-			self._load_Que()
-
-			# empty to run
-			if len(self.to_run) == 0:
-				raise QueEmpty(f"Can't get next run, no runs in {TO_RUN}")
-
-			# full cur_run
-			if (
-				len(self.cur_run) != 0
-			):  # NOTE at some point it might be possible to have multiple busy operations
-				raise QueBusy(f"Can't stash next run, there is something in {CUR_RUN}")
-
-			next_run = self.to_run.pop(0)
-			self.cur_run.append(next_run)
-			self.print_v(f"Stashed next run: {self.run_str(self.run_sum(next_run))}")
-			self._save_Que()
-
-	def store_fin_run(self):
-		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
-
-		Raises:
-																		QueEmpty: If cur_run is empty
-																		Timeout: If cannot acquire file lock
-		"""
-		with self.lock:
-			self._load_Que()
-
-			# empty cur_run
-			if len(self.to_run) == 0:
-				raise QueEmpty(f"Can't move run in {CUR_RUN} because it's empty")
-
-			fin_run = self.cur_run.pop(-1)
-			self.old_runs.insert(0, fin_run)
-			self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
-			self._save_Que()
-
-	
-
-	def get_cur_run(self) -> ExpInfo:
-		"""Get the run stored in cur_run (assumes 1)"""
-		return self._get_run("cur_run", 0)
-
-	def set_cur_run(self, run: ExpInfo):
-		"""Set the run in cur_run (assumes 1)"""
-		self._set_run("cur_run", 0, run)
-
-	@classmethod
-	def get_config(cls, next_run: ExpInfo) -> str:
-		admin = next_run["admin"]
-		return admin["config_path"]
-
-	def print_v(self, message: str) -> None:
-		"""Prints a message if verbose is True."""
-		if self.verbose:
-			print(message)
-
 	def save_state(self):
 		"""Saves state to Runs.jso, with filelock"""
 		with self.lock:
@@ -269,14 +216,67 @@ class que:
 		with self.lock:
 			self._load_Que()
 
-	def fetch_state(self, loc: QueLocation) -> List[ExpInfo]:
-		"""Return reference to the specified list"""
-		if loc == TO_RUN:
-			return self.to_run
-		elif loc == CUR_RUN:
-			return self.cur_run
-		else:
-			return self.old_runs
+	def stash_next_run(self) -> None:
+		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
+
+		Raises:
+																		QueEmpty: If to_run is empty
+																		QueBusy: If cur_run is full
+																		Timeout: If cannot acquire file lock
+		"""
+		self._load_Que()
+
+		# empty to run
+		if len(self.to_run) == 0:
+			raise QueEmpty(f"Can't get next run, no runs in {TO_RUN}")
+
+		# full cur_run
+		if (
+			len(self.cur_run) != 0
+		):  # NOTE at some point it might be possible to have multiple busy operations
+			raise QueBusy(f"Can't stash next run, there is something in {CUR_RUN}")
+
+		next_run = self.to_run.pop(0)
+		self.cur_run.append(next_run)
+		self.print_v(f"Stashed next run: {self.run_str(self.run_sum(next_run))}")
+		self._save_Que()
+
+	def store_fin_run(self):
+		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
+
+		Raises:
+																		QueEmpty: If cur_run is empty
+																		Timeout: If cannot acquire file lock
+		"""
+		# empty cur_run
+		if len(self.cur_run) == 0:
+			raise QueEmpty(f"Can't move run in {CUR_RUN} because it's empty")
+
+		fin_run = self.cur_run.pop(0)
+		self.old_runs.insert(0, fin_run)
+		self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
+		self._save_Que()
+
+	def get_cur_run(self) -> ExpInfo:
+		"""Get the run stored in cur_run (assumes 1)"""
+		return self._get_run("cur_run", 0)
+
+	def set_cur_run(self, run: ExpInfo):
+		"""Set the run in cur_run (assumes 1)"""
+		self._set_run("cur_run", 0, run)
+   
+	def stash_failed_run(self, error: str) -> None:
+		"""Move a run to the failed que"""
+		run = self._get_run("cur_run", 0)
+		failed = cast(FailedExp, run | {"error": error})
+		self.fail_runs.append(failed)
+  
+	#summarisation
+
+	@classmethod
+	def get_config(cls, next_run: ExpInfo) -> str:
+		admin = next_run["admin"]
+		return admin["config_path"]
 
 	def run_sum(self, run: RunInfo, exc: Optional[List[str]] = None) -> Dict[str, str]:
 		"""Extract key details from a run configuration.
@@ -292,8 +292,12 @@ class que:
 
 		dic = {}
 
-		if "wandb" in run and run["wandb"]["run_id"] is not None:
-			dic["run_id"] = run["wandb"]["run_id"]
+		if "wandb" in run:
+			run_id = run["wandb"]["run_id"] 
+			if run_id is None:
+				dic['run_id'] = 'None'
+			else:
+				dic["run_id"] = run_id
 
 		dic.update(
 			{
@@ -329,16 +333,13 @@ class que:
 		max_model = max(len(r["model"]) for r in runs_info)
 		max_exp = max(len(str(r["exp_no"])) for r in runs_info)
 		max_split = max(len(r["split"]) for r in runs_info)
-
-		stats = {}
-
-		if "run_id" in runs_info[0] and runs_info[0]["run_id"] is not None:
-			max_id = max(len(r["run_id"]) for r in runs_info)
-			stats["max_id"] = max_id
-
-		stats.update(
-			{"max_model": max_model, "max_exp": max_exp, "max_split": max_split}
-		)
+		max_id = max(len(r["run_id"]) for r in runs_info)
+		stats =	{
+      		"max_model": max_model,
+        	"max_exp": max_exp,
+         	"max_split": max_split,
+			"max_id" : max_id
+          }
 
 		return runs_info, stats
 
@@ -376,6 +377,17 @@ class que:
 		)
 
 		return r_str
+
+	#for queShell interface
+
+	def recover_run(self) -> None:
+		"""Set the run in cur_run to recover"""
+		try:
+			run = self._get_run("cur_run", 0)
+			run["admin"]["recover"] = True
+			self._set_run("cur_run", 0, run)
+		except Exception as e:
+			self.print_v(str(e))
 
 	def clear_runs(self, loc: QueLocation) -> None:
 		"""reset the runs queue"""
@@ -528,6 +540,7 @@ class que:
 		if of_idx is None:
 			try:
 				self._set_run(n_loc, 0, self._get_run(o_loc, oi_idx))
+				self.print_v("Move successful")
 			except Exception as e:
 				self.print_v(str(e))
 		else:
@@ -552,24 +565,20 @@ class que:
 			for run in tomv:
 				new_location.insert(0, run)
 
-	def recover_run(self) -> None:
-		"""Set the run in cur_run to recover"""
+			self.print_v("multi-move successful")
+
+	def edit_run(self, loc: QueLocation, idx: int, key1: str, value: Any, key2: Optional[str]=None) -> None:
 		try:
-			run = self._get_run("cur_run", 0)
-			run["admin"]["recover"] = True
-			self._set_run("cur_run", 0, run)
+			run = self._get_run(loc, idx)
+			if key2 is not None:
+				run[key1][key2] = value
+			else:
+				run[key1] = value
+			self._set_run(loc, idx, run)
+			self.print_v("Edit successful")
 		except Exception as e:
 			self.print_v(str(e))
    
-	def stash_failed_run(self, error: str) -> None:
-		"""Move a run to the failed que"""
-		try:
-			run = self._get_run("cur_run", 0)
-			failed = cast(FailedExp, run | {"error": error})
-			self.fail_runs.append(failed)
-		except Exception as e:
-			self.print_v(str(e))
-
 class tmux_manager:
 	def __init__(
 		self,
@@ -764,6 +773,7 @@ class worker:
 			gpu_manager.wait_for_completion()
 
 			# get next run
+			self.que.load_state()
 			info = self.que.get_cur_run()
 
 			wandb_info = info["wandb"]
@@ -811,6 +821,7 @@ class worker:
 
 			self.print_v("writing my id to temp file")
 			self.que.set_cur_run(info)
+			self.que.save_state()
 
 			self.print_v(f"Run ID: {run.id}")
 			self.print_v(f"Run name: {run.name}")  # Human-readable name
@@ -819,6 +830,7 @@ class worker:
 			train_loop(admin["model"], run, recover=admin["recover"])
 			run.finish()
 		except Exception as e:
+			#TODO: handle ctrl+c gracefully
 			self.print_v("Training run failed due to an error")
 			self.que.stash_failed_run(str(e))
 			raise e #still need to crash so daemon can 
@@ -1044,6 +1056,7 @@ class daemon:
 					)
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
+    
 				if self.stp_on_fail:
 					self.print_v("Stopping exectuion")
 					break
@@ -1276,6 +1289,18 @@ class queShell(cmdLib.Cmd):
 
 		self.que.create_run(admin_info, wandb_info)
 
+	def do_edit(self, arg):
+		"""Edit a run in a given location"""
+		parsed_args = self._parse_args_or_cancel("edit", arg)
+		if parsed_args is None:
+			return
+
+		self.que.edit_run(parsed_args.location,
+                    	parsed_args.index,
+                     	parsed_args.key1,
+                      	parsed_args.value,
+                       	parsed_args.key2)
+
 	# process based functions
 
 	# tmux
@@ -1368,6 +1393,7 @@ class queShell(cmdLib.Cmd):
 			"attach": self._get_attach_parser,
 			"daemon": self._get_daemon_parser,
 			"worker": self._get_worker_parser,
+			"edit": self._get_edit_parser,
 		}
 
 		if cmd in parsers:
@@ -1496,7 +1522,35 @@ class queShell(cmdLib.Cmd):
 
 		return parser
 
-
+	def _get_edit_parser(self) -> argparse.ArgumentParser:
+		opts_keys = list(map(str, self.que.old_runs[0].keys()))
+		parser = argparse.ArgumentParser(
+			description="Edit run", prog="<edit>"
+		)
+		parser.add_argument(
+			"location", choices=self.avail_locs, help="Location of the run"
+		)
+		parser.add_argument("index", type=int, help="Position of run in location")
+		parser.add_argument(
+			"key1",
+			type=str,
+			help='First key in dictionary',
+			choices=opts_keys,
+		)
+		parser.add_argument(
+			"value",
+			type=str,
+			help='Other types not implemented yet',
+		)
+		parser.add_argument(
+			'-k2',
+			'--key2',
+			type=str,
+			help='Optional second key',
+			default=None
+		)
+  
+		return parser
 
 if __name__ == "__main__":
 	# try:
