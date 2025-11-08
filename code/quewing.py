@@ -14,6 +14,7 @@ from typing import (
 	TypedDict,
 	cast,
 )
+from result import Ok, Err, Result
 import subprocess
 import time
 import cmd as cmdLib
@@ -173,7 +174,8 @@ class que:
 			self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
 			self._save_Que()
 
-	def _get_run(self, loc: QueLocation, idx: int) -> ExpInfo:
+
+	def _get_run(self, loc: QueLocation, idx: int) -> Result[ExpInfo, str]:
 		"""Get a specified run from the given location
 
 		Args:
@@ -181,16 +183,15 @@ class que:
 										idx (int): Index of run in location
 
 		Returns:
-										QueRun: The specified run config
+			Result[ExpInfo, str]: Ok(run) if successful, otherwise Err(str)
 		"""
 		to_get = self.fetch_state(loc)
 		if len(to_get) < abs(idx):
-			raise ValueError(
-				f"The provided index: {idx} is out of range for the given location: {loc}"
-			)
-		return to_get.pop(idx)
-
-	def _set_run(self, loc: QueLocation, idx: int, run: ExpInfo):
+			return Err(f"The provided index: {idx} is out of range for the given location: {loc}")
+		else:
+			return Ok(to_get.pop(idx))
+  
+	def _set_run(self, loc: QueLocation, idx:int, run:ExpInfo) -> Result[None, str]:
 		"""Set a run at a specified location and index
 
 		Args:
@@ -198,21 +199,23 @@ class que:
 			idx (int): New index, must be within [-len(loc), len(loc)]
 			run (ExpInfo): Experiment info to add to loc
 
-		Raises:
-			ValueError: If idx not in [-len(loc), len(loc)]
+		Returns:
+			Result[None, str]: Ok(None) if successful, otherwise Err(str)
 		"""
 		to_set = self.fetch_state(loc)
 		if len(to_set) < abs(idx):
-			raise ValueError(f'Index: {idx} out of range for len({loc}) = {len(to_set)}')
+			return Err(f'Index: {idx} out of range for len({loc}) = {len(to_set)}')
 		to_set.insert(idx, run)
+		return Ok(None)
   
 	def get_cur_run(self) -> ExpInfo:
 		"""Get the run stored in cur_run (assumes 1)"""
-		try:
-			return self._get_run("cur_run", 0)
-		except ValueError:
-			raise ValueError("Can't get next run because cur_run is empty")
-
+		match self._get_run('cur_run', 0):
+			case Ok(run):
+				return run
+			case Err(_):
+				raise ValueError("No current run available")
+  
 	def set_cur_run(self, run: ExpInfo):
 		"""Set the run in cur_run (assumes 1)"""
 		self._set_run("cur_run", 0, run)
@@ -316,11 +319,11 @@ class que:
 		"""Convert a run to summarised string representation
 
 		Args:
-																																		r_info (Dict): Summarised run info.
-																																		stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+			r_info (Dict): Summarised run info.
+			stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
 
 		Returns:
-																																		str: Summarised string representation of run info
+			str: Summarised string representation of run info
 		"""
 
 		if stats is None:
@@ -345,39 +348,31 @@ class que:
 
 		return r_str
 
-	def clear_runs(self, loc: QueLocation):
+	def clear_runs(self, loc: QueLocation) -> Result[str, str]:
 		"""reset the runs queue"""
 		to_clear = self.fetch_state(loc)
 
 		if len(to_clear) > 0:
-			self.print_v(f"{loc} successfully cleared")
+			to_clear = []
+			return Ok(f"{loc} successfully cleared")
 		else:
-			self.print_v(f"{loc} already empty")
-
-		to_clear = []
-
-	def list_runs(self, loc: QueLocation, disp: bool = False) -> List[str]:
+			return Err(f"{loc} already empty")
+			
+	def list_runs(self, loc: QueLocation) -> Result[List[str], str]:
 		"""Summarise to a list of runs, in a given location
 
 		Args:
-																																		loc (QueLocation): Location to list
-																																		disp (bool, optional): Print list, with indexes. Defaults to False.
+			loc (QueLocation): Location to list
+			disp (bool, optional): Print list, with indexes. Defaults to False.
 
 		Returns:
-																																		List[str]: Summarised run info
+			List[str]: Summarised run info
 		"""
 
 		to_disp = self.fetch_state(loc)
 
-		# Nicer header
-		loc_display = loc.replace("_", " ").title()
-
-		if disp:
-			print(f"\n=== {loc_display} ===")
-
 		if len(to_disp) == 0:
-			print("  No runs available\n")
-			return []
+			return Err(" No runs available\n")
 
 		# Extract run info
 		runs_info, stats = self.get_runs_info(to_disp)
@@ -385,16 +380,22 @@ class que:
 		conf_list = []
 		for i, info in enumerate(runs_info):
 			# Format with padding for alignment
-			r_str = self.run_str(info, stats)
-			if disp:
-				print(f"  [{i:2d}] {r_str}")
+			r_str = f"  [{i:2d}] {self.run_str(info, stats)}"
 			conf_list.append(r_str)
 
-		if disp:
-			print()  # Add spacing after list
+		return Ok(conf_list)
 
-		return conf_list
-
+	def disp_runs(self, loc: QueLocation) -> None:
+		# Nicer header
+		loc_display = loc.replace("_", " ").title()
+		print(f"\n=== {loc_display} ===")
+		match self.list_runs(loc):
+			case Err(e):
+				print(e)
+			case Ok(runs):
+				for run in runs:
+					print(run)
+  
 	def _is_dup_exp(self, new_run: RunInfo) -> bool:
 		"""Check if new_run already exists in to_run or old_runs (ignores run_id and config_path)"""
 		exc = ["run_id", "config_path"]
@@ -410,30 +411,26 @@ class que:
 		arg_dict: AdminInfo,
 		wandb_dict: WandbInfo,
 		ask: bool = True,
-	) -> None:
+	) -> Result[str, str]:
 		"""Create and add a new training run entry
 
 		Args:
-																																		arg_dict (dict): Arguments used by training function
-																																		tags (list[str]): Wandb tags
-																																		output (str): Experiment directory
-																																		save_path (str): Checkpoint directory
-																																		project (str): Wandb project
-																																		entity (str): Wandb entity
-																																		ask (bool, optional): Pre-check run before creation. Defaults to True.
+			arg_dict (dict): Arguments used by training function
+			tags (list[str]): Wandb tags
+			output (str): Experiment directory
+			save_path (str): Checkpoint directory
+			project (str): Wandb project
+			entity (str): Wandb entity
+			ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
 
 		try:
 			config = configs.load_config(arg_dict)
 		except ValueError:
-			print(f"{arg_dict['config_path']} not found")
-			self.print_v("Training cancelled")
-			return
+			return Err(f"{arg_dict['config_path']} not found. Create cancelled")
 
 		if self._is_dup_exp(config):
-			print(f"Duplicate run detected: {self.run_str(self.run_sum(config))}")
-			self.print_v("Training cancelled")
-			return
+			return Err(f"Duplicate run detected: {self.run_str(self.run_sum(config))}")
 
 		if ask:
 			configs.print_config(config)
@@ -454,102 +451,92 @@ class que:
 			config = cast(ExpInfo, config | {"wandb": wandb_dict})
 
 			self.to_run.append(config)
-			self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
+			return Ok(f"Added new run: {self.run_str(self.run_sum(config))}")
 		else:
-			self.print_v("Training cancelled by user")
+			return Err("Training cancelled by user")
 
-	def remove_run(self, loc: QueLocation, idx: int) -> Optional[ExpInfo]:
+	def remove_run(self, loc: QueLocation, idx: int) -> Result[ExpInfo, str]:
 		"""Removes a run from the que
-		Args:
-																																		loc: TO_RUN or OLD_RUNS
-																																		idx: index of run
+			Args:
+				loc: TO_RUN or OLD_RUNS
+				idx: index of run
+
 		Returns:
-																																		rem: the removed run, if successful"""
-
-		to_remove = self.fetch_state(loc)
-
-		if abs(idx) < len(to_remove):
-			self.print_v(f"Successfully removed entry from {loc}")
-			return to_remove.pop(idx)
-		else:
-			print(f"Index: {idx} out of range for len({loc}) = {len(to_remove)}")
-
-	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int):
+			Result[ExpInfo, str]: Ok(ExpInfo) is successful, otherwise Err(str)
+		"""
+		return self._get_run(loc, idx)
+		
+	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> Result[None, str]:
 		"""Repositions a run from the que
 		Args:
-																																		loc: TO_RUN or OLD_RUNS
-																																		o_idx: original index of run
-																																		n_idx: new index of run
+			loc: TO_RUN or OLD_RUNS
+			o_idx: original index of run
+			n_idx: new index of run
+		Returns:
+			Result[None, str]: Ok(None) is successful, otherwise Err(str)
 		"""
-
-		to_shuffle = self.fetch_state(loc)
-
-		try:
-			srun = self._get_run(loc, o_idx)
-		except ValueError as e:
-			print(f"Warning: {e}")
-			return	
-
-		try:
-			self._set_run(loc, n_idx, srun)
-		except ValueError as e:
-			print(f"Warning: {e}")
-
-		to_shuffle.insert(n_idx, srun)
-
-		self.list_runs(loc, disp=self.verbose)
-
+		match self._get_run(loc, o_idx):
+			case Ok(srun):
+				return self._set_run(loc, n_idx, srun)
+			case Err(error):
+				return Err(error)
+		
 	def move(
 		self,
 		o_loc: QueLocation,
 		n_loc: QueLocation,
 		oi_idx: int,
 		of_idx: Optional[int] = None,
-	):
+	) -> Result[None, str]:
 		"""Moves a run between locations in que (at beginning)
 
 		Args:
-																																		o_loc (QueLocation): Old location
-																																		n_loc (QueLocation): New location
-																																		oi_idx (int): Old initial index
-																																		of_idx (int): Old final index, if specifying a range.
+			o_loc (QueLocation): Old location
+			n_loc (QueLocation): New location
+			oi_idx (int): Old initial index
+			of_idx (int): Old final index, if specifying a range.
 		"""
-
-		old_location = self.fetch_state(o_loc)
-		new_location = self.fetch_state(n_loc)
-
 		if of_idx is None:
-			try:
-				run = self._get_run(o_loc, oi_idx)
-			except ValueError as e:
-				print(f"Warning: {e}")
-				return	
-
-			self._set_run(n_loc, 0, run)
-
+			# Single run move
+			match self._get_run(o_loc, oi_idx):
+				case Ok(run):
+					return self._set_run(n_loc, 0, run)
+				case Err(error):
+					return Err(error)
 		else:
-			if abs(oi_idx) < len(old_location) and abs(of_idx) < len(old_location):
-				tomv = []
-				for _ in range(oi_idx, of_idx + 1):
-					tomv.append(old_location.pop(oi_idx))
-			else:
-				print(
-					f"Range: {oi_idx} - {of_idx} is an invalid range. Length of {o_loc} is: {len(old_location)}"
+			# Range move
+			old_location = self.fetch_state(o_loc)
+			new_location = self.fetch_state(n_loc)
+			
+			# Validate range
+			if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
+				return Err(
+					f"Range: {oi_idx} - {of_idx} is an invalid range. "
+					f"Length of {o_loc} is: {len(old_location)}"
 				)
-				return
-
+			
+			# Extract the runs to move
+			tomv = []
+			for _ in range(oi_idx, of_idx + 1):
+				tomv.append(old_location.pop(oi_idx))
+			
+			# Insert into new location (in reverse to maintain order when inserting at 0)
 			for run in tomv:
 				new_location.insert(0, run)
-
-		self.print_v("Successfully added\n")
-
-		self.list_runs(n_loc, disp=self.verbose)
-
-	def recover_run(self):
+			
+			return Ok(None)
+  
+	def recover_run(self) -> Result[None, str]:
 		"""Set the run in cur_run to recover"""
-		info = self.get_cur_run()
-		info['admin']['recover'] = True
-		self.set_cur_run(info)
+		match self._get_run('cur_run', 0):
+			case Ok(run):
+				run['admin']['recover'] = True
+				return self._set_run('cur_run', 0, run)
+			case Err(e):
+				return Err(e)
+
+		
+  
 
 class tmux_manager:
 	def __init__(
@@ -740,10 +727,10 @@ class worker:
 		if self.verbose:
 			print(message)
 
-	def work(self):
+	def work(self) -> Result[None, str]:
 		gpu_manager.wait_for_completion()
 
-		# get the next run
+		#get next run
 		info = self.que.get_cur_run()
 
 		wandb_info = info["wandb"]
@@ -787,6 +774,7 @@ class worker:
 
 		self.print_v("writing my id to temp file")
 		self.que.set_cur_run(info)
+		
 
 		self.print_v(f"Run ID: {run.id}")
 		self.print_v(f"Run name: {run.name}")  # Human-readable name
@@ -794,6 +782,8 @@ class worker:
 
 		train_loop(admin["model"], run, recover=admin["recover"])
 		run.finish()
+  
+		return Ok(None)
 
 	def idle(
 		self,
@@ -1188,7 +1178,11 @@ class queShell(cmdLib.Cmd):
 		if parsed_args is None:
 			return
 
-		self.que.clear_runs(parsed_args.location)
+		match self.que.clear_runs(parsed_args.location):
+			case Ok(msg):
+				print(msg)
+			case Err(msg):
+				print(msg)
 
 	def do_list(self, arg):
 		"""Summarise to a list of runs, in a given location"""
@@ -1196,7 +1190,7 @@ class queShell(cmdLib.Cmd):
 		if parsed_args is None:
 			return
 
-		self.que.list_runs(parsed_args.location, disp=True)
+		self.que.disp_runs(parsed_args.location)
 
 	def do_remove(self, arg):
 		"""Remove a run from the past or future"""
@@ -1204,7 +1198,11 @@ class queShell(cmdLib.Cmd):
 		if parsed_args is None:
 			return
 
-		self.que.remove_run(parsed_args.location, parsed_args.index)
+		match self.que.remove_run(parsed_args.location, parsed_args.index):
+			case Ok(_):
+				print(f"Removed run {parsed_args.index} from {parsed_args.location}")
+			case Err(_):
+				print(f"Failed to remove run {parsed_args.index} from {parsed_args.location}")
 
 	def do_shuffle(self, arg):
 		"""Reposition a run in the que"""
@@ -1212,20 +1210,27 @@ class queShell(cmdLib.Cmd):
 		if parsed_args is None:
 			return
 
-		self.que.shuffle(parsed_args.location, parsed_args.o_index, parsed_args.n_index)
-
+		match self.que.shuffle(parsed_args.location, parsed_args.o_index, parsed_args.n_index):
+			case Ok(_):
+				print(f"Successfully moved run from {parsed_args.o_index} to {parsed_args.n_index} in {parsed_args.location}")
+			case Err(_):
+				print(f"Failed to move run from {parsed_args.o_index} to {parsed_args.n_index} in {parsed_args.location}")			
+    
+    
 	def do_move(self, arg):
 		"""Moves a run between locations in que"""
 		parsed_args = self._parse_args_or_cancel("move", arg)
 		if parsed_args is None:
 			return
 
-		self.que.move(
+		match self.que.move(
 			parsed_args.o_location,
 			parsed_args.n_location,
 			parsed_args.oi_index,
 			parsed_args.of_index,
-		)
+		):
+			case Ok(_):
+				print(f"Successfully move run {parsed_args.o_location} {parsed_args.oi_index} to {parsed_args.n_location} {parsed_args.n_location}")
 
 	def do_create(self, arg):
 		"""Create a new run and add it to the queue"""
