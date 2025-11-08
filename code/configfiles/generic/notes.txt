@@ -1,37 +1,68 @@
 - hframe_hwd (S3D 13) Original
     best val loss: 1.85474 
-    best val acc: 
+    best val acc: 68.3432
+
 - hframe_hwd1 (S3D 14) increased the backbone_init_lr (of hframe_hwd)
     by x10 (1e-5 -> 1e-4) and suffered a noticeable knock in
-    performance (1.98 -> 2.3 val loss)
+    performance
+    best val loss: 2.22761
+    best val acc: 62.42604
     
     conclusion: don't increase backbone_init_lr
 
 - hframe_hwd1_nosched (S3D 15) was the same as hframe_hwd1, but with
-    no lr scheduler, and sufered a noticeable knock in performance
+    no lr scheduler, and sufered a minor loss in performance
     (2.3 -> 2.8 val loss)
+    best val loss: 2.23484
+    best val acc: 61.2426
 
-    conclusion: include lr scheduler
+    conclusion: experiment more with lr scheduler but at least not hurting
 
 - hframe_mwd (S3D 16) was the same as hframe_hwd1, but decreased the
     backbone_weight_decay by x10 (1e-3 -> 1e-4), and saw a small 
-    increase in val loss, but also val accuracy 
+    increase in val loss 
+    best val loss: 2.18403
+    best val acc: 60.65089
 
     conclusion: don't increase the backbone_weight_decay 
     (but small effect)
 
 - hframe_hwd_leps (S3D 17) was the same as hframe_hwd, but decreased 
-    the adam eps by x10000000 (1e-3 -> 1e-8), and saw a noticeable 
-    kncock in performance (1.98 -> 2.22)
+    the adam eps by x10000000 (1e-3 -> 1e-8), and saw a slight 
+    kncock in performance 
+    best val loss: 1.89451
+    best val acc: 65.68047
 
     conclusion: inconclusive, vary eps by less
+    
 
 - hframe_hwd_leps2 (S3D 18) was the same as hframe_hwd, but decreased 
-    the adam eps by x1000000 (1e-3 -> 1e-7), 
+    the adam eps by x1000000 (1e-3 -> 1e-7), still worse performance, but an improvement
+    best val loss: 1.93781
+    best val acc: 68.3432
 
 
+- hframe_hwd_leps3 (S3D 19) same pattern as previous eps experiments. eps now at (1e-6)
+    best val loss: 1.95846
+    best val acc: 69.52663
+
+    now an improvement on the previous highest (S3D 13)
+
+- hframe_hwd_leps4 (S3D 20) 
+    best val loss: 1.72448
+    best val acc: 73.66864
+
+    another improvement
+
+- hframe_hwd_leps5 (S3D 21)
+    best val loss: 1.66771
+    best val acc: 73.37278
+
+    improvement stops
 
 
 
 #Misc
+i notice the time of runs increases with the better runs taking longer
+
 -added type in scheduler as an after effect
