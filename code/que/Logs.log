@@ -407,3 +407,189 @@ VAL - Epoch 14:
   Accuracy: 69.82% (236/338)
 Epoch 14/200
 ----------
+Step 2530: Accumulated Loss: 0.1130, Current Accuracy: 97.50%
+Step 2540: Accumulated Loss: 0.1986, Current Accuracy: 97.50%
+Step 2550: Accumulated Loss: 0.0545, Current Accuracy: 97.92%
+Step 2560: Accumulated Loss: 0.0184, Current Accuracy: 98.12%
+Step 2570: Accumulated Loss: 0.0093, Current Accuracy: 98.50%
+Step 2580: Accumulated Loss: 0.0112, Current Accuracy: 98.54%
+Step 2590: Accumulated Loss: 0.0163, Current Accuracy: 98.75%
+Step 2600: Accumulated Loss: 0.0463, Current Accuracy: 98.75%
+Step 2610: Accumulated Loss: 0.0226, Current Accuracy: 98.75%
+Step 2620: Accumulated Loss: 0.0389, Current Accuracy: 98.75%
+Step 2630: Accumulated Loss: 0.1522, Current Accuracy: 98.52%
+Step 2640: Accumulated Loss: 0.0295, Current Accuracy: 98.33%
+Step 2650: Accumulated Loss: 0.2797, Current Accuracy: 98.27%
+Step 2660: Accumulated Loss: 0.0275, Current Accuracy: 98.12%
+Step 2670: Accumulated Loss: 0.1429, Current Accuracy: 98.08%
+Step 2680: Accumulated Loss: 0.0815, Current Accuracy: 98.20%
+Step 2690: Accumulated Loss: 0.0353, Current Accuracy: 98.01%
+Step 2700: Accumulated Loss: 0.0244, Current Accuracy: 97.92%
+TRAIN - Epoch 15:
+  Loss: 0.0883
+  Accuracy: 97.92% (1412/1442)
+VAL - Epoch 15:
+  Loss: 1.0981
+  Accuracy: 72.78% (246/338)
+Checkpoint saved: runs/asl100/MViTv2_S_exp005/checkpoints/checkpoint_015.pth
+Epoch 15/200
+----------
+Step 2710: Accumulated Loss: 0.0376, Current Accuracy: 98.75%
+Step 2720: Accumulated Loss: 0.0350, Current Accuracy: 99.38%
+Step 2730: Accumulated Loss: 0.3000, Current Accuracy: 98.33%
+Step 2740: Accumulated Loss: 0.3181, Current Accuracy: 98.12%
+Step 2750: Accumulated Loss: 0.0156, Current Accuracy: 98.25%
+Step 2760: Accumulated Loss: 0.8564, Current Accuracy: 98.12%
+Step 2770: Accumulated Loss: 0.0737, Current Accuracy: 98.21%
+Step 2780: Accumulated Loss: 0.0404, Current Accuracy: 98.28%
+Step 2790: Accumulated Loss: 0.0178, Current Accuracy: 98.47%
+Step 2800: Accumulated Loss: 0.0399, Current Accuracy: 98.50%
+Step 2810: Accumulated Loss: 0.3192, Current Accuracy: 98.41%
+Step 2820: Accumulated Loss: 0.0859, Current Accuracy: 98.33%
+Step 2830: Accumulated Loss: 0.0799, Current Accuracy: 98.37%
+Step 2840: Accumulated Loss: 0.0238, Current Accuracy: 98.30%
+Step 2850: Accumulated Loss: 0.0131, Current Accuracy: 98.42%
+Step 2860: Accumulated Loss: 0.0205, Current Accuracy: 98.52%
+Step 2870: Accumulated Loss: 0.0216, Current Accuracy: 98.53%
+Step 2880: Accumulated Loss: 0.0247, Current Accuracy: 98.47%
+TRAIN - Epoch 16:
+  Loss: 0.0863
+  Accuracy: 98.47% (1420/1442)
+VAL - Epoch 16:
+  Loss: 0.9722
+  Accuracy: 73.67% (249/338)
+Best validation loss so far: 0.97
+New best model saved: runs/asl100/MViTv2_S_exp005/checkpoints/best.pth (Loss: 0.97%)
+Epoch 16/200
+----------
+Step 2890: Accumulated Loss: 0.0423, Current Accuracy: 98.75%
+Step 2900: Accumulated Loss: 0.0184, Current Accuracy: 96.88%
+Step 2910: Accumulated Loss: 0.0129, Current Accuracy: 97.92%
+Step 2920: Accumulated Loss: 0.0490, Current Accuracy: 98.44%
+Step 2930: Accumulated Loss: 0.0300, Current Accuracy: 98.50%
+Step 2940: Accumulated Loss: 0.0834, Current Accuracy: 98.75%
+Step 2950: Accumulated Loss: 0.0292, Current Accuracy: 98.75%
+Step 2960: Accumulated Loss: 0.0218, Current Accuracy: 98.12%
+Step 2970: Accumulated Loss: 0.0419, Current Accuracy: 98.06%
+Step 2980: Accumulated Loss: 0.0179, Current Accuracy: 98.25%
+Step 2990: Accumulated Loss: 0.0170, Current Accuracy: 98.18%
+Step 3000: Accumulated Loss: 0.0147, Current Accuracy: 98.23%
+Step 3010: Accumulated Loss: 0.0202, Current Accuracy: 98.37%
+Step 3020: Accumulated Loss: 0.0862, Current Accuracy: 98.39%
+Step 3030: Accumulated Loss: 0.0885, Current Accuracy: 98.42%
+Step 3040: Accumulated Loss: 0.0284, Current Accuracy: 98.52%
+Step 3050: Accumulated Loss: 0.1086, Current Accuracy: 98.46%
+Step 3060: Accumulated Loss: 0.0218, Current Accuracy: 98.47%
+TRAIN - Epoch 17:
+  Loss: 0.0689
+  Accuracy: 98.47% (1420/1442)
+VAL - Epoch 17:
+  Loss: 1.0852
+  Accuracy: 72.49% (245/338)
+Epoch 17/200
+----------
+Step 3070: Accumulated Loss: 0.0618, Current Accuracy: 97.50%
+Step 3080: Accumulated Loss: 0.4310, Current Accuracy: 97.50%
+Step 3090: Accumulated Loss: 0.0147, Current Accuracy: 97.92%
+Step 3100: Accumulated Loss: 0.0475, Current Accuracy: 98.12%
+Step 3110: Accumulated Loss: 0.0271, Current Accuracy: 98.50%
+Step 3120: Accumulated Loss: 0.0050, Current Accuracy: 98.54%
+Step 3130: Accumulated Loss: 0.0340, Current Accuracy: 98.75%
+Step 3140: Accumulated Loss: 0.0478, Current Accuracy: 98.44%
+Step 3150: Accumulated Loss: 0.1241, Current Accuracy: 98.61%
+Step 3160: Accumulated Loss: 0.0034, Current Accuracy: 98.62%
+Step 3170: Accumulated Loss: 0.0703, Current Accuracy: 98.64%
+Step 3180: Accumulated Loss: 0.0097, Current Accuracy: 98.65%
+Step 3190: Accumulated Loss: 0.0420, Current Accuracy: 98.75%
+Step 3200: Accumulated Loss: 0.0146, Current Accuracy: 98.75%
+Step 3210: Accumulated Loss: 0.0502, Current Accuracy: 98.67%
+Step 3220: Accumulated Loss: 0.0115, Current Accuracy: 98.75%
+Step 3230: Accumulated Loss: 0.0142, Current Accuracy: 98.75%
+Step 3240: Accumulated Loss: 0.0283, Current Accuracy: 98.82%
+TRAIN - Epoch 18:
+  Loss: 0.0584
+  Accuracy: 98.82% (1425/1442)
+VAL - Epoch 18:
+  Loss: 1.0964
+  Accuracy: 72.78% (246/338)
+Epoch 18/200
+----------
+Step 3250: Accumulated Loss: 0.0073, Current Accuracy: 100.00%
+Step 3260: Accumulated Loss: 0.0058, Current Accuracy: 100.00%
+Step 3270: Accumulated Loss: 0.0142, Current Accuracy: 100.00%
+Step 3280: Accumulated Loss: 0.0068, Current Accuracy: 100.00%
+Step 3290: Accumulated Loss: 0.0268, Current Accuracy: 100.00%
+Step 3300: Accumulated Loss: 0.0169, Current Accuracy: 100.00%
+Step 3310: Accumulated Loss: 0.0312, Current Accuracy: 100.00%
+Step 3320: Accumulated Loss: 0.0083, Current Accuracy: 100.00%
+Step 3330: Accumulated Loss: 0.0098, Current Accuracy: 99.58%
+Step 3340: Accumulated Loss: 0.0107, Current Accuracy: 99.38%
+Step 3350: Accumulated Loss: 0.2245, Current Accuracy: 99.32%
+Step 3360: Accumulated Loss: 0.4029, Current Accuracy: 99.06%
+Step 3370: Accumulated Loss: 0.0202, Current Accuracy: 98.94%
+Step 3380: Accumulated Loss: 0.0151, Current Accuracy: 98.75%
+Step 3390: Accumulated Loss: 0.2084, Current Accuracy: 98.67%
+Step 3400: Accumulated Loss: 0.0114, Current Accuracy: 98.67%
+Step 3410: Accumulated Loss: 0.0842, Current Accuracy: 98.60%
+Step 3420: Accumulated Loss: 0.1848, Current Accuracy: 98.33%
+TRAIN - Epoch 19:
+  Loss: 0.0785
+  Accuracy: 98.34% (1418/1442)
+VAL - Epoch 19:
+  Loss: 1.1982
+  Accuracy: 71.60% (242/338)
+Epoch 19/200
+----------
+Step 3430: Accumulated Loss: 0.6089, Current Accuracy: 97.50%
+Step 3440: Accumulated Loss: 0.0131, Current Accuracy: 98.12%
+Step 3450: Accumulated Loss: 0.0504, Current Accuracy: 98.75%
+Step 3460: Accumulated Loss: 0.0562, Current Accuracy: 98.44%
+Step 3470: Accumulated Loss: 0.6614, Current Accuracy: 98.25%
+Step 3480: Accumulated Loss: 0.0178, Current Accuracy: 98.54%
+Step 3490: Accumulated Loss: 0.0241, Current Accuracy: 98.39%
+Step 3500: Accumulated Loss: 0.0093, Current Accuracy: 98.59%
+Step 3510: Accumulated Loss: 0.1514, Current Accuracy: 98.61%
+Step 3520: Accumulated Loss: 0.0024, Current Accuracy: 98.75%
+Step 3530: Accumulated Loss: 0.0159, Current Accuracy: 98.86%
+Step 3540: Accumulated Loss: 0.0051, Current Accuracy: 98.75%
+Step 3550: Accumulated Loss: 0.1434, Current Accuracy: 98.75%
+Step 3560: Accumulated Loss: 0.0099, Current Accuracy: 98.66%
+Step 3570: Accumulated Loss: 0.0223, Current Accuracy: 98.67%
+Step 3580: Accumulated Loss: 0.5139, Current Accuracy: 98.67%
+Step 3590: Accumulated Loss: 0.0110, Current Accuracy: 98.68%
+Step 3600: Accumulated Loss: 0.2256, Current Accuracy: 98.47%
+TRAIN - Epoch 20:
+  Loss: 0.0768
+  Accuracy: 98.47% (1420/1442)
+VAL - Epoch 20:
+  Loss: 1.0868
+  Accuracy: 73.37% (248/338)
+Checkpoint saved: runs/asl100/MViTv2_S_exp005/checkpoints/checkpoint_020.pth
+Epoch 20/200
+----------
+Step 3610: Accumulated Loss: 0.0308, Current Accuracy: 100.00%
+Step 3620: Accumulated Loss: 0.0323, Current Accuracy: 98.75%
+Step 3630: Accumulated Loss: 0.4138, Current Accuracy: 98.33%
+Step 3640: Accumulated Loss: 0.0127, Current Accuracy: 98.44%
+Step 3650: Accumulated Loss: 0.0063, Current Accuracy: 98.75%
+Step 3660: Accumulated Loss: 0.0084, Current Accuracy: 98.96%
+Step 3670: Accumulated Loss: 0.0281, Current Accuracy: 99.11%
+Step 3680: Accumulated Loss: 0.0100, Current Accuracy: 98.75%
+Step 3690: Accumulated Loss: 0.0167, Current Accuracy: 98.89%
+Step 3700: Accumulated Loss: 0.0057, Current Accuracy: 99.00%
+Step 3710: Accumulated Loss: 0.0069, Current Accuracy: 98.98%
+Step 3720: Accumulated Loss: 0.0088, Current Accuracy: 98.85%
+Step 3730: Accumulated Loss: 0.0584, Current Accuracy: 98.85%
+Step 3740: Accumulated Loss: 0.0180, Current Accuracy: 98.93%
+Step 3750: Accumulated Loss: 0.0326, Current Accuracy: 98.75%
+Step 3760: Accumulated Loss: 0.0127, Current Accuracy: 98.59%
+Step 3770: Accumulated Loss: 0.0186, Current Accuracy: 98.53%
+Step 3780: Accumulated Loss: 0.0859, Current Accuracy: 98.47%
+TRAIN - Epoch 21:
+  Loss: 0.0646
+  Accuracy: 98.47% (1420/1442)
+VAL - Epoch 21:
+  Loss: 1.1930
+  Accuracy: 71.30% (241/338)
+Epoch 21/200
+----------
