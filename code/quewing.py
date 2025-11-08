@@ -43,6 +43,7 @@ LOG_PATH = QUE_DIR + "Logs.log"
 TO_RUN = "to_run"  # havent run yet
 CUR_RUN = "cur_run"  # busy running
 OLD_RUNS = "old_runs"  # run already
+FAIL_RUNS = "fail_runs" # runs that crashed
 # List for argparse choices
 QUE_LOCATIONS = [TO_RUN, CUR_RUN, OLD_RUNS]
 SYNONYMS = {
@@ -52,15 +53,19 @@ SYNONYMS = {
 	"busy": "cur_run",
 	"old": "old_runs",
 	"or": "old_runs",
+	"fail": "fail_runs",
+	"fr" : "fail_runs"
 }
-QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs"]
+QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
 
+class FailedExp(ExpInfo):
+    error: str
 
 class AllRuns(TypedDict):
 	old_runs: List[ExpInfo]
 	cur_run: List[ExpInfo]
 	to_run: List[ExpInfo]
-
+	fail_runs: List[FailedExp]
 
 def retrieve_Data(path: Path) -> Any:
 	"""Retrieves data from a given path."""
@@ -118,6 +123,7 @@ class que:
 		self.old_runs: List[ExpInfo] = []
 		self.cur_run: List[ExpInfo] = []
 		self.to_run: List[ExpInfo] = []
+		self.fail_runs: List[FailedExp] = []
 		self.auto_save: bool = auto_save
 		self.load_state()
 
@@ -129,6 +135,7 @@ class que:
 			self.to_run = data.get(TO_RUN, [])
 			self.cur_run = data.get(CUR_RUN, [])
 			self.old_runs = data.get(OLD_RUNS, [])
+			self.fail_runs = data.get(FAIL_RUNS, [])
 		except FileNotFoundError:
 			self.print_v(
 				f"No existing state found at {self.runs_path}. Starting fresh."
@@ -136,6 +143,7 @@ class que:
 			self.to_run = []
 			self.cur_run = []
 			self.old_runs = []
+			self.fail_runs = []
 
 	def _save_Que(self):
 		"""Write que to file"""
@@ -144,8 +152,47 @@ class que:
 				TO_RUN: self.to_run,
 				CUR_RUN: self.cur_run,
 				OLD_RUNS: self.old_runs,
+				FAIL_RUNS: self.fail_runs
 			}
 			json.dump(all_runs, f, indent=4)
+
+	def _get_run(self, loc: QueLocation, idx: int) -> ExpInfo:
+		"""Get the run at the given location with the provided index
+
+		Args:
+				loc (QueLocation): to_run, cur_run or old_runs
+				idx (int): Index of the run
+
+		Raises:
+				QueEmpty: len(loc) == 0
+				QueIdxOOR: abs(idx) >= len(loc)
+
+		Returns:
+				ExpInfo: The specified run
+		"""
+		to_get = self.fetch_state(loc)
+		if len(to_get) == 0:
+			raise QueEmpty()
+		elif abs(idx) >= len(to_get):
+			raise QueIdxOOR(loc, idx, len(to_get))
+		return to_get.pop(idx)
+
+	def _set_run(self, loc: QueLocation, idx: int, run: ExpInfo) -> None:
+		"""Set a run at a specified location and index
+
+		Args:
+				loc (QueLocation): to_run, cur_run or old_runs
+				idx (int): New index, must be within [-len(loc), len(loc)]
+				run (ExpInfo): Experiment info to add to loc
+
+
+		Raises:
+				QueIdxOOR: The provied index is out of range: [-len(loc), len(loc)]
+		"""
+		to_set = self.fetch_state(loc)
+		if len(to_set) < abs(idx):
+			raise QueIdxOOR(loc, idx, len(to_set))
+		to_set.insert(idx, run)
 
 	def stash_next_run(self) -> None:
 		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
@@ -192,43 +239,7 @@ class que:
 			self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
 			self._save_Que()
 
-	def _get_run(self, loc: QueLocation, idx: int) -> ExpInfo:
-		"""Get the run at the given location with the provided index
-
-		Args:
-				loc (QueLocation): to_run, cur_run or old_runs
-				idx (int): Index of the run
-
-		Raises:
-				QueEmpty: len(loc) == 0
-				QueIdxOOR: abs(idx) >= len(loc)
-
-		Returns:
-				ExpInfo: The specified run
-		"""
-		to_get = self.fetch_state(loc)
-		if len(to_get) == 0:
-			raise QueEmpty()
-		elif abs(idx) >= len(to_get):
-			raise QueIdxOOR(loc, idx, len(to_get))
-		return to_get.pop(idx)
-
-	def _set_run(self, loc: QueLocation, idx: int, run: ExpInfo) -> None:
-		"""Set a run at a specified location and index
-
-		Args:
-				loc (QueLocation): to_run, cur_run or old_runs
-				idx (int): New index, must be within [-len(loc), len(loc)]
-				run (ExpInfo): Experiment info to add to loc
-
-
-		Raises:
-				QueIdxOOR: The provied index is out of range: [-len(loc), len(loc)]
-		"""
-		to_set = self.fetch_state(loc)
-		if len(to_set) < abs(idx):
-			raise QueIdxOOR(loc, idx, len(to_set))
-		to_set.insert(idx, run)
+	
 
 	def get_cur_run(self) -> ExpInfo:
 		"""Get the run stored in cur_run (assumes 1)"""
@@ -549,7 +560,15 @@ class que:
 			self._set_run("cur_run", 0, run)
 		except Exception as e:
 			self.print_v(str(e))
-
+   
+	def stash_failed_run(self, error: str) -> None:
+		"""Move a run to the failed que"""
+		try:
+			run = self._get_run("cur_run", 0)
+			failed = cast(FailedExp, run | {"error": error})
+			self.fail_runs.append(failed)
+		except Exception as e:
+			self.print_v(str(e))
 
 class tmux_manager:
 	def __init__(
@@ -741,64 +760,70 @@ class worker:
 			print(message)
 
 	def work(self) -> None:
-		gpu_manager.wait_for_completion()
+		try:
+			gpu_manager.wait_for_completion()
 
-		# get next run
-		info = self.que.get_cur_run()
+			# get next run
+			info = self.que.get_cur_run()
 
-		wandb_info = info["wandb"]
-		entity = wandb_info["entity"]
-		project = wandb_info["project"]
-		tags = wandb_info["tags"]
+			wandb_info = info["wandb"]
+			entity = wandb_info["entity"]
+			project = wandb_info["project"]
+			tags = wandb_info["tags"]
 
-		admin = info["admin"]
+			admin = info["admin"]
 
-		# setup wandb run
-		run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
+			# setup wandb run
+			run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
 
-		if admin["recover"]:
-			if "run_id" in info:
-				run_id = info["run_id"]
+			if admin["recover"]:
+				if "run_id" in info:
+					run_id = info["run_id"]
+				else:
+					run_id = wandb_manager.get_run_id(
+						run_name, entity, project, idx=-1
+					)  # probably want the last one
+
+				self.print_v(f"Resuming run with ID: {run_id}")
+
+				run = wandb.init(
+					entity=entity,
+					project=project,
+					id=run_id,
+					resume="must",
+					name=run_name,
+					tags=tags,
+					config=cast(Dict[str, Any], info),  # cast to regular for wandb,
+				)
 			else:
-				run_id = wandb_manager.get_run_id(
-					run_name, entity, project, idx=-1
-				)  # probably want the last one
+				self.print_v(f"Starting new run with name: {run_name}")
+				run = wandb.init(
+					entity=entity,
+					project=project,
+					name=run_name,
+					tags=tags,
+					config=cast(Dict[str, Any], info),  # cast to regular for wandb
+				)
 
-			self.print_v(f"Resuming run with ID: {run_id}")
+			# save run_id for recovering
+			wandb_info["run_id"] = run.id
+			info["wandb"] = wandb_info
 
-			run = wandb.init(
-				entity=entity,
-				project=project,
-				id=run_id,
-				resume="must",
-				name=run_name,
-				tags=tags,
-				config=cast(Dict[str, Any], info),  # cast to regular for wandb,
-			)
-		else:
-			self.print_v(f"Starting new run with name: {run_name}")
-			run = wandb.init(
-				entity=entity,
-				project=project,
-				name=run_name,
-				tags=tags,
-				config=cast(Dict[str, Any], info),  # cast to regular for wandb
-			)
+			self.print_v("writing my id to temp file")
+			self.que.set_cur_run(info)
 
-		# save run_id for recovering
-		wandb_info["run_id"] = run.id
-		info["wandb"] = wandb_info
+			self.print_v(f"Run ID: {run.id}")
+			self.print_v(f"Run name: {run.name}")  # Human-readable name
+			self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
 
-		self.print_v("writing my id to temp file")
-		self.que.set_cur_run(info)
-
-		self.print_v(f"Run ID: {run.id}")
-		self.print_v(f"Run name: {run.name}")  # Human-readable name
-		self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
-
-		train_loop(admin["model"], run, recover=admin["recover"])
-		run.finish()
-
+			train_loop(admin["model"], run, recover=admin["recover"])
+			run.finish()
+		except Exception as e:
+			self.print_v("Training run failed due to an error")
+			self.que.stash_failed_run(str(e))
+			raise e #still need to crash so daemon can 
+  
+  
 	def idle(
 		self,
 		message: str,
@@ -1008,20 +1033,22 @@ class daemon:
 
 			if return_code == 0:
 				self.print_v("Process completed successfully")
+				# save finished run (move from cur_run -> old_runs)
+				try:
+					self.que.store_fin_run()
+				except QueEmpty:
+					self.print_v("Could not find current run")
+				except Timeout:
+					self.print_v(
+						"Cannot store finished run, file is already held by another process"
+					)
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
 				if self.stp_on_fail:
+					self.print_v("Stopping exectuion")
 					break
-
-			# save finished run (move from cur_run -> old_runs)
-			try:
-				self.que.store_fin_run()
-			except QueEmpty:
-				self.print_v("Could not find current run")
-			except Timeout:
-				self.print_v(
-					"Cannot store finished run, file is already held by another process"
-				)
+				else:
+					self.print_v("Continuing with next run")
 
 	def start_idle(self):
 		"""Start process in this terminal and watch"""
