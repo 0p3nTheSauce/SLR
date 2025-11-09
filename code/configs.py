@@ -1,7 +1,7 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List, Optional, Union, TypedDict, Tuple
+from typing import Dict, Any, List, Optional, Union, TypedDict, Tuple, TypeAlias, Literal
 from utils import enum_dir, ask_nicely
 from stopping import EarlyStopper, StopperOn
 from pathlib import Path
@@ -55,18 +55,29 @@ class OptimizerInfo(TypedDict):
 class Model_paramsInfo(TypedDict):
 	drop_p: float
 
-class SchedulerInfo(TypedDict):
-	type: str
+class WarmUpSched(TypedDict):
+	start_factor: float
+	end_factor: float
+	warmup_epochs: int
+	
+class SchedBase(TypedDict):
+	warm_up: Optional[WarmUpSched]
+
+class WarmOnly(SchedBase):
+    type: Literal['WarmOnly']
+
+class CosAnealInfo(SchedBase):
+	type: Literal['CosineAnnealingLR']
+	tmax: int
 	eta_min: float
  
-class CosAnealInfo(SchedulerInfo):
-	tmax: int
- 
-class WarmRestartInfo(SchedulerInfo):
+class WarmRestartInfo(SchedBase):
+	type: Literal['CosineAnnealingWarmRestarts']  # Make type specific
 	t0: int
-	tmult: float
-
-
+	tmult: int
+	eta_min: float
+ 
+SchedInfo : TypeAlias = Union[CosAnealInfo, WarmRestartInfo, WarmOnly]
 
 class DataInfo(TypedDict):
 	num_frames: int
@@ -84,7 +95,7 @@ class RunInfo(TypedDict):
 	optimizer: OptimizerInfo
 	model_params: Model_paramsInfo
 	data: DataInfo
-	scheduler: Optional[Union[CosAnealInfo, WarmRestartInfo]]
+	scheduler: Optional[SchedInfo]
 	early_stopping: Optional[StopperOn]
 
 class ExpInfo(RunInfo):
@@ -151,7 +162,7 @@ def print_config(config_dict):
 
 ###################### Config generation ###############################
 
-def _schedular_precheck(sched_info: Optional[SchedulerInfo]) -> None:
+def _schedular_precheck(sched_info: Optional[SchedInfo]) -> None:
 	"""Fail early if scheduler config is invalid. 
 
 	Args:
@@ -168,21 +179,20 @@ def _schedular_precheck(sched_info: Optional[SchedulerInfo]) -> None:
 		return
  
 	#these have already been implemented
-	valid_types = [
-		'CosineAnnealingLR',
-		'CosineAnnealingWarmRestarts',
-	]
+	# valid_types = [
+	# 	'WarmOnly', #warm up only
+	# 	'CosineAnnealingLR',
+	# 	'CosineAnnealingWarmRestarts',
+	# ]
 	
-	if sched_info["type"] not in valid_types:
-		raise ValueError(
-			f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
-		)
+	# if sched_info["type"] not in valid_types:
+	# 	raise ValueError(
+	# 		f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
+	# 	)
 		
 	if 'warmup_epochs' in sched_info:
 		if sched_info["warmup_epochs"] < 0:
 			raise ValueError("warmup_epochs must be non-negative")
-		if "start_factor" not in sched_info or "end_factor" not in sched_info:
-			raise ValueError("Both start_factor and end_factor must be specified for warmup")
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
 
@@ -225,20 +235,30 @@ def _to_exp_info(config: Dict[str, Any]) -> RunInfo:
 	# Optional sections with None default
 	scheduler = None
 	if 'scheduler' in config:
+		#Converts warmup to subdict
+		warm_up = None
+		if 'warmup_epochs' in config['scheduler']:
+			warm_up = WarmUpSched(
+				start_factor=config["scheduler"]['start_factor'],
+				end_factor=config['scheduler']['end_factor'],
+				warmup_epochs=config['scheduler']['warmup_epochs']
+			)
+   
 		if config["scheduler"]['type'] == 'CosineAnnealingLR':
 			scheduler = CosAnealInfo(
 				type=config['scheduler']['type'],
 				tmax=config['scheduler']['tmax'],
-				eta_min=config['scheduler']['eta_min']
+				eta_min=config['scheduler']['eta_min'],
+				warm_up=warm_up
 			)
 		elif config["scheduler"]['type'] == 'CosineAnnealingWarmRestarts':
 			scheduler = WarmRestartInfo(
 				type=config['scheduler']['type'],
 				t0=config['scheduler']['t0'],
 				tmult=config['scheduler']['tmult'],
-				eta_min=config['scheduler']['eta_min']
-			)
-			
+				eta_min=config['scheduler']['eta_min'],
+				warm_up=warm_up
+			)	
 			
 	early_stopping = None
 	if 'early_stopping' in config:
