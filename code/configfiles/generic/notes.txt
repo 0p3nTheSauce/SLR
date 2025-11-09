@@ -48,19 +48,37 @@
 
     now an improvement on the previous highest (S3D 13)
 
-- hframe_hwd_leps4 (S3D 20) 
+- hframe_hwd_leps4 (S3D 20) eps: 1e-5
     best val loss: 1.72448
     best val acc: 73.66864
 
     another improvement
 
-- hframe_hwd_leps5 (S3D 21)
+- hframe_hwd_leps5 (S3D 21) eps: 1e-4
     best val loss: 1.66771
     best val acc: 73.37278
 
-    improvement stops
+    slight improvement in loss, but acc declines
 
+- hframe_hwd_warmups (S3D 22) Same as hframe_hwd_leps4, but with warm ups
+    best val loss: 1.64363
+    best val acc: 71.89349
 
+    slight improvement in loss, but acc declines
+
+- hframe_hwd_warmrestarts (S3D 23)  Same as hframe_hwd_leps4, but with warm restarts
+    best val loss: 1.44793
+    best val acc: 71.30178
+
+    slitght improvement in loss, while acc declines
+
+- hf_hwd_eps_dp01 (S3D 24) Same as hframe_hwd_leps4, but with dropout = 0.1
+    best val loss: 4.66636
+    best val acc: 21.59763
+
+    huge knock in performance
+
+    
 
 #Misc
 i notice the time of runs increases with the better runs taking longer

@@ -118,6 +118,7 @@ class VideoDataset(Dataset):
 
 
 class DataSetInfo(TypedDict):
+    """Necessary info to import datast"""
     root: Path
     labels: Path
     label_suff: str
@@ -153,15 +154,14 @@ def get_data_loader(
         std (Tuple[float, float, float]): Model specific standard deviation (normalisation)
         frame_size (int): Length of Square frame.
         num_frames (int): Number of frames.
-        root (Path): Path to the directory where the video files are located.
-        labels (Path): Path to the directory where the preprocessed label files are located.
-        set_type (Union[TrainSet, TestSet]): Dictionary containing the dataset name, and if it is train, also the batch size.
+        set_info (DataSetInfo): Dictionary containing information to load the dataset.
         shuffle (bool, optional): Whether to shuffle frames. Defaults to False.
-        label_suffix (str, optional): Preprocessed label filename suffix. Defaults to LABEL_SUFFIX.
+        batch_size (Optional[int], optional): Batch size for dataloader. Defaults to None.
 
     Returns:
-        Tuple[DataLoader[VideoDataset], int]: Dataloader and number of classes.
+        Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]: dataloader, number of classes, permutation and shannon entropy
     """
+
 
     if shuffle:
         maybe_shuffle_t = Shuffle(num_frames)
