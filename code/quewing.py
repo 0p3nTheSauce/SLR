@@ -934,7 +934,7 @@ class daemon:
 		wr: Optional[worker] = None,
 		q: Optional[que] = None,
 		tm: Optional[tmux_manager] = None,
-		stp_on_fail: bool = True,
+		stp_on_fail: bool = True, #TODO: add this to parser
 	) -> None:
 		self.name = name
 		self.wr_name = wr_name
@@ -1019,6 +1019,7 @@ class daemon:
 			# prepare next run (move from to_run -> cur_run)
 			try:
 				self.que.stash_next_run()
+				self.que.save_state()
 			except QueEmpty:
 				self.print_v("No more runs to execute")
 				break
@@ -1030,7 +1031,7 @@ class daemon:
 					"Cannot stash next run, file is already held by another process"
 				)
 				break
-
+			
 			run = self.que.get_cur_run()
 			self.print_v(self.seperator(run))
 
@@ -1047,6 +1048,7 @@ class daemon:
 				self.print_v("Process completed successfully")
 				# save finished run (move from cur_run -> old_runs)
 				try:
+					self.que.load_state()
 					self.que.store_fin_run()
 				except QueEmpty:
 					self.print_v("Could not find current run")
