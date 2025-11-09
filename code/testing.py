@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple, Dict, List, Any
+from typing import Optional, Union, Tuple, Dict, List, Any, TypedDict, Literal
 from argparse import ArgumentParser
 import torch
 import json
@@ -15,7 +15,7 @@ from models import norm_vals, get_model
 from configs import set_seed
 from video_dataset import VideoDataset, get_data_loader, get_wlasl_info
 from models import avail_models
-from configs import get_avail_splits, load_config, WLASL_ROOT, RAW_DIR, LABELS_PATH, RUNS_PATH
+from configs import get_avail_splits, load_config, AdminInfo, RunInfo, RUNS_PATH
 from utils import print_dict
 #################################### Utilities #################################
 
@@ -29,22 +29,25 @@ def cleanup_memory():
 
 #################################### Helper classes #############################
 
-class top_k:
-	
-	def __init__(self,
-				 per: str,     
-				 top1: float,
-				 top5: float,
-				 top10: float, 
-				 perm: Optional[torch.Tensor]) -> None:
-		possible_pers = ["class", "instance"]
-		if per not in possible_pers:
-			raise ValueError(f'per not one of available metric: {possible_pers}')
-		self.per = per    
-		self.top1 = top1
-		self.top5 = top5
-		self.top10 = top10
+class TopKRes(TypedDict):
+	top1: float
+	top5: float
+	top10: float
 
+class BaseRes(TypedDict):
+	top_k_average_per_class_acc: TopKRes
+	top_k_per_instance_acc: TopKRes
+	
+class ShuffRes(BaseRes):
+	perm: List[int]
+	shannon_entropy: float
+
+class CompRes(TypedDict):
+	check_name: str
+	best_val_loss: Optional[float]
+	test: BaseRes
+	val: BaseRes
+	test_shuff: ShuffRes
 
 ##############################   Individual-run testing   ######################################
 
@@ -170,7 +173,7 @@ def test_topk_clsrep(
 	verbose: bool = False,
 	save_path: Optional[Union[str, Path]] = None,
 ) -> Tuple[
-	Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]
+	BaseRes, Dict[str, Dict[str, float]], List[int], List[int]
 ]:
 	"""Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
@@ -269,19 +272,18 @@ def test_topk_clsrep(
 	print(fstr)
 	print(fstr2)
 
-	topk_res = {
-		"top_k_average_per_class_acc": {
-			"top1": top1_per_class,
-			"top5": top5_per_class,
-			"top10": top10_per_class,
-		},
-		"top_k_per_instance_acc": {
-			"top1": top1_per_instance,
-			"top5": top5_per_instance,
-			"top10": top10_per_instance,
-		},
-	}
-
+	topk_res = BaseRes(
+		top_k_average_per_class_acc=TopKRes(
+			top1=float(top1_per_class),
+			top5=float(top5_per_class),
+			top10=float(top10_per_class)
+		),
+		top_k_per_instance_acc=TopKRes(
+			top1=top1_per_instance,
+			top5=top5_per_instance,
+			top10=top10_per_instance
+		)
+	)
 	if save_path is not None:
 		with open(save_path, "w") as f:
 			json.dump(topk_res, f, indent=2)
@@ -298,7 +300,6 @@ def collect_results(res_p: Path):
 def load_info(dirp: Path, checkname: str):
 	resd = {}
 	fnames = list(dirp.glob(f"{checkname}_*.json"))
-	print('here')
 	for fn in fnames:
 		with open(fn, "r") as f:
 			resd[fn.name.replace(".json", "")] = json.load(f)
@@ -306,7 +307,7 @@ def load_info(dirp: Path, checkname: str):
 
 
 def test_run(
-	config: Dict[str, Any],
+	config: RunInfo,
 	shuffle: bool = False,
 	test_val: bool = False,
 	test_test: bool = True,
@@ -472,6 +473,138 @@ def test_run(
 
 	return results
 
+def test_run2(
+	config: RunInfo,
+	set_name: Literal['test', 'val', 'train'],
+	shuffle: bool = False,
+	check: str = "best.pth",
+	br_graph: bool = False,
+	cf_matrix: bool = False,
+	heatmap: bool = False,
+	disp: bool = False,
+	save: bool = True,
+) -> Union[BaseRes, ShuffRes]:
+	"""Perform testing of a model according to the provided configuration.
+
+	Args:
+			config (Dict[str, Any]): Run config file.
+			perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+			test_val (bool, optional): Test on the val set. Defaults to False.
+			test_test (bool, optional): Test on the test set. Defaults to True.
+			check (str, optional): Checkpoint name. Defaults to "best.pth".
+			br_graph (bool, optional): Create bar graph. Defaults to False.
+			cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+			heatmap (bool, optional): Create heatmap. Defaults to False.
+			disp (bool, optional): Display plots. Defaults to False.
+			save (bool, optional): Save results and plots. Defaults to True.
+			re_test (bool, optional): Test even if results already saved. Defaults to False.
+
+	Returns:
+			Optional[Dict[str, Any]]: Results if correct parameters.
+	"""
+
+	set_seed()
+
+	admin = config["admin"]
+	model_name = admin["model"]
+	data = config["data"]
+
+	model_norms = norm_vals(model_name)
+	results = {}
+
+	save_path = Path(admin["save_path"])
+
+	output = save_path.parent / "results"
+
+	if save:
+		output.mkdir(exist_ok=True)
+	
+	dloader, num_classes, m_permt, m_sh_et = get_data_loader(
+     	model_norms['mean'],
+		model_norms['std'],
+		data["frame_size"],
+		data["num_frames"],
+		set_info=get_wlasl_info(admin["split"], set_name=set_name),
+		shuffle=shuffle,
+		batch_size=1
+	)
+
+	model = get_model(model_name, num_classes, drop_p=0.0)
+
+	check_path = save_path / check
+
+	print(f"Loading weights from: {check_path}")
+
+	checkpoint = torch.load(check_path)
+
+	if check_path.name == "best.pth":
+		model.load_state_dict(checkpoint)
+	else:
+		model.load_state_dict(checkpoint["model_state_dict"])
+
+	if shuffle:
+		suffix = "-top-k_shuffled.json"
+	else:
+		suffix = "-top-k.json"
+
+	
+	print(f"Testing on {set_name} set")
+	fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
+	save2 = output / fname
+	
+	topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
+		model=model,
+		test_loader=dloader,
+		verbose=False,
+	)
+	
+	if m_permt is not None and m_sh_et is not None: #shuffled
+		results = ShuffRes(
+			top_k_average_per_class_acc=topk_res['top_k_average_per_class_acc'],
+			top_k_per_instance_acc=topk_res['top_k_per_instance_acc'],
+			perm=m_permt,
+			shannon_entropy=m_sh_et
+		)
+	else:
+		results = topk_res
+  
+	if save:
+		with open(save2, "w") as f:
+			json.dump(results, f, indent=4)
+		
+	if heatmap:
+		fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
+		save2 = output / fname if save else None
+		plot_heatmap(
+			report=cls_report,
+			title=f"{set_name.capitalize()} set Classification Report",
+			save_path=save2,
+			disp=disp,
+		)
+
+	if br_graph:
+		fname = check_path.name.replace(".pth", f"_{set_name}-bargraph.png")
+		save2 = output / fname if save else None
+		plot_bar_graph(
+			report=cls_report,
+			title=f"{set_name.capitalize()} set Classification Report",
+			save_path=save2,
+			disp=disp,
+		)
+
+	if cf_matrix:
+		fname = check_path.name.replace(".pth", f"_{set_name}-confmat.png")
+		save2 = output / fname if save else None
+		plot_confusion_matrix(
+			y_true=all_targets,
+			y_pred=all_preds,
+			title=f"{set_name.capitalize()} set Confusion Matrix",
+			save_path=save2,
+			disp=disp,
+		)
+
+	return results
+
 
 ##################### Multiple-run testing utility #########################
 
@@ -494,11 +627,17 @@ def find_best_checkpnt(run_idx: int):
 		)
 		
 	
+def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> ArgumentParser:
+	"""Get parser for testing configuration
 
+	Args:
+		prog (Optional[str], optional): Script name, (e.g. testing.py). Defaults to None.
+		desc (str, optional): Program desctiption. Defaults to "Test a model".
 
-if __name__ == "__main__":
-	# find_best_checkpnt(0)
-	parser = ArgumentParser(description='testing.py')
+	Returns:
+		ArgumentParser: Parser which takes testing arguments
+	"""
+	parser = ArgumentParser(description=desc, prog=prog)
 	models_available = avail_models()
 	splits_available = get_avail_splits()
 	parser.add_argument(
@@ -514,6 +653,14 @@ if __name__ == "__main__":
 		help=f"The class split, one of:  {', '.join(splits_available)}",
 	)
 	parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
+	parser.add_argument(
+		'-ds',
+		'--dataset',
+		type=str,
+		choices=['WLASL'],
+		help="Not implemented yet",
+		default='WLASL'
+	)
 	parser.add_argument("-c", "--config_path", help="path to config .ini file")
 	parser.add_argument(
 		'-sf',
@@ -576,13 +723,16 @@ if __name__ == "__main__":
 		action='store_true',
 		help="Re-run test, even if results files already exist"
 	)
- 
+	return parser
+
+if __name__ == "__main__":
+	# find_best_checkpnt(0)
+	
+	parser = get_test_parser()
 	args = parser.parse_args()
 	
 	exp_no = str(int(args.exp_no)).zfill(3)
 	args.exp_no = exp_no
-	args.root = WLASL_ROOT + "/" + RAW_DIR
-	args.labels = f"{LABELS_PATH}/{args.split}"
 	output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
 	save_path = output / "checkpoints"
  
@@ -597,7 +747,17 @@ if __name__ == "__main__":
  
 	arg_dict = vars(args)
  
-	conf = load_config(arg_dict)
+	admin = AdminInfo(
+		model=args.model,
+		dataset=args.dataset,
+		split=args.split,
+		exp_no=args.exp_no,
+		recover=False,
+		config_path=args.config_path,
+		save_path=args.save_path
+	)
+ 
+	conf = load_config(admin)
  
 	results = test_run(
 		config=conf,

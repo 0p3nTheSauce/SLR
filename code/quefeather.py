@@ -26,8 +26,6 @@ class queFeather:
 			0: 'sWatch',
 			1: 'sMonitor',
 			2: 'monitorO',
-			3: 'idle',
-			4: 'idle_log',
 		}
 		if args is not None and args.recover:
 			#NOTE: the interface will likely become better when recovery is given to que instead of daemon
@@ -42,10 +40,6 @@ class queFeather:
 			daem.start_n_monitor()
 		elif setting == cmd_d[2]:
 			daem.monitor_log()
-		elif setting == cmd_d[3]:
-			daem.start_idle()
-		elif setting == cmd_d[4]:
-			daem.start_idle_log()
 			
 		else:
 			print('huh?')
@@ -79,7 +73,7 @@ def main():
 
 	daemon_parser.add_argument(
 		'setting',
-		choices=['sWatch', 'sMonitor','monitorO', 'idle', 'idle_log'],
+		choices=['sWatch', 'sMonitor','monitorO'],
 		help='Operation of daemon'
 	)
 	daemon_parser.add_argument(
@@ -131,4 +125,3 @@ if __name__ == '__main__':
 
 
 
-  
