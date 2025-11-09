@@ -1025,6 +1025,14 @@ def test_raise():
 		# or
 		print(str(e))  # Explicitly convert to string (same result)
 
+def test_loss4():
+	crit = torch.nn.CrossEntropyLoss()
+	otp  =torch.rand(4, 100)
+	target = torch.rand(4)
+	loss = crit(otp, target)
+	print(loss)
+	print(loss.item())
+
 if __name__ == "__main__":
 	# test_get_avail_splits()
 	# reformet2()
@@ -1032,4 +1040,5 @@ if __name__ == "__main__":
 	# test_loss3()
 	# test_tmux_man()
 	# test_safe_index2()
-	test_raise()
+	# test_raise()
+	test_loss4()
