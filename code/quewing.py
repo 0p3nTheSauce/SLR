@@ -26,10 +26,10 @@ import torch
 
 # locals
 import configs
-from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo
+from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, _exp_to_run_info
 import utils
 from utils import gpu_manager
-from training import train_loop, wandb_manager
+from training import train_loop, wandb_manager, _setup_wandb
 
 # constants
 SESH_NAME = "que_training"
@@ -777,43 +777,14 @@ class worker:
 			info = self.que.get_cur_run()
 
 			wandb_info = info["wandb"]
-			entity = wandb_info["entity"]
-			project = wandb_info["project"]
-			tags = wandb_info["tags"]
-
 			admin = info["admin"]
-
+			config = _exp_to_run_info(info)		
+  
 			# setup wandb run
-			run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
-
-			if admin["recover"]:
-				if "run_id" in info:
-					run_id = info["run_id"]
-				else:
-					run_id = wandb_manager.get_run_id(
-						run_name, entity, project, idx=-1
-					)  # probably want the last one
-
-				self.print_v(f"Resuming run with ID: {run_id}")
-
-				run = wandb.init(
-					entity=entity,
-					project=project,
-					id=run_id,
-					resume="must",
-					name=run_name,
-					tags=tags,
-					config=cast(Dict[str, Any], info),  # cast to regular for wandb,
-				)
-			else:
-				self.print_v(f"Starting new run with name: {run_name}")
-				run = wandb.init(
-					entity=entity,
-					project=project,
-					name=run_name,
-					tags=tags,
-					config=cast(Dict[str, Any], info),  # cast to regular for wandb
-				)
+			run = _setup_wandb(config, wandb_info)
+			if run is None:
+				return
+		
 
 			# save run_id for recovering
 			wandb_info["run_id"] = run.id
@@ -827,7 +798,7 @@ class worker:
 			self.print_v(f"Run name: {run.name}")  # Human-readable name
 			self.print_v(f"Run path: {run.path}")  # entity/project/run_id format
 
-			train_loop(admin["model"], run, recover=admin["recover"])
+			train_loop(admin["model"], config, run, recover=admin["recover"])
 			run.finish()
 		except Exception as e:
 			#TODO: handle ctrl+c gracefully

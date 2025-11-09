@@ -186,12 +186,13 @@ def get_optimizer(model: torch.nn.Module, conf: OptimizerInfo) -> optim.AdamW:
 
 def train_loop(
 	model_name: str,
+	config: RunInfo,
 	wandb_run: Run,
 	load: Optional[Union[Path, str]] = None,
 	save_every: int = 5,
 	recover: bool = False,
 	seed: Optional[int] = SEED,
-) -> None:
+) -> Optional[Dict[str, float]]:
 	"""Train loop for video classification model.
 
 	Args:
@@ -207,17 +208,11 @@ def train_loop(
 	if seed is not None:
 		set_seed(seed)
 
-	config = wandb_run.config
-
 	model_info = norm_vals(model_name)
 
 	dataloaders, num_classes = setup_data(model_info["mean"], model_info["std"], config)
 
-	try:
-		drop_p = config.model_params["drop_p"]
-	except Exception as _:
-		drop_p = 0.0
-
+	drop_p = config["model_params"]["drop_p"]
 	model = get_model(model_name, num_classes, drop_p)
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -228,35 +223,12 @@ def train_loop(
 	best_val_loss = float("inf")
 	best_val_acc = float("-inf")
 
-	param_groups = [
-		{
-			"params": model.backbone.parameters(),
-			"lr": config.optimizer[
-				"backbone_init_lr"
-			],  # Low LR for pretrained backbone
-			"weight_decay": config.optimizer[
-				"backbone_weight_decay"
-			],  # also higher weight decay
-		},
-		{
-			"params": model.classifier.parameters(),
-			"lr": config.optimizer[
-				"classifier_init_lr"
-			],  # Higher LR for new classifier
-			"weight_decay": config.optimizer[
-				"classifier_weight_decay"
-			],  # lower weight decay
-		},
-	]
-
-	optimizer = optim.AdamW(param_groups, eps=config.optimizer["eps"])
-
+	optimizer = get_optimizer(model, config['optimizer'])
 	scheduler = get_scheduler(optimizer, config.get("scheduler", None))
 
 	loss_func = nn.CrossEntropyLoss()
 
-	# usi
-	save_path = Path(config.admin["save_path"])
+	save_path = Path(config['admin']["save_path"])
 
 	# if we are continuing from last checkpoint, set 'load'
 	if recover:
@@ -310,8 +282,8 @@ def train_loop(
 			steps = 0
 
 	# train it
-	while epoch < config.training["max_epoch"] and not stopper.stop:
-		print(f"Epoch {epoch}/{config.training['max_epoch']}")
+	while epoch < config['training']["max_epoch"] and not stopper.stop:
+		print(f"Epoch {epoch}/{config['training']['max_epoch']}")
 		print("-" * 10)
 
 		epoch += 1
@@ -327,10 +299,12 @@ def train_loop(
 			running_corrects = 0
 			total_samples = 0
 
-			# for gradient accumulation
-			accumulated_loss = 0.0
+			# For step-level logging (only train phase)
+			step_loss = 0.0
+			step_corrects = 0
+			step_samples = 0
 			accumulated_steps = 0
-			optimizer.zero_grad()
+			# optimizer.zero_grad()
 
 			for item in dataloaders[phase]:
 				data, target = item["frames"], item["label_num"]
@@ -351,41 +325,50 @@ def train_loop(
 				running_corrects += predicted.eq(target).sum().item()
 
 				if phase == "train":
-					scaled_loss = loss / config.training["update_per_step"]
+					# Accumulate for step logging
+					step_loss += loss.item() * batch_size
+					step_corrects += predicted.eq(target).sum().item()
+					step_samples += batch_size
+		
+		
+					scaled_loss = loss / config['training']["update_per_step"]
 					scaled_loss.backward()
 
-					accumulated_loss += loss.item()
 					accumulated_steps += 1
 
-					if accumulated_steps == config.training["update_per_step"]:
+					if accumulated_steps == config['training']["update_per_step"]:
 						optimizer.step()
 						optimizer.zero_grad()
 						steps += 1
 
-						# Print progress every few steps
+						# Print step level output
 						if steps % 10 == 0:
-							avg_acc_loss = accumulated_loss / accumulated_steps
-							current_acc = 100.0 * running_corrects / total_samples
+							avg_step_loss = step_loss / step_samples
+							step_acc = 100.0 * step_corrects / step_samples
 
 							print(
-								f"Step {steps}: Accumulated Loss: {avg_acc_loss:.4f}, "
-								f"Current Accuracy: {current_acc:.2f}%"
+								f"Step {steps}: Loss: {avg_step_loss:.4f}, "
+								f"Accuracy: {step_acc:.2f}%"
 							)
 
 							wandb_run.log(
 								{
-									"Loss/Train_Step": avg_acc_loss,
-									"Accuracy/Train_Step": current_acc,
+									"Loss/Train_Step": avg_step_loss,
+									"Accuracy/Train_Step": step_acc,
 									"Step": steps,
 								}
 							)
+							
+							# Reset step metrics
+							step_loss = 0.0
+							step_corrects = 0
+							step_samples = 0
 
 						# Reset accumulation
-						accumulated_loss = 0.0
 						accumulated_steps = 0
 
 			# calculate  epoch metrics
-			epoch_loss = running_loss / total_samples  # Average loss per sample
+			epoch_loss = running_loss / total_samples
 			epoch_acc = 100.0 * running_corrects / total_samples
 
 			# early stopping logic
@@ -394,6 +377,7 @@ def train_loop(
 			if phase == stopper.phase:
 				stopper.step(stopping_metrics[phase][stopper.metric])
 
+			#print epoch level output
 			print(f"{phase.upper()} - Epoch {epoch}:")
 			print(f"  Loss: {epoch_loss:.4f}")
 			print(f"  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})")
@@ -435,7 +419,7 @@ def train_loop(
 		# Save checkpoint
 		if (
 			epoch % save_every == 0
-			or not epoch < config.training["max_epoch"]
+			or not epoch < config['training']["max_epoch"]
 			or stopper.stop
 		):
 			checkpoint_data = {
@@ -455,7 +439,11 @@ def train_loop(
 			print(f"Checkpoint saved: {checkpoint_path}")
 
 	print("Finished training successfully")
-	# wandb_run.finish()
+	return {
+		'best_val_acc': best_val_acc,
+		'best_val_loss': best_val_loss
+	}
+ 
 
 
 
@@ -736,7 +724,7 @@ def main():
 	print(f"Run name: {run.name}")  # Human-readable name
 	print(f"Run path: {run.path}")  # entity/project/run_id format
 
-	train_loop(admin["model"], run, recover=admin["recover"])
+	train_loop(admin["model"], config, run, recover=admin["recover"])
 	run.finish()
 
 

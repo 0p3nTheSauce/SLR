@@ -101,7 +101,20 @@ class RunInfo(TypedDict):
 class ExpInfo(RunInfo):
 	wandb: WandbInfo #NOTE: make wandb optional?
 
-
+def _exp_to_run_info(expInfo: ExpInfo) -> RunInfo:
+    """
+    Convert ExpInfo to RunInfo by removing wandb key.
+    """
+    run_info: RunInfo = {
+        'admin': expInfo['admin'],
+        'training': expInfo['training'],
+        'optimizer': expInfo['optimizer'],
+        'model_params': expInfo['model_params'],
+        'data': expInfo['data'],
+        'scheduler': expInfo['scheduler'],
+        'early_stopping': expInfo['early_stopping'],
+    }
+    return run_info
 ####################### Utility functions ##############################
 
 def set_seed(seed: int=SEED):
