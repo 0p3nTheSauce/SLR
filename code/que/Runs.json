@@ -33,7 +33,8 @@
             "scheduler": {
                 "type": "CosineAnnealingLR",
                 "tmax": 100,
-                "eta_min": 1e-05
+                "eta_min": 1e-05,
+                "warm_up": null
             },
             "early_stopping": {
                 "metric": [
@@ -90,7 +91,8 @@
             "scheduler": {
                 "type": "CosineAnnealingLR",
                 "tmax": 100,
-                "eta_min": 1e-05
+                "eta_min": 1.0,
+                "warm_up": null
             },
             "early_stopping": {
                 "metric": [
@@ -109,7 +111,7 @@
                     "S3D",
                     "exp-024"
                 ],
-                "run_id": null
+                "run_id": "5msuv0c0"
             }
         }
     ],

@@ -1,4 +1,4 @@
-from typing import Optional, Union, Callable, cast, Dict, Any
+from typing import Optional, Union, Callable, cast, Dict, Any, Tuple
 import torch  # type: ignore
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -30,24 +30,24 @@ from models import get_model, norm_vals
 from utils import wandb_manager
 
 
-def setup_data(mean, std, config):
+def setup_data(mean: Tuple[float, float, float], std: Tuple[float, float, float], config: RunInfo):
 	# NOTE: update for other datasets
-	train_info = get_wlasl_info(config.admin["split"], set_name="train")
-	val_info = get_wlasl_info(config.admin["split"], set_name="val")
+	train_info = get_wlasl_info(config['admin']["split"], set_name="train")
+	val_info = get_wlasl_info(config['admin']["split"], set_name="val")
 
 	train_loader, num_t_classes, _, _ = get_data_loader(
 		mean,
 		std,
-		config.data["frame_size"],
-		config.data["num_frames"],
+		config['data']["frame_size"],
+		config['data']["num_frames"],
 		set_info=train_info,
-		batch_size=config.training["batch_size"],
+		batch_size=config['training']["batch_size"],
 	)
 	val_loader, num_v_classes, _, _ = get_data_loader(
 		mean,
 		std,
-		config.data["frame_size"],
-		config.data["num_frames"],
+		config['data']["frame_size"],
+		config['data']["num_frames"],
 		set_info=val_info,
 		batch_size=1,
 	)
