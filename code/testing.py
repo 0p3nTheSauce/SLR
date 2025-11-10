@@ -445,6 +445,7 @@ def test_run(
 
 	return results
 
+#TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
 def full_test(
 	config: RunInfo,
 	save: bool = True
@@ -514,8 +515,8 @@ def full_test(
 
 
 	
-def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> ArgumentParser:
-	"""Get parser for testing configuration
+def get_test_parser(prog: Optional[str] = None, desc: str = "Test a model") -> ArgumentParser:
+	"""Get parser for testing configuration with subparsers for full/partial test modes
 
 	Args:
 		prog (Optional[str], optional): Script name, (e.g. testing.py). Defaults to None.
@@ -527,26 +528,30 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 	parser = ArgumentParser(description=desc, prog=prog)
 	models_available = avail_models()
 	splits_available = get_avail_splits()
-	parser.add_argument(
+	
+	# Create subparsers for 'full' and 'partial' commands
+	subparsers = parser.add_subparsers(dest='command', help='Test mode', required=True)
+	
+	# ============ FULL TEST SUBPARSER ============
+	full_parser = subparsers.add_parser(
+		'full',
+		help='Run full test suite (test, val, and shuffled test with all visualizations)'
+	)
+	
+	full_parser.add_argument(
 		"model",
 		type=str,
 		choices=models_available,
 		help=f"Model name from one of the implemented models: {models_available}",
 	)
-	parser.add_argument(
+	full_parser.add_argument(
 		"split",
 		type=str,
 		choices=splits_available,
-		help=f"The class split, one of:  {', '.join(splits_available)}",
+		help=f"The class split, one of: {', '.join(splits_available)}",
 	)
-	parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
-	parser.add_argument(
-		'set_name',
-		type=str,
-		choices=['train', 'val', 'test'],
-		help='Which set to test on'
-	)
-	parser.add_argument(
+	full_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
+	full_parser.add_argument(
 		'-ds',
 		'--dataset',
 		type=str,
@@ -554,56 +559,122 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 		help="Not implemented yet",
 		default='WLASL'
 	)
-	parser.add_argument("-c", "--config_path", help="path to config .ini file")
-	parser.add_argument(
+	full_parser.add_argument("-c", "--config_path", help="Path to config .ini file")
+	full_parser.add_argument(
+		'-se',
+		'--save',
+		action='store_true',
+		help='Save the outputs of the test'
+	)
+	
+	# ============ PARTIAL TEST SUBPARSER ============
+	partial_parser = subparsers.add_parser(
+		'partial',
+		help='Run partial test on a specific set with custom options'
+	)
+	
+	partial_parser.add_argument(
+		"model",
+		type=str,
+		choices=models_available,
+		help=f"Model name from one of the implemented models: {models_available}",
+	)
+	partial_parser.add_argument(
+		"split",
+		type=str,
+		choices=splits_available,
+		help=f"The class split, one of: {', '.join(splits_available)}",
+	)
+	partial_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
+	partial_parser.add_argument(
+		'-ds',
+		'--dataset',
+		type=str,
+		choices=['WLASL'],
+		help="Not implemented yet",
+		default='WLASL'
+	)
+	partial_parser.add_argument("-c", "--config_path", help="Path to config .ini file")
+	
+	# Set name selection
+	partial_parser.add_argument(
+		'-tt',
+		'--test',
+		action='store_const',
+		const='test',
+		dest='set_name',
+		help='Test on the test set'
+	)
+	partial_parser.add_argument(
+		'-tv',
+		'--val',
+		action='store_const',
+		const='val',
+		dest='set_name',
+		help='Test on the validation set'
+	)
+	partial_parser.add_argument(
+		'-tr',
+		'--train',
+		action='store_const',
+		const='train',
+		dest='set_name',
+		help='Test on the training set'
+	)
+	
+	partial_parser.add_argument(
 		'-sf',
 		'--shuffle_frames',
 		action='store_true',
 		help='Shuffle the frames when testing'
 	)
-	
-	parser.add_argument(
+	partial_parser.add_argument(
 		'-cn',
 		'--checkpoint_name',
 		type=str,
 		help='Checkpoint name, if not best.pth',
 		default='best.pth'
 	)
-	parser.add_argument(
+	partial_parser.add_argument(
 		'-bg',
 		'--bar_graph',
 		action='store_true',
 		help='Plot the bar graph'
 	)
-	parser.add_argument(
+	partial_parser.add_argument(
 		'-cm',
 		'--confusion_matrix',
 		action='store_true',
 		help='Plot the confusion matrix'
 	)
-	parser.add_argument(
+	partial_parser.add_argument(
 		'-hm',
 		'--heatmap',
 		action='store_true',
 		help='Plot the heatmap'
 	)
-	parser.add_argument(
+	partial_parser.add_argument(
 		'-dy',
 		'--display',
 		action='store_true',
 		help='Display the graphs, if they have been selected'
 	)
-	parser.add_argument(
+	partial_parser.add_argument(
 		'-se',
 		'--save',
 		action='store_true',
 		help='Save the outputs of the test'
 	)
+	
 	return parser
 
 def main():
 	parser = get_test_parser()
 	args = parser.parse_args()
+	
+	# Validate partial test mode requires a set selection
+	if args.command == 'partial' and args.set_name is None:
+		parser.error("Partial test requires one of: -tt/--test, -tv/--val, or -tr/--train")
 	
 	exp_no = str(int(args.exp_no)).zfill(3)
 	args.exp_no = exp_no
@@ -619,7 +690,6 @@ def main():
 	if args.config_path is None:
 		args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
 
- 
 	admin = AdminInfo(
 		model=args.model,
 		dataset=args.dataset,
@@ -632,23 +702,28 @@ def main():
  
 	conf = load_config(admin)
  
-	# results = test_run(
-	# 	config=conf,
-	# 	shuffle=args.shuffle_frames,
-	# 	set_name=args.set_name,
-	# 	check=args.checkpoint_name,
-	# 	br_graph=args.bar_graph,
-	# 	cf_matrix=args.confusion_matrix,
-	# 	heatmap=args.heatmap,
-	# 	disp=args.display,
-	# 	save=args.save,
-	# )
-	# print_dict(results)
-	full_test(conf)	
- 
- 
+	if args.command == 'full':
+		# Run complete test suite
+		print("Running full test suite...")
+		results = full_test(conf, save=args.save)
+		print_dict(results)
+	elif args.command == 'partial':
+		# Run partial test with specified parameters
+		print(f"Running partial test on {args.set_name} set...")
+		results = test_run(
+			config=conf,
+			set_name=args.set_name,
+			shuffle=args.shuffle_frames,
+			check=args.checkpoint_name,
+			br_graph=args.bar_graph,
+			cf_matrix=args.confusion_matrix,
+			heatmap=args.heatmap,
+			disp=args.display,
+			save=args.save,
+		)
+		print_dict(results)
+
 if __name__ == "__main__":
 	main()
-	# full_test()
 	
 	

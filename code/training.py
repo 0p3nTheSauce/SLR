@@ -1,5 +1,6 @@
 from typing import Optional, Union, cast, Dict, Any, Tuple
 import torch  # type: ignore
+import json
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LRScheduler
@@ -14,6 +15,7 @@ from configs import (
 	print_config,
 	take_args,
 	set_seed,
+	DataInfo,
 	SEED,
 	RunInfo,
 	WandbInfo,
@@ -178,6 +180,11 @@ def get_optimizer(model: torch.nn.Module, conf: OptimizerInfo) -> optim.AdamW:
 	
 	return optim.AdamW(param_groups, eps=conf["eps"])
 
+def save_test_sizes(data_specs: DataInfo, save_path: Path):
+	"""Save the frame size and number of frames for convenient testing"""
+	fname = save_path / ".testing.json"
+	with open(fname, 'w') as f:
+		json.dump(data_specs, f, indent=4)
 
 def train_loop(
 	model_name: str,
@@ -237,6 +244,9 @@ def train_loop(
 	else:
 		# make sure save path exists
 		save_path.mkdir(parents=True, exist_ok=True)
+
+	#save frame size and num frames for convenient testing
+	save_test_sizes(config["data"], save_path.parent)
 
 	# early stopping setup
 	stopping_metrics = {

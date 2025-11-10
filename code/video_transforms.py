@@ -219,13 +219,11 @@ class Shuffle(Transform):
                 diff += plen
             diffs[i] = diff    
         
-        print(diffs)
             
         hist = torch.bincount(diffs, minlength=plen).float()
             
         normed = hist / plen
         normed_no0 = normed[normed > 0]
-        print(normed_no0)
         entropy = -torch.sum(normed_no0 * torch.log2(normed_no0))
         return entropy.item()
 
