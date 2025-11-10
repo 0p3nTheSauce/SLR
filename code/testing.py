@@ -584,7 +584,6 @@ def get_test_parser(
 		"full",
 		help="Run full test suite (test, val, and shuffled test with all visualizations)",
 	)
-
 	full_parser.add_argument(
 		"model",
 		type=str,
@@ -603,10 +602,23 @@ def get_test_parser(
 		"--dataset",
 		type=str,
 		choices=["WLASL"],
-		help="Not implemented yet",
+		help="Dataset name",
 		default="WLASL",
 	)
-	full_parser.add_argument("-c", "--config_path", help="Path to config .ini file")
+	full_parser.add_argument(
+		"-nf",
+		"--num_frames",
+		type=int,
+		help="Number of frames (overrides data_info.json if provided)",
+		default=None,
+	)
+	full_parser.add_argument(
+		"-fs",
+		"--frame_size",
+		type=int,
+		help="Frame size (overrides data_info.json if provided)",
+		default=None,
+	)
 	full_parser.add_argument(
 		"-se", "--save", action="store_true", help="Save the outputs of the test"
 	)
@@ -630,41 +642,33 @@ def get_test_parser(
 	)
 	partial_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	partial_parser.add_argument(
+		"set_name",
+		type=str,
+		choices=['test', 'val', 'train'],
+		help="Which set to test on"
+	)
+	partial_parser.add_argument(
 		"-ds",
 		"--dataset",
 		type=str,
 		choices=["WLASL"],
-		help="Not implemented yet",
+		help="Dataset name",
 		default="WLASL",
 	)
-	partial_parser.add_argument("-c", "--config_path", help="Path to config .ini file")
-
-	# Set name selection
 	partial_parser.add_argument(
-		"-tt",
-		"--test",
-		action="store_const",
-		const="test",
-		dest="set_name",
-		help="Test on the test set",
+		"-nf",
+		"--num_frames",
+		type=int,
+		help="Number of frames (overrides data_info.json if provided)",
+		default=None,
 	)
 	partial_parser.add_argument(
-		"-tv",
-		"--val",
-		action="store_const",
-		const="val",
-		dest="set_name",
-		help="Test on the validation set",
+		"-fs",
+		"--frame_size",
+		type=int,
+		help="Frame size (overrides data_info.json if provided)",
+		default=None,
 	)
-	partial_parser.add_argument(
-		"-tr",
-		"--train",
-		action="store_const",
-		const="train",
-		dest="set_name",
-		help="Test on the training set",
-	)
-
 	partial_parser.add_argument(
 		"-sf",
 		"--shuffle_frames",
@@ -707,12 +711,6 @@ def main():
 	parser = get_test_parser()
 	args = parser.parse_args()
 
-	# Validate partial test mode requires a set selection
-	if args.command == "partial" and args.set_name is None:
-		parser.error(
-			"Partial test requires one of: -tt/--test, -tv/--val, or -tr/--train"
-		)
-
 	exp_no = str(int(args.exp_no)).zfill(3)
 	args.exp_no = exp_no
 	output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
@@ -729,39 +727,63 @@ def main():
 
 	args.save_path = str(save_path)
 
-	# Set config path
-	if args.config_path is None:
-		args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
-
-	# admin = AdminInfo(
-	# 	model=args.model,
-	# 	dataset=args.dataset,
-	# 	split=args.split,
-	# 	exp_no=args.exp_no,
-	# 	recover=False,
-	# 	config_path=args.config_path,
-	# 	save_path=args.save_path,
-	# )
-
-	# conf = load_config(admin)
-
-	conf = MinInfo(
+	# Create minimal admin info
+	admin = MinInfo(
 		model=args.model,
 		dataset=args.dataset,
 		split=args.split,
 		save_path=args.save_path
 	)
 
+	# Load or create DataInfo
+	data_info_path = output / DATA_FNAME
+	
+	# Try to load data_info.json, or use provided arguments
+	if args.num_frames is not None and args.frame_size is not None:
+		# Use provided arguments
+		data = DataInfo(
+			num_frames=args.num_frames,
+			frame_size=args.frame_size
+		)
+		print(f"Using provided data parameters: num_frames={args.num_frames}, frame_size={args.frame_size}")
+	else:
+		# Try to load from data_info.json
+		try:
+			data = load_test_sizes(output)
+			print(f"Loaded data info from {data_info_path}")
+			print(f"num_frames={data['num_frames']}, frame_size={data['frame_size']}")
+			
+			# Allow partial override
+			if args.num_frames is not None:
+				data['num_frames'] = args.num_frames
+				print(f"Overriding num_frames: {args.num_frames}")
+			if args.frame_size is not None:
+				data['frame_size'] = args.frame_size
+				print(f"Overriding frame_size: {args.frame_size}")
+				
+		except FileNotFoundError:
+			raise FileNotFoundError(
+				f"Could not find {data_info_path}. "
+				"Please provide -nf/--num_frames and -fs/--frame_size arguments, "
+				"or ensure data_info.json exists in the experiment directory."
+			)
+		except Exception as e:
+			raise RuntimeError(
+				f"Failed to load data info from {data_info_path}: {e}\n"
+				"You can provide -nf/--num_frames and -fs/--frame_size arguments instead."
+			)
+
 	if args.command == "full":
 		# Run complete test suite
 		print("Running full test suite...")
-		results = full_test(conf, save=args.save)
+		results = full_test(admin, data=data, save=args.save)
 		print_dict(results)
 	elif args.command == "partial":
 		# Run partial test with specified parameters
 		print(f"Running partial test on {args.set_name} set...")
 		results = test_run(
-			config=conf,
+			admin=admin,
+			data=data,
 			set_name=args.set_name,
 			shuffle=args.shuffle_frames,
 			check=args.checkpoint_name,
