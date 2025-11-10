@@ -1,7 +1,6 @@
-from typing import Optional, Union, Callable, cast, Dict, Any, Tuple
+from typing import Optional, Union, cast, Dict, Any, Tuple
 import torch  # type: ignore
 import torch.nn as nn
-from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.optim.lr_scheduler import LRScheduler
 from pathlib import Path
@@ -16,12 +15,8 @@ from configs import (
 	take_args,
 	set_seed,
 	SEED,
-	ExpInfo,
 	RunInfo,
 	WandbInfo,
-	CosAnealInfo,
-	WarmRestartInfo,
-	WarmOnly,
 	SchedInfo,
 	OptimizerInfo,
 )

@@ -501,9 +501,6 @@ class que:
 
 		return conf_list
 
-
-
-
 	def disp_runs(self, loc: QueLocation) -> None:
 		# Nice header
 		loc_display = loc.replace("_", " ").title()
@@ -516,9 +513,6 @@ class que:
 		for run in runs[1:]:
 			print(run)
 		print()
-
-	
-
 
 	def _is_dup_exp(self, new_run: RunInfo) -> bool:
 		"""Check if new_run already exists in to_run or old_runs (ignores run_id and config_path)"""
