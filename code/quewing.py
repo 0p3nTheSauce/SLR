@@ -25,11 +25,11 @@ import torch
 
 # locals
 import configs
-from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, _exp_to_run_info
+from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  _exp_to_run_info
 import utils
 from utils import gpu_manager
 from training import train_loop, _setup_wandb
-from testing import test_run
+from testing import full_test
 
 # constants
 SESH_NAME = "que_training"
@@ -841,6 +841,7 @@ class worker:
 		sesh_name: str = SESH_NAME,
 		debug: bool = True,
 		verbose: bool = True,
+		test_after: bool = True #TODO: add to parser
 	):
 		self.exec_path = exec_path
 		self.que = que(runs_path=runs_path, verbose=verbose)
@@ -891,23 +892,20 @@ class worker:
 			self.que.stash_failed_run(str(e))
 			raise e  # still need to crash so daemon can
 
-	# def test(self) -> None:
-	# 	gpu_manager.wait_for_completion()
-	# 	self.que.load_state()
-	# 	info = self.que.get_cur_run()
-	# 	#main test
-	# 	res_reg = test_run(
-	#   		info, 
-	#     	test_val=True, 
-	#       	br_graph=True, 	
-	#        	cf_matrix=True, 
-	#         heatmap=True,
-	#     )
-	# 	res_shuff = test_run(
-	# 		info, 
-	# 		shuffle=True,
-	# 		re_test=True
-	# 	)
+	def test(self) -> None:
+		gpu_manager.wait_for_completion()
+		self.que.load_state()
+		info = self.que.get_cur_run()
+		admin = info["admin"]
+		min_admin = MinInfo(
+			model=admin["model"],
+			dataset=admin['dataset'],
+			split=admin['split'],
+			save_path=admin['save_path']
+		)
+		data = info["data"]
+		
+		
 
 	def idle(
 		self,
@@ -1007,7 +1005,7 @@ class daemon:
 		wr: Optional[worker] = None,
 		q: Optional[que] = None,
 		tm: Optional[tmux_manager] = None,
-		stp_on_fail: bool = True,  # TODO: add this to parser
+		stp_on_fail: bool = False,  # TODO: add this to parser
 	) -> None:
 		self.name = name
 		self.wr_name = wr_name
