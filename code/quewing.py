@@ -321,7 +321,7 @@ class que:
 		return dic
 
 	def get_runs_info(
-		self, run_confs: List[ExpInfo]
+		self, run_confs: List[ExpInfo], head_sum: Optional[Dict[str, str]] = None 
 	) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
 		"""Get summarised run info, and stats for printing
 
@@ -331,14 +331,19 @@ class que:
 		Returns:
 																																																																																																																																		Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
 		"""
+		runs_info = []
+		if head_sum is not None:
+			runs_info.append(head_sum)
+  
+		runs_sum = [self.run_sum(run) for run in run_confs]
 
-		runs_info = [self.run_sum(run) for run in run_confs]
+		runs_info.extend(runs_sum)
 
 		# Calculate column widths
-		max_model = max(len(r["model"]) for r in runs_info)
-		max_exp = max(len(str(r["exp_no"])) for r in runs_info)
-		max_split = max(len(r["split"]) for r in runs_info)
-		max_id = max(len(r["run_id"]) for r in runs_info)
+		max_model = max([len(r["model"]) for r in runs_info] + [len("Model")])
+		max_exp = max([len(str(r["exp_no"])) for r in runs_info] + [len("Exp")])
+		max_split = max([len(r["split"]) for r in runs_info] + [len("Split")])
+		max_id = max([len(r["run_id"]) for r in runs_info] + [len("Run ID")])
 		stats = {
 			"max_model": max_model,
 			"max_exp": max_exp,
@@ -348,7 +353,7 @@ class que:
 
 		return runs_info, stats
 
-	def run_str(
+	def run_str0(
 		self, r_info: Dict[str, str], stats: Optional[Dict[str, int]] = None
 	) -> str:
 		"""Convert a run to summarised string representation
@@ -383,6 +388,41 @@ class que:
 
 		return r_str
 
+	def run_str(
+		self, r_info: Dict[str, str], stats: Optional[Dict[str, int]] = None
+	) -> str:
+		"""Convert a run to summarised string representation
+
+		Args:
+						r_info (Dict): Summarised run info.
+						stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
+
+		Returns:
+						str: Summarised string representation of run info
+		"""
+
+		if stats is None:
+			stats = {
+				"max_id": 0,
+				"max_model": 0,
+				"max_exp": 0,
+				"max_split": 0,
+			}
+
+		r_str = ""
+
+		if "run_id" in r_info and r_info["run_id"] is not None:
+			r_str += f"{r_info['run_id']:<{stats['max_id']}}  "
+
+		r_str += (
+			f"{r_info['model']:<{stats['max_model']}}  "
+			f"{r_info['split']:<{stats['max_split']}}  "
+			f"{r_info['exp_no']:<{stats['max_exp']}}  "
+			f"{r_info['config_path']}"
+		)
+
+		return r_str
+
 	# for queShell interface
 
 	def recover_run(self) -> None:
@@ -404,7 +444,7 @@ class que:
 		else:
 			self.print_v(f"{loc} already empty")
 
-	def list_runs(self, loc: QueLocation) -> List[str]:
+	def list_runso(self, loc: QueLocation) -> List[str]:
 		"""Summarise to a list of runs, in a given location
 
 		Args:
@@ -432,13 +472,53 @@ class que:
 
 		return conf_list
 
+	def list_runs(self, loc: QueLocation) -> List[str]:
+		to_disp = self.fetch_state(loc)
+
+		if len(to_disp) == 0:
+			self.print_v(" No runs available\n")
+			return []
+
+		head_sum = {
+			"model" : "Model",
+			"split" : "Split", 
+			"exp_no": "Exp",
+			"run_id" : "Run ID",
+			"config_path": "Config"
+		}
+
+		# Extract run info
+		runs_info, stats = self.get_runs_info(to_disp, head_sum)
+  
+		conf_list = []
+		head = f"  [{'Idx':>3}] {self.run_str(runs_info[0], stats)}"  
+		conf_list.append(head)
+		# conf_list.append("-" * len(head))
+		for i, info in enumerate(runs_info[1:]):
+			# Format with padding for alignment
+			r_str = f"  [{i:3d}] {self.run_str(info, stats)}"
+			conf_list.append(r_str)
+
+		return conf_list
+
+
+
+
 	def disp_runs(self, loc: QueLocation) -> None:
 		# Nice header
 		loc_display = loc.replace("_", " ").title()
 		print(f"\n=== {loc_display} ===")
+		print()
 		runs = self.list_runs(loc)
-		for run in runs:
+		max_len = max(len(r) for r in runs)
+		print(runs[0]) #head
+		print("-" * max_len)
+		for run in runs[1:]:
 			print(run)
+		print()
+
+	
+
 
 	def _is_dup_exp(self, new_run: RunInfo) -> bool:
 		"""Check if new_run already exists in to_run or old_runs (ignores run_id and config_path)"""
@@ -824,12 +904,12 @@ class worker:
 	# 	info = self.que.get_cur_run()
 	# 	#main test
 	# 	res_reg = test_run(
-    #   		info, 
-    #     	test_val=True, 
-    #       	br_graph=True, 	
-    #        	cf_matrix=True, 
-    #         heatmap=True,
-    #     )
+	#   		info, 
+	#     	test_val=True, 
+	#       	br_graph=True, 	
+	#        	cf_matrix=True, 
+	#         heatmap=True,
+	#     )
 	# 	res_shuff = test_run(
 	# 		info, 
 	# 		shuffle=True,
