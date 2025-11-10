@@ -25,7 +25,7 @@ import torch
 
 # locals
 import configs
-from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  _exp_to_run_info
+from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  _exp_to_run_info, CompExpInfo
 import utils
 from utils import gpu_manager
 from training import train_loop, _setup_wandb
@@ -122,7 +122,7 @@ class que:
 		self.lock: FileLock = FileLock(self.lock_file, timeout=30)
 		self.imp_splits: List[str] = configs.get_avail_splits()
 		self.verbose: bool = verbose
-		self.old_runs: List[ExpInfo] = []
+		self.old_runs: List[CompExpInfo] = []
 		self.cur_run: List[ExpInfo] = []
 		self.to_run: List[ExpInfo] = []
 		self.fail_runs: List[FailedExp] = []
@@ -140,6 +140,8 @@ class que:
 			return self.to_run
 		elif loc == CUR_RUN:
 			return self.cur_run
+		elif loc == FAIL_RUNS:
+			return self.fail_runs
 		else:
 			return self.old_runs
 
@@ -228,8 +230,6 @@ class que:
 																																		QueBusy: If cur_run is full
 																																		Timeout: If cannot acquire file lock
 		"""
-		self._load_Que()
-
 		# empty to run
 		if len(self.to_run) == 0:
 			raise QueEmpty(f"Can't get next run, no runs in {TO_RUN}")
@@ -243,7 +243,6 @@ class que:
 		next_run = self.to_run.pop(0)
 		self.cur_run.append(next_run)
 		self.print_v(f"Stashed next run: {self.run_str(self.run_sum(next_run))}")
-		self._save_Que()
 
 	def store_fin_run(self):
 		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
@@ -257,9 +256,23 @@ class que:
 			raise QueEmpty(f"Can't move run in {CUR_RUN} because it's empty")
 
 		fin_run = self.cur_run.pop(0)
-		self.old_runs.insert(0, fin_run)
+		results = full_test(
+			admin=fin_run["admin"],
+			data=fin_run['data']
+		)
+		comp_run = CompExpInfo(
+			admin=fin_run["admin"],
+			training=fin_run["training"],
+			optimizer=fin_run["optimizer"],
+			model_params=fin_run['model_params'],
+			data=fin_run["data"],
+			scheduler=fin_run["scheduler"],
+			early_stopping=fin_run["early_stopping"],
+			wandb=fin_run['wandb'], 
+			results=results
+		)
+		self.old_runs.insert(0, comp_run)
 		self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
-		self._save_Que()
 
 	def get_cur_run(self) -> ExpInfo:
 		"""Get the run stored in cur_run (assumes 1)"""
@@ -506,6 +519,8 @@ class que:
 		print(f"\n=== {loc_display} ===")
 		print()
 		runs = self.list_runs(loc)
+		if len(runs) == 0:
+			return
 		max_len = max(len(r) for r in runs)
 		print(runs[0]) #head
 		print("-" * max_len)
@@ -1051,6 +1066,7 @@ class daemon:
 
 	def start_n_watch(self):
 		"""Start process in this terminal and watch"""
+		raise DeprecationWarning("This function needs to be updated")
 		while True:
 			# prepare next run (move from to_run -> cur_run)
 			try:
@@ -1089,6 +1105,7 @@ class daemon:
 		while True:
 			# prepare next run (move from to_run -> cur_run)
 			try:
+				self.que.load_state()
 				self.que.stash_next_run()
 				self.que.save_state()
 			except QueEmpty:
@@ -1119,8 +1136,8 @@ class daemon:
 				self.print_v("Process completed successfully")
 				# save finished run (move from cur_run -> old_runs)
 				try:
-					self.que.load_state()
 					self.que.store_fin_run()
+					self.que.save_state()
 				except QueEmpty:
 					self.print_v("Could not find current run")
 				except Timeout:

@@ -16,6 +16,7 @@ import math
 import torch
 import configs
 import quewing
+import testing
 
 def plot_simulated_training(x_range, f):
 	x = x_range
@@ -84,7 +85,7 @@ def test_early_stopping(mode="min"):
 	#                         min_delta=min_delta,
 	#                         wandb_run=None)
 
-	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None)
+	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=None) #type: ignore
 	x_range = []
 	x = 0
 	f = partial(sim_loss)
@@ -207,7 +208,7 @@ def simulate_wandb_run(
 		"min_delta": min_delta,
 	}
 
-	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=run)
+	stopper = EarlyStopper(arg_dict=arg_dict, wandb_run=run) #type: ignore
 	x_range = []
 	x = 0
 	f = partial(sim_loss)
@@ -909,7 +910,7 @@ def test_loss3():
 	print("STEP 2: Calculate -log(probability of correct class)")
 	print("=" * 70)
 
-	correct_class_prob = probabilities[target.item()]
+	correct_class_prob = probabilities[target.item()] #type: ignore
 	print(f"\nProbability of correct class (cat): {correct_class_prob.item():.4f}")
 
 	manual_loss = -torch.log(correct_class_prob)
@@ -1067,6 +1068,47 @@ def reformet4():
 				print(f"Savine nf: {run['data']['num_frames']} fs: {run['data']['frame_size']} save_dir: {save_dir}")
 				save_test_sizes(run["data"], save_dir)		
 
+def reformet5():
+	errs = []
+	with open('que/Runs.json', 'r') as f:
+		data = json.load(f)
+	all_runs = cast(quewing.AllRuns, data)
+	old_runs = all_runs['old_runs']
+	for run in old_runs:
+		info = cast(configs.ExpInfo, run)
+		try:
+			testing.full_test(
+				info['admin'],
+				info['data'],
+				save=True
+			)
+		except KeyError as e:
+			print(f"Ran into an issue testing: {run['admin']['save_path']}")
+			print(e)
+			errs.append(f"Ran into an issue testing: {run['admin']['save_path']}: {e}")
+	print()
+	for err in errs:
+		print(err)
+
+def reformet6():
+	paths = ['runs/asl100/S3D_exp018/checkpoints','runs/asl100/S3D_exp014/checkpoints', 'runs/asl100/S3D_exp013/checkpoints' ]
+	scores = [
+		(68.3432, 1.93781), #acc, loss
+		(62.42604, 2.22761),
+		(68.3432, 1.85474)
+	]
+	for i, p in enumerate(paths):
+		exp = Path(p)
+		
+		#make a psuedo checkpoint, otherwise torch.save corrupts the file (probably because we used to try pickle a wandb run)
+		psuedo = {
+			"message": "This is just to run full_test with deprecated checkpoints",
+			"best_val_acc": scores[i][0],
+			"best_val_loss": scores[i][1]
+		}
+		torch.save(psuedo, exp / 'psuedo_checkpoint.pth')
+  
+
 if __name__ == "__main__":
 	# test_get_avail_splits()
 	# reformet2()
@@ -1076,4 +1118,4 @@ if __name__ == "__main__":
 	# test_safe_index2()
 	# test_raise()
 	# test_loss4()
-	reformet4()
+	reformet5()
