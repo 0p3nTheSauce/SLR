@@ -369,7 +369,7 @@ def test_run(
 
 	output = save_path.parent / "results"
 
-	if save:
+	if save or save_img:
 		output.mkdir(exist_ok=True)
 
 	dloader, num_classes, m_permt, m_sh_et = get_data_loader(
@@ -488,25 +488,53 @@ def load_test_sizes(save_dir: Path) -> DataInfo:
 	return cast(DataInfo, info)
 
 
+def load_comp_res(save_path: Path) -> CompRes:
+	"""Load results from file"""
+	with open(save_path, 'r') as f:
+		data = json.load(f)
+	return CompRes(
+		check_name=data['check_name'],
+		best_val_acc=data['best_val_acc'],
+		best_val_loss=data['best_val_loss'],
+		test=data['test'],
+		val = data['val'],
+		test_shuff=data['test_shuff']
+	)
+
 # TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
 def full_test(
-	admin: MinInfo, data: Optional[DataInfo] = None, save: bool = True
+	admin: MinInfo, data: Optional[DataInfo] = None, save: bool = True, re_test: bool = False
 ) -> CompRes:
 	"""Complete test, which includes:
-			- The best validation loss, and accuracy for the whole training run
-			- The test, val and 'shuffled test' results.
-	The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
-	The shuffled results additionally contain the permutation used, and it's shannon entropy
+	- The best validation loss, and accuracy for the whole training run
+	- The test, val and 'shuffled test' results.
+	- The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
+	- The shuffled results additionally contain the permutation used, and it's shannon entropy
+
 
 	Args:
-			config (RunInfo): The run config used for training.
-			save (bool, optional): Whether to save results. Defaults to True.
+		admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
+		data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
+		save (bool, optional): Whether to save. Defaults to True.
+		re_test (bool, optional): Re-test even if files exist. Defaults to False.
+
+	Raises:
+		Exception: If there is an error loading data from data_info.json
 
 	Returns:
-			CompRes: A results dictionary (as described above).
-	"""
+		CompRes: A results dictionary (as described above).
+	""" 
 	save_path = Path(admin["save_path"])
 
+	# output
+	out_dir = save_path.parent / "results"
+	res_path = out_dir / "best_val_loss.json"
+
+	#dont retest if exists
+	if res_path.exists() and not re_test:
+		return load_comp_res(res_path)
+ 
+	#optionall load data
 	if data is None:
 		try:
 			data = load_test_sizes(save_path.parent)
@@ -524,10 +552,7 @@ def full_test(
 	best_val_acc = last_check["best_val_acc"]
 	best_val_loss = last_check["best_val_loss"]
 
-	# output
-	out_dir = save_path.parent / "results"
-	res_path = out_dir / "best_val_loss.json"
-
+	
 	# test set
 	test = test_run(
 		admin,
