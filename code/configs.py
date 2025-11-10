@@ -30,14 +30,17 @@ RUNS_PATH = "./runs"
 SEED = 42
 
 ####################### Typed Dictionaries #############################
-class AdminInfo(TypedDict):
+
+class MinInfo(TypedDict):
 	model: str
 	dataset: str
 	split: str
+	save_path: str
+ 
+class AdminInfo(MinInfo):
 	exp_no: str
 	recover: bool
 	config_path: str
-	save_path: str
 
 class TrainingInfo(TypedDict):
 	batch_size: int

@@ -10,7 +10,7 @@ from pathlib import Path
 import json
 import test
 from collections import Counter
-from typing import Optional, Literal, cast
+from typing import Optional, Literal, cast, List
 from functools import partial
 import math
 import torch
@@ -1052,9 +1052,20 @@ def reformet3():
 	with open('que/Runs.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 	
-	
-	
-	
+def reformet4():
+	from training import save_test_sizes
+	with open('que/Runs.json', 'r') as f:
+		data = json.load(f)
+	all_runs = cast(quewing.AllRuns, data)
+ 
+	for runs in all_runs.values():
+		runs = cast(List[configs.ExpInfo], runs)
+		# print(len(runs))
+		for run in runs:
+			save_dir = Path(run['admin']['save_path']).parent
+			if save_dir.exists():
+				print(f"Savine nf: {run['data']['num_frames']} fs: {run['data']['frame_size']} save_dir: {save_dir}")
+				save_test_sizes(run["data"], save_dir)		
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
@@ -1065,4 +1076,4 @@ if __name__ == "__main__":
 	# test_safe_index2()
 	# test_raise()
 	# test_loss4()
-	reformet3()
+	reformet4()
