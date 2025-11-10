@@ -100,6 +100,31 @@ class RunInfo(TypedDict):
 
 class ExpInfo(RunInfo):
 	wandb: WandbInfo #NOTE: make wandb optional?
+ 
+#Results
+class TopKRes(TypedDict):
+	top1: float
+	top5: float
+	top10: float
+
+class BaseRes(TypedDict):
+	top_k_average_per_class_acc: TopKRes
+	top_k_per_instance_acc: TopKRes
+	average_loss: float
+	
+class ShuffRes(BaseRes):
+	perm: List[int]
+	shannon_entropy: float
+
+class CompRes(TypedDict):
+	check_name: str
+	best_val_acc: float
+	best_val_loss: float
+	test: BaseRes
+	val: BaseRes
+	test_shuff: ShuffRes
+
+
 
 def _exp_to_run_info(expInfo: ExpInfo) -> RunInfo:
     """

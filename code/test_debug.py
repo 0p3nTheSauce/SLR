@@ -10,11 +10,12 @@ from pathlib import Path
 import json
 import test
 from collections import Counter
-from typing import Optional, Literal
+from typing import Optional, Literal, cast
 from functools import partial
 import math
 import torch
-
+import configs
+import quewing
 
 def plot_simulated_training(x_range, f):
 	x = x_range
@@ -1033,6 +1034,28 @@ def test_loss4():
 	print(loss)
 	print(loss.item())
 
+def reformet3():
+	
+	with open('que/Runs.json', 'r') as f:
+		data = json.load(f)
+	all_runs = cast(quewing.AllRuns, data)
+	old_runs = all_runs["old_runs"]
+	for i, run in enumerate(old_runs):
+		info = cast(configs.ExpInfo, run)
+		admin = info['admin']
+		admin['config_path'] = admin['config_path'].replace('/home/luke/Code/SLR/code', '.')
+		info['admin'] = admin
+		old_runs[i] = info
+		
+	all_runs['old_runs'] = old_runs
+
+	with open('que/Runs.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+	
+	
+	
+	
+
 if __name__ == "__main__":
 	# test_get_avail_splits()
 	# reformet2()
@@ -1041,4 +1064,5 @@ if __name__ == "__main__":
 	# test_tmux_man()
 	# test_safe_index2()
 	# test_raise()
-	test_loss4()
+	# test_loss4()
+	reformet3()
