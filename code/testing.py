@@ -1,4 +1,15 @@
-from typing import Optional, Union, Tuple, Dict, List, Any, TypedDict, Literal, cast
+from typing import (
+	Optional,
+	Union,
+	Tuple,
+	Dict,
+	List,
+	Any,
+	TypedDict,
+	Literal,
+	cast,
+	TypedDict,
+)
 from argparse import ArgumentParser
 import torch
 import json
@@ -15,20 +26,31 @@ from models import norm_vals, get_model
 from configs import set_seed, CompRes
 from video_dataset import VideoDataset, get_data_loader, get_wlasl_info
 from models import avail_models
-from configs import get_avail_splits, load_config, AdminInfo, RunInfo, RUNS_PATH, BaseRes, ShuffRes, TopKRes
+from configs import (
+	get_avail_splits,
+	load_config,
+	AdminInfo,
+	DataInfo,
+	MinInfo,
+	RUNS_PATH,
+	BaseRes,
+	ShuffRes,
+	TopKRes,
+)
 from utils import print_dict
+
+# constants
+
+DATA_FNAME = "data_info.json"
+
+
 #################################### Utilities #################################
-
-
 def cleanup_memory():
 	"""Cleanup GPU and CPU memory"""
 	if torch.cuda.is_available():
 		torch.cuda.empty_cache()
 		torch.cuda.synchronize()
 	gc.collect()
-
-#################################### Helper classes #############################
-
 
 
 ##############################   Individual-run testing   ######################################
@@ -61,7 +83,6 @@ def test_model(model, test_loader):
 
 
 def test_top_k(model, test_loader, verbose=False, save_path=None):
-
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	model.to(device)
 	model.eval()
@@ -154,20 +175,18 @@ def test_topk_clsrep(
 	test_loader: DataLoader[VideoDataset],
 	verbose: bool = False,
 	save_path: Optional[Union[str, Path]] = None,
-) -> Tuple[
-	BaseRes, Dict[str, Dict[str, float]], List[int], List[int]
-]:
+) -> Tuple[BaseRes, Dict[str, Dict[str, float]], List[int], List[int]]:
 	"""Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
 	Args:
-					model (torch.nn.Module): Initialised model to test.
-					test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
-					seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
-					verbose (bool, optional): Verbose output. Defaults to False.
-					save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
+									model (torch.nn.Module): Initialised model to test.
+									test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
+									seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
+									verbose (bool, optional): Verbose output. Defaults to False.
+									save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
 
 	Returns:
-					Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
+									Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
 	"""
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -195,7 +214,6 @@ def test_topk_clsrep(
 	top10_fp = np.zeros(num_classes, dtype=np.int64)
 	top10_tp = np.zeros(num_classes, dtype=np.int64)
 
-
 	loss_func = torch.nn.CrossEntropyLoss()
 	running_loss = 0.0
 	total_samples = 0
@@ -209,7 +227,7 @@ def test_topk_clsrep(
 
 			predictions = model(data)
 
-			#for loss
+			# for loss
 			loss = loss_func(predictions, target)
 			running_loss += loss.item() * batch_size
 
@@ -265,25 +283,21 @@ def test_topk_clsrep(
 	print(fstr)
 	print(fstr2)
 
-	#loss
+	# loss
 	epoch_loss = running_loss / total_samples
- 
-	print(f"Averag Loss: {epoch_loss:.2f}")
 
+	print(f"Averag Loss: {epoch_loss:.2f}")
 
 	topk_res = BaseRes(
 		top_k_average_per_class_acc=TopKRes(
 			top1=float(top1_per_class),
 			top5=float(top5_per_class),
-			top10=float(top10_per_class)
+			top10=float(top10_per_class),
 		),
 		top_k_per_instance_acc=TopKRes(
-			top1=top1_per_instance,
-			top5=top5_per_instance,
-			top10=top10_per_instance
+			top1=top1_per_instance, top5=top5_per_instance, top10=top10_per_instance
 		),
-		average_loss=epoch_loss
-  
+		average_loss=epoch_loss,
 	)
 	if save_path is not None:
 		with open(save_path, "w") as f:
@@ -307,10 +321,10 @@ def load_info(dirp: Path, checkname: str):
 	return resd
 
 
-
 def test_run(
-	config: RunInfo,
-	set_name: Literal['test', 'val', 'train'],
+	admin: MinInfo,
+	data: DataInfo,
+	set_name: Literal["test", "val", "train"],
 	shuffle: bool = False,
 	check: str = "best.pth",
 	br_graph: bool = False,
@@ -318,35 +332,35 @@ def test_run(
 	heatmap: bool = False,
 	disp: bool = False,
 	save: bool = True,
-	save_img: Optional[bool] = None
+	save_img: Optional[bool] = None,
 ) -> Union[BaseRes, ShuffRes]:
 	"""Perform testing of a model according to the provided configuration.
 
 	Args:
-			config (Dict[str, Any]): Run config file.
-			perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
-			test_val (bool, optional): Test on the val set. Defaults to False.
-			test_test (bool, optional): Test on the test set. Defaults to True.
-			check (str, optional): Checkpoint name. Defaults to "best.pth".
-			br_graph (bool, optional): Create bar graph. Defaults to False.
-			cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
-			heatmap (bool, optional): Create heatmap. Defaults to False.
-			disp (bool, optional): Display plots. Defaults to False.
-			save (bool, optional): Save results and plots. Defaults to True.
-			re_test (bool, optional): Test even if results already saved. Defaults to False.
+					config (Dict[str, Any]): Run config file.
+					perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+					test_val (bool, optional): Test on the val set. Defaults to False.
+					test_test (bool, optional): Test on the test set. Defaults to True.
+					check (str, optional): Checkpoint name. Defaults to "best.pth".
+					br_graph (bool, optional): Create bar graph. Defaults to False.
+					cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+					heatmap (bool, optional): Create heatmap. Defaults to False.
+					disp (bool, optional): Display plots. Defaults to False.
+					save (bool, optional): Save results and plots. Defaults to True.
+					re_test (bool, optional): Test even if results already saved. Defaults to False.
 
 	Returns:
-			Optional[Dict[str, Any]]: Results if correct parameters.
+					Optional[Dict[str, Any]]: Results if correct parameters.
 	"""
- 
+
 	if save_img is None:
 		save_img = save
 
 	set_seed()
 
-	admin = config["admin"]
+	# admin = config["admin"]
 	model_name = admin["model"]
-	data = config["data"]
+	# data = config["data"]
 
 	model_norms = norm_vals(model_name)
 	results = {}
@@ -357,15 +371,15 @@ def test_run(
 
 	if save:
 		output.mkdir(exist_ok=True)
-	
+
 	dloader, num_classes, m_permt, m_sh_et = get_data_loader(
-	 	model_norms['mean'],
-		model_norms['std'],
+		model_norms["mean"],
+		model_norms["std"],
 		data["frame_size"],
 		data["num_frames"],
 		set_info=get_wlasl_info(admin["split"], set_name=set_name),
 		shuffle=shuffle,
-		batch_size=1
+		batch_size=1,
 	)
 
 	model = get_model(model_name, num_classes, drop_p=0.0)
@@ -386,32 +400,31 @@ def test_run(
 	else:
 		suffix = "-top-k.json"
 
-	
 	print(f"Testing on {set_name} set")
 	fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
 	save2 = output / fname
-	
+
 	topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
 		model=model,
 		test_loader=dloader,
 		verbose=False,
 	)
-	
-	if m_permt is not None and m_sh_et is not None: #shuffled
+
+	if m_permt is not None and m_sh_et is not None:  # shuffled
 		results = ShuffRes(
-			top_k_average_per_class_acc=topk_res['top_k_average_per_class_acc'],
-			top_k_per_instance_acc=topk_res['top_k_per_instance_acc'],
-			average_loss=topk_res['average_loss'],
+			top_k_average_per_class_acc=topk_res["top_k_average_per_class_acc"],
+			top_k_per_instance_acc=topk_res["top_k_per_instance_acc"],
+			average_loss=topk_res["average_loss"],
 			perm=m_permt,
-			shannon_entropy=m_sh_et
+			shannon_entropy=m_sh_et,
 		)
 	else:
 		results = topk_res
-  
+
 	if save:
 		with open(save2, "w") as f:
 			json.dump(results, f, indent=4)
-		
+
 	if heatmap:
 		fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
 		save2 = output / fname if save_img else None
@@ -445,99 +458,133 @@ def test_run(
 
 	return results
 
-#TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
-def full_test(
-	config: RunInfo,
-	save: bool = True
-) -> CompRes: 
-	"""Complete test, which includes:
-		- The best validation loss, and accuracy for the whole training run 
-		- The test, val and 'shuffled test' results.
-	The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
-	The shuffled results additionally contain the permutation used, and it's shannon entropy 
-  
+
+def save_test_sizes(data_specs: DataInfo, save_dir: Path):
+	"""Save the frame size and number of frames for convenient testing.
+
 	Args:
-		config (RunInfo): The run config used for training.
-		save (bool, optional): Whether to save results. Defaults to True.
+			data_specs (DataInfo): Dictionary containing frame_size and num_frames
+			save_dir (Path): Experiment directory (can retrieve with save_path.parent from AdminInfo)
+	"""
+	fname = save_dir / DATA_FNAME
+	with open(fname, "w") as f:
+		json.dump(data_specs, f, indent=4)
+
+
+def load_test_sizes(save_dir: Path) -> DataInfo:
+	"""Load the frame size and number of frames for convenient testing. This function needs
+	Filename symmetry with save_test_sizes
+
+	Args:
+			data_path (Path): Path to data_info.json ()
 
 	Returns:
-		CompRes: A results dictionary (as described above).
+			DataInfo: _description_
 	"""
-	save_path = Path(config['admin']['save_path'])
+	fname = save_dir / DATA_FNAME
+	with open(fname, "r") as f:
+		info = json.load(f)
+
+	return cast(DataInfo, info)
+
+
+# TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
+def full_test(
+	admin: MinInfo, data: Optional[DataInfo] = None, save: bool = True
+) -> CompRes:
+	"""Complete test, which includes:
+			- The best validation loss, and accuracy for the whole training run
+			- The test, val and 'shuffled test' results.
+	The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
+	The shuffled results additionally contain the permutation used, and it's shannon entropy
+
+	Args:
+			config (RunInfo): The run config used for training.
+			save (bool, optional): Whether to save results. Defaults to True.
+
+	Returns:
+			CompRes: A results dictionary (as described above).
+	"""
+	save_path = Path(admin["save_path"])
+
+	if data is None:
+		try:
+			data = load_test_sizes(save_path.parent)
+		except Exception as e:
+			print(
+				f"Full test failed to automatically load data info from: {save_path.parent / DATA_FNAME}"
+			)
+			print("Create the file, or pass as parameter instead")
+			raise e
+
+	# load checkpoint
 	files = sorted(list(save_path.iterdir()))
 	last_check = torch.load(files[-1])
+	# extract metrics
 	best_val_acc = last_check["best_val_acc"]
 	best_val_loss = last_check["best_val_loss"]
+
+	# output
 	out_dir = save_path.parent / "results"
-	res_path = out_dir / "best_val_loss.json" 
- 
-	#test set
+	res_path = out_dir / "best_val_loss.json"
+
+	# test set
 	test = test_run(
-		config,
-		'test',
+		admin,
+		data,
+		"test",
 		br_graph=True,
 		cf_matrix=True,
 		heatmap=True,
 		save_img=True,
-		save=False
+		save=False,
 	)
-	#validation set
-	val = test_run(
-		config,
-		'val',
-		save=False
-	)
-	#shuffled frames test set
-	test_shuff = test_run(
-		config,
-		'test',
-		shuffle=True,
-		save=False
-	)
-	
+	# validation set
+	val = test_run(admin, data, "val", save=False)
+	# shuffled frames test set
+	test_shuff = test_run(admin, data, "test", shuffle=True, save=False)
+
 	results = CompRes(
-		check_name='best_val',
+		check_name="best_val",
 		best_val_acc=best_val_acc,
 		best_val_loss=best_val_loss,
 		test=test,
 		val=val,
-		test_shuff=cast(ShuffRes,test_shuff)
+		test_shuff=cast(ShuffRes, test_shuff),
 	)
- 
+
 	if save:
-		with open(res_path, 'w') as f:
+		with open(res_path, "w") as f:
 			json.dump(results, f, indent=4)
-   
+
 	return results
 
-	
-	
 
-
-	
-def get_test_parser(prog: Optional[str] = None, desc: str = "Test a model") -> ArgumentParser:
+def get_test_parser(
+	prog: Optional[str] = None, desc: str = "Test a model"
+) -> ArgumentParser:
 	"""Get parser for testing configuration with subparsers for full/partial test modes
 
 	Args:
-		prog (Optional[str], optional): Script name, (e.g. testing.py). Defaults to None.
-		desc (str, optional): Program desctiption. Defaults to "Test a model".
+			prog (Optional[str], optional): Script name, (e.g. testing.py). Defaults to None.
+			desc (str, optional): Program desctiption. Defaults to "Test a model".
 
 	Returns:
-		ArgumentParser: Parser which takes testing arguments
+			ArgumentParser: Parser which takes testing arguments
 	"""
 	parser = ArgumentParser(description=desc, prog=prog)
 	models_available = avail_models()
 	splits_available = get_avail_splits()
-	
+
 	# Create subparsers for 'full' and 'partial' commands
-	subparsers = parser.add_subparsers(dest='command', help='Test mode', required=True)
-	
+	subparsers = parser.add_subparsers(dest="command", help="Test mode", required=True)
+
 	# ============ FULL TEST SUBPARSER ============
 	full_parser = subparsers.add_parser(
-		'full',
-		help='Run full test suite (test, val, and shuffled test with all visualizations)'
+		"full",
+		help="Run full test suite (test, val, and shuffled test with all visualizations)",
 	)
-	
+
 	full_parser.add_argument(
 		"model",
 		type=str,
@@ -552,27 +599,23 @@ def get_test_parser(prog: Optional[str] = None, desc: str = "Test a model") -> A
 	)
 	full_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	full_parser.add_argument(
-		'-ds',
-		'--dataset',
+		"-ds",
+		"--dataset",
 		type=str,
-		choices=['WLASL'],
+		choices=["WLASL"],
 		help="Not implemented yet",
-		default='WLASL'
+		default="WLASL",
 	)
 	full_parser.add_argument("-c", "--config_path", help="Path to config .ini file")
 	full_parser.add_argument(
-		'-se',
-		'--save',
-		action='store_true',
-		help='Save the outputs of the test'
+		"-se", "--save", action="store_true", help="Save the outputs of the test"
 	)
-	
+
 	# ============ PARTIAL TEST SUBPARSER ============
 	partial_parser = subparsers.add_parser(
-		'partial',
-		help='Run partial test on a specific set with custom options'
+		"partial", help="Run partial test on a specific set with custom options"
 	)
-	
+
 	partial_parser.add_argument(
 		"model",
 		type=str,
@@ -587,127 +630,134 @@ def get_test_parser(prog: Optional[str] = None, desc: str = "Test a model") -> A
 	)
 	partial_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	partial_parser.add_argument(
-		'-ds',
-		'--dataset',
+		"-ds",
+		"--dataset",
 		type=str,
-		choices=['WLASL'],
+		choices=["WLASL"],
 		help="Not implemented yet",
-		default='WLASL'
+		default="WLASL",
 	)
 	partial_parser.add_argument("-c", "--config_path", help="Path to config .ini file")
-	
+
 	# Set name selection
 	partial_parser.add_argument(
-		'-tt',
-		'--test',
-		action='store_const',
-		const='test',
-		dest='set_name',
-		help='Test on the test set'
+		"-tt",
+		"--test",
+		action="store_const",
+		const="test",
+		dest="set_name",
+		help="Test on the test set",
 	)
 	partial_parser.add_argument(
-		'-tv',
-		'--val',
-		action='store_const',
-		const='val',
-		dest='set_name',
-		help='Test on the validation set'
+		"-tv",
+		"--val",
+		action="store_const",
+		const="val",
+		dest="set_name",
+		help="Test on the validation set",
 	)
 	partial_parser.add_argument(
-		'-tr',
-		'--train',
-		action='store_const',
-		const='train',
-		dest='set_name',
-		help='Test on the training set'
+		"-tr",
+		"--train",
+		action="store_const",
+		const="train",
+		dest="set_name",
+		help="Test on the training set",
 	)
-	
+
 	partial_parser.add_argument(
-		'-sf',
-		'--shuffle_frames',
-		action='store_true',
-		help='Shuffle the frames when testing'
+		"-sf",
+		"--shuffle_frames",
+		action="store_true",
+		help="Shuffle the frames when testing",
 	)
 	partial_parser.add_argument(
-		'-cn',
-		'--checkpoint_name',
+		"-cn",
+		"--checkpoint_name",
 		type=str,
-		help='Checkpoint name, if not best.pth',
-		default='best.pth'
+		help="Checkpoint name, if not best.pth",
+		default="best.pth",
 	)
 	partial_parser.add_argument(
-		'-bg',
-		'--bar_graph',
-		action='store_true',
-		help='Plot the bar graph'
+		"-bg", "--bar_graph", action="store_true", help="Plot the bar graph"
 	)
 	partial_parser.add_argument(
-		'-cm',
-		'--confusion_matrix',
-		action='store_true',
-		help='Plot the confusion matrix'
+		"-cm",
+		"--confusion_matrix",
+		action="store_true",
+		help="Plot the confusion matrix",
 	)
 	partial_parser.add_argument(
-		'-hm',
-		'--heatmap',
-		action='store_true',
-		help='Plot the heatmap'
+		"-hm", "--heatmap", action="store_true", help="Plot the heatmap"
 	)
 	partial_parser.add_argument(
-		'-dy',
-		'--display',
-		action='store_true',
-		help='Display the graphs, if they have been selected'
+		"-dy",
+		"--display",
+		action="store_true",
+		help="Display the graphs, if they have been selected",
 	)
 	partial_parser.add_argument(
-		'-se',
-		'--save',
-		action='store_true',
-		help='Save the outputs of the test'
+		"-se", "--save", action="store_true", help="Save the outputs of the test"
 	)
-	
+
 	return parser
+
 
 def main():
 	parser = get_test_parser()
 	args = parser.parse_args()
-	
+
 	# Validate partial test mode requires a set selection
-	if args.command == 'partial' and args.set_name is None:
-		parser.error("Partial test requires one of: -tt/--test, -tv/--val, or -tr/--train")
-	
+	if args.command == "partial" and args.set_name is None:
+		parser.error(
+			"Partial test requires one of: -tt/--test, -tv/--val, or -tr/--train"
+		)
+
 	exp_no = str(int(args.exp_no)).zfill(3)
 	args.exp_no = exp_no
 	output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
 	save_path = output / "checkpoints"
- 
-	if not save_path.exists() or not save_path.is_dir() or len(list(save_path.iterdir())) == 0:
-		raise ValueError(f"Invalid output: {output}, must exist and be a directory that is not empty")
+
+	if (
+		not save_path.exists()
+		or not save_path.is_dir()
+		or len(list(save_path.iterdir())) == 0
+	):
+		raise ValueError(
+			f"Invalid output: {output}, must exist and be a directory that is not empty"
+		)
 
 	args.save_path = str(save_path)
- 
+
 	# Set config path
 	if args.config_path is None:
 		args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
 
-	admin = AdminInfo(
+	# admin = AdminInfo(
+	# 	model=args.model,
+	# 	dataset=args.dataset,
+	# 	split=args.split,
+	# 	exp_no=args.exp_no,
+	# 	recover=False,
+	# 	config_path=args.config_path,
+	# 	save_path=args.save_path,
+	# )
+
+	# conf = load_config(admin)
+
+	conf = MinInfo(
 		model=args.model,
 		dataset=args.dataset,
 		split=args.split,
-		exp_no=args.exp_no,
-		recover=False,
-		config_path=args.config_path,
 		save_path=args.save_path
 	)
- 
-	conf = load_config(admin)
- 
-	if args.command == 'full':
+
+	if args.command == "full":
 		# Run complete test suite
 		print("Running full test suite...")
 		results = full_test(conf, save=args.save)
 		print_dict(results)
-	elif args.command == 'partial':
+	elif args.command == "partial":
 		# Run partial test with specified parameters
 		print(f"Running partial test on {args.set_name} set...")
 		results = test_run(
@@ -723,7 +773,6 @@ def main():
 		)
 		print_dict(results)
 
+
 if __name__ == "__main__":
 	main()
-	
-	

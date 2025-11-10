@@ -25,7 +25,7 @@ from configs import (
 from stopping import EarlyStopper, StopperOn
 from models import get_model, norm_vals
 from utils import wandb_manager
-
+from testing import save_test_sizes
 
 def setup_data(mean: Tuple[float, float, float], std: Tuple[float, float, float], config: RunInfo):
 	# NOTE: update for other datasets
@@ -180,11 +180,7 @@ def get_optimizer(model: torch.nn.Module, conf: OptimizerInfo) -> optim.AdamW:
 	
 	return optim.AdamW(param_groups, eps=conf["eps"])
 
-def save_test_sizes(data_specs: DataInfo, save_path: Path):
-	"""Save the frame size and number of frames for convenient testing"""
-	fname = save_path / ".testing.json"
-	with open(fname, 'w') as f:
-		json.dump(data_specs, f, indent=4)
+
 
 def train_loop(
 	model_name: str,
