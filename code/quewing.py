@@ -9,7 +9,6 @@ from typing import (
 	TypeAlias,
 	Tuple,
 	Dict,
-	Union,
 	Any,
 	TypedDict,
 	cast,

@@ -1,4 +1,4 @@
-from typing import Optional, Union, Tuple, Dict, List, Any, TypedDict, Literal
+from typing import Optional, Union, Tuple, Dict, List, Any, TypedDict, Literal, cast
 from argparse import ArgumentParser
 import torch
 import json
@@ -12,10 +12,10 @@ import gc
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model
-from configs import set_seed
+from configs import set_seed, CompRes
 from video_dataset import VideoDataset, get_data_loader, get_wlasl_info
 from models import avail_models
-from configs import get_avail_splits, load_config, AdminInfo, RunInfo, RUNS_PATH
+from configs import get_avail_splits, load_config, AdminInfo, RunInfo, RUNS_PATH, BaseRes, ShuffRes, TopKRes
 from utils import print_dict
 #################################### Utilities #################################
 
@@ -29,26 +29,7 @@ def cleanup_memory():
 
 #################################### Helper classes #############################
 
-class TopKRes(TypedDict):
-	top1: float
-	top5: float
-	top10: float
 
-class BaseRes(TypedDict):
-	top_k_average_per_class_acc: TopKRes
-	top_k_per_instance_acc: TopKRes
-	average_loss: float
-	
-class ShuffRes(BaseRes):
-	perm: List[int]
-	shannon_entropy: float
-
-class CompRes(TypedDict):
-	check_name: str
-	best_val_loss: Optional[float]
-	test: BaseRes
-	val: BaseRes
-	test_shuff: ShuffRes
 
 ##############################   Individual-run testing   ######################################
 
@@ -337,6 +318,7 @@ def test_run(
 	heatmap: bool = False,
 	disp: bool = False,
 	save: bool = True,
+	save_img: Optional[bool] = None
 ) -> Union[BaseRes, ShuffRes]:
 	"""Perform testing of a model according to the provided configuration.
 
@@ -356,6 +338,9 @@ def test_run(
 	Returns:
 			Optional[Dict[str, Any]]: Results if correct parameters.
 	"""
+ 
+	if save_img is None:
+		save_img = save
 
 	set_seed()
 
@@ -374,7 +359,7 @@ def test_run(
 		output.mkdir(exist_ok=True)
 	
 	dloader, num_classes, m_permt, m_sh_et = get_data_loader(
-     	model_norms['mean'],
+	 	model_norms['mean'],
 		model_norms['std'],
 		data["frame_size"],
 		data["num_frames"],
@@ -429,7 +414,7 @@ def test_run(
 		
 	if heatmap:
 		fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
-		save2 = output / fname if save else None
+		save2 = output / fname if save_img else None
 		plot_heatmap(
 			report=cls_report,
 			title=f"{set_name.capitalize()} set Classification Report",
@@ -439,7 +424,7 @@ def test_run(
 
 	if br_graph:
 		fname = check_path.name.replace(".pth", f"_{set_name}-bargraph.png")
-		save2 = output / fname if save else None
+		save2 = output / fname if save_img else None
 		plot_bar_graph(
 			report=cls_report,
 			title=f"{set_name.capitalize()} set Classification Report",
@@ -449,7 +434,7 @@ def test_run(
 
 	if cf_matrix:
 		fname = check_path.name.replace(".pth", f"_{set_name}-confmat.png")
-		save2 = output / fname if save else None
+		save2 = output / fname if save_img else None
 		plot_confusion_matrix(
 			y_true=all_targets,
 			y_pred=all_preds,
@@ -460,8 +445,72 @@ def test_run(
 
 	return results
 
+def full_test(
+	config: RunInfo,
+	save: bool = True
+) -> CompRes: 
+	"""Complete test, which includes:
+		- The best validation loss, and accuracy for the whole training run 
+		- The test, val and 'shuffled test' results.
+	The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
+	The shuffled results additionally contain the permutation used, and it's shannon entropy 
+  
+	Args:
+		config (RunInfo): The run config used for training.
+		save (bool, optional): Whether to save results. Defaults to True.
 
-##################### Multiple-run testing utility #########################
+	Returns:
+		CompRes: A results dictionary (as described above).
+	"""
+	save_path = Path(config['admin']['save_path'])
+	files = sorted(list(save_path.iterdir()))
+	last_check = torch.load(files[-1])
+	best_val_acc = last_check["best_val_acc"]
+	best_val_loss = last_check["best_val_loss"]
+	out_dir = save_path.parent / "results"
+	res_path = out_dir / "best_val_loss.json" 
+ 
+	#test set
+	test = test_run(
+		config,
+		'test',
+		br_graph=True,
+		cf_matrix=True,
+		heatmap=True,
+		save_img=True,
+		save=False
+	)
+	#validation set
+	val = test_run(
+		config,
+		'val',
+		save=False
+	)
+	#shuffled frames test set
+	test_shuff = test_run(
+		config,
+		'test',
+		shuffle=True,
+		save=False
+	)
+	
+	results = CompRes(
+		check_name='best_val',
+		best_val_acc=best_val_acc,
+		best_val_loss=best_val_loss,
+		test=test,
+		val=val,
+		test_shuff=cast(ShuffRes,test_shuff)
+	)
+ 
+	if save:
+		with open(res_path, 'w') as f:
+			json.dump(results, f, indent=4)
+   
+	return results
+
+	
+	
 
 
 	
@@ -552,9 +601,7 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 	)
 	return parser
 
-if __name__ == "__main__":
-	# find_best_checkpnt(0)
-	
+def main():
 	parser = get_test_parser()
 	args = parser.parse_args()
 	
@@ -571,8 +618,7 @@ if __name__ == "__main__":
 	# Set config path
 	if args.config_path is None:
 		args.config_path = f"./configfiles/{args.split}/{args.model}_{exp_no}.ini"
- 
-	arg_dict = vars(args)
+
  
 	admin = AdminInfo(
 		model=args.model,
@@ -586,15 +632,23 @@ if __name__ == "__main__":
  
 	conf = load_config(admin)
  
-	results = test_run(
-		config=conf,
-		shuffle=args.shuffle_frames,
-		set_name=args.set_name,
-		check=args.checkpoint_name,
-		br_graph=args.bar_graph,
-		cf_matrix=args.confusion_matrix,
-		heatmap=args.heatmap,
-		disp=args.display,
-		save=args.save,
-	)
-	print_dict(results)
+	# results = test_run(
+	# 	config=conf,
+	# 	shuffle=args.shuffle_frames,
+	# 	set_name=args.set_name,
+	# 	check=args.checkpoint_name,
+	# 	br_graph=args.bar_graph,
+	# 	cf_matrix=args.confusion_matrix,
+	# 	heatmap=args.heatmap,
+	# 	disp=args.display,
+	# 	save=args.save,
+	# )
+	# print_dict(results)
+	full_test(conf)	
+ 
+ 
+if __name__ == "__main__":
+	main()
+	# full_test()
+	
+	

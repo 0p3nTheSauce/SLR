@@ -438,10 +438,6 @@ def train_loop(
 		'best_val_acc': best_val_acc,
 		'best_val_loss': best_val_loss
 	}
- 
-
-
-
 
 def train(
 	model_name: str,
