@@ -306,174 +306,8 @@ def load_info(dirp: Path, checkname: str):
 	return resd
 
 
+
 def test_run(
-	config: RunInfo,
-	shuffle: bool = False,
-	test_val: bool = False,
-	test_test: bool = True,
-	check: str = "best.pth",
-	br_graph: bool = False,
-	cf_matrix: bool = False,
-	heatmap: bool = False,
-	disp: bool = False,
-	save: bool = True,
-	re_test: bool = False,
-) -> Dict[str, Any]:
-	"""Perform testing of a model according to the provided configuration.
-
-	Args:
-			config (Dict[str, Any]): Run config file.
-			perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
-			test_val (bool, optional): Test on the val set. Defaults to False.
-			test_test (bool, optional): Test on the test set. Defaults to True.
-			check (str, optional): Checkpoint name. Defaults to "best.pth".
-			br_graph (bool, optional): Create bar graph. Defaults to False.
-			cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
-			heatmap (bool, optional): Create heatmap. Defaults to False.
-			disp (bool, optional): Display plots. Defaults to False.
-			save (bool, optional): Save results and plots. Defaults to True.
-			re_test (bool, optional): Test even if results already saved. Defaults to False.
-
-	Returns:
-			Optional[Dict[str, Any]]: Results if correct parameters.
-	"""
-
-	set_seed()
-
-	admin = config["admin"]
-	model_name = admin["model"]
-	data = config["data"]
-
-	model_norms = norm_vals(model_name)
-	results = {}
-
-	save_path = Path(admin["save_path"])
-
-	output = save_path.parent / "results"
-
-	if output.exists() and not re_test:
-		return load_info(output, check.replace('.pth', ''))
-
-	if save:
-		output.mkdir(exist_ok=True)
-
-	tloaders = {}
-	mperm_info = {}
-	
-	if not test_test and not test_val:
-		return results
-
-	if test_test:
-		
-		tloaders["test"], _, m_permt, m_sh_et = get_data_loader(
-			model_norms['mean'],
-			model_norms['std'],
-			data["frame_size"],
-			data["num_frames"],
-			set_info=get_wlasl_info(admin["split"], set_name='test'),
-			shuffle=shuffle,
-			batch_size=1
-		)
-		mperm_info["test"] = (m_permt, m_sh_et)
-
-	if test_val:
-		tloaders["val"], _, m_permv, m_sh_ev = get_data_loader(
-			model_norms['mean'],
-			model_norms['std'],
-			data["frame_size"],
-			data["num_frames"],
-			set_info=get_wlasl_info(admin["split"], set_name='val'),
-			shuffle=shuffle,
-			batch_size=1
-		)
-		mperm_info["val"] = (m_permv, m_sh_ev)
-
-	keys = list(tloaders.keys())
-	gen_loader = tloaders[keys[0]]
-	assert isinstance(gen_loader.dataset, VideoDataset), (
-		"This function uses a custom dataset"
-	)
-	num_classes = len(set(gen_loader.dataset.classes))
-
-	model = get_model(model_name, num_classes, drop_p=0.0)
-
-	check_path = save_path / check
-
-	print(f"Loading weights from: {check_path}")
-
-	checkpoint = torch.load(check_path)
-
-	if check_path.name == "best.pth":
-		model.load_state_dict(checkpoint)
-	else:
-		model.load_state_dict(checkpoint["model_state_dict"])
-
-	if shuffle:
-		suffix = "-top-k_shuffled.json"
-	else:
-		suffix = "-top-k.json"
-
-	for set_name, tloader in tloaders.items():
-		print(f"Testing on {set_name} set")
-		fname = check_path.name.replace(".pth", f"_{set_name}{suffix}")
-		save2 = output / fname
-		
-		topk_res, cls_report, all_targets, all_preds = test_topk_clsrep(
-			model=model,
-			test_loader=tloader,
-			verbose=False,
-		)
-	 
-		m_perm, m_sh_e = mperm_info[set_name]
-		if m_perm is not None:
-			topk_res["perm"] = m_perm
-			topk_res["shannon_entropy"] = m_sh_e 
-		
-		if save:
-			with open(save2, "w") as f:
-				json.dump(topk_res, f, indent=4)
-			
-		
-		results[fname.replace(".json", "")] = topk_res
-		heatmap, br_graph, cf_matrix = False, False, False  # skip plots if loading
-
-		if heatmap:
-			fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
-			save2 = output / fname if save else None
-			plot_heatmap(
-				report=cls_report,
-				title=f"{set_name.capitalize()} set Classification Report",
-				save_path=save2,
-				disp=disp,
-			)
-
-		if br_graph:
-			fname = check_path.name.replace(".pth", f"_{set_name}-bargraph.png")
-			save2 = output / fname if save else None
-			plot_bar_graph(
-				report=cls_report,
-				title=f"{set_name.capitalize()} set Classification Report",
-				save_path=save2,
-				disp=disp,
-			)
-
-		if cf_matrix:
-			fname = check_path.name.replace(".pth", f"_{set_name}-confmat.png")
-			save2 = output / fname if save else None
-			assert isinstance(gen_loader.dataset, VideoDataset), (
-				"This function uses a custom dataset"
-			)
-			plot_confusion_matrix(
-				y_true=all_targets,
-				y_pred=all_preds,
-				title=f"{set_name.capitalize()} set Confusion Matrix",
-				save_path=save2,
-				disp=disp,
-			)
-
-	return results
-
-def test_run2(
 	config: RunInfo,
 	set_name: Literal['test', 'val', 'train'],
 	shuffle: bool = False,
@@ -609,23 +443,6 @@ def test_run2(
 ##################### Multiple-run testing utility #########################
 
 
-def find_best_checkpnt(run_idx: int):
-	with open("queRuns.json", "r") as f:
-		all_runs = json.load(f)
-
-	old_runs = all_runs["old_runs"]
-	run = old_runs[run_idx]
-	save_path = Path(run["admin"]["save_path"])
-	print(f"Looking in: {save_path}")
-	checkpnts = sorted([p for p in save_path.iterdir()])
-	for c in checkpnts:
-		print(c.name)
-		test_run(
-			config=run,
-			test_val=True,
-			check=c.name,
-		)
-		
 	
 def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> ArgumentParser:
 	"""Get parser for testing configuration
@@ -669,16 +486,11 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 		help='Shuffle the frames when testing'
 	)
 	parser.add_argument(
-		'-tt',
-		'--test_test',
-		action='store_true',
-		help='Test on the test dataset'
-	)
-	parser.add_argument(
-		'-tv',
-		'--test_val',
-		action='store_true',
-		help='Test on the val dataset'
+		'-sn',
+		'--set_name',
+		type=str,
+		choices=['train', 'val', 'test'],
+		help='Which set to test on'
 	)
 	parser.add_argument(
 		'-cn',
@@ -762,14 +574,12 @@ if __name__ == "__main__":
 	results = test_run(
 		config=conf,
 		shuffle=args.shuffle_frames,
-		test_test=args.test_test,
-		test_val=args.test_val,
+		set_name=args.set_name,
 		check=args.checkpoint_name,
 		br_graph=args.bar_graph,
 		cf_matrix=args.confusion_matrix,
 		heatmap=args.heatmap,
 		disp=args.display,
 		save=args.save,
-		re_test=args.re_test
 	)
 	print_dict(results)
