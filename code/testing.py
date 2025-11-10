@@ -37,6 +37,7 @@ class TopKRes(TypedDict):
 class BaseRes(TypedDict):
 	top_k_average_per_class_acc: TopKRes
 	top_k_per_instance_acc: TopKRes
+	average_loss: float
 	
 class ShuffRes(BaseRes):
 	perm: List[int]
@@ -213,12 +214,23 @@ def test_topk_clsrep(
 	top10_fp = np.zeros(num_classes, dtype=np.int64)
 	top10_tp = np.zeros(num_classes, dtype=np.int64)
 
+
+	loss_func = torch.nn.CrossEntropyLoss()
+	running_loss = 0.0
+	total_samples = 0
+
 	with torch.no_grad():
 		for item in tqdm.tqdm(test_loader, desc="Testing"):
 			data, target = item["frames"], item["label_num"]
 			data, target = data.to(device), target.to(device)
+			batch_size = data.size(0)
+			total_samples += batch_size
 
 			predictions = model(data)
+
+			#for loss
+			loss = loss_func(predictions, target)
+			running_loss += loss.item() * batch_size
 
 			# for classification report:
 			_, preds = torch.max(predictions, 1)
@@ -272,6 +284,12 @@ def test_topk_clsrep(
 	print(fstr)
 	print(fstr2)
 
+	#loss
+	epoch_loss = running_loss / total_samples
+ 
+	print(f"Averag Loss: {epoch_loss:.2f}")
+
+
 	topk_res = BaseRes(
 		top_k_average_per_class_acc=TopKRes(
 			top1=float(top1_per_class),
@@ -282,7 +300,9 @@ def test_topk_clsrep(
 			top1=top1_per_instance,
 			top5=top5_per_instance,
 			top10=top10_per_instance
-		)
+		),
+		average_loss=epoch_loss
+  
 	)
 	if save_path is not None:
 		with open(save_path, "w") as f:
@@ -396,6 +416,7 @@ def test_run(
 		results = ShuffRes(
 			top_k_average_per_class_acc=topk_res['top_k_average_per_class_acc'],
 			top_k_per_instance_acc=topk_res['top_k_per_instance_acc'],
+			average_loss=topk_res['average_loss'],
 			perm=m_permt,
 			shannon_entropy=m_sh_et
 		)
@@ -471,6 +492,12 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 	)
 	parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	parser.add_argument(
+		'set_name',
+		type=str,
+		choices=['train', 'val', 'test'],
+		help='Which set to test on'
+	)
+	parser.add_argument(
 		'-ds',
 		'--dataset',
 		type=str,
@@ -485,13 +512,7 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 		action='store_true',
 		help='Shuffle the frames when testing'
 	)
-	parser.add_argument(
-		'-sn',
-		'--set_name',
-		type=str,
-		choices=['train', 'val', 'test'],
-		help='Which set to test on'
-	)
+	
 	parser.add_argument(
 		'-cn',
 		'--checkpoint_name',
@@ -528,12 +549,6 @@ def get_test_parser(prog: Optional[str] = None,desc: str = "Test a model") -> Ar
 		'--save',
 		action='store_true',
 		help='Save the outputs of the test'
-	)
-	parser.add_argument(
-		'-rt',
-		'--re_test',
-		action='store_true',
-		help="Re-run test, even if results files already exist"
 	)
 	return parser
 
