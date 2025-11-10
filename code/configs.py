@@ -92,18 +92,6 @@ class WandbInfo(TypedDict):
 	tags: List[str]
 	run_id: Optional[str]
 
-class RunInfo(TypedDict):
-	admin: AdminInfo
-	training: TrainingInfo
-	optimizer: OptimizerInfo
-	model_params: Model_paramsInfo
-	data: DataInfo
-	scheduler: Optional[SchedInfo]
-	early_stopping: Optional[StopperOn]
-
-class ExpInfo(RunInfo):
-	wandb: WandbInfo #NOTE: make wandb optional?
- 
 #Results
 class TopKRes(TypedDict):
 	top1: float
@@ -126,6 +114,21 @@ class CompRes(TypedDict):
 	test: BaseRes
 	val: BaseRes
 	test_shuff: ShuffRes
+
+class RunInfo(TypedDict):
+	admin: AdminInfo
+	training: TrainingInfo
+	optimizer: OptimizerInfo
+	model_params: Model_paramsInfo
+	data: DataInfo
+	scheduler: Optional[SchedInfo]
+	early_stopping: Optional[StopperOn]
+
+class ExpInfo(RunInfo):
+	wandb: WandbInfo #NOTE: make wandb optional?
+ 
+class CompExpInfo(ExpInfo):
+    results: CompRes
 
 
 
