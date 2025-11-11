@@ -448,6 +448,7 @@ def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> 
 def take_args(
 	sup_args: Optional[List[str]] = None,
 	make_dirs: bool = False,
+	ask_bf_ovrite: bool = True, 
 ) -> Optional[Tuple[AdminInfo, WandbInfo]]:
 	"""Retrieve arguments for new training run
 
@@ -493,7 +494,7 @@ def take_args(
 	output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
 
 	# recovering
-	if not args.recover and output.exists():  # fresh run
+	if not args.recover and output.exists() and ask_bf_ovrite:  # fresh run
 		if not args.enum_exp:
 			ans = ask_nicely(
 				message=f"{output} already exists, do you want to cancel, proceed, or enumerate (c, p, e): ",
@@ -513,7 +514,7 @@ def take_args(
 	save_path = output / "checkpoints"
 	args.save_path = save_path
 	# if not args.recover and args.enum_chck:
-	if not args.recover and save_path.exists():
+	if not args.recover and save_path.exists() and ask_bf_ovrite:
 		if not args.enum_chck:
 			ans = ask_nicely(
 				message=f"{save_path} already exists, do you want to cancel, overwrite, or enumerate (c, o, e): ",
