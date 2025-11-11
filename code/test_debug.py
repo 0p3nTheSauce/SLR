@@ -1108,6 +1108,40 @@ def reformet6():
 		}
 		torch.save(psuedo, exp / 'psuedo_checkpoint.pth')
   
+def reformet7():
+	from testing import load_comp_res
+	with open('que/Runs.json', 'r') as f:
+		data = json.load(f)
+	all_runs = cast(quewing.AllRuns, data)
+	old_runs = all_runs['old_runs']
+	for i, run in enumerate(old_runs):
+		info = cast(configs.ExpInfo, run)
+		save_path = Path(info['admin']['save_path'])
+		out_dir = save_path.parent / "results"
+		res_path = out_dir / "best_val_loss.json"
+		results = load_comp_res(res_path)
+		fin_run = info
+		# print(', '.join(fin_run.keys()))
+		if "scheduler" not in fin_run:
+			fin_run["scheduler"] = None
+		comp_run = configs.CompExpInfo(
+			admin=fin_run["admin"],
+			training=fin_run["training"],
+			optimizer=fin_run["optimizer"],
+			model_params=fin_run['model_params'],
+			data=fin_run["data"],
+			scheduler=fin_run["scheduler"],
+			early_stopping=fin_run["early_stopping"],
+			wandb=fin_run['wandb'], 
+			results=results
+		)
+		old_runs[i] = comp_run
+	# return
+	all_runs["old_runs"] = old_runs
+	with open('que/Runs.json', 'w') as f:
+		json.dump(all_runs, f, indent=4, separators=(",", ":"))
+  
+
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
@@ -1118,4 +1152,4 @@ if __name__ == "__main__":
 	# test_safe_index2()
 	# test_raise()
 	# test_loss4()
-	reformet5()
+	reformet7()

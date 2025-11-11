@@ -1,61 +1,6 @@
 {
-    "to_run": [
-        {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "033",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp07.ini",
-                "save_path": "runs/asl100/S3D_exp033/checkpoints"
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.7
-            },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
-                    "asl100",
-                    "S3D",
-                    "exp-033"
-                ],
-                "run_id": null
-            }
-        },
+    "to_run": [],
+    "cur_run": [
         {
             "admin": {
                 "model": "S3D",
@@ -109,11 +54,67 @@
                     "S3D",
                     "exp-034"
                 ],
-                "run_id": null
+                "run_id": "nct17shz"
             }
         }
     ],
-    "cur_run": [
+    "old_runs": [
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "033",
+                "recover": false,
+                "config_path": "./configfiles/generic/hf_hwd_eps_dp07.ini",
+                "save_path": "runs/asl100/S3D_exp033/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.7
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingLR",
+                "tmax": 100,
+                "eta_min": 1e-05,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-033"
+                ],
+                "run_id": "5qk8q6cj"
+            }
+        },
         {
             "admin": {
                 "model": "S3D",
@@ -169,9 +170,7 @@
                 ],
                 "run_id": "rsrzm9fn"
             }
-        }
-    ],
-    "old_runs": [
+        },
         {
             "admin": {
                 "model": "S3D",
@@ -1074,7 +1073,7 @@
                 "model": "S3D",
                 "split": "asl100",
                 "recover": false,
-                "config_path": "/home/luke/Code/SLR/code/configfiles/generic/hframe_hwd_leps.ini",
+                "config_path": "./configfiles/generic/hframe_hwd_leps.ini",
                 "save_path": "runs/asl100/S3D_exp017/checkpoints",
                 "dataset": "WLASL"
             },
@@ -1129,7 +1128,7 @@
                 "model": "S3D",
                 "split": "asl100",
                 "recover": false,
-                "config_path": "/home/luke/Code/SLR/code/configfiles/generic/hframe_mwd.ini",
+                "config_path": "./configfiles/generic/hframe_mwd.ini",
                 "save_path": "runs/asl100/S3D_exp016/checkpoints",
                 "dataset": "WLASL"
             },
@@ -1184,7 +1183,7 @@
                 "model": "S3D",
                 "split": "asl100",
                 "recover": false,
-                "config_path": "/home/luke/Code/SLR/code/configfiles/generic/hframe_hwd1_nosched.ini",
+                "config_path": "./configfiles/generic/hframe_hwd1_nosched.ini",
                 "save_path": "runs/asl100/S3D_exp015/checkpoints",
                 "dataset": "WLASL"
             },
@@ -1336,61 +1335,6 @@
                     "exp-013"
                 ],
                 "run_id": "1ooh1h8z"
-            }
-        },
-        {
-            "admin": {
-                "exp_no": "014",
-                "recover": false,
-                "model": "S3D",
-                "split": "asl100",
-                "config_path": "./configfiles/generic/hframe_hwd1.ini",
-                "save_path": "runs/asl100/S3D_exp014/checkpoints",
-                "dataset": "WLASL"
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 0.001,
-                "backbone_init_lr": 1e-05,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5
-            },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
-                    "asl100",
-                    "S3D",
-                    "exp-014"
-                ],
-                "run_id": "o9p6nj1z"
             }
         }
     ],
