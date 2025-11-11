@@ -12,6 +12,8 @@ from typing import (
 	Any,
 	TypedDict,
 	cast,
+	Union,
+	TypeGuard
 )
 
 import subprocess
@@ -25,7 +27,7 @@ import torch
 
 # locals
 import configs
-from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  _exp_to_run_info, CompExpInfo
+from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  _exp_to_run_info, CompExpInfo, CompRes
 import utils
 from utils import gpu_manager
 from training import train_loop, _setup_wandb
@@ -57,14 +59,15 @@ SYNONYMS = {
 	"fr": "fail_runs",
 }
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
-
-
 class FailedExp(ExpInfo):
 	error: str
-
+ 
+ 
+GenExp: TypeAlias = Union[ExpInfo, FailedExp, CompExpInfo]
+ExpQue: TypeAlias = Union[List[ExpInfo], List[FailedExp], List[CompExpInfo]]
 
 class AllRuns(TypedDict):
-	old_runs: List[ExpInfo]
+	old_runs: List[CompExpInfo]
 	cur_run: List[ExpInfo]
 	to_run: List[ExpInfo]
 	fail_runs: List[FailedExp]
@@ -134,7 +137,7 @@ class que:
 		if self.verbose:
 			print(message)
 
-	def fetch_state(self, loc: QueLocation) -> List[ExpInfo]:
+	def fetch_state(self, loc: QueLocation) -> ExpQue:
 		"""Return reference to the specified list"""
 		if loc == TO_RUN:
 			return self.to_run
@@ -174,7 +177,15 @@ class que:
 			}
 			json.dump(all_runs, f, indent=4)
 
-	def _get_run(self, loc: QueLocation, idx: int) -> ExpInfo:
+	def _is_failed_exp(self, run: GenExp) -> TypeGuard[FailedExp]:
+		"""Check if run is a FailedExp"""
+		return isinstance(run, dict) and 'error' in run
+
+	def _is_comp_exp_info(self, run: GenExp) -> TypeGuard[CompExpInfo]:
+		"""Check if run is a CompExpInfo"""
+		return isinstance(run, dict) and 'results' in run
+
+	def _get_run(self, loc: QueLocation, idx: int) -> GenExp:
 		"""Get the run at the given location with the provided index
 
 		Args:
@@ -195,22 +206,35 @@ class que:
 			raise QueIdxOOR(loc, idx, len(to_get))
 		return to_get.pop(idx)
 
-	def _set_run(self, loc: QueLocation, idx: int, run: ExpInfo) -> None:
+	def _set_run(self, loc: QueLocation, idx: int, run: GenExp) -> None:
 		"""Set a run at a specified location and index
 
 		Args:
-						loc (QueLocation): to_run, cur_run or old_runs
-						idx (int): New index, must be within [-len(loc), len(loc)]
-						run (ExpInfo): Experiment info to add to loc
-
+			loc (QueLocation): to_run, cur_run or old_runs
+			idx (int): New index, must be within [-len(loc), len(loc)]
+			run (ExpInfo): Experiment info to add to loc
 
 		Raises:
-						QueIdxOOR: The provied index is out of range: [-len(loc), len(loc)]
+			QueIdxOOR: The provided index is out of range: [-len(loc), len(loc)]
+			TypeError: The run type doesn't match the queue location
 		"""
 		to_set = self.fetch_state(loc)
 		if len(to_set) < abs(idx):
 			raise QueIdxOOR(loc, idx, len(to_set))
-		to_set.insert(idx, run)
+		
+		# Runtime type checking with type narrowing
+		if loc == FAIL_RUNS:
+			if not self._is_failed_exp(run):
+				raise TypeError("fail_runs requires FailedExp with 'error' field")
+			self.fail_runs.insert(idx, run)
+		elif loc == OLD_RUNS:
+			if not self._is_comp_exp_info(run):
+				raise TypeError("old_runs requires CompExpInfo with 'results' field")
+			self.old_runs.insert(idx, run)
+		elif loc == TO_RUN:
+			self.to_run.insert(idx, run)
+		else:  # CUR_RUN   
+			self.cur_run.insert(idx, run)
 
 	def save_state(self):
 		"""Saves state to Runs.jso, with filelock"""
@@ -299,22 +323,30 @@ class que:
 		"""Extract key details from a run configuration.
 
 		Args:
-																																		run: Dictionary containing run configuration with admin details
-																																		exc: Optional list of keys to exclude from the summary
+			run: Dictionary containing run configuration with admin details
+			exc: Optional list of keys to exclude from the summary
 
 		Returns:
-																																		Dictionary with model, exp_no, split, and config_path
+			Dictionary with model, exp_no, split, and config_path
 		"""
 		admin = run["admin"]
 
 		dic = {}
 
-		if "wandb" in run:
+		if "wandb" in run: #ExpInfo
 			run_id = run["wandb"]["run_id"]
 			if run_id is None:
 				dic["run_id"] = "None"
 			else:
 				dic["run_id"] = run_id
+
+		if "error" in run: #FaileExp
+			dic["error"] = run["error"]
+   
+		if "results" in run: #CompExpInfo
+			results = cast(CompRes, run["results"])
+			dic['best_val_acc'] = f"{results['best_val_acc']:.4f}"
+			dic['best_val_loss'] = f"{results['best_val_loss']:.4f}"
 
 		dic.update(
 			{
@@ -333,15 +365,15 @@ class que:
 		return dic
 
 	def get_runs_info(
-		self, run_confs: List[ExpInfo], head_sum: Optional[Dict[str, str]] = None 
+		self, run_confs: ExpQue, head_sum: Optional[Dict[str, str]] = None 
 	) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
 		"""Get summarised run info, and stats for printing
 
 		Args:
-																																																																																																																																		run_confs (List[Dict]): A list of run configs (to_run or old_runs)
+			run_confs (List[Dict]): A list of run configs (to_run or old_runs)
 
 		Returns:
-																																																																																																																																		Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
+			Tuple[List[Dict], Dict]: List of summary dictionaries, dictionary of max lengths
 		"""
 		runs_info = []
 		if head_sum is not None:
@@ -352,53 +384,34 @@ class que:
 		runs_info.extend(runs_sum)
 
 		# Calculate column widths
-		max_model = max([len(r["model"]) for r in runs_info] + [len("Model")])
-		max_exp = max([len(str(r["exp_no"])) for r in runs_info] + [len("Exp")])
-		max_split = max([len(r["split"]) for r in runs_info] + [len("Split")])
-		max_id = max([len(r["run_id"]) for r in runs_info] + [len("Run ID")])
+		# max_model = max([len(r["model"]) for r in runs_info] + [len("Model")])
+		# max_exp = max([len(str(r["exp_no"])) for r in runs_info] + [len("Exp")])
+		# max_split = max([len(r["split"]) for r in runs_info] + [len("Split")])
+		# max_id = max([len(r["run_id"]) for r in runs_info] + [len("Run ID")])
+		max_model = max(len(r["model"]) for r in runs_info)
+		max_exp = max(len(str(r["exp_no"])) for r in runs_info)
+		max_split = max(len(r["split"]) for r in runs_info)
+		max_id = max(len(r["run_id"]) for r in runs_info)
 		stats = {
 			"max_model": max_model,
 			"max_exp": max_exp,
 			"max_split": max_split,
 			"max_id": max_id,
 		}
+  
+		#check for extra keys 
+		if "error" in runs_info[0]: #FailedExp
+			max_error = max(len(r["error"]) for r in runs_info)
+			stats["max_error"] = max_error
 
+		if 'best_val_acc' in runs_info[0]: #CompExpInfo
+			max_val_loss = max(len(r['best_val_loss']) for r in runs_info)
+			max_val_acc = max(len(r['best_val_acc']) for r in runs_info)
+			stats['max_val_loss'] = max_val_loss
+			stats['max_val_acc'] = max_val_acc
+   
+   
 		return runs_info, stats
-
-	def run_str0(
-		self, r_info: Dict[str, str], stats: Optional[Dict[str, int]] = None
-	) -> str:
-		"""Convert a run to summarised string representation
-
-		Args:
-						r_info (Dict): Summarised run info.
-						stats (Optional[Dict[str, int]], optional): Max lengths for alignment. Defaults to None.
-
-		Returns:
-						str: Summarised string representation of run info
-		"""
-
-		if stats is None:
-			stats = {
-				"max_id": 0,
-				"max_model": 0,
-				"max_exp": 0,
-				"max_split": 0,
-			}
-
-		r_str = ""
-
-		if "run_id" in r_info and r_info["run_id"] is not None:
-			r_str += f"Run ID: {r_info['run_id']:<{stats['max_id']}}  "
-
-		r_str += (
-			f"{r_info['model']:<{stats['max_model']}}  "
-			f"Split: {r_info['split']:<{stats['max_split']}}  "
-			f"Exp: {r_info['exp_no']:<{stats['max_exp']}}  "
-			f"Config: {r_info['config_path']}"
-		)
-
-		return r_str
 
 	def run_str(
 		self, r_info: Dict[str, str], stats: Optional[Dict[str, int]] = None
@@ -423,15 +436,24 @@ class que:
 
 		r_str = ""
 
-		if "run_id" in r_info and r_info["run_id"] is not None:
-			r_str += f"{r_info['run_id']:<{stats['max_id']}}  "
-
 		r_str += (
+			f"{r_info['run_id']:<{stats['max_id']}}  "
 			f"{r_info['model']:<{stats['max_model']}}  "
 			f"{r_info['split']:<{stats['max_split']}}  "
 			f"{r_info['exp_no']:<{stats['max_exp']}}  "
-			f"{r_info['config_path']}"
 		)
+
+		#check for extra keys
+		if "error" in r_info: #FailedExp
+			r_str += f"{r_info['error']:<{stats['max_error']}}  "
+   
+		if "best_val_acc" in r_info: #CompExpInfo
+			r_str += (
+       			f"{r_info['best_val_acc']:<{stats['max_val_acc']}}  "
+				f"{r_info['best_val_loss']:<{stats['max_val_loss']}}  "
+          	)
+  
+		r_str += f"{r_info['config_path']}" #keep config at end
 
 		return r_str
 
@@ -456,34 +478,6 @@ class que:
 		else:
 			self.print_v(f"{loc} already empty")
 
-	def list_runso(self, loc: QueLocation) -> List[str]:
-		"""Summarise to a list of runs, in a given location
-
-		Args:
-						loc (QueLocation): Location to list
-						disp (bool, optional): Print list, with indexes. Defaults to False.
-
-		Returns:
-						List[str]: Summarised run info
-		"""
-
-		to_disp = self.fetch_state(loc)
-
-		if len(to_disp) == 0:
-			self.print_v(" No runs available\n")
-			return []
-
-		# Extract run info
-		runs_info, stats = self.get_runs_info(to_disp)
-
-		conf_list = []
-		for i, info in enumerate(runs_info):
-			# Format with padding for alignment
-			r_str = f"  [{i:2d}] {self.run_str(info, stats)}"
-			conf_list.append(r_str)
-
-		return conf_list
-
 	def list_runs(self, loc: QueLocation) -> List[str]:
 		to_disp = self.fetch_state(loc)
 
@@ -498,6 +492,13 @@ class que:
 			"run_id" : "Run ID",
 			"config_path": "Config"
 		}
+
+		#check for extra headings
+		if loc == FAIL_RUNS:
+			head_sum["error"] = "Exception"
+		if loc == OLD_RUNS:
+			head_sum["best_val_acc"] = "Best Val Acc"
+			head_sum["best_val_loss"] = "Best Val Loss"
 
 		# Extract run info
 		runs_info, stats = self.get_runs_info(to_disp, head_sum)
