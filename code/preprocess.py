@@ -98,7 +98,7 @@ def fix_bad_frame_range(instance_path, raw_path, log, instances=None, output=Non
         with open(instance_path, "r") as f:
             instances = json.load(f)
     for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
-        vid_path = raw_path / instance["video_id"] + ".mp4"
+        vid_path = raw_path / (instance["video_id"] + ".mp4")
         # decoder = VideoDecoder(vid_path)
 
         num_frames = 0
@@ -188,7 +188,7 @@ def fix_bad_bboxes(instance_path, raw_path, log, instances=None, output=None):
         with open(instance_path, "r") as f:
             instances = json.load(f)
     for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
-        vid_path = raw_path / instance["video_id"] + ".mp4"
+        vid_path = raw_path / (instance["video_id"] + ".mp4")
         frames = load_rgb_frames_from_video(
             vid_path, instance["frame_start"], instance["frame_end"], all=True
         )

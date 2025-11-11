@@ -125,6 +125,18 @@ class DataSetInfo(TypedDict):
     set_name: Literal["train", "test", "val"]
     
 def get_wlasl_info(split: str, set_name: Literal["train", "test", "val"]) -> DataSetInfo:
+    """Get wlasl dataset loading information in a tpyed dict
+
+    Args:
+        split (str): One of avail_splits, E.g. asl100
+        set_name (Literal['train', 'test', 'val']): Set to use
+
+    Raises:
+        ValueError: If split is not available
+
+    Returns:
+        DataSetInfo: For get_dataloader
+    """
     avail_sp = get_avail_splits()
     if split not in avail_sp:
         raise ValueError(f"Supplied split: {split} not one of available splits: {', '.join(avail_sp)}")
