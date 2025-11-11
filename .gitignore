@@ -6,13 +6,11 @@
 data/
 .venv
 *.jpg
+*.log
+*.lock
 code/runs/
 code/experiments/
 code/media/
 code/weights/
 code/wandb
-queRuns.json
-queRuns.json.lock
-queTemp.json
-queLogs.log
 .vscode/
