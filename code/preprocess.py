@@ -395,7 +395,9 @@ def check_paths(
         return False
     return True
 
-
+#NOTE: it is slow, especially for the bigger datasets, mostly held up
+# by fixing the bounding boxes, but this doesn't totally exhause the GPU.
+# so could potentially allocate more processes to the task
 if __name__ == "__main__":
     parser = ArgumentParser(description="preprocess.py")
     parser.add_argument(

@@ -1,8 +1,9 @@
+import json
 import configparser
 import argparse
 import ast
 from typing import Dict, Any, List, Optional, Union, TypedDict, Tuple, TypeAlias, Literal
-from utils import enum_dir, ask_nicely
+from utils import enum_dir, ask_nicely, print_dict
 from stopping import EarlyStopper, StopperOn
 from pathlib import Path
 import torch
@@ -199,7 +200,13 @@ def print_config(config_dict):
 		)
 		if isinstance(section_data, dict):
 			for key, value in section_data.items():
-				print(f"    {key:<{max_key_len}} : {value}")
+				if isinstance(value, dict):
+					print(f"{key} :")
+					print_dict(value) #TODO: could be better
+					
+				else:
+					print(f"    {key:<{max_key_len}} : {value}")
+
 		else:
 			print(section_data)
 		print()
