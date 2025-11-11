@@ -399,7 +399,7 @@ class que:
 			"max_id": max_id,
 		}
   
-		#check for extra keys 
+		#check for extra keys (in 1 so we ignore header)
 		if "error" in runs_info[0]: #FailedExp
 			max_error = max(len(r["error"]) for r in runs_info)
 			stats["max_error"] = max_error

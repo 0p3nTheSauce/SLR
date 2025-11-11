@@ -2296,3 +2296,504 @@ VAL - Epoch 85:
 Checkpoint saved: runs/asl100/S3D_exp034/checkpoints/checkpoint_085.pth
 Epoch 85/200
 ----------
+Step 15390: Loss: 0.0047, Accuracy: 100.00%
+Step 15400: Loss: 0.0176, Accuracy: 98.75%
+Step 15410: Loss: 0.0003, Accuracy: 100.00%
+Step 15420: Loss: 0.0004, Accuracy: 100.00%
+Step 15430: Loss: 0.0068, Accuracy: 100.00%
+Step 15440: Loss: 0.0051, Accuracy: 100.00%
+Step 15450: Loss: 0.0013, Accuracy: 100.00%
+Step 15460: Loss: 0.0003, Accuracy: 100.00%
+Step 15470: Loss: 0.0046, Accuracy: 100.00%
+Step 15480: Loss: 0.0002, Accuracy: 100.00%
+Step 15490: Loss: 0.0055, Accuracy: 100.00%
+Step 15500: Loss: 0.0013, Accuracy: 100.00%
+Step 15510: Loss: 0.0024, Accuracy: 100.00%
+Step 15520: Loss: 0.0375, Accuracy: 97.50%
+Step 15530: Loss: 0.0022, Accuracy: 100.00%
+Step 15540: Loss: 0.0075, Accuracy: 100.00%
+Step 15550: Loss: 0.0139, Accuracy: 98.75%
+Step 15560: Loss: 0.0017, Accuracy: 100.00%
+TRAIN - Epoch 86:
+  Loss: 0.0062
+  Accuracy: 99.72% (1438/1442)
+VAL - Epoch 86:
+  Loss: 1.8908
+  Accuracy: 69.82% (236/338)
+Epoch 86/200
+----------
+Step 15570: Loss: 0.0001, Accuracy: 100.00%
+Step 15580: Loss: 0.0106, Accuracy: 98.75%
+Step 15590: Loss: 0.0006, Accuracy: 100.00%
+Step 15600: Loss: 0.0084, Accuracy: 100.00%
+Step 15610: Loss: 0.0040, Accuracy: 100.00%
+Step 15620: Loss: 0.0231, Accuracy: 97.50%
+Step 15630: Loss: 0.0055, Accuracy: 100.00%
+Step 15640: Loss: 0.0024, Accuracy: 100.00%
+Step 15650: Loss: 0.0183, Accuracy: 98.75%
+Step 15660: Loss: 0.0183, Accuracy: 98.75%
+Step 15670: Loss: 0.0002, Accuracy: 100.00%
+Step 15680: Loss: 0.0002, Accuracy: 100.00%
+Step 15690: Loss: 0.0147, Accuracy: 98.75%
+Step 15700: Loss: 0.0169, Accuracy: 98.75%
+Step 15710: Loss: 0.0002, Accuracy: 100.00%
+Step 15720: Loss: 0.0007, Accuracy: 100.00%
+Step 15730: Loss: 0.0020, Accuracy: 100.00%
+Step 15740: Loss: 0.0247, Accuracy: 98.75%
+TRAIN - Epoch 87:
+  Loss: 0.0166
+  Accuracy: 99.31% (1432/1442)
+VAL - Epoch 87:
+  Loss: 1.8781
+  Accuracy: 70.41% (238/338)
+Best validation acc so far: 70.41
+Epoch 87/200
+----------
+Step 15750: Loss: 0.0354, Accuracy: 100.00%
+Step 15760: Loss: 0.0049, Accuracy: 100.00%
+Step 15770: Loss: 0.0023, Accuracy: 100.00%
+Step 15780: Loss: 0.0010, Accuracy: 100.00%
+Step 15790: Loss: 0.0015, Accuracy: 100.00%
+Step 15800: Loss: 0.0220, Accuracy: 98.75%
+Step 15810: Loss: 0.0009, Accuracy: 100.00%
+Step 15820: Loss: 0.0007, Accuracy: 100.00%
+Step 15830: Loss: 0.0118, Accuracy: 98.75%
+Step 15840: Loss: 0.0039, Accuracy: 100.00%
+Step 15850: Loss: 0.0043, Accuracy: 100.00%
+Step 15860: Loss: 0.0281, Accuracy: 98.75%
+Step 15870: Loss: 0.0003, Accuracy: 100.00%
+Step 15880: Loss: 0.0005, Accuracy: 100.00%
+Step 15890: Loss: 0.0006, Accuracy: 100.00%
+Step 15900: Loss: 0.0010, Accuracy: 100.00%
+Step 15910: Loss: 0.0019, Accuracy: 100.00%
+Step 15920: Loss: 0.0011, Accuracy: 100.00%
+TRAIN - Epoch 88:
+  Loss: 0.0060
+  Accuracy: 99.79% (1439/1442)
+VAL - Epoch 88:
+  Loss: 1.8307
+  Accuracy: 69.82% (236/338)
+Epoch 88/200
+----------
+Step 15930: Loss: 0.0545, Accuracy: 93.75%
+Step 15940: Loss: 0.0106, Accuracy: 98.75%
+Step 15950: Loss: 0.0110, Accuracy: 98.75%
+Step 15960: Loss: 0.0007, Accuracy: 100.00%
+Step 15970: Loss: 0.0003, Accuracy: 100.00%
+Step 15980: Loss: 0.0033, Accuracy: 100.00%
+Step 15990: Loss: 0.0007, Accuracy: 100.00%
+Step 16000: Loss: 0.0007, Accuracy: 100.00%
+Step 16010: Loss: 0.0006, Accuracy: 100.00%
+Step 16020: Loss: 0.0011, Accuracy: 100.00%
+Step 16030: Loss: 0.0067, Accuracy: 100.00%
+Step 16040: Loss: 0.0184, Accuracy: 100.00%
+Step 16050: Loss: 0.0003, Accuracy: 100.00%
+Step 16060: Loss: 0.0008, Accuracy: 100.00%
+Step 16070: Loss: 0.0056, Accuracy: 100.00%
+Step 16080: Loss: 0.0026, Accuracy: 100.00%
+Step 16090: Loss: 0.0162, Accuracy: 100.00%
+Step 16100: Loss: 0.0094, Accuracy: 98.75%
+TRAIN - Epoch 89:
+  Loss: 0.0068
+  Accuracy: 99.65% (1437/1442)
+VAL - Epoch 89:
+  Loss: 1.7994
+  Accuracy: 70.41% (238/338)
+Epoch 89/200
+----------
+Step 16110: Loss: 0.0000, Accuracy: 100.00%
+Step 16120: Loss: 0.0002, Accuracy: 100.00%
+Step 16130: Loss: 0.0004, Accuracy: 100.00%
+Step 16140: Loss: 0.0082, Accuracy: 100.00%
+Step 16150: Loss: 0.0005, Accuracy: 100.00%
+Step 16160: Loss: 0.0007, Accuracy: 100.00%
+Step 16170: Loss: 0.0003, Accuracy: 100.00%
+Step 16180: Loss: 0.0005, Accuracy: 100.00%
+Step 16190: Loss: 0.0021, Accuracy: 100.00%
+Step 16200: Loss: 0.0030, Accuracy: 100.00%
+Step 16210: Loss: 0.0118, Accuracy: 98.75%
+Step 16220: Loss: 0.0010, Accuracy: 100.00%
+Step 16230: Loss: 0.0127, Accuracy: 98.75%
+Step 16240: Loss: 0.0013, Accuracy: 100.00%
+Step 16250: Loss: 0.0122, Accuracy: 98.75%
+Step 16260: Loss: 0.0004, Accuracy: 100.00%
+Step 16270: Loss: 0.0034, Accuracy: 100.00%
+Step 16280: Loss: 0.0272, Accuracy: 97.50%
+Step 16290: Loss: 0.0101, Accuracy: 98.65%
+TRAIN - Epoch 90:
+  Loss: 0.0053
+  Accuracy: 99.58% (1436/1442)
+VAL - Epoch 90:
+  Loss: 1.8841
+  Accuracy: 70.41% (238/338)
+Checkpoint saved: runs/asl100/S3D_exp034/checkpoints/checkpoint_090.pth
+Epoch 90/200
+----------
+Step 16300: Loss: 0.0003, Accuracy: 100.00%
+Step 16310: Loss: 0.0010, Accuracy: 100.00%
+Step 16320: Loss: 0.0007, Accuracy: 100.00%
+Step 16330: Loss: 0.0048, Accuracy: 100.00%
+Step 16340: Loss: 0.0108, Accuracy: 100.00%
+Step 16350: Loss: 0.0325, Accuracy: 97.50%
+Step 16360: Loss: 0.0008, Accuracy: 100.00%
+Step 16370: Loss: 0.0066, Accuracy: 100.00%
+Step 16380: Loss: 0.0001, Accuracy: 100.00%
+Step 16390: Loss: 0.0006, Accuracy: 100.00%
+Step 16400: Loss: 0.0454, Accuracy: 97.50%
+Step 16410: Loss: 0.0167, Accuracy: 100.00%
+Step 16420: Loss: 0.0012, Accuracy: 100.00%
+Step 16430: Loss: 0.0003, Accuracy: 100.00%
+Step 16440: Loss: 0.0004, Accuracy: 100.00%
+Step 16450: Loss: 0.0010, Accuracy: 100.00%
+Step 16460: Loss: 0.0265, Accuracy: 97.50%
+Step 16470: Loss: 0.0010, Accuracy: 100.00%
+TRAIN - Epoch 91:
+  Loss: 0.0084
+  Accuracy: 99.58% (1436/1442)
+VAL - Epoch 91:
+  Loss: 1.8553
+  Accuracy: 69.53% (235/338)
+Epoch 91/200
+----------
+Step 16480: Loss: 0.0016, Accuracy: 100.00%
+Step 16490: Loss: 0.0237, Accuracy: 98.75%
+Step 16500: Loss: 0.0026, Accuracy: 100.00%
+Step 16510: Loss: 0.0114, Accuracy: 98.75%
+Step 16520: Loss: 0.0007, Accuracy: 100.00%
+Step 16530: Loss: 0.0154, Accuracy: 98.75%
+Step 16540: Loss: 0.0009, Accuracy: 100.00%
+Step 16550: Loss: 0.0080, Accuracy: 100.00%
+Step 16560: Loss: 0.0025, Accuracy: 100.00%
+Step 16570: Loss: 0.0004, Accuracy: 100.00%
+Step 16580: Loss: 0.0212, Accuracy: 98.75%
+Step 16590: Loss: 0.0093, Accuracy: 100.00%
+Step 16600: Loss: 0.0067, Accuracy: 100.00%
+Step 16610: Loss: 0.0117, Accuracy: 98.75%
+Step 16620: Loss: 0.0015, Accuracy: 100.00%
+Step 16630: Loss: 0.0027, Accuracy: 100.00%
+Step 16640: Loss: 0.0011, Accuracy: 100.00%
+Step 16650: Loss: 0.0001, Accuracy: 100.00%
+TRAIN - Epoch 92:
+  Loss: 0.0067
+  Accuracy: 99.65% (1437/1442)
+VAL - Epoch 92:
+  Loss: 1.7771
+  Accuracy: 70.71% (239/338)
+Best validation acc so far: 70.71
+Epoch 92/200
+----------
+Step 16660: Loss: 0.0003, Accuracy: 100.00%
+Step 16670: Loss: 0.0004, Accuracy: 100.00%
+Step 16680: Loss: 0.0004, Accuracy: 100.00%
+Step 16690: Loss: 0.0055, Accuracy: 100.00%
+Step 16700: Loss: 0.0246, Accuracy: 97.50%
+Step 16710: Loss: 0.0077, Accuracy: 100.00%
+Step 16720: Loss: 0.0613, Accuracy: 97.50%
+Step 16730: Loss: 0.0021, Accuracy: 100.00%
+Step 16740: Loss: 0.0007, Accuracy: 100.00%
+Step 16750: Loss: 0.0007, Accuracy: 100.00%
+Step 16760: Loss: 0.0018, Accuracy: 100.00%
+Step 16770: Loss: 0.0138, Accuracy: 98.75%
+Step 16780: Loss: 0.0002, Accuracy: 100.00%
+Step 16790: Loss: 0.0283, Accuracy: 98.75%
+Step 16800: Loss: 0.0002, Accuracy: 100.00%
+Step 16810: Loss: 0.0190, Accuracy: 98.75%
+Step 16820: Loss: 0.0017, Accuracy: 100.00%
+Step 16830: Loss: 0.0092, Accuracy: 98.75%
+TRAIN - Epoch 93:
+  Loss: 0.0100
+  Accuracy: 99.45% (1434/1442)
+VAL - Epoch 93:
+  Loss: 1.8110
+  Accuracy: 70.41% (238/338)
+Epoch 93/200
+----------
+Step 16840: Loss: 0.0004, Accuracy: 100.00%
+Step 16850: Loss: 0.0037, Accuracy: 100.00%
+Step 16860: Loss: 0.0005, Accuracy: 100.00%
+Step 16870: Loss: 0.0007, Accuracy: 100.00%
+Step 16880: Loss: 0.0002, Accuracy: 100.00%
+Step 16890: Loss: 0.0122, Accuracy: 98.75%
+Step 16900: Loss: 0.0015, Accuracy: 100.00%
+Step 16910: Loss: 0.0003, Accuracy: 100.00%
+Step 16920: Loss: 0.0003, Accuracy: 100.00%
+Step 16930: Loss: 0.0260, Accuracy: 97.50%
+Step 16940: Loss: 0.0163, Accuracy: 98.75%
+Step 16950: Loss: 0.0006, Accuracy: 100.00%
+Step 16960: Loss: 0.0036, Accuracy: 100.00%
+Step 16970: Loss: 0.0133, Accuracy: 98.75%
+Step 16980: Loss: 0.0101, Accuracy: 100.00%
+Step 16990: Loss: 0.0128, Accuracy: 98.75%
+Step 17000: Loss: 0.0113, Accuracy: 98.75%
+Step 17010: Loss: 0.0003, Accuracy: 100.00%
+TRAIN - Epoch 94:
+  Loss: 0.0073
+  Accuracy: 99.45% (1434/1442)
+VAL - Epoch 94:
+  Loss: 1.7755
+  Accuracy: 70.41% (238/338)
+Epoch 94/200
+----------
+Step 17020: Loss: 0.0146, Accuracy: 100.00%
+Step 17030: Loss: 0.0018, Accuracy: 100.00%
+Step 17040: Loss: 0.0021, Accuracy: 100.00%
+Step 17050: Loss: 0.0125, Accuracy: 98.75%
+Step 17060: Loss: 0.0064, Accuracy: 100.00%
+Step 17070: Loss: 0.0008, Accuracy: 100.00%
+Step 17080: Loss: 0.0372, Accuracy: 98.75%
+Step 17090: Loss: 0.0023, Accuracy: 100.00%
+Step 17100: Loss: 0.0008, Accuracy: 100.00%
+Step 17110: Loss: 0.0002, Accuracy: 100.00%
+Step 17120: Loss: 0.0004, Accuracy: 100.00%
+Step 17130: Loss: 0.0080, Accuracy: 100.00%
+Step 17140: Loss: 0.0010, Accuracy: 100.00%
+Step 17150: Loss: 0.0117, Accuracy: 98.75%
+Step 17160: Loss: 0.0022, Accuracy: 100.00%
+Step 17170: Loss: 0.0923, Accuracy: 97.50%
+Step 17180: Loss: 0.0071, Accuracy: 100.00%
+Step 17190: Loss: 0.0006, Accuracy: 100.00%
+TRAIN - Epoch 95:
+  Loss: 0.0133
+  Accuracy: 99.58% (1436/1442)
+VAL - Epoch 95:
+  Loss: 1.8673
+  Accuracy: 68.93% (233/338)
+Checkpoint saved: runs/asl100/S3D_exp034/checkpoints/checkpoint_095.pth
+Epoch 95/200
+----------
+Step 17200: Loss: 0.0006, Accuracy: 100.00%
+Step 17210: Loss: 0.0005, Accuracy: 100.00%
+Step 17220: Loss: 0.0171, Accuracy: 98.75%
+Step 17230: Loss: 0.0012, Accuracy: 100.00%
+Step 17240: Loss: 0.0004, Accuracy: 100.00%
+Step 17250: Loss: 0.0086, Accuracy: 100.00%
+Step 17260: Loss: 0.0004, Accuracy: 100.00%
+Step 17270: Loss: 0.0161, Accuracy: 98.75%
+Step 17280: Loss: 0.0005, Accuracy: 100.00%
+Step 17290: Loss: 0.0005, Accuracy: 100.00%
+Step 17300: Loss: 0.0005, Accuracy: 100.00%
+Step 17310: Loss: 0.0004, Accuracy: 100.00%
+Step 17320: Loss: 0.0513, Accuracy: 96.25%
+Step 17330: Loss: 0.0284, Accuracy: 97.50%
+Step 17340: Loss: 0.0007, Accuracy: 100.00%
+Step 17350: Loss: 0.0016, Accuracy: 100.00%
+Step 17360: Loss: 0.0197, Accuracy: 98.75%
+Step 17370: Loss: 0.0037, Accuracy: 100.00%
+TRAIN - Epoch 96:
+  Loss: 0.0098
+  Accuracy: 99.38% (1433/1442)
+VAL - Epoch 96:
+  Loss: 1.8913
+  Accuracy: 68.93% (233/338)
+Epoch 96/200
+----------
+Step 17380: Loss: 0.0004, Accuracy: 100.00%
+Step 17390: Loss: 0.0006, Accuracy: 100.00%
+Step 17400: Loss: 0.0036, Accuracy: 100.00%
+Step 17410: Loss: 0.0366, Accuracy: 96.25%
+Step 17420: Loss: 0.0009, Accuracy: 100.00%
+Step 17430: Loss: 0.0479, Accuracy: 98.75%
+Step 17440: Loss: 0.0010, Accuracy: 100.00%
+Step 17450: Loss: 0.0014, Accuracy: 100.00%
+Step 17460: Loss: 0.0002, Accuracy: 100.00%
+Step 17470: Loss: 0.0015, Accuracy: 100.00%
+Step 17480: Loss: 0.0002, Accuracy: 100.00%
+Step 17490: Loss: 0.0222, Accuracy: 98.75%
+Step 17500: Loss: 0.0007, Accuracy: 100.00%
+Step 17510: Loss: 0.0030, Accuracy: 100.00%
+Step 17520: Loss: 0.0034, Accuracy: 100.00%
+Step 17530: Loss: 0.0104, Accuracy: 98.75%
+Step 17540: Loss: 0.0111, Accuracy: 98.75%
+Step 17550: Loss: 0.0023, Accuracy: 100.00%
+TRAIN - Epoch 97:
+  Loss: 0.0092
+  Accuracy: 99.45% (1434/1442)
+VAL - Epoch 97:
+  Loss: 1.8504
+  Accuracy: 67.75% (229/338)
+Epoch 97/200
+----------
+Step 17560: Loss: 0.0012, Accuracy: 100.00%
+Step 17570: Loss: 0.0011, Accuracy: 100.00%
+Step 17580: Loss: 0.0014, Accuracy: 100.00%
+Step 17590: Loss: 0.0001, Accuracy: 100.00%
+Step 17600: Loss: 0.0156, Accuracy: 98.75%
+Step 17610: Loss: 0.0086, Accuracy: 100.00%
+Step 17620: Loss: 0.0119, Accuracy: 100.00%
+Step 17630: Loss: 0.0004, Accuracy: 100.00%
+Step 17640: Loss: 0.0107, Accuracy: 100.00%
+Step 17650: Loss: 0.0099, Accuracy: 100.00%
+Step 17660: Loss: 0.0012, Accuracy: 100.00%
+Step 17670: Loss: 0.0012, Accuracy: 100.00%
+Step 17680: Loss: 0.0034, Accuracy: 100.00%
+Step 17690: Loss: 0.0102, Accuracy: 98.75%
+Step 17700: Loss: 0.0009, Accuracy: 100.00%
+Step 17710: Loss: 0.0011, Accuracy: 100.00%
+Step 17720: Loss: 0.0116, Accuracy: 98.75%
+Step 17730: Loss: 0.0126, Accuracy: 98.75%
+TRAIN - Epoch 98:
+  Loss: 0.0068
+  Accuracy: 99.72% (1438/1442)
+VAL - Epoch 98:
+  Loss: 1.8585
+  Accuracy: 68.05% (230/338)
+Epoch 98/200
+----------
+Step 17740: Loss: 0.0007, Accuracy: 100.00%
+Step 17750: Loss: 0.0232, Accuracy: 97.50%
+Step 17760: Loss: 0.0019, Accuracy: 100.00%
+Step 17770: Loss: 0.0001, Accuracy: 100.00%
+Step 17780: Loss: 0.0013, Accuracy: 100.00%
+Step 17790: Loss: 0.0214, Accuracy: 98.75%
+Step 17800: Loss: 0.0013, Accuracy: 100.00%
+Step 17810: Loss: 0.0159, Accuracy: 98.75%
+Step 17820: Loss: 0.0002, Accuracy: 100.00%
+Step 17830: Loss: 0.0137, Accuracy: 98.75%
+Step 17840: Loss: 0.0136, Accuracy: 98.75%
+Step 17850: Loss: 0.0118, Accuracy: 98.75%
+Step 17860: Loss: 0.0008, Accuracy: 100.00%
+Step 17870: Loss: 0.0407, Accuracy: 98.75%
+Step 17880: Loss: 0.0006, Accuracy: 100.00%
+Step 17890: Loss: 0.0003, Accuracy: 100.00%
+Step 17900: Loss: 0.0081, Accuracy: 100.00%
+Step 17910: Loss: 0.0010, Accuracy: 100.00%
+TRAIN - Epoch 99:
+  Loss: 0.0110
+  Accuracy: 99.38% (1433/1442)
+VAL - Epoch 99:
+  Loss: 1.8940
+  Accuracy: 68.34% (231/338)
+Epoch 99/200
+----------
+Step 17920: Loss: 0.0001, Accuracy: 100.00%
+Step 17930: Loss: 0.0008, Accuracy: 100.00%
+Step 17940: Loss: 0.0003, Accuracy: 100.00%
+Step 17950: Loss: 0.0008, Accuracy: 100.00%
+Step 17960: Loss: 0.0007, Accuracy: 100.00%
+Step 17970: Loss: 0.0003, Accuracy: 100.00%
+Step 17980: Loss: 0.0003, Accuracy: 100.00%
+Step 17990: Loss: 0.0067, Accuracy: 100.00%
+Step 18000: Loss: 0.0120, Accuracy: 100.00%
+Step 18010: Loss: 0.0167, Accuracy: 100.00%
+Step 18020: Loss: 0.0122, Accuracy: 98.75%
+Step 18030: Loss: 0.0043, Accuracy: 100.00%
+Step 18040: Loss: 0.0091, Accuracy: 100.00%
+Step 18050: Loss: 0.0134, Accuracy: 98.75%
+Step 18060: Loss: 0.0005, Accuracy: 100.00%
+Step 18070: Loss: 0.0016, Accuracy: 100.00%
+Step 18080: Loss: 0.0240, Accuracy: 98.75%
+Step 18090: Loss: 0.0057, Accuracy: 100.00%
+Step 18100: Loss: 0.0376, Accuracy: 98.65%
+TRAIN - Epoch 100:
+  Loss: 0.0080
+  Accuracy: 99.72% (1438/1442)
+VAL - Epoch 100:
+  Loss: 1.9218
+  Accuracy: 68.05% (230/338)
+Checkpoint saved: runs/asl100/S3D_exp034/checkpoints/checkpoint_100.pth
+Epoch 100/200
+----------
+Step 18110: Loss: 0.0004, Accuracy: 100.00%
+Step 18120: Loss: 0.0005, Accuracy: 100.00%
+Step 18130: Loss: 0.0005, Accuracy: 100.00%
+Step 18140: Loss: 0.0108, Accuracy: 100.00%
+Step 18150: Loss: 0.0094, Accuracy: 100.00%
+Step 18160: Loss: 0.0192, Accuracy: 98.75%
+Step 18170: Loss: 0.0022, Accuracy: 100.00%
+Step 18180: Loss: 0.0154, Accuracy: 98.75%
+Step 18190: Loss: 0.0034, Accuracy: 100.00%
+Step 18200: Loss: 0.0004, Accuracy: 100.00%
+Step 18210: Loss: 0.0016, Accuracy: 100.00%
+Step 18220: Loss: 0.0103, Accuracy: 100.00%
+Step 18230: Loss: 0.0006, Accuracy: 100.00%
+Step 18240: Loss: 0.0148, Accuracy: 100.00%
+Step 18250: Loss: 0.0003, Accuracy: 100.00%
+Step 18260: Loss: 0.0003, Accuracy: 100.00%
+Step 18270: Loss: 0.0162, Accuracy: 98.75%
+Step 18280: Loss: 0.0021, Accuracy: 100.00%
+TRAIN - Epoch 101:
+  Loss: 0.0062
+  Accuracy: 99.79% (1439/1442)
+VAL - Epoch 101:
+  Loss: 1.8799
+  Accuracy: 69.23% (234/338)
+Epoch 101/200
+----------
+Step 18290: Loss: 0.0024, Accuracy: 100.00%
+Step 18300: Loss: 0.0085, Accuracy: 100.00%
+Step 18310: Loss: 0.0108, Accuracy: 98.75%
+Step 18320: Loss: 0.0092, Accuracy: 100.00%
+Step 18330: Loss: 0.0167, Accuracy: 98.75%
+Step 18340: Loss: 0.0006, Accuracy: 100.00%
+Step 18350: Loss: 0.0218, Accuracy: 98.75%
+Step 18360: Loss: 0.0006, Accuracy: 100.00%
+Step 18370: Loss: 0.0011, Accuracy: 100.00%
+Step 18380: Loss: 0.0005, Accuracy: 100.00%
+Step 18390: Loss: 0.0005, Accuracy: 100.00%
+Step 18400: Loss: 0.0141, Accuracy: 98.75%
+Step 18410: Loss: 0.0013, Accuracy: 100.00%
+Step 18420: Loss: 0.0003, Accuracy: 100.00%
+Step 18430: Loss: 0.0260, Accuracy: 97.50%
+Step 18440: Loss: 0.0002, Accuracy: 100.00%
+Step 18450: Loss: 0.0004, Accuracy: 100.00%
+Step 18460: Loss: 0.0003, Accuracy: 100.00%
+TRAIN - Epoch 102:
+  Loss: 0.0068
+  Accuracy: 99.58% (1436/1442)
+VAL - Epoch 102:
+  Loss: 1.8822
+  Accuracy: 68.93% (233/338)
+Epoch 102/200
+----------
+Step 18470: Loss: 0.0002, Accuracy: 100.00%
+Step 18480: Loss: 0.0002, Accuracy: 100.00%
+Step 18490: Loss: 0.0035, Accuracy: 100.00%
+Step 18500: Loss: 0.0059, Accuracy: 100.00%
+Step 18510: Loss: 0.0102, Accuracy: 98.75%
+Step 18520: Loss: 0.0009, Accuracy: 100.00%
+Step 18530: Loss: 0.0015, Accuracy: 100.00%
+Step 18540: Loss: 0.0071, Accuracy: 100.00%
+Step 18550: Loss: 0.0099, Accuracy: 98.75%
+Step 18560: Loss: 0.0034, Accuracy: 100.00%
+Step 18570: Loss: 0.0217, Accuracy: 98.75%
+Step 18580: Loss: 0.0088, Accuracy: 100.00%
+Step 18590: Loss: 0.0038, Accuracy: 100.00%
+Step 18600: Loss: 0.0004, Accuracy: 100.00%
+Step 18610: Loss: 0.0007, Accuracy: 100.00%
+Step 18620: Loss: 0.0005, Accuracy: 100.00%
+Step 18630: Loss: 0.0002, Accuracy: 100.00%
+Step 18640: Loss: 0.0093, Accuracy: 100.00%
+TRAIN - Epoch 103:
+  Loss: 0.0049
+  Accuracy: 99.79% (1439/1442)
+VAL - Epoch 103:
+  Loss: 1.8618
+  Accuracy: 68.93% (233/338)
+Epoch 103/200
+----------
+Step 18650: Loss: 0.0001, Accuracy: 100.00%
+Step 18660: Loss: 0.0224, Accuracy: 100.00%
+Step 18670: Loss: 0.0008, Accuracy: 100.00%
+Step 18680: Loss: 0.0100, Accuracy: 98.75%
+Step 18690: Loss: 0.0062, Accuracy: 100.00%
+Step 18700: Loss: 0.0117, Accuracy: 100.00%
+Step 18710: Loss: 0.0009, Accuracy: 100.00%
+Step 18720: Loss: 0.0018, Accuracy: 100.00%
+Step 18730: Loss: 0.0168, Accuracy: 98.75%
+Step 18740: Loss: 0.0047, Accuracy: 100.00%
+Step 18750: Loss: 0.0147, Accuracy: 98.75%
+Step 18760: Loss: 0.0011, Accuracy: 100.00%
+Step 18770: Loss: 0.0004, Accuracy: 100.00%
+Step 18780: Loss: 0.0009, Accuracy: 100.00%
+Step 18790: Loss: 0.0100, Accuracy: 100.00%
+Step 18800: Loss: 0.0005, Accuracy: 100.00%
+Step 18810: Loss: 0.0009, Accuracy: 100.00%
+Step 18820: Loss: 0.0011, Accuracy: 100.00%
+TRAIN - Epoch 104:
+  Loss: 0.0063
+  Accuracy: 99.79% (1439/1442)
+VAL - Epoch 104:
+  Loss: 1.8382
+  Accuracy: 69.53% (235/338)
+Epoch 104/200
+----------
