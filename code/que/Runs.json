@@ -1,161 +1,240 @@
 {
-    "to_run": [],
-    "cur_run": [],
-    "old_runs": [
+    "to_run":[],
+    "cur_run":[],
+    "old_runs":[
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "034",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_hbs.ini",
-                "save_path": "runs/asl100/S3D_exp034/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"034",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_hbs.ini",
+                "save_path":"runs/asl100/S3D_exp034/checkpoints"
             },
-            "training": {
-                "batch_size": 8,
-                "update_per_step": 1,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":8,
+                "update_per_step":1,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.1
+            "model_params":{
+                "drop_p":0.1
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-034"
                 ],
-                "run_id": "nct17shz"
+                "run_id":"nct17shz"
+            },
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":70.71005917159763,
+                "best_val_loss":1.7605276174754776,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6096666666666667,
+                        "top5":0.8633333333333333,
+                        "top10":0.92
+                    },
+                    "top_k_per_instance_acc":{
+                        "top1":0.6085271317829457,
+                        "top5":0.8604651162790697,
+                        "top10":0.9186046511627907
+                    },
+                    "average_loss":2.2172186262649114
+                },
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.696,
+                        "top5":0.8933333333333334,
+                        "top10":0.945
+                    },
+                    "top_k_per_instance_acc":{
+                        "top1":0.6893491124260355,
+                        "top5":0.893491124260355,
+                        "top10":0.9437869822485208
+                    },
+                    "average_loss":1.7605276174754776
+                },
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.2905,
+                        "top5":0.5808333333333333,
+                        "top10":0.715
+                    },
+                    "top_k_per_instance_acc":{
+                        "top1":0.28294573643410853,
+                        "top5":0.5852713178294574,
+                        "top10":0.7170542635658915
+                    },
+                    "average_loss":5.600523044802805,
+                    "perm":[
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy":4.288909912109375
+                }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "033",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp07.ini",
-                "save_path": "runs/asl100/S3D_exp033/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"033",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_dp07.ini",
+                "save_path":"runs/asl100/S3D_exp033/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.7
+            "model_params":{
+                "drop_p":0.7
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-033"
                 ],
-                "run_id": "5qk8q6cj"
+                "run_id":"5qk8q6cj"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 74.85207100591715,
-                "best_val_loss": 1.6676101968609074,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6635000000000001,
-                        "top5": 0.9146666666666667,
-                        "top10": 0.9613333333333333
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":74.85207100591715,
+                "best_val_loss":1.6676101968609074,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6635000000000001,
+                        "top5":0.9146666666666667,
+                        "top10":0.9613333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6627906976744186,
-                        "top5": 0.9108527131782945,
-                        "top10": 0.9573643410852714
+                    "top_k_per_instance_acc":{
+                        "top1":0.6627906976744186,
+                        "top5":0.9108527131782945,
+                        "top10":0.9573643410852714
                     },
-                    "average_loss": 1.9333141110971577
+                    "average_loss":1.9333141110971577
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7471666666666669,
-                        "top5": 0.9258333333333333,
-                        "top10": 0.9608333333333333
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7471666666666669,
+                        "top5":0.9258333333333333,
+                        "top10":0.9608333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.742603550295858,
-                        "top5": 0.9230769230769231,
-                        "top10": 0.9585798816568047
+                    "top_k_per_instance_acc":{
+                        "top1":0.742603550295858,
+                        "top5":0.9230769230769231,
+                        "top10":0.9585798816568047
                     },
-                    "average_loss": 1.6676101968609074
+                    "average_loss":1.6676101968609074
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.338,
-                        "top5": 0.5730000000000001,
-                        "top10": 0.7066666666666667
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.338,
+                        "top5":0.5730000000000001,
+                        "top10":0.7066666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.32558139534883723,
-                        "top5": 0.5697674418604651,
-                        "top10": 0.7015503875968992
+                    "top_k_per_instance_acc":{
+                        "top1":0.32558139534883723,
+                        "top5":0.5697674418604651,
+                        "top10":0.7015503875968992
                     },
-                    "average_loss": 7.078171349702298,
-                    "perm": [
+                    "average_loss":7.078171349702298,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -189,108 +268,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "032",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp06.ini",
-                "save_path": "runs/asl100/S3D_exp032/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"032",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_dp06.ini",
+                "save_path":"runs/asl100/S3D_exp032/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.6
+            "model_params":{
+                "drop_p":0.6
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-032"
                 ],
-                "run_id": "rsrzm9fn"
+                "run_id":"rsrzm9fn"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 73.07692307692308,
-                "best_val_loss": 1.7298621130814964,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6759999999999999,
-                        "top5": 0.885,
-                        "top10": 0.9375
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":73.07692307692308,
+                "best_val_loss":1.7298621130814964,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6759999999999999,
+                        "top5":0.885,
+                        "top10":0.9375
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6705426356589147,
-                        "top5": 0.8837209302325582,
-                        "top10": 0.937984496124031
+                    "top_k_per_instance_acc":{
+                        "top1":0.6705426356589147,
+                        "top5":0.8837209302325582,
+                        "top10":0.937984496124031
                     },
-                    "average_loss": 1.9347075385450425
+                    "average_loss":1.9347075385450425
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7223333333333334,
-                        "top5": 0.9255,
-                        "top10": 0.9658333333333333
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7223333333333334,
+                        "top5":0.9255,
+                        "top10":0.9658333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.7189349112426036,
-                        "top5": 0.9230769230769231,
-                        "top10": 0.9644970414201184
+                    "top_k_per_instance_acc":{
+                        "top1":0.7189349112426036,
+                        "top5":0.9230769230769231,
+                        "top10":0.9644970414201184
                     },
-                    "average_loss": 1.7298621130814964
+                    "average_loss":1.7298621130814964
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.33183333333333337,
-                        "top5": 0.575,
-                        "top10": 0.6983333333333333
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.33183333333333337,
+                        "top5":0.575,
+                        "top10":0.6983333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.32558139534883723,
-                        "top5": 0.5697674418604651,
-                        "top10": 0.6937984496124031
+                    "top_k_per_instance_acc":{
+                        "top1":0.32558139534883723,
+                        "top5":0.5697674418604651,
+                        "top10":0.6937984496124031
                     },
-                    "average_loss": 6.174480149215892,
-                    "perm": [
+                    "average_loss":6.174480149215892,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -324,108 +403,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "031",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp04.ini",
-                "save_path": "runs/asl100/S3D_exp031/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"031",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_dp04.ini",
+                "save_path":"runs/asl100/S3D_exp031/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.4
+            "model_params":{
+                "drop_p":0.4
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-031"
                 ],
-                "run_id": "ju1vc483"
+                "run_id":"ju1vc483"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 73.37278106508876,
-                "best_val_loss": 1.6876290839092156,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6616666666666667,
-                        "top5": 0.87,
-                        "top10": 0.9375
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":73.37278106508876,
+                "best_val_loss":1.6876290839092156,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6616666666666667,
+                        "top5":0.87,
+                        "top10":0.9375
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6627906976744186,
-                        "top5": 0.8643410852713178,
-                        "top10": 0.937984496124031
+                    "top_k_per_instance_acc":{
+                        "top1":0.6627906976744186,
+                        "top5":0.8643410852713178,
+                        "top10":0.937984496124031
                     },
-                    "average_loss": 2.0206915938278964
+                    "average_loss":2.0206915938278964
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7218333333333335,
-                        "top5": 0.9116666666666667,
-                        "top10": 0.9566666666666666
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7218333333333335,
+                        "top5":0.9116666666666667,
+                        "top10":0.9566666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.7159763313609467,
-                        "top5": 0.9112426035502958,
-                        "top10": 0.9585798816568047
+                    "top_k_per_instance_acc":{
+                        "top1":0.7159763313609467,
+                        "top5":0.9112426035502958,
+                        "top10":0.9585798816568047
                     },
-                    "average_loss": 1.6876290839092156
+                    "average_loss":1.6876290839092156
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.353,
-                        "top5": 0.6016666666666667,
-                        "top10": 0.6933333333333332
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.353,
+                        "top5":0.6016666666666667,
+                        "top10":0.6933333333333332
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.35271317829457366,
-                        "top5": 0.6007751937984496,
-                        "top10": 0.686046511627907
+                    "top_k_per_instance_acc":{
+                        "top1":0.35271317829457366,
+                        "top5":0.6007751937984496,
+                        "top10":0.686046511627907
                     },
-                    "average_loss": 6.218426293635855,
-                    "perm": [
+                    "average_loss":6.218426293635855,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -459,108 +538,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "030",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp03.ini",
-                "save_path": "runs/asl100/S3D_exp030/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"030",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_dp03.ini",
+                "save_path":"runs/asl100/S3D_exp030/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.3
+            "model_params":{
+                "drop_p":0.3
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-030"
                 ],
-                "run_id": "sojnyyy5"
+                "run_id":"sojnyyy5"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 68.63905325443787,
-                "best_val_loss": 2.0132170095273025,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.4771666666666667,
-                        "top5": 0.7824999999999999,
-                        "top10": 0.8808333333333332
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":68.63905325443787,
+                "best_val_loss":2.0132170095273025,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.4771666666666667,
+                        "top5":0.7824999999999999,
+                        "top10":0.8808333333333332
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4883720930232558,
-                        "top5": 0.7906976744186046,
-                        "top10": 0.8798449612403101
+                    "top_k_per_instance_acc":{
+                        "top1":0.4883720930232558,
+                        "top5":0.7906976744186046,
+                        "top10":0.8798449612403101
                     },
-                    "average_loss": 2.4244173439896297
+                    "average_loss":2.4244173439896297
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5165,
-                        "top5": 0.8496666666666668,
-                        "top10": 0.9141666666666667
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5165,
+                        "top5":0.8496666666666668,
+                        "top10":0.9141666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5118343195266272,
-                        "top5": 0.849112426035503,
-                        "top10": 0.9142011834319527
+                    "top_k_per_instance_acc":{
+                        "top1":0.5118343195266272,
+                        "top5":0.849112426035503,
+                        "top10":0.9142011834319527
                     },
-                    "average_loss": 2.0132170095273025
+                    "average_loss":2.0132170095273025
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.18966666666666668,
-                        "top5": 0.4608333333333334,
-                        "top10": 0.5541666666666667
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.18966666666666668,
+                        "top5":0.4608333333333334,
+                        "top10":0.5541666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.18992248062015504,
-                        "top5": 0.45348837209302323,
-                        "top10": 0.5503875968992248
+                    "top_k_per_instance_acc":{
+                        "top1":0.18992248062015504,
+                        "top5":0.45348837209302323,
+                        "top10":0.5503875968992248
                     },
-                    "average_loss": 5.650791230013634,
-                    "perm": [
+                    "average_loss":5.650791230013634,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -594,108 +673,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "029",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp02.ini",
-                "save_path": "runs/asl100/S3D_exp029/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"029",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_dp02.ini",
+                "save_path":"runs/asl100/S3D_exp029/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.2
+            "model_params":{
+                "drop_p":0.2
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-029"
                 ],
-                "run_id": "hezf5rbv"
+                "run_id":"hezf5rbv"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 67.45562130177515,
-                "best_val_loss": 1.9626260498046741,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5051666666666667,
-                        "top5": 0.79,
-                        "top10": 0.8866666666666666
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":67.45562130177515,
+                "best_val_loss":1.9626260498046741,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5051666666666667,
+                        "top5":0.79,
+                        "top10":0.8866666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5038759689922481,
-                        "top5": 0.7906976744186046,
-                        "top10": 0.8837209302325582
+                    "top_k_per_instance_acc":{
+                        "top1":0.5038759689922481,
+                        "top5":0.7906976744186046,
+                        "top10":0.8837209302325582
                     },
-                    "average_loss": 2.0878177849666537
+                    "average_loss":2.0878177849666537
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5484999999999999,
-                        "top5": 0.8480000000000001,
-                        "top10": 0.8983333333333333
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5484999999999999,
+                        "top5":0.8480000000000001,
+                        "top10":0.8983333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5443786982248521,
-                        "top5": 0.8461538461538461,
-                        "top10": 0.8964497041420119
+                    "top_k_per_instance_acc":{
+                        "top1":0.5443786982248521,
+                        "top5":0.8461538461538461,
+                        "top10":0.8964497041420119
                     },
-                    "average_loss": 1.9626260498046741
+                    "average_loss":1.9626260498046741
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.24766666666666665,
-                        "top5": 0.49,
-                        "top10": 0.5716666666666667
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.24766666666666665,
+                        "top5":0.49,
+                        "top10":0.5716666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.2441860465116279,
-                        "top5": 0.4883720930232558,
-                        "top10": 0.5697674418604651
+                    "top_k_per_instance_acc":{
+                        "top1":0.2441860465116279,
+                        "top5":0.4883720930232558,
+                        "top10":0.5697674418604651
                     },
-                    "average_loss": 4.920748694090181,
-                    "perm": [
+                    "average_loss":4.920748694090181,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -729,113 +808,113 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "028",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_wups_restarts.ini",
-                "save_path": "runs/asl100/S3D_exp028/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"028",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_wups_restarts.ini",
+                "save_path":"runs/asl100/S3D_exp028/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 1e-05,
-                "warm_up": {
-                    "start_factor": 0.1,
-                    "end_factor": 1.0,
-                    "warmup_epochs": 10
+            "scheduler":{
+                "type":"CosineAnnealingWarmRestarts",
+                "t0":10,
+                "tmult":1,
+                "eta_min":1e-05,
+                "warm_up":{
+                    "start_factor":0.1,
+                    "end_factor":1.0,
+                    "warmup_epochs":10
                 }
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-028"
                 ],
-                "run_id": "98eqy3nw"
+                "run_id":"98eqy3nw"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 69.8224852071006,
-                "best_val_loss": 1.549887095128904,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6396666666666666,
-                        "top5": 0.8688333333333332,
-                        "top10": 0.9191666666666667
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":69.8224852071006,
+                "best_val_loss":1.549887095128904,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6396666666666666,
+                        "top5":0.8688333333333332,
+                        "top10":0.9191666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6395348837209303,
-                        "top5": 0.8643410852713178,
-                        "top10": 0.9186046511627907
+                    "top_k_per_instance_acc":{
+                        "top1":0.6395348837209303,
+                        "top5":0.8643410852713178,
+                        "top10":0.9186046511627907
                     },
-                    "average_loss": 1.8975948955183957
+                    "average_loss":1.8975948955183957
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6921666666666667,
-                        "top5": 0.9275000000000001,
-                        "top10": 0.9525000000000001
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6921666666666667,
+                        "top5":0.9275000000000001,
+                        "top10":0.9525000000000001
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6893491124260355,
-                        "top5": 0.9230769230769231,
-                        "top10": 0.9497041420118343
+                    "top_k_per_instance_acc":{
+                        "top1":0.6893491124260355,
+                        "top5":0.9230769230769231,
+                        "top10":0.9497041420118343
                     },
-                    "average_loss": 1.549887095128904
+                    "average_loss":1.549887095128904
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.36216666666666664,
-                        "top5": 0.6191666666666666,
-                        "top10": 0.7016666666666665
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.36216666666666664,
+                        "top5":0.6191666666666666,
+                        "top10":0.7016666666666665
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.3643410852713178,
-                        "top5": 0.6124031007751938,
-                        "top10": 0.6976744186046512
+                    "top_k_per_instance_acc":{
+                        "top1":0.3643410852713178,
+                        "top5":0.6124031007751938,
+                        "top10":0.6976744186046512
                     },
-                    "average_loss": 4.25231028971642,
-                    "perm": [
+                    "average_loss":4.25231028971642,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -869,109 +948,109 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "027",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_warmrestarts2.ini",
-                "save_path": "runs/asl100/S3D_exp027/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"027",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_warmrestarts2.ini",
+                "save_path":"runs/asl100/S3D_exp027/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingWarmRestarts",
+                "t0":10,
+                "tmult":1,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-027"
                 ],
-                "run_id": "yldvan41"
+                "run_id":"yldvan41"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 71.00591715976331,
-                "best_val_loss": 1.6258108042645099,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6163333333333333,
-                        "top5": 0.8733333333333333,
-                        "top10": 0.9316666666666668
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":71.00591715976331,
+                "best_val_loss":1.6258108042645099,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6163333333333333,
+                        "top5":0.8733333333333333,
+                        "top10":0.9316666666666668
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6201550387596899,
-                        "top5": 0.8682170542635659,
-                        "top10": 0.9302325581395349
+                    "top_k_per_instance_acc":{
+                        "top1":0.6201550387596899,
+                        "top5":0.8682170542635659,
+                        "top10":0.9302325581395349
                     },
-                    "average_loss": 2.0033567587043875
+                    "average_loss":2.0033567587043875
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6630000000000001,
-                        "top5": 0.8913333333333334,
-                        "top10": 0.9450000000000002
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6630000000000001,
+                        "top5":0.8913333333333334,
+                        "top10":0.9450000000000002
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6568047337278107,
-                        "top5": 0.8905325443786982,
-                        "top10": 0.9437869822485208
+                    "top_k_per_instance_acc":{
+                        "top1":0.6568047337278107,
+                        "top5":0.8905325443786982,
+                        "top10":0.9437869822485208
                     },
-                    "average_loss": 1.6258108042645099
+                    "average_loss":1.6258108042645099
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.3263333333333333,
-                        "top5": 0.555,
-                        "top10": 0.645
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.3263333333333333,
+                        "top5":0.555,
+                        "top10":0.645
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.32170542635658916,
-                        "top5": 0.5465116279069767,
-                        "top10": 0.6395348837209303
+                    "top_k_per_instance_acc":{
+                        "top1":0.32170542635658916,
+                        "top5":0.5465116279069767,
+                        "top10":0.6395348837209303
                     },
-                    "average_loss": 4.541451558195026,
-                    "perm": [
+                    "average_loss":4.541451558195026,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -1005,108 +1084,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "026",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps7.ini",
-                "save_path": "runs/asl100/S3D_exp026/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"026",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps7.ini",
+                "save_path":"runs/asl100/S3D_exp026/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.01,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.01,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-026"
                 ],
-                "run_id": "5rqn7ebt"
+                "run_id":"5rqn7ebt"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 70.41420118343196,
-                "best_val_loss": 1.5451269734798685,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6076666666666667,
-                        "top5": 0.8766666666666666,
-                        "top10": 0.9333333333333332
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":70.41420118343196,
+                "best_val_loss":1.5451269734798685,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6076666666666667,
+                        "top5":0.8766666666666666,
+                        "top10":0.9333333333333332
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6046511627906976,
-                        "top5": 0.875968992248062,
-                        "top10": 0.9302325581395349
+                    "top_k_per_instance_acc":{
+                        "top1":0.6046511627906976,
+                        "top5":0.875968992248062,
+                        "top10":0.9302325581395349
                     },
-                    "average_loss": 1.9613530397980337
+                    "average_loss":1.9613530397980337
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6946666666666667,
-                        "top5": 0.9025000000000002,
-                        "top10": 0.9375000000000001
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6946666666666667,
+                        "top5":0.9025000000000002,
+                        "top10":0.9375000000000001
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6863905325443787,
-                        "top5": 0.8994082840236687,
-                        "top10": 0.9349112426035503
+                    "top_k_per_instance_acc":{
+                        "top1":0.6863905325443787,
+                        "top5":0.8994082840236687,
+                        "top10":0.9349112426035503
                     },
-                    "average_loss": 1.5451269734798685
+                    "average_loss":1.5451269734798685
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.3421666666666666,
-                        "top5": 0.6516666666666666,
-                        "top10": 0.7266666666666667
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.3421666666666666,
+                        "top5":0.6516666666666666,
+                        "top10":0.7266666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.34108527131782945,
-                        "top5": 0.6434108527131783,
-                        "top10": 0.7170542635658915
+                    "top_k_per_instance_acc":{
+                        "top1":0.34108527131782945,
+                        "top5":0.6434108527131783,
+                        "top10":0.7170542635658915
                     },
-                    "average_loss": 4.18337306444658,
-                    "perm": [
+                    "average_loss":4.18337306444658,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -1140,108 +1219,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "025",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps6.ini",
-                "save_path": "runs/asl100/S3D_exp025/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"025",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps6.ini",
+                "save_path":"runs/asl100/S3D_exp025/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.001,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.001,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-025"
                 ],
-                "run_id": "sf4u3wbo"
+                "run_id":"sf4u3wbo"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 68.93491124260355,
-                "best_val_loss": 1.9323981195430482,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5558333333333334,
-                        "top5": 0.79,
-                        "top10": 0.8849999999999999
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":68.93491124260355,
+                "best_val_loss":1.9323981195430482,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5558333333333334,
+                        "top5":0.79,
+                        "top10":0.8849999999999999
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5581395348837209,
-                        "top5": 0.7906976744186046,
-                        "top10": 0.8837209302325582
+                    "top_k_per_instance_acc":{
+                        "top1":0.5581395348837209,
+                        "top5":0.7906976744186046,
+                        "top10":0.8837209302325582
                     },
-                    "average_loss": 2.170617846001573
+                    "average_loss":2.170617846001573
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5751666666666667,
-                        "top5": 0.8496666666666667,
-                        "top10": 0.9225
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5751666666666667,
+                        "top5":0.8496666666666667,
+                        "top10":0.9225
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5710059171597633,
-                        "top5": 0.8461538461538461,
-                        "top10": 0.9230769230769231
+                    "top_k_per_instance_acc":{
+                        "top1":0.5710059171597633,
+                        "top5":0.8461538461538461,
+                        "top10":0.9230769230769231
                     },
-                    "average_loss": 1.9323981195430482
+                    "average_loss":1.9323981195430482
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.26466666666666666,
-                        "top5": 0.53,
-                        "top10": 0.6366666666666666
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.26466666666666666,
+                        "top5":0.53,
+                        "top10":0.6366666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.26356589147286824,
-                        "top5": 0.5232558139534884,
-                        "top10": 0.627906976744186
+                    "top_k_per_instance_acc":{
+                        "top1":0.26356589147286824,
+                        "top5":0.5232558139534884,
+                        "top10":0.627906976744186
                     },
-                    "average_loss": 5.032505622010249,
-                    "perm": [
+                    "average_loss":5.032505622010249,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -1275,108 +1354,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "MViTv2_S",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "006",
-                "recover": false,
-                "config_path": "./configfiles/generic/leps_wd_lb.ini",
-                "save_path": "runs/asl100/MViTv2_S_exp006/checkpoints"
+            "admin":{
+                "model":"MViTv2_S",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"006",
+                "recover":false,
+                "config_path":"./configfiles/generic/leps_wd_lb.ini",
+                "save_path":"runs/asl100/MViTv2_S_exp006/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 16,
-                "frame_size": 224
+            "data":{
+                "num_frames":16,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "MViTv2_S",
                     "exp-006"
                 ],
-                "run_id": "f4cdwisi"
+                "run_id":"f4cdwisi"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 76.03550295857988,
-                "best_val_loss": 0.9645377738976826,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7046666666666667,
-                        "top5": 0.8933333333333334,
-                        "top10": 0.945
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":76.03550295857988,
+                "best_val_loss":0.9645377738976826,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7046666666666667,
+                        "top5":0.8933333333333334,
+                        "top10":0.945
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.7015503875968992,
-                        "top5": 0.8914728682170543,
-                        "top10": 0.9457364341085271
+                    "top_k_per_instance_acc":{
+                        "top1":0.7015503875968992,
+                        "top5":0.8914728682170543,
+                        "top10":0.9457364341085271
                     },
-                    "average_loss": 1.168968959925597
+                    "average_loss":1.168968959925597
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7591666666666668,
-                        "top5": 0.9275,
-                        "top10": 0.9758333333333333
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7591666666666668,
+                        "top5":0.9275,
+                        "top10":0.9758333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.7603550295857988,
-                        "top5": 0.9289940828402367,
-                        "top10": 0.9763313609467456
+                    "top_k_per_instance_acc":{
+                        "top1":0.7603550295857988,
+                        "top5":0.9289940828402367,
+                        "top10":0.9763313609467456
                     },
-                    "average_loss": 0.9645377738976826
+                    "average_loss":0.9645377738976826
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.4508333333333333,
-                        "top5": 0.785,
-                        "top10": 0.8958333333333333
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.4508333333333333,
+                        "top5":0.785,
+                        "top10":0.8958333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4496124031007752,
-                        "top5": 0.7751937984496124,
-                        "top10": 0.8875968992248062
+                    "top_k_per_instance_acc":{
+                        "top1":0.4496124031007752,
+                        "top5":0.7751937984496124,
+                        "top10":0.8875968992248062
                     },
-                    "average_loss": 2.3990626141041798,
-                    "perm": [
+                    "average_loss":2.3990626141041798,
+                    "perm":[
                         6,
                         3,
                         0,
@@ -1394,108 +1473,108 @@
                         11,
                         1
                     ],
-                    "shannon_entropy": 3.327819585800171
+                    "shannon_entropy":3.327819585800171
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "024",
-                "recover": false,
-                "config_path": "./configfiles/generic/hf_hwd_eps_dp01_.ini",
-                "save_path": "runs/asl100/S3D_exp024/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"024",
+                "recover":false,
+                "config_path":"./configfiles/generic/hf_hwd_eps_dp01_.ini",
+                "save_path":"runs/asl100/S3D_exp024/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.1
+            "model_params":{
+                "drop_p":0.1
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1.0,
-                "warm_up": null
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1.0,
+                "warm_up":null
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-024"
                 ],
-                "run_id": "5msuv0c0"
+                "run_id":"5msuv0c0"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 21.597633136094675,
-                "best_val_loss": 4.666360256137762,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.2,
-                        "top5": 0.5086666666666667,
-                        "top10": 0.6729999999999999
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":21.597633136094675,
+                "best_val_loss":4.666360256137762,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.2,
+                        "top5":0.5086666666666667,
+                        "top10":0.6729999999999999
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.2054263565891473,
-                        "top5": 0.49612403100775193,
-                        "top10": 0.6705426356589147
+                    "top_k_per_instance_acc":{
+                        "top1":0.2054263565891473,
+                        "top5":0.49612403100775193,
+                        "top10":0.6705426356589147
                     },
-                    "average_loss": 4.826102984945642
+                    "average_loss":4.826102984945642
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.21499999999999997,
-                        "top5": 0.5353333333333334,
-                        "top10": 0.6910000000000001
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.21499999999999997,
+                        "top5":0.5353333333333334,
+                        "top10":0.6910000000000001
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.21597633136094674,
-                        "top5": 0.5236686390532544,
-                        "top10": 0.6804733727810651
+                    "top_k_per_instance_acc":{
+                        "top1":0.21597633136094674,
+                        "top5":0.5236686390532544,
+                        "top10":0.6804733727810651
                     },
-                    "average_loss": 4.666360256137762
+                    "average_loss":4.666360256137762
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.11083333333333333,
-                        "top5": 0.3906666666666666,
-                        "top10": 0.4993333333333333
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.11083333333333333,
+                        "top5":0.3906666666666666,
+                        "top10":0.4993333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.1124031007751938,
-                        "top5": 0.3875968992248062,
-                        "top10": 0.5
+                    "top_k_per_instance_acc":{
+                        "top1":0.1124031007751938,
+                        "top5":0.3875968992248062,
+                        "top10":0.5
                     },
-                    "average_loss": 7.21583850481315,
-                    "perm": [
+                    "average_loss":7.21583850481315,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -1529,108 +1608,108 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "023",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_warmrestarts.ini",
-                "save_path": "runs/asl100/S3D_exp023/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"023",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_warmrestarts.ini",
+                "save_path":"runs/asl100/S3D_exp023/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 0
+            "scheduler":{
+                "type":"CosineAnnealingWarmRestarts",
+                "t0":10,
+                "tmult":1,
+                "eta_min":0
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-023"
                 ],
-                "run_id": "yaylbndm"
+                "run_id":"yaylbndm"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 71.30177514792899,
-                "best_val_loss": 1.447925063179952,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5923333333333334,
-                        "top5": 0.8658333333333332,
-                        "top10": 0.925
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":71.30177514792899,
+                "best_val_loss":1.447925063179952,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5923333333333334,
+                        "top5":0.8658333333333332,
+                        "top10":0.925
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5813953488372093,
-                        "top5": 0.8643410852713178,
-                        "top10": 0.9263565891472868
+                    "top_k_per_instance_acc":{
+                        "top1":0.5813953488372093,
+                        "top5":0.8643410852713178,
+                        "top10":0.9263565891472868
                     },
-                    "average_loss": 1.8019663431758843
+                    "average_loss":1.8019663431758843
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6618333333333334,
-                        "top5": 0.8896666666666668,
-                        "top10": 0.9458333333333333
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6618333333333334,
+                        "top5":0.8896666666666668,
+                        "top10":0.9458333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.650887573964497,
-                        "top5": 0.8846153846153846,
-                        "top10": 0.9437869822485208
+                    "top_k_per_instance_acc":{
+                        "top1":0.650887573964497,
+                        "top5":0.8846153846153846,
+                        "top10":0.9437869822485208
                     },
-                    "average_loss": 1.447925063179952
+                    "average_loss":1.447925063179952
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.29766666666666663,
-                        "top5": 0.606,
-                        "top10": 0.73
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.29766666666666663,
+                        "top5":0.606,
+                        "top10":0.73
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.29069767441860467,
-                        "top5": 0.5968992248062015,
-                        "top10": 0.7248062015503876
+                    "top_k_per_instance_acc":{
+                        "top1":0.29069767441860467,
+                        "top5":0.5968992248062015,
+                        "top10":0.7248062015503876
                     },
-                    "average_loss": 3.4398782795244096,
-                    "perm": [
+                    "average_loss":3.4398782795244096,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -1664,107 +1743,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "022",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_warmups.ini",
-                "save_path": "runs/asl100/S3D_exp022/checkpoints"
+            "admin":{
+                "model":"S3D",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"022",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_warmups.ini",
+                "save_path":"runs/asl100/S3D_exp022/checkpoints"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-022"
                 ],
-                "run_id": "h8xukxfn"
+                "run_id":"h8xukxfn"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 71.89349112426035,
-                "best_val_loss": 1.643628252759298,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5286666666666666,
-                        "top5": 0.845,
-                        "top10": 0.9025
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":71.89349112426035,
+                "best_val_loss":1.643628252759298,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5286666666666666,
+                        "top5":0.845,
+                        "top10":0.9025
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5232558139534884,
-                        "top5": 0.8449612403100775,
-                        "top10": 0.9069767441860465
+                    "top_k_per_instance_acc":{
+                        "top1":0.5232558139534884,
+                        "top5":0.8449612403100775,
+                        "top10":0.9069767441860465
                     },
-                    "average_loss": 2.3195833228918064
+                    "average_loss":2.3195833228918064
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.621,
-                        "top5": 0.8816666666666668,
-                        "top10": 0.9375
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.621,
+                        "top5":0.8816666666666668,
+                        "top10":0.9375
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6153846153846154,
-                        "top5": 0.878698224852071,
-                        "top10": 0.9349112426035503
+                    "top_k_per_instance_acc":{
+                        "top1":0.6153846153846154,
+                        "top5":0.878698224852071,
+                        "top10":0.9349112426035503
                     },
-                    "average_loss": 1.643628252759298
+                    "average_loss":1.643628252759298
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.2891666666666667,
-                        "top5": 0.5974999999999999,
-                        "top10": 0.7066666666666667
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.2891666666666667,
+                        "top5":0.5974999999999999,
+                        "top10":0.7066666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.29457364341085274,
-                        "top5": 0.5968992248062015,
-                        "top10": 0.7054263565891473
+                    "top_k_per_instance_acc":{
+                        "top1":0.29457364341085274,
+                        "top5":0.5968992248062015,
+                        "top10":0.7054263565891473
                     },
-                    "average_loss": 4.01362017077881,
-                    "perm": [
+                    "average_loss":4.01362017077881,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -1798,107 +1877,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "MViTv2_S",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "005",
-                "recover": false,
-                "config_path": "./configfiles/generic/lframe_lbs_hwd_epsm5.ini",
-                "save_path": "runs/asl100/MViTv2_S_exp005/checkpoints"
+            "admin":{
+                "model":"MViTv2_S",
+                "dataset":"WLASL",
+                "split":"asl100",
+                "exp_no":"005",
+                "recover":false,
+                "config_path":"./configfiles/generic/lframe_lbs_hwd_epsm5.ini",
+                "save_path":"runs/asl100/MViTv2_S_exp005/checkpoints"
             },
-            "training": {
-                "batch_size": 2,
-                "update_per_step": 4,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":2,
+                "update_per_step":4,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 16,
-                "frame_size": 224
+            "data":{
+                "num_frames":16,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "MViTv2_S",
                     "exp-005"
                 ],
-                "run_id": "brdvmc0l"
+                "run_id":"brdvmc0l"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 77.51479289940828,
-                "best_val_loss": 0.9721886918334306,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7190000000000001,
-                        "top5": 0.9125,
-                        "top10": 0.9591666666666666
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":77.51479289940828,
+                "best_val_loss":0.9721886918334306,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7190000000000001,
+                        "top5":0.9125,
+                        "top10":0.9591666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.7131782945736435,
-                        "top5": 0.9108527131782945,
-                        "top10": 0.9573643410852714
+                    "top_k_per_instance_acc":{
+                        "top1":0.7131782945736435,
+                        "top5":0.9108527131782945,
+                        "top10":0.9573643410852714
                     },
-                    "average_loss": 1.2249770843461805
+                    "average_loss":1.2249770843461805
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7405000000000002,
-                        "top5": 0.9475,
-                        "top10": 0.9716666666666666
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7405000000000002,
+                        "top5":0.9475,
+                        "top10":0.9716666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.7366863905325444,
-                        "top5": 0.9467455621301775,
-                        "top10": 0.9704142011834319
+                    "top_k_per_instance_acc":{
+                        "top1":0.7366863905325444,
+                        "top5":0.9467455621301775,
+                        "top10":0.9704142011834319
                     },
-                    "average_loss": 0.9721886918334306
+                    "average_loss":0.9721886918334306
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.4958333333333333,
-                        "top5": 0.8208333333333334,
-                        "top10": 0.9
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.4958333333333333,
+                        "top5":0.8208333333333334,
+                        "top10":0.9
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4883720930232558,
-                        "top5": 0.810077519379845,
-                        "top10": 0.8875968992248062
+                    "top_k_per_instance_acc":{
+                        "top1":0.4883720930232558,
+                        "top5":0.810077519379845,
+                        "top10":0.8875968992248062
                     },
-                    "average_loss": 2.3292763975869444,
-                    "perm": [
+                    "average_loss":2.3292763975869444,
+                    "perm":[
                         6,
                         3,
                         0,
@@ -1916,107 +1995,107 @@
                         11,
                         1
                     ],
-                    "shannon_entropy": 3.327819585800171
+                    "shannon_entropy":3.327819585800171
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "021",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps5.ini",
-                "save_path": "runs/asl100/S3D_exp021/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "model":"S3D",
+                "split":"asl100",
+                "exp_no":"021",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps5.ini",
+                "save_path":"runs/asl100/S3D_exp021/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.0001,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.0001,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-021"
                 ],
-                "run_id": "7i3y8aqj"
+                "run_id":"7i3y8aqj"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 73.37278106508876,
-                "best_val_loss": 1.667708854606241,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5535,
-                        "top5": 0.8341666666666666,
-                        "top10": 0.9058333333333333
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":73.37278106508876,
+                "best_val_loss":1.667708854606241,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5535,
+                        "top5":0.8341666666666666,
+                        "top10":0.9058333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5465116279069767,
-                        "top5": 0.8294573643410853,
-                        "top10": 0.9031007751937985
+                    "top_k_per_instance_acc":{
+                        "top1":0.5465116279069767,
+                        "top5":0.8294573643410853,
+                        "top10":0.9031007751937985
                     },
-                    "average_loss": 2.239788476827599
+                    "average_loss":2.239788476827599
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5836666666666667,
-                        "top5": 0.8316666666666667,
-                        "top10": 0.9166666666666665
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5836666666666667,
+                        "top5":0.8316666666666667,
+                        "top10":0.9166666666666665
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5769230769230769,
-                        "top5": 0.8313609467455622,
-                        "top10": 0.9171597633136095
+                    "top_k_per_instance_acc":{
+                        "top1":0.5769230769230769,
+                        "top5":0.8313609467455622,
+                        "top10":0.9171597633136095
                     },
-                    "average_loss": 2.077222524131283
+                    "average_loss":2.077222524131283
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.27316666666666667,
-                        "top5": 0.5305000000000001,
-                        "top10": 0.6238333333333334
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.27316666666666667,
+                        "top5":0.5305000000000001,
+                        "top10":0.6238333333333334
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.26744186046511625,
-                        "top5": 0.5193798449612403,
-                        "top10": 0.6124031007751938
+                    "top_k_per_instance_acc":{
+                        "top1":0.26744186046511625,
+                        "top5":0.5193798449612403,
+                        "top10":0.6124031007751938
                     },
-                    "average_loss": 4.766070482566449,
-                    "perm": [
+                    "average_loss":4.766070482566449,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2050,107 +2129,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "020",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps4.ini",
-                "save_path": "runs/asl100/S3D_exp020/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "model":"S3D",
+                "split":"asl100",
+                "exp_no":"020",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps4.ini",
+                "save_path":"runs/asl100/S3D_exp020/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-05,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-020"
                 ],
-                "run_id": "j1m1c1qs"
+                "run_id":"j1m1c1qs"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 73.66863905325444,
-                "best_val_loss": 1.7244786683626432,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7076666666666667,
-                        "top5": 0.9058333333333333,
-                        "top10": 0.9341666666666666
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":73.66863905325444,
+                "best_val_loss":1.7244786683626432,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7076666666666667,
+                        "top5":0.9058333333333333,
+                        "top10":0.9341666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6976744186046512,
-                        "top5": 0.9031007751937985,
-                        "top10": 0.9341085271317829
+                    "top_k_per_instance_acc":{
+                        "top1":0.6976744186046512,
+                        "top5":0.9031007751937985,
+                        "top10":0.9341085271317829
                     },
-                    "average_loss": 1.9074238078486851
+                    "average_loss":1.9074238078486851
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.7326666666666667,
-                        "top5": 0.9241666666666667,
-                        "top10": 0.9533333333333333
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.7326666666666667,
+                        "top5":0.9241666666666667,
+                        "top10":0.9533333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.727810650887574,
-                        "top5": 0.9230769230769231,
-                        "top10": 0.9526627218934911
+                    "top_k_per_instance_acc":{
+                        "top1":0.727810650887574,
+                        "top5":0.9230769230769231,
+                        "top10":0.9526627218934911
                     },
-                    "average_loss": 1.7246354878782635
+                    "average_loss":1.7246354878782635
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.37633333333333335,
-                        "top5": 0.6075,
-                        "top10": 0.7
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.37633333333333335,
+                        "top5":0.6075,
+                        "top10":0.7
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.3682170542635659,
-                        "top5": 0.6007751937984496,
-                        "top10": 0.6937984496124031
+                    "top_k_per_instance_acc":{
+                        "top1":0.3682170542635659,
+                        "top5":0.6007751937984496,
+                        "top10":0.6937984496124031
                     },
-                    "average_loss": 6.0453904713139766,
-                    "perm": [
+                    "average_loss":6.0453904713139766,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2184,107 +2263,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "019",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps3.ini",
-                "save_path": "runs/asl100/S3D_exp019/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "model":"S3D",
+                "split":"asl100",
+                "exp_no":"019",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps3.ini",
+                "save_path":"runs/asl100/S3D_exp019/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-06,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-06,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-019"
                 ],
-                "run_id": "plviroao"
+                "run_id":"plviroao"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 69.5266272189349,
-                "best_val_loss": 1.9584599469874966,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5393333333333333,
-                        "top5": 0.8183333333333335,
-                        "top10": 0.8833333333333334
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":69.5266272189349,
+                "best_val_loss":1.9584599469874966,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5393333333333333,
+                        "top5":0.8183333333333335,
+                        "top10":0.8833333333333334
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5310077519379846,
-                        "top5": 0.813953488372093,
-                        "top10": 0.8798449612403101
+                    "top_k_per_instance_acc":{
+                        "top1":0.5310077519379846,
+                        "top5":0.813953488372093,
+                        "top10":0.8798449612403101
                     },
-                    "average_loss": 2.62380031943592
+                    "average_loss":2.62380031943592
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.639,
-                        "top5": 0.8480000000000001,
-                        "top10": 0.9129999999999999
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.639,
+                        "top5":0.8480000000000001,
+                        "top10":0.9129999999999999
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.6331360946745562,
-                        "top5": 0.8461538461538461,
-                        "top10": 0.9112426035502958
+                    "top_k_per_instance_acc":{
+                        "top1":0.6331360946745562,
+                        "top5":0.8461538461538461,
+                        "top10":0.9112426035502958
                     },
-                    "average_loss": 1.9584937024609679
+                    "average_loss":1.9584937024609679
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.2643333333333333,
-                        "top5": 0.48999999999999994,
-                        "top10": 0.6216666666666666
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.2643333333333333,
+                        "top5":0.48999999999999994,
+                        "top10":0.6216666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.2596899224806202,
-                        "top5": 0.4806201550387597,
-                        "top10": 0.6124031007751938
+                    "top_k_per_instance_acc":{
+                        "top1":0.2596899224806202,
+                        "top5":0.4806201550387597,
+                        "top10":0.6124031007751938
                     },
-                    "average_loss": 5.463534499239659,
-                    "perm": [
+                    "average_loss":5.463534499239659,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2318,107 +2397,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "018",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps2.ini",
-                "save_path": "runs/asl100/S3D_exp018/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "model":"S3D",
+                "split":"asl100",
+                "exp_no":"018",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps2.ini",
+                "save_path":"runs/asl100/S3D_exp018/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-07,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-07,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-018"
                 ],
-                "run_id": "ysg9tmr9"
+                "run_id":"ysg9tmr9"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 68.3432,
-                "best_val_loss": 1.93781,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5133333333333333,
-                        "top5": 0.7829999999999999,
-                        "top10": 0.8633333333333334
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":68.3432,
+                "best_val_loss":1.93781,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5133333333333333,
+                        "top5":0.7829999999999999,
+                        "top10":0.8633333333333334
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5,
-                        "top5": 0.7829457364341085,
-                        "top10": 0.8604651162790697
+                    "top_k_per_instance_acc":{
+                        "top1":0.5,
+                        "top5":0.7829457364341085,
+                        "top10":0.8604651162790697
                     },
-                    "average_loss": 2.371216924760943
+                    "average_loss":2.371216924760943
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.6036666666666668,
-                        "top5": 0.8176666666666667,
-                        "top10": 0.8888333333333334
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.6036666666666668,
+                        "top5":0.8176666666666667,
+                        "top10":0.8888333333333334
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5887573964497042,
-                        "top5": 0.8106508875739645,
-                        "top10": 0.8846153846153846
+                    "top_k_per_instance_acc":{
+                        "top1":0.5887573964497042,
+                        "top5":0.8106508875739645,
+                        "top10":0.8846153846153846
                     },
-                    "average_loss": 1.9378346109165054
+                    "average_loss":1.9378346109165054
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.2598333333333333,
-                        "top5": 0.5388333333333333,
-                        "top10": 0.6458333333333335
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.2598333333333333,
+                        "top5":0.5388333333333333,
+                        "top10":0.6458333333333335
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.2596899224806202,
-                        "top5": 0.5426356589147286,
-                        "top10": 0.6472868217054264
+                    "top_k_per_instance_acc":{
+                        "top1":0.2596899224806202,
+                        "top5":0.5426356589147286,
+                        "top10":0.6472868217054264
                     },
-                    "average_loss": 4.645887097794573,
-                    "perm": [
+                    "average_loss":4.645887097794573,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2452,107 +2531,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "exp_no": "017",
-                "model": "S3D",
-                "split": "asl100",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd_leps.ini",
-                "save_path": "runs/asl100/S3D_exp017/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "exp_no":"017",
+                "model":"S3D",
+                "split":"asl100",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd_leps.ini",
+                "save_path":"runs/asl100/S3D_exp017/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 1e-08,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":1e-08,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-017"
                 ],
-                "run_id": "nk7ius3q"
+                "run_id":"nk7ius3q"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 65.68047337278107,
-                "best_val_loss": 1.8945111121354319,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5306666666666666,
-                        "top5": 0.8316666666666667,
-                        "top10": 0.8733333333333333
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":65.68047337278107,
+                "best_val_loss":1.8945111121354319,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5306666666666666,
+                        "top5":0.8316666666666667,
+                        "top10":0.8733333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5232558139534884,
-                        "top5": 0.8294573643410853,
-                        "top10": 0.872093023255814
+                    "top_k_per_instance_acc":{
+                        "top1":0.5232558139534884,
+                        "top5":0.8294573643410853,
+                        "top10":0.872093023255814
                     },
-                    "average_loss": 2.1510710903423345
+                    "average_loss":2.1510710903423345
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5648333333333333,
-                        "top5": 0.8421666666666667,
-                        "top10": 0.9091666666666667
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5648333333333333,
+                        "top5":0.8421666666666667,
+                        "top10":0.9091666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5532544378698225,
-                        "top5": 0.8372781065088757,
-                        "top10": 0.908284023668639
+                    "top_k_per_instance_acc":{
+                        "top1":0.5532544378698225,
+                        "top5":0.8372781065088757,
+                        "top10":0.908284023668639
                     },
-                    "average_loss": 1.8945753394224094
+                    "average_loss":1.8945753394224094
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.29649999999999993,
-                        "top5": 0.5258333333333334,
-                        "top10": 0.6674999999999999
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.29649999999999993,
+                        "top5":0.5258333333333334,
+                        "top10":0.6674999999999999
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.2868217054263566,
-                        "top5": 0.5232558139534884,
-                        "top10": 0.6666666666666666
+                    "top_k_per_instance_acc":{
+                        "top1":0.2868217054263566,
+                        "top5":0.5232558139534884,
+                        "top10":0.6666666666666666
                     },
-                    "average_loss": 4.174450702340465,
-                    "perm": [
+                    "average_loss":4.174450702340465,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2586,107 +2665,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "exp_no": "016",
-                "model": "S3D",
-                "split": "asl100",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_mwd.ini",
-                "save_path": "runs/asl100/S3D_exp016/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "exp_no":"016",
+                "model":"S3D",
+                "split":"asl100",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_mwd.ini",
+                "save_path":"runs/asl100/S3D_exp016/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.001,
-                "backbone_init_lr": 1e-05,
-                "backbone_weight_decay": 0.0001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.001,
+                "backbone_init_lr":1e-05,
+                "backbone_weight_decay":0.0001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-016"
                 ],
-                "run_id": "usq1y605"
+                "run_id":"usq1y605"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 60.650887573964496,
-                "best_val_loss": 2.184025860329267,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.42483333333333334,
-                        "top5": 0.7449999999999999,
-                        "top10": 0.8491666666666666
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":60.650887573964496,
+                "best_val_loss":2.184025860329267,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.42483333333333334,
+                        "top5":0.7449999999999999,
+                        "top10":0.8491666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4186046511627907,
-                        "top5": 0.7403100775193798,
-                        "top10": 0.8488372093023255
+                    "top_k_per_instance_acc":{
+                        "top1":0.4186046511627907,
+                        "top5":0.7403100775193798,
+                        "top10":0.8488372093023255
                     },
-                    "average_loss": 2.9032081176524462
+                    "average_loss":2.9032081176524462
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5601666666666667,
-                        "top5": 0.7941666666666667,
-                        "top10": 0.8675000000000002
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5601666666666667,
+                        "top5":0.7941666666666667,
+                        "top10":0.8675000000000002
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5562130177514792,
-                        "top5": 0.7899408284023669,
-                        "top10": 0.863905325443787
+                    "top_k_per_instance_acc":{
+                        "top1":0.5562130177514792,
+                        "top5":0.7899408284023669,
+                        "top10":0.863905325443787
                     },
-                    "average_loss": 2.183670608829156
+                    "average_loss":2.183670608829156
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.20066666666666666,
-                        "top5": 0.44166666666666665,
-                        "top10": 0.5858333333333333
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.20066666666666666,
+                        "top5":0.44166666666666665,
+                        "top10":0.5858333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.18992248062015504,
-                        "top5": 0.44573643410852715,
-                        "top10": 0.5891472868217055
+                    "top_k_per_instance_acc":{
+                        "top1":0.18992248062015504,
+                        "top5":0.44573643410852715,
+                        "top10":0.5891472868217055
                     },
-                    "average_loss": 5.041538910396623,
-                    "perm": [
+                    "average_loss":5.041538910396623,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2720,103 +2799,103 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "exp_no": "015",
-                "model": "S3D",
-                "split": "asl100",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd1_nosched.ini",
-                "save_path": "runs/asl100/S3D_exp015/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "exp_no":"015",
+                "model":"S3D",
+                "split":"asl100",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd1_nosched.ini",
+                "save_path":"runs/asl100/S3D_exp015/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.001,
-                "backbone_init_lr": 1e-05,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.001,
+                "backbone_init_lr":1e-05,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": null,
-            "early_stopping": {
-                "metric": [
+            "scheduler":null,
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-015"
                 ],
-                "run_id": "hfmbz6ai"
+                "run_id":"hfmbz6ai"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 61.24260355029586,
-                "best_val_loss": 2.234835533085827,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.44483333333333336,
-                        "top5": 0.7483333333333333,
-                        "top10": 0.8608333333333333
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":61.24260355029586,
+                "best_val_loss":2.234835533085827,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.44483333333333336,
+                        "top5":0.7483333333333333,
+                        "top10":0.8608333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4418604651162791,
-                        "top5": 0.751937984496124,
-                        "top10": 0.8604651162790697
+                    "top_k_per_instance_acc":{
+                        "top1":0.4418604651162791,
+                        "top5":0.751937984496124,
+                        "top10":0.8604651162790697
                     },
-                    "average_loss": 3.0790209947667417
+                    "average_loss":3.0790209947667417
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5793333333333331,
-                        "top5": 0.8105000000000001,
-                        "top10": 0.8788333333333336
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5793333333333331,
+                        "top5":0.8105000000000001,
+                        "top10":0.8788333333333336
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5739644970414202,
-                        "top5": 0.8047337278106509,
-                        "top10": 0.8757396449704142
+                    "top_k_per_instance_acc":{
+                        "top1":0.5739644970414202,
+                        "top5":0.8047337278106509,
+                        "top10":0.8757396449704142
                     },
-                    "average_loss": 2.2352477553292402
+                    "average_loss":2.2352477553292402
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.23149999999999998,
-                        "top5": 0.4943333333333333,
-                        "top10": 0.6341666666666668
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.23149999999999998,
+                        "top5":0.4943333333333333,
+                        "top10":0.6341666666666668
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.22868217054263565,
-                        "top5": 0.49224806201550386,
-                        "top10": 0.6317829457364341
+                    "top_k_per_instance_acc":{
+                        "top1":0.22868217054263565,
+                        "top5":0.49224806201550386,
+                        "top10":0.6317829457364341
                     },
-                    "average_loss": 5.120006301765806,
-                    "perm": [
+                    "average_loss":5.120006301765806,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2850,107 +2929,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "014",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd1.ini",
-                "save_path": "runs/asl100/S3D_exp014/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "model":"S3D",
+                "split":"asl100",
+                "exp_no":"014",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd1.ini",
+                "save_path":"runs/asl100/S3D_exp014/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.001,
-                "backbone_init_lr": 1e-05,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.001,
+                "backbone_init_lr":1e-05,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-014"
                 ],
-                "run_id": "r9xw23wo"
+                "run_id":"r9xw23wo"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 62.42604,
-                "best_val_loss": 2.22761,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.4543333333333333,
-                        "top5": 0.7683333333333333,
-                        "top10": 0.8683333333333333
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":62.42604,
+                "best_val_loss":2.22761,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.4543333333333333,
+                        "top5":0.7683333333333333,
+                        "top10":0.8683333333333333
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4573643410852713,
-                        "top5": 0.7674418604651163,
-                        "top10": 0.872093023255814
+                    "top_k_per_instance_acc":{
+                        "top1":0.4573643410852713,
+                        "top5":0.7674418604651163,
+                        "top10":0.872093023255814
                     },
-                    "average_loss": 3.000227715048803
+                    "average_loss":3.000227715048803
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.5551666666666666,
-                        "top5": 0.8125000000000001,
-                        "top10": 0.9066666666666667
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.5551666666666666,
+                        "top5":0.8125000000000001,
+                        "top10":0.9066666666666667
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5532544378698225,
-                        "top5": 0.8076923076923077,
-                        "top10": 0.9053254437869822
+                    "top_k_per_instance_acc":{
+                        "top1":0.5532544378698225,
+                        "top5":0.8076923076923077,
+                        "top10":0.9053254437869822
                     },
-                    "average_loss": 2.2275377433019075
+                    "average_loss":2.2275377433019075
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.158,
-                        "top5": 0.4666666666666666,
-                        "top10": 0.6199999999999999
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.158,
+                        "top5":0.4666666666666666,
+                        "top10":0.6199999999999999
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.15503875968992248,
-                        "top5": 0.4728682170542636,
-                        "top10": 0.624031007751938
+                    "top_k_per_instance_acc":{
+                        "top1":0.15503875968992248,
+                        "top5":0.4728682170542636,
+                        "top10":0.624031007751938
                     },
-                    "average_loss": 5.147357792301781,
-                    "perm": [
+                    "average_loss":5.147357792301781,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -2984,107 +3063,107 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         },
         {
-            "admin": {
-                "model": "S3D",
-                "split": "asl100",
-                "exp_no": "013",
-                "recover": false,
-                "config_path": "./configfiles/generic/hframe_hwd.ini",
-                "save_path": "runs/asl100/S3D_exp013/checkpoints",
-                "dataset": "WLASL"
+            "admin":{
+                "model":"S3D",
+                "split":"asl100",
+                "exp_no":"013",
+                "recover":false,
+                "config_path":"./configfiles/generic/hframe_hwd.ini",
+                "save_path":"runs/asl100/S3D_exp013/checkpoints",
+                "dataset":"WLASL"
             },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
+            "training":{
+                "batch_size":4,
+                "update_per_step":2,
+                "max_epoch":200,
+                "batch_size_equivalent":8
             },
-            "optimizer": {
-                "eps": 0.001,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
+            "optimizer":{
+                "eps":0.001,
+                "backbone_init_lr":0.0001,
+                "backbone_weight_decay":0.001,
+                "classifier_init_lr":0.001,
+                "classifier_weight_decay":0.001
             },
-            "model_params": {
-                "drop_p": 0.5
+            "model_params":{
+                "drop_p":0.5
             },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
+            "data":{
+                "num_frames":32,
+                "frame_size":224
             },
-            "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 100,
-                "eta_min": 1e-05
+            "scheduler":{
+                "type":"CosineAnnealingLR",
+                "tmax":100,
+                "eta_min":1e-05
             },
-            "early_stopping": {
-                "metric": [
+            "early_stopping":{
+                "metric":[
                     "val",
                     "loss"
                 ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
+                "mode":"min",
+                "patience":50,
+                "min_delta":0.01
             },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
+            "wandb":{
+                "entity":"ljgoodall2001-rhodes-university",
+                "project":"WLASL-100",
+                "tags":[
                     "asl100",
                     "S3D",
                     "exp-013"
                 ],
-                "run_id": "1ooh1h8z"
+                "run_id":"1ooh1h8z"
             },
-            "results": {
-                "check_name": "best_val",
-                "best_val_acc": 68.3432,
-                "best_val_loss": 1.85474,
-                "test": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.47300000000000003,
-                        "top5": 0.7875000000000001,
-                        "top10": 0.9016666666666666
+            "results":{
+                "check_name":"best_val",
+                "best_val_acc":68.3432,
+                "best_val_loss":1.85474,
+                "test":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.47300000000000003,
+                        "top5":0.7875000000000001,
+                        "top10":0.9016666666666666
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.4689922480620155,
-                        "top5": 0.7829457364341085,
-                        "top10": 0.8992248062015504
+                    "top_k_per_instance_acc":{
+                        "top1":0.4689922480620155,
+                        "top5":0.7829457364341085,
+                        "top10":0.8992248062015504
                     },
-                    "average_loss": 2.217513927540304
+                    "average_loss":2.217513927540304
                 },
-                "val": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.58,
-                        "top5": 0.8283333333333333,
-                        "top10": 0.9025
+                "val":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.58,
+                        "top5":0.8283333333333333,
+                        "top10":0.9025
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.5739644970414202,
-                        "top5": 0.8224852071005917,
-                        "top10": 0.8964497041420119
+                    "top_k_per_instance_acc":{
+                        "top1":0.5739644970414202,
+                        "top5":0.8224852071005917,
+                        "top10":0.8964497041420119
                     },
-                    "average_loss": 1.8548976104597517
+                    "average_loss":1.8548976104597517
                 },
-                "test_shuff": {
-                    "top_k_average_per_class_acc": {
-                        "top1": 0.19999999999999996,
-                        "top5": 0.5083333333333333,
-                        "top10": 0.665
+                "test_shuff":{
+                    "top_k_average_per_class_acc":{
+                        "top1":0.19999999999999996,
+                        "top5":0.5083333333333333,
+                        "top10":0.665
                     },
-                    "top_k_per_instance_acc": {
-                        "top1": 0.19767441860465115,
-                        "top5": 0.5077519379844961,
-                        "top10": 0.6705426356589147
+                    "top_k_per_instance_acc":{
+                        "top1":0.19767441860465115,
+                        "top5":0.5077519379844961,
+                        "top10":0.6705426356589147
                     },
-                    "average_loss": 4.104448572271416,
-                    "perm": [
+                    "average_loss":4.104448572271416,
+                    "perm":[
                         6,
                         13,
                         18,
@@ -3118,10 +3197,10 @@
                         20,
                         14
                     ],
-                    "shannon_entropy": 4.288909912109375
+                    "shannon_entropy":4.288909912109375
                 }
             }
         }
     ],
-    "fail_runs": []
+    "fail_runs":[]
 }
