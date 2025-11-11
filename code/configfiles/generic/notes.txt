@@ -1,88 +1,133 @@
-- hframe_hwd (S3D 13) Original
-    best val loss: 1.85474 
-    best val acc: 68.3432
+- hframe_hwd (S3D 13) best val loss: 1.85474 ; best val acc: 68.3432 
+    Original 
 
-- hframe_hwd1 (S3D 14) increased the backbone_init_lr (of hframe_hwd)
+@conclusion: don't increase backbone_init_lr (+ ~0.37 val loss) worse
+- hframe_hwd1 (S3D 14) best val loss: 2.22761 ; best val acc: 62.42604
+    increased the backbone_init_lr (of hframe_hwd)
     by x10 (1e-5 -> 1e-4) and suffered a noticeable knock in
     performance
-    best val loss: 2.22761
-    best val acc: 62.42604
-    
-    conclusion: don't increase backbone_init_lr
 
-- hframe_hwd1_nosched (S3D 15) was the same as hframe_hwd1, but with
-    no lr scheduler, and sufered a minor loss in performance
-    (2.3 -> 2.8 val loss)
-    best val loss: 2.23484
-    best val acc: 61.2426
+@conclusion: experiment more with lr scheduler (+ ~0.007 val loss) worse
+- hframe_hwd1_nosched (S3D 15) best val loss: 2.23484 ; best val acc: 61.2426
+    was the same as hframe_hwd1, but with
+    no lr scheduler, and sufered a slight knock in performance
 
-    conclusion: experiment more with lr scheduler but at least not hurting
-
-- hframe_mwd (S3D 16) was the same as hframe_hwd1, but decreased the
+@conclusion: maybe increase the backbone_weight_decay (- ~0.04 val loss) better
+- hframe_mwd (S3D 16) best val loss: 2.18403 ; best val acc: 60.65089
+    was the same as hframe_hwd1, but decreased the
     backbone_weight_decay by x10 (1e-3 -> 1e-4), and saw a small 
-    increase in val loss 
-    best val loss: 2.18403
-    best val acc: 60.65089
-
-    conclusion: don't increase the backbone_weight_decay 
+    decrease in val loss, but worse val acc
+    
     (but small effect)
 
-- hframe_hwd_leps (S3D 17) was the same as hframe_hwd, but decreased 
+@conclusion: inconclusive, vary eps by less (+ ~0.04 val loss) worse
+- hframe_hwd_leps (S3D 17) best val loss: 1.89451 ; best val acc: 65.68047
+    was the same as hframe_hwd, but decreased 
     the adam eps by x10000000 (1e-3 -> 1e-8), and saw a slight 
     kncock in performance 
-    best val loss: 1.89451
-    best val acc: 65.68047
 
-    conclusion: inconclusive, vary eps by less
-    
+@conclusion: still worse performance, vary eps by less (+ ~0.08 val loss) worse 
+- hframe_hwd_leps2 (S3D 18) best val loss: 1.93781 ; best val acc: 68.3432
+    was the same as hframe_hwd, but decreased 
+    the adam eps by x1000000 (1e-3 -> 1e-7), 
 
-- hframe_hwd_leps2 (S3D 18) was the same as hframe_hwd, but decreased 
-    the adam eps by x1000000 (1e-3 -> 1e-7), still worse performance, but an improvement
-    best val loss: 1.93781
-    best val acc: 68.3432
+@conclusion: still worse in loss, but now better in acc (+ ~0.1 val loss) worse
+- hframe_hwd_leps3 (S3D 19) best val loss: 1.95846 ; best val acc: 69.52663
+    same pattern as previous eps experiments. eps now at (1e-6)
 
+    now an improvement on the previous highest (S3D 13) in acc but worse in loss
 
-- hframe_hwd_leps3 (S3D 19) same pattern as previous eps experiments. eps now at (1e-6)
-    best val loss: 1.95846
-    best val acc: 69.52663
+@conclusion: an improvement on hframe_hwd (eps 1e-5) (- ~0.13 val loss) better
+- hframe_hwd_leps4 (S3D 20) best val loss: 1.72448 ; best val acc: 73.66864
+    eps: 1e-5
 
-    now an improvement on the previous highest (S3D 13)
+    an improvement
 
-- hframe_hwd_leps4 (S3D 20) eps: 1e-5
-    best val loss: 1.72448
-    best val acc: 73.66864
-
-    another improvement
-
-- hframe_hwd_leps5 (S3D 21) eps: 1e-4
-    best val loss: 1.66771
-    best val acc: 73.37278
+@conclusion: another small improvement (1e-4) (- ~1.9 val loss) better
+- hframe_hwd_leps5 (S3D 21) best val loss: 1.66771 ; best val acc: 73.37278
+    eps: 1e-4
 
     slight improvement in loss, but acc declines
 
-- hframe_hwd_leps6
+@conclusion: improvement stops, dont increase eps more (+ ~0.08) worse
+- hframe_hwd_leps6 (S3D 25) best val loss: 1.9324 ; best val acc: 68.9349
+    eps: 1e-3
 
-- hframe_hwd_warmups (S3D 22) Same as hframe_hwd_leps4, but with warm ups
-    best val loss: 1.64363
-    best val acc: 71.89349
+    decrease in loss and accuracy
+
+@conclusion: nvm i take it back, keep eps here or 1e-4 (- ~0.3) better
+- hframe_hwd_leps7 (S3D 26) best val loss: 1.5451 ; best val acc: 70.4142
+    eps: 1e-2
+
+    another improvement in loss
+
+@conclusion: experiment with wram up, (- ~0.08 val loss) better
+- hframe_hwd_warmups (S3D 22) best val loss: 1.64363 ; best val acc: 71.89349
+    Same as hframe_hwd_leps4, but with warm ups
 
     slight improvement in loss, but acc declines
 
-- hframe_hwd_warmrestarts (S3D 23)  Same as hframe_hwd_leps4, but with warm restarts
-    best val loss: 1.44793
-    best val acc: 71.30178
+@conclusion: experiment with warm restarts (- ~0.28 val loss) better
+- hframe_hwd_warmrestarts (S3D 23) best val loss: 1.44793 ; best val acc: 71.30178
+    Same as hframe_hwd_leps4, but with warm restarts and eta min = 0
 
     slitght improvement in loss, while acc declines
 
-- hf_hwd_eps_dp01 (S3D 24) Same as hframe_hwd_leps4, but with dropout = 0.1
-    best val loss: 4.66636
-    best val acc: 21.59763
+@conclusion:  experiment with warm restarts, but lower eta min to 0 (- 0.099 val loss) better 
+- hframe_hwd_warmrestarts2 (S3D 27) best val loss: 1.6258 ; best val acc: 71.0059 
+    Same as hframe_hwd_leps4, but with warm restarts
+
+    slight decrease in loss compared to (S3D 23) hframe_hwd_warmrestarts, but 
+    better than hframe_hwd_leps4 (worse accuracy though)
+
+@conclusion: experiment with dropout, but dont go this low (+ 2.94 val loss) much worse
+- hf_hwd_eps_dp01 (S3D 24) best val loss: 4.66636 ; best val acc: 21.59763
+    Same as hframe_hwd_leps4, but with dropout = 0.1
 
     huge knock in performance
 
+@conclusion: add more dropout (+ ~0.24 val loss) worse
+- hf_hwd_eps_dp02 (S3D 29) best val loss: 1.9626 ; best val acc: 67.4556 
+    Same as hframe_hwd_leps4 but with dropout = 0.2
 
+@conclusion: add more dropout (+ ~2.9 vl) worse
+- hf_hwd_eps_dp03 (S3D 30) bvl: 2.0132 bva: 68.6391
+    Same as hframe_hwd_leps4 but with dropout = 0.3
+
+@conclusion: maybe add more dropout (- ~0.03 vl) better
+- hf_hwd_eps_dp04 (S3D 31) bvl: 1.6876 bva: 73.3728
+    Same as hframe_hwd_leps4 but with dropout = 0.4
+
+@conclusion: not much diff (+ ~0.0054 vl) worse
+- hf_hwd_eps_dp06 (S3D 32) bvl: 1.7299 bva: 73.0769
+    Same as hframe_hwd_leps4 but with dropout = 0.6
+
+@conclusion: a bit better than 0.4 (- ~0.056 vl) better
+- hf_hwd_eps_dp07 (S3D 33) bvl: 1.6676 bva: 74.8521 
+    Same as hframe_hwd_leps4 but with dropout = 0.7
+
+-- drop_p = 0.4 -> 0.7 seems fine
+
+
+@Conclusion: both warm ups and warm restarts reduced loss, and even more when combined (- 0.17 val loss) better
+- hf_hwd_eps_wups_restarts (S3D 28) best val loss: 1.5499 ; best val acc: 69.8225 
+    Same as hframe_hwd_leps4, but with warm ups and warm restarts
+
+    improvement on hframe_hwd_leps4 in loss, but not acc. 
+    improvement on hframe_hwd_warmrestarts2 in loss, but not acc
+    improvement on hframe_hwd_warmups on loss, but not acc
+
+    next up: try lower eta min as per hframe_hwd_warmrestarts
+
+@conclusion: can use batch size of 8 (+ ~ 0.03) 
+- hf_hwd_eps_hbs (S3D 34) bvl: 1.7605 bva:  70.7101
+    ; Same as hframe_hwd_leps4, but with increased batch size (same equivalent)
+
+ -- can use batch size of 8 with 32 frames and 224 width, decreases runtime
 
 #Misc
 i notice the time of runs increases with the better runs taking longer
 
 -added type in scheduler as an after effect
+
+drop_p 

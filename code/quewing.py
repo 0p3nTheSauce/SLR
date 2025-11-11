@@ -459,6 +459,13 @@ class que:
 
 	# for queShell interface
 
+	def disp_run(self, loc: QueLocation, idx: int) -> None:
+		try:
+			configs.print_config(self._get_run(loc, idx))
+		except Exception as e:
+			print(f"Could not display run {idx} : {loc} due to: {e}")
+  
+  
 	def recover_run(self) -> None:
 		"""Set the run in cur_run to recover"""
 		try:
@@ -1290,12 +1297,21 @@ class queShell(cmdLib.Cmd):
 		self.que.disp_runs(parsed_args.location)
 
 	def do_remove(self, arg):
-		"""Remove a run from the past or future"""
+		"""Remove a run from a given que"""
 		parsed_args = self._parse_args_or_cancel("remove", arg)
 		if parsed_args is None:
 			return
 
 		self.que.remove_run(parsed_args.location, parsed_args.index)
+
+	def do_display(self, arg):
+		"""Display a run config for a given que"""
+		parsed_args = self._parse_args_or_cancel("display", arg)
+		if parsed_args is None:
+			return
+
+		self.que.disp_run(parsed_args.location, parsed_args.index)
+
 
 	def do_shuffle(self, arg):
 		"""Reposition a run in the que"""
@@ -1443,6 +1459,7 @@ class queShell(cmdLib.Cmd):
 			"daemon": self._get_daemon_parser,
 			"worker": self._get_worker_parser,
 			"edit": self._get_edit_parser,
+			"display": self._get_display_parser,
 		}
 
 		if cmd in parsers:
@@ -1532,7 +1549,17 @@ class queShell(cmdLib.Cmd):
 
 	def _get_remove_parser(self) -> argparse.ArgumentParser:
 		parser = argparse.ArgumentParser(
-			description="Remove a run from future or past runs", prog="remove"
+			description="Remove a run in a given que", prog="remove"
+		)
+		parser.add_argument(
+			"location", choices=self.avail_locs, help="Location of the run"
+		)
+		parser.add_argument("index", type=int, help="Position of run in location")
+		return parser
+
+	def _get_display_parser(self) -> argparse.ArgumentParser:
+		parser = argparse.ArgumentParser(
+			description="Display the config of a run in a given que", prog="display"
 		)
 		parser.add_argument(
 			"location", choices=self.avail_locs, help="Location of the run"
