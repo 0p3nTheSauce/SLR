@@ -121,7 +121,8 @@
 
 @conclusion: can use batch size of 8 (+ ~ 0.03) 
 - hf_hwd_eps_hbs (S3D 34) bvl: 1.7605 bva:  70.7101
-    ; Same as hframe_hwd_leps4, but with increased batch size (same equivalent)
+    Same as hframe_hwd_leps4, but with increased batch size (same equivalent) 
+    and drop_p = 0.1
 
  -- can use batch size of 8 with 32 frames and 224 width, decreases runtime
 
