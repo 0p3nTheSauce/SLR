@@ -31,7 +31,7 @@ from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  
 import utils
 from utils import gpu_manager
 from training import train_loop, _setup_wandb
-from testing import full_test
+from testing import full_test, load_comp_res
 
 # constants
 SESH_NAME = "que_training"
@@ -432,6 +432,8 @@ class que:
 				"max_model": 0,
 				"max_exp": 0,
 				"max_split": 0,
+				"max_val_acc" : 0,
+				"max_val_loss": 0
 			}
 
 		r_str = ""
@@ -464,7 +466,6 @@ class que:
 			configs.print_config(self._get_run(loc, idx))
 		except Exception as e:
 			print(f"Could not display run {idx} : {loc} due to: {e}")
-  
   
 	def recover_run(self) -> None:
 		"""Set the run in cur_run to recover"""
@@ -555,13 +556,9 @@ class que:
 		"""Create and add a new training run entry
 
 		Args:
-						arg_dict (dict): Arguments used by training function
-						tags (list[str]): Wandb tags
-						output (str): Experiment directory
-						save_path (str): Checkpoint directory
-						project (str): Wandb project
-						entity (str): Wandb entity
-						ask (bool, optional): Pre-check run before creation. Defaults to True.
+			arg_dict (AdminInfo): Arguments used by training function
+			wandb_dict (WandbInfo): Wandb information not included in arg_dict.
+			ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
 
 		try:
@@ -598,6 +595,47 @@ class que:
 			self.print_v(f"Added new run: {self.run_str(self.run_sum(config))}")
 		else:
 			self.print_v("Training cancelled by user")
+
+	def add_run(
+		self, 
+		arg_dict: AdminInfo,
+		wandb_dict: WandbInfo
+	) -> None:
+		"""Add a completed (and full tested) run to the old_runs que for storage
+
+		Args:
+			arg_dict (AdminInfo): Basic information to load the config and find the results
+			wandb_dict (WandbInfo): Wandb information not included in the run config
+		"""
+		try:
+			config = configs.load_config(arg_dict)
+		except ValueError:
+			self.print_v(f"{arg_dict['config_path']} not found. Add cancelled")
+			return
+
+		if self._is_dup_exp(config):
+			self.print_v(
+				f"Duplicate run detected: {self.run_str(self.run_sum(config))}. Add cancelled"
+			)
+			return
+
+		save_path = Path(arg_dict["save_path"])
+		res_dir = save_path.parent / "results"
+		res_path = res_dir / "best_val_loss.json"
+		results = load_comp_res(res_path)
+		comp_run = CompExpInfo(
+			admin=config["admin"],
+			training=config["training"],
+			optimizer=config["optimizer"],
+			model_params=config['model_params'],
+			data=config["data"],
+			scheduler=config["scheduler"],
+			early_stopping=config["early_stopping"],
+			wandb=wandb_dict, 
+			results=results
+		)
+		self.old_runs.insert(0, comp_run)
+		self.print_v(f"New complete run added: {self.run_str(self.run_sum(comp_run))}")
 
 	def remove_run(self, loc: QueLocation, idx: int) -> None:
 		"""Removes a run from the given location safely
@@ -1351,6 +1389,25 @@ class queShell(cmdLib.Cmd):
 			return
 
 		self.que.create_run(admin_info, wandb_info)
+  
+	def do_add(self, arg):
+		"""Add a completed run to the old runs que"""
+		args = shlex.split(arg)
+
+		try:
+			maybe_args = configs.take_args(sup_args=args, ask_bf_ovrite=False)
+		except (SystemExit, ValueError) as _:
+			print("Add cancelled (incorrect arguments)")
+			return
+
+		if isinstance(maybe_args, tuple):
+			admin_info, wandb_info = maybe_args
+		else:
+			print("Add cancelled (by user)")
+			return
+
+		self.que.add_run(admin_info, wandb_info)
+  
 
 	def do_edit(self, arg):
 		"""Edit a run in a given location"""
@@ -1448,6 +1505,10 @@ class queShell(cmdLib.Cmd):
 			"create": configs.get_train_parser(
 				prog="create",
 				desc="Create a new training run",
+			),
+			"add": configs.get_train_parser(
+				prog="add",
+				desc="Add a completed training run to old_runs",
 			),
 			"remove": self._get_remove_parser,
 			"clear": self._get_clear_parser,
