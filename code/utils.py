@@ -464,7 +464,8 @@ def extract_num(fname):
 				print(f'{ans} is not a digit')
 		return num_substrs[idx]
 	elif len(num_substrs) == 0:
-		raise ValueError(f'No valid number substrings found in {fname}')
+		print(f'No valid number substrings found in {fname}')
+		return
 	else:
 		return num_substrs[0]
 		 
@@ -540,16 +541,22 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
 			if add_zfill:
 				for i, f in enumerate(files):
 					num = extract_num(f)
+					if num is None:
+						continue
 					files[i] = f.replace(num, num.zfill(decimals))
 					
 			if len(files) <= 2:
 				continue 
 			
 			#leave best.pth and the last checkpoint
+			if files[-1] == 'psuedo_checkpoint.pth':
+				print("Ignoring psuedo_checkpoint")
+				files = files[:-1]
 			to_remove = files[:-1]  # not great safety wise, assumes files sort correctly
 			if ask:
 				ans = 'none'
 				while ans != 'y' and ans != '' and ans != 'n':
+					
 					print(f'Only keep checkpoint {files[-1]} in {to_empty} (excluding best.pth and non pth files)?')
 					ans = input(f'Delete up to {files[-2]}[y]/n: ')
 				
