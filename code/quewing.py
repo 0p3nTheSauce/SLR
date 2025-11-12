@@ -21,13 +21,11 @@ import time
 import cmd as cmdLib
 import shlex
 from filelock import FileLock, Timeout
-import sys
-import wandb
 import torch
 
 # locals
 import configs
-from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo, MinInfo, DataInfo,  _exp_to_run_info, CompExpInfo, CompRes
+from configs import ExpInfo, WandbInfo, AdminInfo, RunInfo,  _exp_to_run_info, CompExpInfo, CompRes
 import utils
 from utils import gpu_manager
 from training import train_loop, _setup_wandb
@@ -89,8 +87,8 @@ def store_Data(path: Path, data: Any):
 class QueEmpty(Exception):
 	"""No runs available"""
 
-	def __init__(self, message: str = "No runs available"):
-		super().__init__(message)
+	def __init__(self, loc: QueLocation, message: str = "No runs available"):
+		super().__init__(f"{message} in {loc}")
 
 
 class QueIdxOOR(IndexError):
@@ -112,7 +110,7 @@ class QueIdxOOR(IndexError):
 class QueBusy(Exception):
 	"""There is already a run (likely for cur_run)"""
 
-	def __init__(self, message: str = "There is already a run in cur_run"):
+	def __init__(self, message: str = "There is already a run in cur_run, and there should only be one"):
 		super().__init__(message)
 
 
@@ -185,8 +183,8 @@ class que:
 		"""Check if run is a CompExpInfo"""
 		return isinstance(run, dict) and 'results' in run
 
-	def _get_run(self, loc: QueLocation, idx: int) -> GenExp:
-		"""Get the run at the given location with the provided index
+	def _peak_run(self, loc: QueLocation, idx: int) -> GenExp:
+		"""Get the run at the given location with the provided index, but don't remove
 
 		Args:
 						loc (QueLocation): to_run, cur_run or old_runs
@@ -201,7 +199,29 @@ class que:
 		"""
 		to_get = self.fetch_state(loc)
 		if len(to_get) == 0:
-			raise QueEmpty()
+			raise QueEmpty(loc)
+		elif abs(idx) >= len(to_get):
+			raise QueIdxOOR(loc, idx, len(to_get))
+		return to_get[idx]
+
+
+	def _pop_run(self, loc: QueLocation, idx: int) -> GenExp:
+		"""Pop the run at the given location with the provided index
+
+		Args:
+						loc (QueLocation): to_run, cur_run or old_runs
+						idx (int): Index of the run
+
+		Raises:
+						QueEmpty: len(loc) == 0
+						QueIdxOOR: abs(idx) >= len(loc)
+
+		Returns:
+						ExpInfo: The specified run
+		"""
+		to_get = self.fetch_state(loc)
+		if len(to_get) == 0:
+			raise QueEmpty(loc)
 		elif abs(idx) >= len(to_get):
 			raise QueIdxOOR(loc, idx, len(to_get))
 		return to_get.pop(idx)
@@ -246,40 +266,46 @@ class que:
 		with self.lock:
 			self._load_Que()
 
-	def stash_next_run(self) -> None:
-		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
+	def peak_cur_run(self) -> ExpInfo:
+		"""Get the run stored in cur_run (assumes 1, dont pop)"""
+		return self._peak_run(CUR_RUN, 0)
 
-		Raises:
-																																		QueEmpty: If to_run is empty
-																																		QueBusy: If cur_run is full
-																																		Timeout: If cannot acquire file lock
-		"""
-		# empty to run
-		if len(self.to_run) == 0:
-			raise QueEmpty(f"Can't get next run, no runs in {TO_RUN}")
+	def pop_cur_run(self) -> ExpInfo:
+		"""Pop the run stored in cur_run (assumes 1)"""
+		return self._pop_run(CUR_RUN, 0)
 
+	def set_cur_run(self, run: ExpInfo) -> None:
+		"""Set the run in cur_run (assumes 1)"""
 		# full cur_run
 		if (
 			len(self.cur_run) != 0
 		):  # NOTE at some point it might be possible to have multiple busy operations
-			raise QueBusy(f"Can't stash next run, there is something in {CUR_RUN}")
+			self.print_v("Failed to set cur run")
+			raise QueBusy()
 
-		next_run = self.to_run.pop(0)
-		self.cur_run.append(next_run)
+		self._set_run(CUR_RUN, 0, run)
+
+	def stash_next_run(self) -> None:
+		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
+
+			Raises:
+				QueEmpty: If to_run is empty
+				QueBusy: If cur_run is full
+				Timeout: If cannot acquire file lock
+		"""
+		next_run = self._pop_run(TO_RUN, 0)
+		self.set_cur_run(next_run)
 		self.print_v(f"Stashed next run: {self.run_str(self.run_sum(next_run))}")
 
 	def store_fin_run(self):
 		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
 
 		Raises:
-																																		QueEmpty: If cur_run is empty
-																																		Timeout: If cannot acquire file lock
+			QueEmpty: If cur_run is empty
+			Timeout: If cannot acquire file lock
 		"""
-		# empty cur_run
-		if len(self.cur_run) == 0:
-			raise QueEmpty(f"Can't move run in {CUR_RUN} because it's empty")
 
-		fin_run = self.cur_run.pop(0)
+		fin_run = self.pop_cur_run()
 		results = full_test(
 			admin=fin_run["admin"],
 			data=fin_run['data']
@@ -295,20 +321,12 @@ class que:
 			wandb=fin_run['wandb'], 
 			results=results
 		)
-		self.old_runs.insert(0, comp_run)
+		self._set_run(OLD_RUNS, 0, comp_run)
 		self.print_v(f"Stored finished run: {self.run_str(self.run_sum(fin_run))}")
-
-	def get_cur_run(self) -> ExpInfo:
-		"""Get the run stored in cur_run (assumes 1)"""
-		return self._get_run("cur_run", 0)
-
-	def set_cur_run(self, run: ExpInfo):
-		"""Set the run in cur_run (assumes 1)"""
-		self._set_run("cur_run", 0, run)
 
 	def stash_failed_run(self, error: str) -> None:
 		"""Move a run to the failed que"""
-		run = self._get_run("cur_run", 0)
+		run = self._pop_run(CUR_RUN, 0)
 		failed = cast(FailedExp, run | {"error": error})
 		self.fail_runs.append(failed)
 
@@ -463,14 +481,14 @@ class que:
 
 	def disp_run(self, loc: QueLocation, idx: int) -> None:
 		try:
-			configs.print_config(self._get_run(loc, idx))
+			configs.print_config(self._peak_run(loc, idx))
 		except Exception as e:
 			print(f"Could not display run {idx} : {loc} due to: {e}")
   
 	def recover_run(self) -> None:
 		"""Set the run in cur_run to recover"""
 		try:
-			run = self._get_run("cur_run", 0)
+			run = self._pop_run("cur_run", 0)
 			run["admin"]["recover"] = True
 			self._set_run("cur_run", 0, run)
 		except Exception as e:
@@ -645,7 +663,7 @@ class que:
 						idx (int): Index of run
 		"""
 		try:
-			_ = self._get_run(loc, idx)
+			_ = self._pop_run(loc, idx)
 		except Exception as e:
 			self.print_v(str(e))
 
@@ -657,7 +675,7 @@ class que:
 						n_idx: new index of run
 		"""
 		try:
-			self._set_run(loc, n_idx, self._get_run(loc, o_idx))
+			self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
 		except Exception as e:
 			self.print_v(str(e))
 
@@ -678,7 +696,7 @@ class que:
 		"""
 		if of_idx is None:
 			try:
-				self._set_run(n_loc, 0, self._get_run(o_loc, oi_idx))
+				self._set_run(n_loc, 0, self._pop_run(o_loc, oi_idx))
 				self.print_v("Move successful")
 			except Exception as e:
 				self.print_v(str(e))
@@ -715,7 +733,7 @@ class que:
 		key2: Optional[str] = None,
 	) -> None:
 		try:
-			run = self._get_run(loc, idx)
+			run = self._pop_run(loc, idx)
 			if key2 is not None:
 				run[key1][key2] = value
 			else:
@@ -922,7 +940,7 @@ class worker:
 
 			# get next run
 			self.que.load_state()
-			info = self.que.get_cur_run()
+			info = self.que.pop_cur_run()
 
 			wandb_info = info["wandb"]
 			admin = info["admin"]
@@ -952,21 +970,6 @@ class worker:
 			self.print_v("Training run failed due to an error")
 			self.que.stash_failed_run(str(e))
 			raise e  # still need to crash so daemon can
-
-	def test(self) -> None:
-		gpu_manager.wait_for_completion()
-		self.que.load_state()
-		info = self.que.get_cur_run()
-		admin = info["admin"]
-		min_admin = MinInfo(
-			model=admin["model"],
-			dataset=admin['dataset'],
-			split=admin['split'],
-			save_path=admin['save_path']
-		)
-		data = info["data"]
-		
-		
 
 	def idle(
 		self,
@@ -1166,7 +1169,7 @@ class daemon:
 				)
 				break
 
-			run = self.que.get_cur_run()
+			run = self.que.peak_cur_run()
 			self.print_v(self.seperator(run))
 
 			# Start process in background
@@ -1186,10 +1189,12 @@ class daemon:
 					self.que.save_state()
 				except QueEmpty:
 					self.print_v("Could not find current run")
+					break
 				except Timeout:
 					self.print_v(
 						"Cannot store finished run, file is already held by another process"
 					)
+					break
 			else:
 				self.print_v(f"Process failed with return code: {return_code}")
 
