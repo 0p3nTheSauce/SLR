@@ -455,6 +455,9 @@ class que:
 			}
 
 		r_str = ""
+  
+		if 'run_id' not in r_info:
+			r_info['run_id'] = 'None'
 
 		r_str += (
 			f"{r_info['run_id']:<{stats['max_id']}}  "

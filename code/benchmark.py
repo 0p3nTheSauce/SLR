@@ -8,7 +8,7 @@ import gc
 from typing import cast
 
 #constants 
-OUTPUT = 'results/benchmark2.json'
+OUTPUT = 'results/benchmark.json'
 
 
 # Initialize NVML
@@ -65,29 +65,40 @@ def benchmark_train(model_name: str,
     print()
     for i in range(nwarms):
         print(f"warm up: {i+1} / {nwarms}")
-        warmstart = time.perf_counter()
         for j in range(warmup):
             _ = model(samp_frames)
-        torch.cuda.synchronize()
-        elapsed = time.perf_counter() - warmstart
+        torch.cuda.synchronize()  # Ensure warmup completes
         
         stats = get_gpu_stats()
-        print(f"  Time: {elapsed:.4f}s ")
-        print(f"  Latency: {elapsed/warmup*1000:.2f} ms/iter")
         print(f"  GPU Util: {stats['util']}%")
         print(f"  GPU Memory: {stats['mem_used']:.0f}/{stats['mem_total']:.0f} MB ({stats['mem_percent']:.1f}%)")
         print()
     
-    # Actual test
+    # Actual test with CUDA Events for accurate timing
     print("Main test")
     print(f"Testing over {iterations} iterations")
     print()
     torch.cuda.reset_peak_memory_stats()
-    main_start = time.perf_counter()
+    
+    # Use CUDA Events for precise GPU timing
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+    
+
+    # Start recording
+    start_event.record()
+    
     for i in range(iterations):
         _ = model(samp_frames)
+        
+    # End recording
+    end_event.record()
+        
+    # Wait for everything to finish
     torch.cuda.synchronize()
-    elapsed = time.perf_counter() - main_start
+    
+    # Get elapsed time in milliseconds
+    elapsed = start_event.elapsed_time(end_event) / 1000.0  # Convert to seconds
     
     stats = get_gpu_stats()
     peak_mem = torch.cuda.max_memory_allocated() / 1024**2
@@ -149,31 +160,41 @@ def benchmark_infer(model_name: str,
     print()
     for i in range(nwarms):
         print(f"warm up: {i+1} / {nwarms}")
-        warmstart = time.perf_counter()
         with torch.no_grad():
             for j in range(warmup):
                 _ = model(samp_frames)
-        torch.cuda.synchronize()
-        elapsed = time.perf_counter() - warmstart
+        torch.cuda.synchronize()  # Ensure warmup completes
         
         stats = get_gpu_stats()
-        print(f"  Time: {elapsed:.4f}s ")
-        print(f"  Latency: {elapsed/warmup*1000:.2f} ms/iter")
         print(f"  GPU Util: {stats['util']}%")
         print(f"  GPU Memory: {stats['mem_used']:.0f}/{stats['mem_total']:.0f} MB ({stats['mem_percent']:.1f}%)")
         print()
     
-    # Actual test
+    # Actual test with CUDA Events for accurate timing
     print("Main test")
     print(f"Testing over {iterations} iterations")
     print()
     torch.cuda.reset_peak_memory_stats()
-    main_start = time.perf_counter()
+    
+    # Use CUDA Events for precise GPU timing
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+    
     with torch.no_grad():
+        # Start recording
+        start_event.record()
+        
         for i in range(iterations):
             _ = model(samp_frames)
+            
+        # End recording
+        end_event.record()
+        
+    # Wait for everything to finish
     torch.cuda.synchronize()
-    elapsed = time.perf_counter() - main_start
+    
+    # Get elapsed time in milliseconds
+    elapsed = start_event.elapsed_time(end_event) / 1000.0  # Convert to seconds
     
     stats = get_gpu_stats()
     peak_mem = torch.cuda.max_memory_allocated() / 1024**2
@@ -292,7 +313,8 @@ def single_benchmark(arch:str, bs= 2, iter=100):
 if __name__ == '__main__':
     import sys
     idx = int(sys.argv[1])
-    bs = int(sys.argv[2])
+    # bs = int(sys.argv[2])
+    bs = 1
     avm = avail_models()
     
     # idx = 0

@@ -1,146 +1,146 @@
 {
     "S3D": {
         "train": {
-            "throughput_batches_per_s": 83.40616105618757,
-            "throughput_samples_per_s": 83.40616105618757,
-            "latency_ms": 11.989521965006134,
+            "throughput_batches_per_s": 83.11849387503351,
+            "throughput_samples_per_s": 83.11849387503351,
+            "latency_ms": 12.031016845703125,
             "utilisation_percent": 100,
             "memory_mb": 1610.375,
             "peak_memory_mb": 978.798828125
         },
         "infer": {
-            "throughput_batches_per_s": 48.34259088918182,
-            "throughput_samples_per_s": 96.68518177836364,
-            "latency_ms": 20.68569312497857,
+            "throughput_batches_per_s": 87.99834487488057,
+            "throughput_samples_per_s": 87.99834487488057,
+            "latency_ms": 11.363850097656249,
             "utilisation_percent": 100,
-            "memory_mb": 882.375,
-            "peak_memory_mb": 294.22900390625
+            "memory_mb": 736.375,
+            "peak_memory_mb": 164.43115234375
         }
     },
     "R3D_18": {
         "train": {
-            "throughput_batches_per_s": 26.677386761077184,
-            "throughput_samples_per_s": 26.677386761077184,
-            "latency_ms": 37.48493092505669,
+            "throughput_batches_per_s": 26.692406766212315,
+            "throughput_samples_per_s": 26.692406766212315,
+            "latency_ms": 37.463837890624994,
             "utilisation_percent": 100,
             "memory_mb": 2100.375,
             "peak_memory_mb": 1474.0009765625
         },
         "infer": {
-            "throughput_batches_per_s": 14.651007944234049,
-            "throughput_samples_per_s": 29.302015888468098,
-            "latency_ms": 68.25468962997547,
+            "throughput_batches_per_s": 27.509896947361867,
+            "throughput_samples_per_s": 27.509896947361867,
+            "latency_ms": 36.350554199218756,
             "utilisation_percent": 100,
-            "memory_mb": 1226.375,
-            "peak_memory_mb": 648.00244140625
+            "memory_mb": 952.375,
+            "peak_memory_mb": 397.814453125
         }
     },
     "R(2+1)D_18": {
         "train": {
-            "throughput_batches_per_s": 14.400279050678613,
-            "throughput_samples_per_s": 14.400279050678613,
-            "latency_ms": 69.44309874001192,
+            "throughput_batches_per_s": 14.416264136368286,
+            "throughput_samples_per_s": 14.416264136368286,
+            "latency_ms": 69.3660986328125,
             "utilisation_percent": 100,
             "memory_mb": 4662.375,
             "peak_memory_mb": 3992.9453125
         },
         "infer": {
-            "throughput_batches_per_s": 8.08562029212323,
-            "throughput_samples_per_s": 16.17124058424646,
-            "latency_ms": 123.67634935493697,
+            "throughput_batches_per_s": 15.015073359410781,
+            "throughput_samples_per_s": 15.015073359410781,
+            "latency_ms": 66.59974121093751,
             "utilisation_percent": 100,
-            "memory_mb": 1874.375,
-            "peak_memory_mb": 979.341796875
+            "memory_mb": 1248.375,
+            "peak_memory_mb": 555.65380859375
         }
     },
     "Swin3D_T": {
         "train": {
-            "throughput_batches_per_s": 23.05562500437711,
-            "throughput_samples_per_s": 23.05562500437711,
-            "latency_ms": 43.37336332500854,
+            "throughput_batches_per_s": 23.166781369383017,
+            "throughput_samples_per_s": 23.166781369383017,
+            "latency_ms": 43.16525390625001,
             "utilisation_percent": 100,
             "memory_mb": 3590.375,
             "peak_memory_mb": 2745.95361328125
         },
         "infer": {
-            "throughput_batches_per_s": 12.609615710922506,
-            "throughput_samples_per_s": 25.219231421845013,
-            "latency_ms": 79.30455795998569,
+            "throughput_batches_per_s": 23.366703907351017,
+            "throughput_samples_per_s": 23.366703907351017,
+            "latency_ms": 42.7959375,
             "utilisation_percent": 100,
-            "memory_mb": 1558.375,
-            "peak_memory_mb": 788.99072265625
+            "memory_mb": 1114.375,
+            "peak_memory_mb": 478.958984375
         }
     },
     "Swin3D_S": {
         "train": {
-            "throughput_batches_per_s": 13.519964007104084,
-            "throughput_samples_per_s": 13.519964007104084,
-            "latency_ms": 73.9646939499653,
+            "throughput_batches_per_s": 13.585440547047483,
+            "throughput_samples_per_s": 13.585440547047483,
+            "latency_ms": 73.608212890625,
             "utilisation_percent": 100,
             "memory_mb": 5356.375,
             "peak_memory_mb": 4419.52587890625
         },
         "infer": {
-            "throughput_batches_per_s": 7.474018994639708,
-            "throughput_samples_per_s": 14.948037989279417,
-            "latency_ms": 133.79682346501795,
+            "throughput_batches_per_s": 13.767148182981801,
+            "throughput_samples_per_s": 13.767148182981801,
+            "latency_ms": 72.6366845703125,
             "utilisation_percent": 100,
-            "memory_mb": 1646.375,
-            "peak_memory_mb": 886.36376953125
+            "memory_mb": 1222.375,
+            "peak_memory_mb": 576.33203125
         }
     },
     "Swin3D_B": {
         "train": {
-            "throughput_batches_per_s": 9.482312049978798,
-            "throughput_samples_per_s": 9.482312049978798,
-            "latency_ms": 105.45951184998557,
+            "throughput_batches_per_s": 9.538231308256913,
+            "throughput_samples_per_s": 9.538231308256913,
+            "latency_ms": 104.84124023437501,
             "utilisation_percent": 100,
             "memory_mb": 6942.375,
             "peak_memory_mb": 5980.28955078125
         },
         "infer": {
-            "throughput_batches_per_s": 5.241192859296825,
-            "throughput_samples_per_s": 10.48238571859365,
-            "latency_ms": 190.79626086000644,
+            "throughput_batches_per_s": 9.63796091618607,
+            "throughput_samples_per_s": 9.63796091618607,
+            "latency_ms": 103.75638671875001,
             "utilisation_percent": 100,
-            "memory_mb": 2092.375,
-            "peak_memory_mb": 1234.86865234375
+            "memory_mb": 1514.375,
+            "peak_memory_mb": 827.0556640625
         }
     },
     "MViTv2_S": {
         "train": {
-            "throughput_batches_per_s": 19.140439841368796,
-            "throughput_samples_per_s": 19.140439841368796,
-            "latency_ms": 52.24540335999336,
+            "throughput_batches_per_s": 19.23769867526652,
+            "throughput_samples_per_s": 19.23769867526652,
+            "latency_ms": 51.98126953125,
             "utilisation_percent": 97,
             "memory_mb": 4024.375,
             "peak_memory_mb": 3088.2529296875
         },
         "infer": {
-            "throughput_batches_per_s": 10.172408153628373,
-            "throughput_samples_per_s": 20.344816307256746,
-            "latency_ms": 98.30513924505794,
-            "utilisation_percent": 99,
-            "memory_mb": 1640.375,
-            "peak_memory_mb": 671.4716796875
+            "throughput_batches_per_s": 19.718294128781643,
+            "throughput_samples_per_s": 19.718294128781643,
+            "latency_ms": 50.714326171874994,
+            "utilisation_percent": 98,
+            "memory_mb": 1176.375,
+            "peak_memory_mb": 409.20654296875
         }
     },
     "MViTv1_B": {
         "train": {
-            "throughput_batches_per_s": 24.366762155959577,
-            "throughput_samples_per_s": 24.366762155959577,
-            "latency_ms": 41.03951085497101,
+            "throughput_batches_per_s": 24.50277346151028,
+            "throughput_samples_per_s": 24.50277346151028,
+            "latency_ms": 40.81170654296875,
             "utilisation_percent": 100,
             "memory_mb": 3534.375,
             "peak_memory_mb": 2737.953125
         },
         "infer": {
-            "throughput_batches_per_s": 12.726212665574018,
-            "throughput_samples_per_s": 25.452425331148035,
-            "latency_ms": 78.57797337499505,
+            "throughput_batches_per_s": 24.882367635037877,
+            "throughput_samples_per_s": 24.882367635037877,
+            "latency_ms": 40.1891015625,
             "utilisation_percent": 100,
-            "memory_mb": 1482.375,
-            "peak_memory_mb": 553.5615234375
+            "memory_mb": 1096.375,
+            "peak_memory_mb": 352.751953125
         }
     }
 }

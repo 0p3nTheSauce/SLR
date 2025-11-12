@@ -126,6 +126,15 @@
 
  -- can use batch size of 8 with 32 frames and 224 width, decreases runtime
 
+
+@conclusion: not much diff, but slightly better with eta_min = 0 (- 0.0026 val loss) better
+- wups_restarts_et0 (S3D 35) best acc, best loss: 69.2308  1.5235
+    Same as hf_hwd_eps_wups_restarts but with eta min = 0
+
+@conclusion: dont set eps to e-3, but also not much diff (+ 0.0073) worse
+- wups_restarts_eps2 (S3D 36) 69.8225       1.6228
+    Same as hf_hwd_eps_wups_restarts but with eps = 1e-2
+
 #Misc
 i notice the time of runs increases with the better runs taking longer
 
