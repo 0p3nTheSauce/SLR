@@ -7,6 +7,10 @@ import json
 import gc
 from typing import cast
 
+#constants 
+OUTPUT = 'results/benchmark2.json'
+
+
 # Initialize NVML
 pynvml.nvmlInit()
 gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
@@ -240,12 +244,12 @@ def full_benchmark():
     print(json.dumps(results, indent=4))
     
     # Save results
-    with open('results/benchmark.json', 'w') as f:
+    with open(OUTPUT, 'w') as f:
         json.dump(results, f, indent=4)
     
     print("\nResults saved to results/benchmark.json")
     
-def single_benchmark(arch:str):
+def single_benchmark(arch:str, bs= 2, iter=100):
     print(f"\n{'='*50}")
     print(f"Benchmarking: {arch}")
     print('='*50)
@@ -253,7 +257,7 @@ def single_benchmark(arch:str):
     results = {}
     
     print("\n>>> Training mode:")
-    train_res = benchmark_train(arch)
+    train_res = benchmark_train(arch, batch_size=bs, iterations=iter)
     results['train'] = train_res
     
     torch.cuda.empty_cache()
@@ -264,7 +268,7 @@ def single_benchmark(arch:str):
     print('-'*50)
     print()
     print(">>> Inference mode:")
-    test_res = benchmark_infer(arch)
+    test_res = benchmark_infer(arch, batch_size=bs, iterations=iter)
     results['infer'] = test_res
     
     # Print summary
@@ -272,10 +276,28 @@ def single_benchmark(arch:str):
     print("BENCHMARK SUMMARY")
     print("="*50)
     print(json.dumps(results, indent=4))
+    try:
+        with open(OUTPUT, 'r') as f:
+            alldata = json.load(f)
+    except FileNotFoundError:
+        alldata = {}
+
+
+    alldata[arch] = results
+    
+    with open(OUTPUT, 'w') as f:
+        json.dump(alldata, f, indent=4)
     
 
 if __name__ == '__main__':
-    single_benchmark('MViTv2_S')
+    import sys
+    idx = int(sys.argv[1])
+    bs = int(sys.argv[2])
+    avm = avail_models()
+    
+    # idx = 0
+    print(f"{idx} / {len(avm)}")
+    single_benchmark(avm[idx],bs, iter=100)
     # benchmark_train("Swin3D_B")
     
     pynvml.nvmlShutdown()

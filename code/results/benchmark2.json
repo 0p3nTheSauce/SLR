@@ -1,0 +1,20 @@
+{
+    "S3D": {
+        "train": {
+            "throughput_batches_per_s": 12.369895371726663,
+            "throughput_samples_per_s": 98.9591629738133,
+            "latency_ms": 80.84142751002219,
+            "utilisation_percent": 100,
+            "memory_mb": 8488.375,
+            "peak_memory_mb": 7502.5283203125
+        },
+        "infer": {
+            "throughput_batches_per_s": 12.958708214678197,
+            "throughput_samples_per_s": 103.66966571742557,
+            "latency_ms": 77.16818555010832,
+            "utilisation_percent": 100,
+            "memory_mb": 1818.375,
+            "peak_memory_mb": 1084.8564453125
+        }
+    }
+}
