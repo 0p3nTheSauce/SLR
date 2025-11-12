@@ -441,7 +441,9 @@ def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> 
 		"-t", "--tags", nargs="+", type=str, help="Additional wandb tags"
 	)
 	parser.add_argument("-c", "--config_path", help="path to config .ini file")
-
+	parser.add_argument("-na", "--no_ask", action='store_true', help="Don't ask for confirmation")
+ 
+ 
 	return parser
 
 #NOTE: Seperate into having seperate function for train parser
@@ -449,13 +451,16 @@ def take_args(
 	sup_args: Optional[List[str]] = None,
 	make_dirs: bool = False,
 	ask_bf_ovrite: bool = True, 
+	parsed_args: Optional[argparse.Namespace] = None
 ) -> Optional[Tuple[AdminInfo, WandbInfo]]:
 	"""Retrieve arguments for new training run
 
 	Args:
 		sup_args (Optional[List[str]], optional): Supply arguments instead of taking from command line. Defaults to None.
 		make_dirs (bool, optional): Make output and checkpoint dirs. Defaults to False.
-
+		ask_bf_ovrite (bool, Optional): Ask for permition to overwirte an existing experiment directory. Defaults to True.
+		parsed_args (Optional[argparse.Namespace], Optional): Supply already parsed args, to avoid reparsing. Defaults to None.
+	
 	Raises:
 		ValueError: If model or split supplied are not available, or if recovering and save path is invalid.
 
@@ -470,6 +475,8 @@ def take_args(
 
 	if sup_args:
 		args = parser.parse_args(sup_args)
+	elif parsed_args:
+		args = parsed_args
 	else:
 		args = parser.parse_args()
 
