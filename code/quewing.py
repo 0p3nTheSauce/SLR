@@ -120,7 +120,7 @@ class que:
 	) -> None:
 		self.runs_path: Path = Path(runs_path)
 		self.lock_file: Path = Path(f"{runs_path}.lock")
-		self.lock: FileLock = FileLock(self.lock_file, timeout=30)
+		self.lock: FileLock = FileLock(self.lock_file, timeout=30) 
 		self.imp_splits: List[str] = configs.get_avail_splits()
 		self.verbose: bool = verbose
 		self.old_runs: List[CompExpInfo] = []
@@ -485,12 +485,12 @@ class que:
 		except Exception as e:
 			print(f"Could not display run {idx} : {loc} due to: {e}")
   
-	def recover_run(self) -> None:
-		"""Set the run in cur_run to recover"""
+	def recover_run(self, move_to: QueLocation = TO_RUN) -> None:
+		"""Set the run in cur_run to recover, and move to to_run or cur_run"""
 		try:
-			run = self._pop_run("cur_run", 0)
+			run = self.pop_cur_run()
 			run["admin"]["recover"] = True
-			self._set_run("cur_run", 0, run)
+			self._set_run(move_to, 0, run)
 		except Exception as e:
 			self.print_v(str(e))
 
@@ -1323,6 +1323,11 @@ class queShell(cmdLib.Cmd):
 		self.que.print_v("Que loaded from file")
 		self.que.load_state()
 
+	def do_recover(self, arg):
+		"""Recover a run, at the moment implemented for restarting the daemon script"""
+		self.que.recover_run()
+		self.que.print_v("Recovered run")
+
 	def do_clear(self, arg):
 		"""Clear past or future runs"""
 		parsed_args = self._parse_args_or_cancel("clear", arg)
@@ -1354,7 +1359,6 @@ class queShell(cmdLib.Cmd):
 			return
 
 		self.que.disp_run(parsed_args.location, parsed_args.index)
-
 
 	def do_shuffle(self, arg):
 		"""Reposition a run in the que"""
