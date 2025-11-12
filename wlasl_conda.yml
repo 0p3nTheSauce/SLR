@@ -1,5 +1,8 @@
 name: wlasl
 channels:
+  - pytorch 
+  - nvidia
+  - conda-forge
   - defaults
 dependencies:
   - libnpp=12.2.5.30=0

@@ -1,7 +1,10 @@
 import json
 import torch
 import tqdm
-from ultralytics import YOLO  # type: ignore (have a feeling this will bork the system)
+from ultralytics import YOLO  # type: ignore 
+#NOTE: Running this script will mess up the environment you are using, becuase of this stupid YOLO thing
+#it will give a '3D conv not implemented yada yada' error message
+#The solution is to delete and recreate the environment
 import cv2
 from argparse import ArgumentParser
 from pathlib import Path
