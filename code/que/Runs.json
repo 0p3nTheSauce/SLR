@@ -529,7 +529,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "exp_no": "036",
-                "recover": false,
+                "recover": true,
                 "config_path": "./configfiles/generic/wups_restarts_eps2.ini",
                 "save_path": "runs/asl100/S3D_exp036/checkpoints"
             },
