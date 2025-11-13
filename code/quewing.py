@@ -326,9 +326,9 @@ class que:
 
 	def stash_failed_run(self, error: str) -> None:
 		"""Move a run to the failed que"""
-		run = self._pop_run(CUR_RUN, 0)
+		run = self.pop_cur_run()
 		failed = cast(FailedExp, run | {"error": error})
-		self.fail_runs.append(failed)
+		self._set_run(FAIL_RUNS, 0, failed)
 
 	# summarisation
 
@@ -972,6 +972,7 @@ class worker:
 			# TODO: handle ctrl+c gracefully
 			self.print_v("Training run failed due to an error")
 			self.que.stash_failed_run(str(e))
+			self.que.save_state()
 			raise e  # still need to crash so daemon can
 
 	def idle(
