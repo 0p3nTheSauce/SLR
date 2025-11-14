@@ -1,14 +1,16 @@
 {
-    "to_run": [
+    "to_run": [],
+    "cur_run": [],
+    "old_runs": [
         {
             "admin": {
                 "model": "S3D",
                 "dataset": "WLASL",
                 "split": "asl100",
-                "exp_no": "041",
+                "exp_no": "045",
                 "recover": false,
-                "config_path": "./configfiles/generic/mode.ini",
-                "save_path": "runs/asl100/S3D_exp041/checkpoints"
+                "config_path": "./configfiles/generic/mode2b.ini",
+                "save_path": "runs/asl100/S3D_exp045/checkpoints"
             },
             "training": {
                 "batch_size": 8,
@@ -31,8 +33,9 @@
                 "frame_size": 224
             },
             "scheduler": {
-                "type": "CosineAnnealingLR",
-                "tmax": 200,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
                 "eta_min": 0,
                 "warm_up": null
             },
@@ -51,9 +54,360 @@
                 "tags": [
                     "asl100",
                     "S3D",
-                    "exp-041"
+                    "exp-045"
                 ],
                 "run_id": null
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 65.97633136094674,
+                "best_val_loss": 1.5232996811941573,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5156666666666666,
+                        "top5": 0.8350000000000002,
+                        "top10": 0.8983333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5077519379844961,
+                        "top5": 0.8333333333333334,
+                        "top10": 0.8953488372093024
+                    },
+                    "average_loss": 1.900027439066126
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5968333333333333,
+                        "top5": 0.8438333333333334,
+                        "top10": 0.92
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.591715976331361,
+                        "top5": 0.8402366863905325,
+                        "top10": 0.9201183431952663
+                    },
+                    "average_loss": 1.5232996811941573
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2785,
+                        "top5": 0.5783333333333334,
+                        "top10": 0.7133333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2751937984496124,
+                        "top5": 0.5775193798449613,
+                        "top10": 0.7131782945736435
+                    },
+                    "average_loss": 3.472509943941507,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "044",
+                "recover": false,
+                "config_path": "./configfiles/generic/mode2a.ini",
+                "save_path": "runs/asl100/S3D_exp044/checkpoints"
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 0.01,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.0001
+            },
+            "model_params": {
+                "drop_p": 0.7
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-044"
+                ],
+                "run_id": null
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 66.86390532544378,
+                "best_val_loss": 1.4983234847713687,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5273333333333333,
+                        "top5": 0.845,
+                        "top10": 0.8975
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5232558139534884,
+                        "top5": 0.8410852713178295,
+                        "top10": 0.8953488372093024
+                    },
+                    "average_loss": 1.9775541766044173
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6381666666666667,
+                        "top5": 0.8821666666666669,
+                        "top10": 0.9325
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6331360946745562,
+                        "top5": 0.878698224852071,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.4983234847713687
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2568333333333333,
+                        "top5": 0.565,
+                        "top10": 0.7033333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2558139534883721,
+                        "top5": 0.5697674418604651,
+                        "top10": 0.7015503875968992
+                    },
+                    "average_loss": 3.624873611003038,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "043",
+                "recover": false,
+                "config_path": "./configfiles/generic/mode2.ini",
+                "save_path": "runs/asl100/S3D_exp043/checkpoints"
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 0.01,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.0001
+            },
+            "model_params": {
+                "drop_p": 0.7
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "S3D",
+                    "exp-043"
+                ],
+                "run_id": null
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.04733727810651,
+                "best_val_loss": 1.4688783192144392,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5276666666666666,
+                        "top5": 0.8366666666666667,
+                        "top10": 0.895
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5271317829457365,
+                        "top5": 0.8372093023255814,
+                        "top10": 0.8914728682170543
+                    },
+                    "average_loss": 1.8823384799089942
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6114999999999999,
+                        "top5": 0.8666666666666667,
+                        "top10": 0.9316666666666668
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.606508875739645,
+                        "top5": 0.863905325443787,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.4688783192144392
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.27516666666666667,
+                        "top5": 0.5963333333333334,
+                        "top10": 0.73
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2713178294573643,
+                        "top5": 0.5968992248062015,
+                        "top10": 0.7286821705426356
+                    },
+                    "average_loss": 3.289798969708838,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
             }
         },
         {
@@ -114,6 +468,85 @@
                     "exp-042"
                 ],
                 "run_id": null
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 65.38461538461539,
+                "best_val_loss": 1.7265721883464418,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.48999999999999994,
+                        "top5": 0.7893333333333333,
+                        "top10": 0.8613333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.4806201550387597,
+                        "top5": 0.7829457364341085,
+                        "top10": 0.8565891472868217
+                    },
+                    "average_loss": 2.478898782200293
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5844999999999999,
+                        "top5": 0.8643333333333334,
+                        "top10": 0.9183333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5798816568047337,
+                        "top5": 0.8609467455621301,
+                        "top10": 0.9171597633136095
+                    },
+                    "average_loss": 1.7265721883464418
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.29616666666666663,
+                        "top5": 0.5751666666666666,
+                        "top10": 0.6910000000000001
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.29844961240310075,
+                        "top5": 0.5775193798449613,
+                        "top10": 0.686046511627907
+                    },
+                    "average_loss": 3.591718995769071,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
             }
         },
         {
@@ -121,10 +554,10 @@
                 "model": "S3D",
                 "dataset": "WLASL",
                 "split": "asl100",
-                "exp_no": "043",
+                "exp_no": "041",
                 "recover": false,
-                "config_path": "./configfiles/generic/mode2.ini",
-                "save_path": "runs/asl100/S3D_exp043/checkpoints"
+                "config_path": "./configfiles/generic/mode.ini",
+                "save_path": "runs/asl100/S3D_exp041/checkpoints"
             },
             "training": {
                 "batch_size": 8,
@@ -147,9 +580,8 @@
                 "frame_size": 224
             },
             "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
+                "type": "CosineAnnealingLR",
+                "tmax": 200,
                 "eta_min": 0,
                 "warm_up": null
             },
@@ -168,127 +600,90 @@
                 "tags": [
                     "asl100",
                     "S3D",
-                    "exp-043"
+                    "exp-041"
                 ],
                 "run_id": null
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 64.49704142011835,
+                "best_val_loss": 1.6368889524026629,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5435,
+                        "top5": 0.8225,
+                        "top10": 0.8858333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5465116279069767,
+                        "top5": 0.8217054263565892,
+                        "top10": 0.8837209302325582
+                    },
+                    "average_loss": 2.271076132004127
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6315,
+                        "top5": 0.8725,
+                        "top10": 0.93
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6272189349112426,
+                        "top5": 0.8727810650887574,
+                        "top10": 0.9289940828402367
+                    },
+                    "average_loss": 1.6368889524026629
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2651666666666666,
+                        "top5": 0.5650000000000001,
+                        "top10": 0.6791666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2596899224806202,
+                        "top5": 0.562015503875969,
+                        "top10": 0.6782945736434108
+                    },
+                    "average_loss": 4.144683906891689,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
             }
         },
-        {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "044",
-                "recover": false,
-                "config_path": "./configfiles/generic/mode2a.ini",
-                "save_path": "runs/asl100/S3D_exp044/checkpoints"
-            },
-            "training": {
-                "batch_size": 8,
-                "update_per_step": 1,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 0.01,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.0001
-            },
-            "model_params": {
-                "drop_p": 0.7
-            },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 2,
-                "eta_min": 0,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
-                    "asl100",
-                    "S3D",
-                    "exp-044"
-                ],
-                "run_id": null
-            }
-        },
-        {
-            "admin": {
-                "model": "S3D",
-                "dataset": "WLASL",
-                "split": "asl100",
-                "exp_no": "045",
-                "recover": false,
-                "config_path": "./configfiles/generic/mode2b.ini",
-                "save_path": "runs/asl100/S3D_exp045/checkpoints"
-            },
-            "training": {
-                "batch_size": 8,
-                "update_per_step": 1,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 0.01,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.0001
-            },
-            "model_params": {
-                "drop_p": 0.7
-            },
-            "data": {
-                "num_frames": 32,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 20,
-                "tmult": 1,
-                "eta_min": 0,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100",
-                "tags": [
-                    "asl100",
-                    "S3D",
-                    "exp-045"
-                ],
-                "run_id": null
-            }
-        }
-    ],
-    "cur_run": [
         {
             "admin": {
                 "model": "S3D",
@@ -343,10 +738,87 @@
                     "exp-040"
                 ],
                 "run_id": "dm8do4z5"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 70.11834319526628,
+                "best_val_loss": 1.809887136934411,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6251666666666666,
+                        "top5": 0.9038333333333333,
+                        "top10": 0.938
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.624031007751938,
+                        "top5": 0.9031007751937985,
+                        "top10": 0.937984496124031
+                    },
+                    "average_loss": 2.0316821530920555
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7065,
+                        "top5": 0.9008333333333334,
+                        "top10": 0.95
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7011834319526628,
+                        "top5": 0.8964497041420119,
+                        "top10": 0.9467455621301775
+                    },
+                    "average_loss": 1.809887136934411
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.3188333333333333,
+                        "top5": 0.61,
+                        "top10": 0.7066666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3178294573643411,
+                        "top5": 0.6162790697674418,
+                        "top10": 0.7093023255813954
+                    },
+                    "average_loss": 5.212745542782134,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
             }
-        }
-    ],
-    "old_runs": [
+        },
         {
             "admin": {
                 "model": "S3D",

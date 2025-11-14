@@ -4,6 +4,7 @@ import argparse
 import json
 from typing import (
 	Optional,
+	Callable,
 	List,
 	Literal,
 	TypeAlias,
@@ -116,7 +117,7 @@ class QueBusy(Exception):
 
 class que:
 	def __init__(
-		self, runs_path: str | Path, verbose: bool = True, auto_save: bool = False
+		self, runs_path: str | Path = RUN_PATH, verbose: bool = True, auto_save: bool = False
 	) -> None:
 		self.runs_path: Path = Path(runs_path)
 		self.lock_file: Path = Path(f"{runs_path}.lock")
@@ -255,6 +256,62 @@ class que:
 			self.to_run.insert(idx, run)
 		else:  # CUR_RUN   
 			self.cur_run.insert(idx, run)
+
+	def _get_val(self, run: GenExp,  keys: List[str]) -> Any:
+		"""Unpack the value in a run using a list of keys
+
+		Args:
+			run (GenExp): Provided general run
+			keys (List[str]): Keys to unpack dictionary
+
+		Returns:
+			Any: The value
+		"""
+		unpack = cast(Dict[str, Any], run)
+		for k in keys:
+			unpack = unpack[k]
+		return unpack
+
+	def _find_runs(self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any],bool]) -> Tuple[List[int], List[GenExp]]:
+		"""Find runs with matching keys, if any
+
+		Args:
+			to_search (List[GenExp]): A run list
+			keys (List[str]): Run keys
+			value (Any): The desired value
+
+		Returns:
+			List[Tuple[int, GenExp]]: A List of runs 
+		"""
+		idxs = []
+		runs = []
+		for i, run in enumerate(to_search):
+			if criterion(self._get_val(run, keys)):
+				idxs.append(i)
+				runs.append(run)
+		return idxs, runs
+
+	def find_runs(self, loc: QueLocation, key_set: List[List[str]], values:List[Any]) -> Tuple[List[int], List[GenExp]]:
+		"""Find the set of runs which match all of the key list value pairs
+
+		Args:
+			loc (QueLocation): Location to search
+			key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
+			values (List[Any]): The corresponding values for each set of keys
+
+		Returns:
+			Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
+		"""
+     
+     
+		assert len(key_set) == len(values) , f"Length of key_set: {len(key_set)} does not match length of values: {len(values)}"
+		runs = [run for run in self.fetch_state(loc)]
+		idxs = []
+		for k_lst, val in zip(key_set, values):
+			idxs, runs = self._find_runs(runs, k_lst, val)
+		return idxs, runs
+		
+  
 
 	def save_state(self):
 		"""Saves state to Runs.jso, with filelock"""
@@ -481,6 +538,8 @@ class que:
 		return r_str
 
 	# for queShell interface
+
+	
 
 	def disp_run(self, loc: QueLocation, idx: int) -> None:
 		try:
