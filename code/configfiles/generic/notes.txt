@@ -131,9 +131,14 @@
 - wups_restarts_et0 (S3D 35) best acc, best loss: 69.2308  1.5235
     Same as hf_hwd_eps_wups_restarts but with eta min = 0
 
-@conclusion: dont set eps to e-3, but also not much diff (+ 0.0073) worse
+@conclusion: dont set eps to e-2, but also not much diff (+ 0.0073) worse
 - wups_restarts_eps2 (S3D 36) 69.8225       1.6228
     Same as hf_hwd_eps_wups_restarts but with eps = 1e-2
+
+
+@conclusion i guees set eps to -4, but -5 probs fine (-0.06 ) better
+- wups_restarts_eps4 (S3D 37) 70.7101       1.4899
+    Same as hf_hwd_eps_wups_restarts but with eps = 1e-4
 
 #Misc
 i notice the time of runs increases with the better runs taking longer
