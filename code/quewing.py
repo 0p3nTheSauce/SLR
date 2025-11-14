@@ -291,7 +291,7 @@ class que:
 				runs.append(run)
 		return idxs, runs
 
-	def find_runs(self, loc: QueLocation, key_set: List[List[str]], values:List[Any]) -> Tuple[List[int], List[GenExp]]:
+	def find_runs(self, loc: QueLocation, key_set: List[List[str]], criterions: List[Callable[[Any],bool]]) -> Tuple[List[int], List[GenExp]]:
 		"""Find the set of runs which match all of the key list value pairs
 
 		Args:
@@ -304,11 +304,11 @@ class que:
 		"""
      
      
-		assert len(key_set) == len(values) , f"Length of key_set: {len(key_set)} does not match length of values: {len(values)}"
+		assert len(key_set) == len(criterions) , f"Length of key_set: {len(key_set)} does not match length of values: {len(criterions)}"
 		runs = [run for run in self.fetch_state(loc)]
 		idxs = []
-		for k_lst, val in zip(key_set, values):
-			idxs, runs = self._find_runs(runs, k_lst, val)
+		for k_lst, crit in zip(key_set, criterions):
+			idxs, runs = self._find_runs(runs, k_lst, crit)
 		return idxs, runs
 		
   
@@ -527,7 +527,7 @@ class que:
 		if "error" in r_info: #FailedExp
 			r_str += f"{r_info['error']:<{stats['max_error']}}  "
    
-		if "best_val_acc" in r_info: #CompExpInfo
+		if "best_val_acc" in stats: #CompExpInfo
 			r_str += (
        			f"{r_info['best_val_acc']:<{stats['max_val_acc']}}  "
 				f"{r_info['best_val_loss']:<{stats['max_val_loss']}}  "
