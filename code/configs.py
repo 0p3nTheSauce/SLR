@@ -17,7 +17,7 @@ from models import avail_models
 # constants
 # - wandb
 ENTITY = "ljgoodall2001-rhodes-university"
-PROJECT = "WLASL-100"
+# PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
 # - data
 LABELS_PATH = "preprocessed/labels"
@@ -419,8 +419,7 @@ def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> 
 		"-p",
 		"--project",
 		type=str,
-		default=PROJECT,
-		help=f"wandb project name, if not {PROJECT}",
+		help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)",
 	)
 	parser.add_argument(
 		"-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}"
