@@ -65,7 +65,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "exp_no": "047",
-                "recover": false,
+                "recover": true,
                 "config_path": "./configfiles/generic/hframe_hwd_warmrestarts.ini",
                 "save_path": "runs/asl1000/S3D_exp047/checkpoints"
             },
