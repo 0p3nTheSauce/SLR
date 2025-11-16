@@ -1142,6 +1142,8 @@ def reformet7():
 		json.dump(all_runs, f, indent=4, separators=(",", ":"))
   
 
+def test_get_next_expno():
+    configs.get_next_expno('asl100', 'S3D')
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
@@ -1152,4 +1154,5 @@ if __name__ == "__main__":
 	# test_safe_index2()
 	# test_raise()
 	# test_loss4()
-	reformet7()
+	# reformet7()
+ 	test_get_next_expno()	

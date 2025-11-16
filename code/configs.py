@@ -445,7 +445,14 @@ def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> 
  
 	return parser
 
-#NOTE: Seperate into having seperate function for train parser
+def get_next_expno(split:str, model:str, runs_path:str=RUNS_PATH):
+	split_dir = Path(runs_path) / split
+	assert split_dir.exists() and split_dir.is_dir(), f"{split_dir} must exist and be a directory"
+	model_exps = sorted(split_dir.glob(f"{model}_exp*"))
+	# exp_nos = map(lambda x: int(x.name[-3:]), model_exps)
+	print(int(model_exps[-1].name[-3:]))
+
+
 def take_args(
 	sup_args: Optional[List[str]] = None,
 	make_dirs: bool = False,
