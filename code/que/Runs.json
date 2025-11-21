@@ -1,6 +1,7 @@
 {
     "to_run": [],
-    "cur_run": [
+    "cur_run": [],
+    "old_runs": [
         {
             "admin": {
                 "model": "MViTv2_S",
@@ -60,10 +61,71 @@
                     "exp-009"
                 ],
                 "run_id": "n76kbz8u"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 76.92307692307692,
+                "best_val_loss": 0.972953895469461,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7130000000000001,
+                        "top5": 0.9083333333333333,
+                        "top10": 0.9416666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7131782945736435,
+                        "top5": 0.9031007751937985,
+                        "top10": 0.937984496124031
+                    },
+                    "average_loss": 1.2293358092513156
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.77,
+                        "top5": 0.9283333333333332,
+                        "top10": 0.9525
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7692307692307693,
+                        "top5": 0.9260355029585798,
+                        "top10": 0.9526627218934911
+                    },
+                    "average_loss": 0.972953895469461
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5246666666666666,
+                        "top5": 0.7958333333333334,
+                        "top10": 0.89
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5155038759689923,
+                        "top5": 0.7868217054263565,
+                        "top10": 0.8837209302325582
+                    },
+                    "average_loss": 2.255135668377354,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
             }
-        }
-    ],
-    "old_runs": [
+        },
         {
             "admin": {
                 "model": "MViTv2_S",
