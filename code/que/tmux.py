@@ -5,7 +5,7 @@ from typing import (
 from pathlib import Path
 import subprocess
 #locals 
-from code.que.core import (
+from .core import (
     WR_NAME,
     DN_NAME,
     SESH_NAME,
@@ -32,7 +32,8 @@ class tmux_manager:
 
         ep = Path(exec_path)
         if (not ep.exists()) or (not ep.is_file()):
-            raise ValueError(f"Executable: {exec_path} does not exist")
+            # raise ValueError(f"Executable: {exec_path} does not exist")
+            print(Warning(f"Executable: {exec_path} does not exist"))
 
     def setup_tmux_session(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
         """Create the que_training tmux session is set up, with windows daemon and worker

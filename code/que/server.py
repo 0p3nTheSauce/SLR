@@ -1,5 +1,5 @@
 from multiprocessing.managers import BaseManager
-from quewing import que
+from .core import que
 import time
 
 class QueueManager(BaseManager): 
