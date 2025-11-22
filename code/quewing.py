@@ -381,7 +381,7 @@ class que:
 	# summarisation
 
 	@classmethod
-	def get_config(cls, next_run: ExpInfo) -> str:
+	def get_config(cls, next_run: RunInfo) -> str:
 		admin = next_run["admin"]
 		return admin["config_path"]
 
@@ -430,7 +430,8 @@ class que:
 
 		return dic
 
-	def get_runs_info(
+  
+	def _sum_runs(
 		self, run_confs: ExpQue, head_sum: Optional[Dict[str, str]] = None 
 	) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
 		"""Get summarised run info, and stats for printing
@@ -449,11 +450,6 @@ class que:
 
 		runs_info.extend(runs_sum)
 
-		# Calculate column widths
-		# max_model = max([len(r["model"]) for r in runs_info] + [len("Model")])
-		# max_exp = max([len(str(r["exp_no"])) for r in runs_info] + [len("Exp")])
-		# max_split = max([len(r["split"]) for r in runs_info] + [len("Split")])
-		# max_id = max([len(r["run_id"]) for r in runs_info] + [len("Run ID")])
 		max_model = max(len(r["model"]) for r in runs_info)
 		max_exp = max(len(str(r["exp_no"])) for r in runs_info)
 		max_split = max(len(r["split"]) for r in runs_info)
@@ -476,8 +472,33 @@ class que:
 			stats['max_val_loss'] = max_val_loss
 			stats['max_val_acc'] = max_val_acc
    
-   
 		return runs_info, stats
+
+	def _get_head_sum(self, loc: QueLocation) -> Dict[str, str]:
+		head_sum = {
+			"model" : "Model",
+			"split" : "Split", 
+			"exp_no": "Exp",
+			"run_id" : "Run ID",
+			"config_path": "Config"
+		}
+
+		#check for extra headings
+		if loc == FAIL_RUNS:
+			head_sum["error"] = "Exception"
+		if loc == OLD_RUNS:
+			head_sum["best_val_acc"] = "Best Val Acc"
+			head_sum["best_val_loss"] = "Best Val Loss"
+
+		return head_sum
+
+	def _get_runs_info(self, loc: QueLocation):
+		"""Get summarised run info for a particular que location"""
+		to_disp = self.fetch_state(loc)
+		if len(to_disp) == 0:
+			raise QueEmpty(loc)
+		head_sum = self._get_head_sum(loc)
+		return self._sum_runs(to_disp, head_sum)
 
 	def run_str(
 		self, r_info: Dict[str, str], stats: Optional[Dict[str, int]] = None
@@ -492,15 +513,17 @@ class que:
 						str: Summarised string representation of run info
 		"""
 
-		if stats is None:
-			stats = {
-				"max_id": 0,
-				"max_model": 0,
-				"max_exp": 0,
-				"max_split": 0,
-				"max_val_acc" : 0,
-				"max_val_loss": 0
-			}
+		def_stats = {
+			"max_id": 0,
+			"max_model": 0,
+			"max_exp": 0,
+			"max_split": 0,
+			"max_val_acc" : 0,
+			"max_val_loss": 0
+		}
+   
+		if stats is not None:
+			def_stats.update(stats)
 
 		r_str = ""
   
@@ -508,20 +531,20 @@ class que:
 			r_info['run_id'] = 'None'
 
 		r_str += (
-			f"{r_info['run_id']:<{stats['max_id']}}  "
-			f"{r_info['model']:<{stats['max_model']}}  "
-			f"{r_info['split']:<{stats['max_split']}}  "
-			f"{r_info['exp_no']:<{stats['max_exp']}}  "
+			f"{r_info['run_id']:<{def_stats['max_id']}}  "
+			f"{r_info['model']:<{def_stats['max_model']}}  "
+			f"{r_info['split']:<{def_stats['max_split']}}  "
+			f"{r_info['exp_no']:<{def_stats['max_exp']}}  "
 		)
 
 		#check for extra keys
 		if "error" in r_info: #FailedExp
-			r_str += f"{r_info['error']:<{stats['max_error']}}  "
+			r_str += f"{r_info['error']:<{def_stats['max_error']}}  "
    
-		if "best_val_acc" in stats: #CompExpInfo
+		if "max_val_loss" in def_stats: #CompExpInfo
 			r_str += (
-       			f"{r_info['best_val_acc']:<{stats['max_val_acc']}}  "
-				f"{r_info['best_val_loss']:<{stats['max_val_loss']}}  "
+       			f"{r_info['best_val_acc']:<{def_stats['max_val_acc']}}  "
+				f"{r_info['best_val_loss']:<{def_stats['max_val_loss']}}  "
           	)
   
 		r_str += f"{r_info['config_path']}" #keep config at end
@@ -531,6 +554,34 @@ class que:
 	# for queShell interface
 
 	
+
+	def list_runs(self, loc: QueLocation) -> List[str]:
+		"""Summarise all the runs in a particular que into a list of strings
+
+		Args:
+			loc (QueLocation): The location to summarise
+
+		Returns:
+			List[str]: List of summarised run strings
+		"""
+		# Extract run info
+		try:
+			runs_info, stats = self._get_runs_info(loc)
+		except QueEmpty as qe:
+			self.print_v(str(qe))
+			return []
+      
+		conf_list = []
+		head = f"  [{'Idx':>3}] {self.run_str(runs_info[0], stats)}"  
+		conf_list.append(head)
+		# conf_list.append("-" * len(head))
+		for i, info in enumerate(runs_info[1:]):
+			# Format with padding for alignment
+			r_str = f"  [{i:3d}] {self.run_str(info, stats)}"
+			conf_list.append(r_str)
+
+		return conf_list
+
 
 	def disp_run(self, loc: QueLocation, idx: int) -> None:
 		try:
@@ -556,42 +607,6 @@ class que:
 			self.print_v(f"{loc} successfully cleared")
 		else:
 			self.print_v(f"{loc} already empty")
-
-	def list_runs(self, loc: QueLocation) -> List[str]:
-		to_disp = self.fetch_state(loc)
-
-		if len(to_disp) == 0:
-			self.print_v(" No runs available\n")
-			return []
-
-		head_sum = {
-			"model" : "Model",
-			"split" : "Split", 
-			"exp_no": "Exp",
-			"run_id" : "Run ID",
-			"config_path": "Config"
-		}
-
-		#check for extra headings
-		if loc == FAIL_RUNS:
-			head_sum["error"] = "Exception"
-		if loc == OLD_RUNS:
-			head_sum["best_val_acc"] = "Best Val Acc"
-			head_sum["best_val_loss"] = "Best Val Loss"
-
-		# Extract run info
-		runs_info, stats = self.get_runs_info(to_disp, head_sum)
-  
-		conf_list = []
-		head = f"  [{'Idx':>3}] {self.run_str(runs_info[0], stats)}"  
-		conf_list.append(head)
-		# conf_list.append("-" * len(head))
-		for i, info in enumerate(runs_info[1:]):
-			# Format with padding for alignment
-			r_str = f"  [{i:3d}] {self.run_str(info, stats)}"
-			conf_list.append(r_str)
-
-		return conf_list
 
 	@classmethod
 	def disp_runs(cls, runs: List[str], loc :QueLocation) -> None:

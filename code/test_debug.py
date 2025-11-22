@@ -17,6 +17,7 @@ import torch
 import configs
 import quewing
 import testing
+import utils
 
 def plot_simulated_training(x_range, f):
 	x = x_range
@@ -1143,7 +1144,41 @@ def reformet7():
   
 
 def test_get_next_expno():
-    configs.get_next_expno('asl100', 'S3D')
+	configs.get_next_expno('asl100', 'S3D')
+
+def test_run_sum():
+	q = quewing.que()
+	loc: quewing.QueLocation = 'old_runs'
+	# old0 = q._peak_run('old_runs', 0)
+	# old1 = q._peak_run('old_runs', 1)
+	# configs.print_config(old0)
+	# configs.print_config(q.run_sum(old0))
+	# utils.print_dict(q.run_sum(old0))
+	# print()
+	try:
+		runs_info, stats = q._get_runs_info(loc)
+	except quewing.QueEmpty as qe:
+		q.print_v(str(qe))
+		return []
+	utils.print_dict(stats)
+	print()
+	utils.print_dict(runs_info[0])
+	print()
+ 
+
+	print(f"  [{'Idx':>3}] {q.run_str(runs_info[0], stats)}")
+	for i, info in enumerate(runs_info[1:]):
+		# Format with padding for alignment
+		print(f"  [{i:3d}] {q.run_str(info, stats)}")
+  
+def test_list_runs():
+	q = quewing.que()
+	loc: quewing.QueLocation = 'old_runs'
+	runs = q.list_runs(loc)
+	for run in runs:
+		print(run)
+ 
+
 
 if __name__ == "__main__":
 	# test_get_avail_splits()
@@ -1154,5 +1189,7 @@ if __name__ == "__main__":
 	# test_safe_index2()
 	# test_raise()
 	# test_loss4()
-	reformet7()
+	# reformet7()
  	# test_get_next_expno()	
+	# test_run_sum()
+	test_list_runs()
