@@ -11,7 +11,6 @@ from typing import (
     cast,
     Union,
     TypeGuard,
-    Protocol,
 )
 from pathlib import Path
 import json
@@ -24,18 +23,22 @@ from run_types import (
 from testing import full_test, load_comp_res
 from configs import print_config, load_config
 # import ..utils
-from utils import gpu_manager, ask_nicely, enum_dir, print_dict
-
+from utils import  ask_nicely
 # constants
 SESH_NAME = "que_training"
 DN_NAME = "daemon"
 WR_NAME = "worker"
 SR_NAME = "server"
 # MR_NAME = "monitor"
-QUE_DIR = "./que/"
+QUE_DIR = Path(__file__).parent
+
+RUN_PATH = QUE_DIR / "Runs.json"
+WR_LOG_PATH = QUE_DIR / "Worker.log"
+DN_LOG_PATH = QUE_DIR / "Daemon.log"
+SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = "./quefeather.py"
-RUN_PATH = QUE_DIR + "Runs.json"
-LOG_PATH = QUE_DIR + "Logs.log"
+
+
 TO_RUN = "to_run"  # havent run yet
 CUR_RUN = "cur_run"  # busy running
 OLD_RUNS = "old_runs"  # run already
@@ -128,10 +131,6 @@ class que:
         
     ) -> None:
         self.runs_path: Path = Path(runs_path)
-        # self.lock_file: Path = Path(f"{runs_path}.lock")
-        # self.lock: FileLock = FileLock(self.lock_file, timeout=30)
-        # self.imp_splits: List[str] = configs.get_avail_splits()
-        # self.conf_loader: ConfigLoader = conf_loader
         self.verbose: bool = verbose
         self.old_runs: List[CompExpInfo] = []
         self.cur_run: List[ExpInfo] = []
@@ -165,6 +164,7 @@ class que:
             self.cur_run = data.get(CUR_RUN, [])
             self.old_runs = data.get(OLD_RUNS, [])
             self.fail_runs = data.get(FAIL_RUNS, [])
+            self.print_v(f"Loaded que state from {self.runs_path}")
         except FileNotFoundError:
             self.print_v(
                 f"No existing state found at {self.runs_path}. Starting fresh."
@@ -365,7 +365,12 @@ class que:
                         Timeout: If cannot acquire file lock
         """
         next_run = self._pop_run(TO_RUN, 0)
-        self.set_cur_run(next_run)
+        try:
+            self.set_cur_run(next_run)
+        except QueBusy as qb:
+            # put back
+            self._set_run(TO_RUN, 0, next_run)
+            raise qb
         self.print_v(f"Stashed next run: {self.run_str(self.run_sum(next_run))}")
 
     def store_fin_run(self):
@@ -560,7 +565,7 @@ class que:
         if "error" in r_info:  # FailedExp
             r_str += f"{r_info['error']:<{def_stats['max_error']}}  "
 
-        if "max_val_loss" in def_stats:  # CompExpInfo
+        if "max_val_loss" in def_stats and 'best_val_acc' in r_info:  # CompExpInfo
             r_str += (
                 f"{r_info['best_val_acc']:<{def_stats['max_val_acc']}}  "
                 f"{r_info['best_val_loss']:<{def_stats['max_val_loss']}}  "
@@ -679,18 +684,18 @@ class que:
         if ask:
             print_config(config)
 
-        if ask:
-            proceed = (
-                ask_nicely(
-                    message="Confirm: y/n: ",
-                    requirment=lambda x: x.lower() in ["y", "n"],
-                    error="y or n: ",
-                ).lower()
-                == "y"
-            )
-        else:
-            proceed = True
-
+        # if ask:
+        #     proceed = (
+        #         ask_nicely(
+        #             message="Confirm: y/n: ",
+        #             requirment=lambda x: x.lower() in ["y", "n"],
+        #             error="y or n: ",
+        #         ).lower()
+        #         == "y"
+        #     )
+        # else:
+        #     proceed = True
+        proceed = True
         if proceed:
             config = cast(ExpInfo, config | {"wandb": wandb_dict})
 

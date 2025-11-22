@@ -2,37 +2,36 @@ from typing import  Optional
 import time
 import torch
 from argparse import ArgumentParser
-from quewing import WR_PATH, LOG_PATH, WR_NAME, SESH_NAME
+from pathlib import Path
+import multiprocessing
+import sys
+
+#locals
+from .core import WR_LOG_PATH
 from training import train_loop, _setup_wandb
 from configs import _exp_to_run_info, ExpInfo
 from utils import gpu_manager
-from code.que.server import connect_que
+from .server import connect_que
 
 class worker:
 	def __init__(
 		self,
-		exec_path: str = WR_PATH,
-		log_path: str = LOG_PATH,
-		wr_name: str = WR_NAME,
-		sesh_name: str = SESH_NAME,
-		debug: bool = True,
+		log_path: str | Path = WR_LOG_PATH,
 		verbose: bool = True,
 	):
-		self.exec_path = exec_path
 		self.que = connect_que()
-		self.log_path = log_path
-		self.wr_name = wr_name
-		self.sesh_name = sesh_name
-		self.debug = debug
 		self.verbose = verbose
-
+		self.log_path = log_path
+  
+  
 	def print_v(self, message: str) -> None:
 		if self.verbose:
 			print(message)
 
-	def work(self) -> None:
+	def train(self) ->  Optional[ExpInfo]:
 		try:
 			gpu_manager.wait_for_completion()
+			self.print_v("starting work")
 
 			# get next run
 			self.que.load_state()
@@ -68,9 +67,14 @@ class worker:
 			self.que.save_state()
 			raise e  # still need to crash so daemon can
 
-	# def job(self, info: ExpInfo) -> None:
-		
-
+	def run(self) -> Optional[ExpInfo]:
+		with open(self.log_path, 'w') as log_file:
+			sys.stdout = log_file
+			sys.stderr = log_file
+			return self.train()
+ 
+ 
+ 
 	def idle(
 		self,
 		message: str,
@@ -164,23 +168,11 @@ def get_worker_parser() -> ArgumentParser:
 	
 	return parser
 
-def main():
-	parser = get_worker_parser()
-	args = parser.parse_args()
+
+
+
+if __name__ == '__main__':
 	
-	wr = worker()
-	print("The worker sais: ")
-	wait = args.wait if args else None
-	cycles = args.cycles if args else None
-	
-	if args.setting == 'work':
-		wr.work()
-	elif args.setting == 'idle':
-		wr.idle("Testing", wait, cycles)
-	elif args.setting == 'idle_log':
-		wr.idle_log("Testing", wait, cycles)
-	elif args.setting == 'idle_gpu':
-		z = wr.sim_gpu_usage()
-		print(z.shape)
-	else:
-		print('huh?')
+	p = multiprocessing.Process(target=worker)
+	p.start()
+	p.join()

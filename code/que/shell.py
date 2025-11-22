@@ -1,12 +1,13 @@
-from quewing import tmux_manager, que, QUE_LOCATIONS, SYNONYMS, DN_NAME, WR_NAME, SESH_NAME, WR_PATH, RUN_PATH
-from code.que.server import connect_que
+from .core import que, QUE_LOCATIONS, SYNONYMS, DN_NAME, WR_NAME, SESH_NAME, WR_PATH, RUN_PATH
+from .tmux import tmux_manager
+from .server import connect_que
 import cmd as cmdLib
 import shlex
 from typing import Optional
 import argparse
 import configs
 import time
-
+from pathlib import Path
 
 
 class queShell(cmdLib.Cmd):
@@ -20,7 +21,7 @@ class queShell(cmdLib.Cmd):
 		wr_name: str = WR_NAME,
 		sesh_name: str = SESH_NAME,
 		exec_path: str = WR_PATH,
-		run_path: str = RUN_PATH,
+		run_path: str | Path = RUN_PATH,
 		verbose: bool = True,
 		auto_save: bool = True,
 	) -> None:
@@ -276,11 +277,11 @@ class queShell(cmdLib.Cmd):
 	def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
 		"""Get argument parser for a given command"""
 		parsers = {
-			"create": configs.get_train_parser(
+			"create": lambda: configs.get_train_parser(
 				prog="create",
 				desc="Create a new training run",
 			),
-			"add": configs.get_train_parser(
+			"add": lambda: configs.get_train_parser(
 				prog="add",
 				desc="Add a completed training run to old_runs",
 			),
