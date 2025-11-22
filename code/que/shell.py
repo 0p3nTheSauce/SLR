@@ -1,5 +1,5 @@
 from quewing import tmux_manager, que, QUE_LOCATIONS, SYNONYMS, DN_NAME, WR_NAME, SESH_NAME, WR_PATH, RUN_PATH
-from que_server import connect_que
+from code.que.server import connect_que
 import cmd as cmdLib
 import shlex
 from typing import Optional

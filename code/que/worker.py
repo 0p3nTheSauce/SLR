@@ -6,7 +6,7 @@ from quewing import WR_PATH, LOG_PATH, WR_NAME, SESH_NAME
 from training import train_loop, _setup_wandb
 from configs import _exp_to_run_info, ExpInfo
 from utils import gpu_manager
-from que_server import connect_que
+from code.que.server import connect_que
 
 class worker:
 	def __init__(

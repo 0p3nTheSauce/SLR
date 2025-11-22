@@ -1,11 +1,22 @@
 from typing import  Optional
 import subprocess
 from pathlib import Path
-from quewing import tmux_manager, WR_NAME, SESH_NAME, RUN_PATH, WR_PATH, DN_NAME, LOG_PATH
-from quewing import QueEmpty, QueBusy, ExpInfo
 from argparse import ArgumentParser
 
-from que_server import connect_que
+#locals
+from code.que.core import (
+    WR_NAME,
+    SESH_NAME,
+    RUN_PATH,
+    WR_PATH,
+    DN_NAME,
+    LOG_PATH,
+    QueEmpty,
+    QueBusy,
+    ExpInfo
+)
+
+from code.que.server import connect_que
 
 class daemon:
 	"""Class for the queue daemon process. The function works in a fetch execute repeat
