@@ -1,7 +1,9 @@
 #!/home/luke/miniconda3/envs/wlasl/bin/python
 
 import argparse
-from quewing import daemon, worker, WR_NAME, DN_NAME
+from quewing import WR_NAME, DN_NAME
+from que_daemon import daemon
+from que_worker import worker
 from typing import Literal, TypeAlias, Optional
 Feather: TypeAlias = Literal["worker", "daemon"]
 FEATHERS = [WR_NAME, DN_NAME]
@@ -27,24 +29,14 @@ class queFeather:
 			1: 'sMonitor',
 			2: 'monitorO',
 		}
-		if args is not None and args.recover:
-			#NOTE: the interface will likely become better when recovery is given to que instead of daemon
-			av_set = ['sWatch', 'sMonitor']
-			if	setting not in av_set:
-				raise ValueError(f"Setting: {setting} is not one of available settings: {', '.join(av_set)}")	
-			daem.recover(setting, args.run_id)
 			
-		if setting == cmd_d[0]:
-			daem.start_n_watch()
-		elif setting == cmd_d[1]:
-			daem.start_n_monitor()
-		elif setting == cmd_d[2]:
-			daem.monitor_log()
+		
+		daem.start_n_monitor()
 			
-		else:
-			print('huh?')
-			print(f'You gave me: {setting}')
-			print(f'but i only accept: {cmd_d.values()}')
+		
+		print('huh?')
+		print(f'You gave me: {setting}')
+		print(f'but i only accept: {cmd_d.values()}')
 
 	def run_worker(self, setting: Literal['work', 'idle', 'idle_log', 'idle_gpu'], args : Optional[argparse.Namespace] = None):
 		wr = worker()

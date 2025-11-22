@@ -36,7 +36,6 @@ class daemon:
 		exec_path: str = WR_PATH,
 		log_path : str = LOG_PATH,
 		verbose: bool = True,
-		tm: Optional[tmux_manager] = None,
 		stp_on_fail: bool = False,  # TODO: add this to parser
 	) -> None:
 		self.name = name
@@ -46,12 +45,6 @@ class daemon:
 		self.wr_path = exec_path
 		self.log_path = log_path
 		self.que = connect_que()
-		if tm:
-			self.tmux_man = tm
-		else:
-			self.tmux_man = tmux_manager(
-				wr_name=wr_name, dn_name=name, sesh_name=sesh, exec_path=WR_PATH
-			)
 		self.verbose = verbose
 		self.stp_on_fail = stp_on_fail
 
@@ -72,9 +65,6 @@ class daemon:
 			sep += "\n"
 		return sep.title()
 
-	def start_n_watch(self):
-		"""Start process in this terminal and watch"""
-		raise DeprecationWarning("This function needs to be updated")
 
 	def start_n_monitor(self):
 		"""Start process and use existing tmux monitoring"""
@@ -181,9 +171,8 @@ def main():
 	daem = daemon()
 
 	setting = args.setting
-	if setting == 'sWatch':
-		daem.start_n_watch()
-	elif setting == 'sMonitor':
+
+	if setting == 'sMonitor':
 		daem.start_n_monitor()
 	else:
 		print('huh?')

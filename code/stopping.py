@@ -1,26 +1,7 @@
-from typing import Dict, Any, TypedDict, List, Tuple, Union ,Literal, Optional
+from typing import  List, Tuple, Union , Optional
 from wandb.sdk.wandb_run import Run
+from run_types import StopperOn, StopperState
 
-class StopperOn(TypedDict):
-    """Dictionary of required parameters for the Stopper to be initialised in 'on' state"""
-    metric: Union[Tuple[str, str], List[str]]
-    mode: str
-    patience: int
-    min_delta: float
-
-class StopperState(TypedDict):
-    """Dictionary representing the serializable state of an EarlyStopper instance"""
-    on: bool
-    phase: str
-    metric: str
-    mode: str
-    patience: int
-    min_delta: float
-    curr_epoch: int
-    best_score: Optional[float]
-    best_epoch: int
-    counter: int
-    stop: bool
 
     
 class EarlyStopper:

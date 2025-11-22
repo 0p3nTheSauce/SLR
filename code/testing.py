@@ -23,20 +23,23 @@ import gc
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model
-from configs import set_seed, CompRes
+from configs import set_seed
+
 from video_dataset import VideoDataset, get_data_loader, get_wlasl_info
 from models import avail_models
+
 from configs import (
 	get_avail_splits,
-	load_config,
-	AdminInfo,
-	DataInfo,
-	MinInfo,
 	RUNS_PATH,
+)
+from run_types import (
+    CompRes,
+    DataInfo,
+    MinInfo,
 	BaseRes,
 	ShuffRes,
 	TopKRes,
-)
+    )
 from utils import print_dict
 
 # constants
