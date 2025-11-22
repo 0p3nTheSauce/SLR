@@ -641,7 +641,7 @@ def test_safe_index2():
 
 
 def test_wait_for_completion():
-	from quewing import gpu_manager
+	from utils import gpu_manager
 
 	print(
 		gpu_manager.wait_for_completion(
@@ -1047,7 +1047,7 @@ def reformet3():
 		admin = info['admin']
 		admin['config_path'] = admin['config_path'].replace('/home/luke/Code/SLR/code', '.')
 		info['admin'] = admin
-		old_runs[i] = info
+		old_runs[i] = info #type: ignore
 		
 	all_runs['old_runs'] = old_runs
 

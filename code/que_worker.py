@@ -4,7 +4,7 @@ import torch
 from argparse import ArgumentParser
 from quewing import WR_PATH, LOG_PATH, WR_NAME, SESH_NAME
 from training import train_loop, _setup_wandb
-from configs import _exp_to_run_info
+from configs import _exp_to_run_info, ExpInfo
 from utils import gpu_manager
 from que_server import connect_que
 
@@ -67,6 +67,9 @@ class worker:
 			self.que.stash_failed_run(str(e))
 			self.que.save_state()
 			raise e  # still need to crash so daemon can
+
+	# def job(self, info: ExpInfo) -> None:
+		
 
 	def idle(
 		self,
