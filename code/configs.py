@@ -68,7 +68,7 @@ class SchedBase(TypedDict):
 	warm_up: Optional[WarmUpSched]
 
 class WarmOnly(SchedBase):
-    type: Literal['WarmOnly']
+	type: Literal['WarmOnly']
 
 class CosAnealInfo(SchedBase):
 	type: Literal['CosineAnnealingLR']
@@ -117,6 +117,8 @@ class CompRes(TypedDict):
 	test_shuff: ShuffRes
 
 class RunInfo(TypedDict):
+	"""Base run information needed for training
+	"""
 	admin: AdminInfo
 	training: TrainingInfo
 	optimizer: OptimizerInfo
@@ -126,27 +128,29 @@ class RunInfo(TypedDict):
 	early_stopping: Optional[StopperOn]
 
 class ExpInfo(RunInfo):
+	"""Inherits from RunInfo, adds wandb"""
 	wandb: WandbInfo #NOTE: make wandb optional?
  
 class CompExpInfo(ExpInfo):
-    results: CompRes
+	"""Inherits from ExpInfo, adds results"""
+	results: CompRes
 
 
 
 def _exp_to_run_info(expInfo: ExpInfo) -> RunInfo:
-    """
-    Convert ExpInfo to RunInfo by removing wandb key.
-    """
-    run_info: RunInfo = {
-        'admin': expInfo['admin'],
-        'training': expInfo['training'],
-        'optimizer': expInfo['optimizer'],
-        'model_params': expInfo['model_params'],
-        'data': expInfo['data'],
-        'scheduler': expInfo['scheduler'],
-        'early_stopping': expInfo['early_stopping'],
-    }
-    return run_info
+	"""
+	Convert ExpInfo to RunInfo by removing wandb key.
+	"""
+	run_info: RunInfo = {
+		'admin': expInfo['admin'],
+		'training': expInfo['training'],
+		'optimizer': expInfo['optimizer'],
+		'model_params': expInfo['model_params'],
+		'data': expInfo['data'],
+		'scheduler': expInfo['scheduler'],
+		'early_stopping': expInfo['early_stopping'],
+	}
+	return run_info
 ####################### Utility functions ##############################
 
 def set_seed(seed: int=SEED):
