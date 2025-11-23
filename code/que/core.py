@@ -213,6 +213,23 @@ class que:
         elif abs(idx) >= len(to_get):
             raise QueIdxOOR(loc, idx, len(to_get))
         return to_get[idx]
+    
+    def peak_run(self, loc: QueLocation, idx: int) -> Optional[GenExp]:
+        """Get the run at the given location with the provided index, but don't remove
+
+        Args:
+                                                                        loc (QueLocation): to_run, cur_run or old_runs
+                                                                        idx (int): Index of the run
+
+        Returns:
+                                                                        Optional[ExpInfo]: The specified run, or None if not found
+        """
+        try:
+            return self._peak_run(loc, idx)
+        except (QueEmpty, QueIdxOOR) as e:
+            self.print_v(str(e))
+            return None
+
 
     def _pop_run(self, loc: QueLocation, idx: int) -> GenExp:
         """Pop the run at the given location with the provided index
@@ -594,15 +611,31 @@ class que:
             return []
 
         conf_list = []
-        head = f"  [{'Idx':>3}] {self.run_str(runs_info[0], stats)}"
+        head = f"   {self.run_str(runs_info[0], stats)}"
         conf_list.append(head)
         # conf_list.append("-" * len(head))
-        for i, info in enumerate(runs_info[1:]):
+        for info in runs_info[1:]:
             # Format with padding for alignment
-            r_str = f"  [{i:3d}] {self.run_str(info, stats)}"
+            r_str = f"  {self.run_str(info, stats)}"
             conf_list.append(r_str)
 
         return conf_list
+
+    @classmethod
+    def disp_runs(cls, runs: List[str], loc: QueLocation) -> None:
+        # Nice header
+        loc_display = loc.replace("_", " ").title()
+        print(f"\n=== {loc_display} ===")
+        print()
+        # runs = cls.list_runs(loc)
+        if len(runs) == 0:
+            return
+        max_len = max(len(r) for r in runs)
+        print(runs[0])  # head
+        print("-" * max_len)
+        for run in runs[1:]:
+            print(run)
+        print()
 
     def disp_run(self, loc: QueLocation, idx: int) -> None:
         try:
@@ -629,21 +662,7 @@ class que:
         else:
             self.print_v(f"{loc} already empty")
 
-    @classmethod
-    def disp_runs(cls, runs: List[str], loc: QueLocation) -> None:
-        # Nice header
-        loc_display = loc.replace("_", " ").title()
-        print(f"\n=== {loc_display} ===")
-        print()
-        # runs = cls.list_runs(loc)
-        if len(runs) == 0:
-            return
-        max_len = max(len(r) for r in runs)
-        print(runs[0])  # head
-        print("-" * max_len)
-        for run in runs[1:]:
-            print(run)
-        print()
+   
 
     def _is_dup_exp(self, new_run: RunInfo) -> bool:
         """Check if new_run already exists in to_run or old_runs (ignores run_id and config_path)"""
