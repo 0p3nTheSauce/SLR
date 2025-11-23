@@ -1,16 +1,14 @@
-from typing import  Optional
+from typing import  Optional, Tuple
 import subprocess
 from pathlib import Path
 from argparse import ArgumentParser
 import sys
 import multiprocessing
+from contextlib import contextmanager
 #locals
 from .core import (
-	WR_NAME,
-	SESH_NAME,
 	RUN_PATH,
 	WR_PATH,
-	DN_NAME,
 	DN_LOG_PATH,
 	WR_LOG_PATH,
 	QueEmpty,
@@ -18,8 +16,24 @@ from .core import (
 	ExpInfo
 )
 
-from .server import connect_que
+from .server import connect_manager
 from .worker import worker
+from .core import que
+
+@contextmanager
+def redirect_to_file(filename):
+    """Redirect stdout/stderr to a file"""
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    
+    with open(filename, 'a') as f:
+        sys.stdout = f
+        sys.stderr = f
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 class daemon:
 	"""Class for the queue daemon process. The function works in a fetch execute repeat
@@ -43,27 +57,23 @@ class daemon:
 
 	def __init__(
 		self,
-		name: str = DN_NAME,
-		wr_name: str = WR_NAME,
-		sesh: str = SESH_NAME,
+		que: que, 
 		runs_path: str | Path = RUN_PATH,
 		exec_path: str | Path = WR_PATH,
 		dn_log_path : str | Path = DN_LOG_PATH,
 		wr_log_path : str | Path = WR_LOG_PATH,
+		
 		verbose: bool = True,
-		stp_on_fail: bool = False,  # TODO: add this to parser
+		stp_on_fail: bool = False,  
 	) -> None:
-		self.name = name
-		self.wr_name = wr_name
-		self.sesh = sesh
+		self.que = que
 		self.runs_path = Path(runs_path)
 		self.wr_path = exec_path
 		self.dn_log_path = dn_log_path
 		self.wr_log_path = wr_log_path
-		self.que = connect_que()
 		self.verbose = verbose
 		self.stp_on_fail = stp_on_fail
-		self.worker = worker() #TODO: maybe pass args?
+		self.worker = worker(self.que) 
 
 	def print_v(self, message: str) -> None:
 		"""Prints a message if verbose is True."""
@@ -93,8 +103,7 @@ class daemon:
 			
 			# sys.stdout.flush()
    
-   
-	def run_worker(self):
+	def start(self):
 		while True:
 			# prepare next run (move from to_run -> cur_run)
 			try:
@@ -129,51 +138,55 @@ class daemon:
 					break
 				else:
 					self.print_v("Continuing with next run")
+	 
+	def debug(self):
+		proc = self.run_worker() 
+		try:
+			return_code = proc.wait()
+			if return_code == 0:
+				print("process passed")
+			else:
+				print("process failed")
+		except KeyboardInterrupt:
+			print("Daemon interrupted, terminating worker...")
+			proc.terminate()
+			proc.wait()
+			print("Worker terminated.")
+		# stdout, stderr = proc.communicate()
+		# print("STDOUT:")
+		# print(stdout)
+		# print("STDERR:")
+		# print(stderr)
+  
+	def debug2(self):
+		#maybe having a seperate worker proc is overkill and server should just be the "daemon"
+		#in that way the que is still shared by the 'worker/daemon' and the shell
+		#and then the daemon can just be restated or, the work paused etc.
+		try:
+			with open(self.wr_log_path, 'a') as log_file:
+				sys.stdout = log_file
+				sys.stderr = log_file
+				self.worker.debug2()
+		except KeyboardInterrupt:
+			self.print_v('CLosing worker...')
+		except Exception as e:
+			self.print_v(f"Worker ran into a problem: {e}")
+
+  
+	def run_worker(self) -> subprocess.Popen:
+		"""Starts a worker process and returns it."""
+			
+		process = subprocess.Popen(
+			[sys.executable, '-u', '-m', 'que.worker'],  # -u for unbuffered
+			stdout=open(self.wr_log_path, 'a') ,
+			stderr=subprocess.STDOUT,
+			bufsize=0  # Unbuffered
+		)
+		
+		return process
+		
 	
 	#Subprocess version below - deprecated
-
-	def start_n_monitor(self):
-		"""Start process using subprocess.Popen and use existing tmux monitoring"""
-		while True:
-			# prepare next run (move from to_run -> cur_run)
-			try:
-				self.que.load_state()
-				self.que.stash_next_run()
-				self.que.save_state()
-			except QueEmpty:
-				self.print_v("No more runs to execute")
-				break
-			except QueBusy:
-				self.print_v("Cannot overwrite current run")
-				break
- 
-
-			run = self.que.peak_cur_run()
-			self.print_v(self.seperator(run))
-
-			# Start process in background
-			proc = self.worker_log()
-
-			# Wait for completion
-			return_code = proc.wait()
-
-			if return_code == 0:
-				self.print_v("Process completed successfully")
-				# save finished run (move from cur_run -> old_runs)
-				try:
-					self.que.store_fin_run()
-					self.que.save_state()
-				except QueEmpty:
-					self.print_v("Could not find current run")
-					break
-			else:
-				self.print_v(f"Process failed with return code: {return_code}")
-
-				if self.stp_on_fail:
-					self.print_v("Stopping exectuion")
-					break
-				else:
-					self.print_v("Continuing with next run")
  
 	def worker_here(self, args: Optional[list[str]] = None) -> None:
 		"""Blocking start which prints worker output in daemon terminal"""
@@ -194,28 +207,6 @@ class daemon:
 			cmd, stdout=open(self.wr_log_path, "w"), stderr=subprocess.STDOUT
 		)
 
-	  
-def get_daemon_parser() -> ArgumentParser:
-	parser = ArgumentParser(description="Run the que daemon process")
-	parser.add_argument(
-		"setting",
-		type=str,
-		choices=['sWatch', 'sMonitor'],
-		help="Daemon mode to run in",
-	)
-	parser.add_argument(
-		"--recover",
-		action="store_true",
-		help="Recover from last run in queTemp.json",
-	)
-	parser.add_argument(
-		"--run_id",
-		type=str,
-		default=None,
-		help="WandB run ID to recover (if applicable)",
-	)
-	return parser
-
 def main():
 	# parser = get_daemon_parser()
 	# args = parser.parse_args()
@@ -230,8 +221,9 @@ def main():
 	# 	print('huh?')
 	# 	print(f'You gave me: {setting}')
 	# 	print('but i only accept: ["sWatch", "sMonitor"]')
-	daem = daemon()
-	daem.start_log()
+	server = connect_manager()
+	daem = daemon(server.get_que())
+	daem.debug2()
   
 if __name__ == '__main__':
 	main()
