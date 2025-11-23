@@ -3,25 +3,25 @@ from typing import TypedDict, Literal, Optional, TypeAlias, Union, List, Tuple
 ########################## EArly stopping #############################
 
 class StopperOn(TypedDict):
-    """Dictionary of required parameters for the Stopper to be initialised in 'on' state"""
-    metric: Union[Tuple[str, str], List[str]]
-    mode: str
-    patience: int
-    min_delta: float
+	"""Dictionary of required parameters for the Stopper to be initialised in 'on' state"""
+	metric: Union[Tuple[str, str], List[str]]
+	mode: str
+	patience: int
+	min_delta: float
 
 class StopperState(TypedDict):
-    """Dictionary representing the serializable state of an EarlyStopper instance"""
-    on: bool
-    phase: str
-    metric: str
-    mode: str
-    patience: int
-    min_delta: float
-    curr_epoch: int
-    best_score: Optional[float]
-    best_epoch: int
-    counter: int
-    stop: bool
+	"""Dictionary representing the serializable state of an EarlyStopper instance"""
+	on: bool
+	phase: str
+	metric: str
+	mode: str
+	patience: int
+	min_delta: float
+	curr_epoch: int
+	best_score: Optional[float]
+	best_epoch: int
+	counter: int
+	stop: bool
 
 
 ####################### Typed Dictionaries #############################
@@ -97,7 +97,8 @@ class BaseRes(TypedDict):
 	top_k_average_per_class_acc: TopKRes
 	top_k_per_instance_acc: TopKRes
 	average_loss: float
-	
+
+
 class ShuffRes(BaseRes):
 	perm: List[int]
 	shannon_entropy: float
@@ -109,6 +110,16 @@ class CompRes(TypedDict):
 	test: BaseRes
 	val: BaseRes
 	test_shuff: ShuffRes
+
+class SumRes(TypedDict):
+	"""Sumarised results for quick view"""
+	check_name: str
+	best_val_acc: float
+	best_val_loss: float
+	test: BaseRes
+	val: BaseRes
+	test_shuff: BaseRes
+
 
 #Runs
 
@@ -130,3 +141,16 @@ class ExpInfo(RunInfo):
 class CompExpInfo(ExpInfo):
 	"""Inherits from ExpInfo, adds results"""
 	results: CompRes
+
+ 
+class Sumarised(TypedDict):
+	run_id: Optional[str]
+	model: str
+	exp_no: str
+	dataset: str
+	split: str
+	best_val_acc: Optional[float]
+	best_val_loss: Optional[float]
+	config_path: str
+	error: Optional[str]
+ 

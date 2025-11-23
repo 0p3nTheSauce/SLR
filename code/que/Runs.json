@@ -56,16 +56,14 @@
                 ],
                 "run_id": null
             }
-        }
-    ],
-    "cur_run": [
+        },
         {
             "admin": {
                 "model": "R(2+1)D_18",
                 "dataset": "WLASL",
                 "split": "asl100",
                 "exp_no": "007",
-                "recover": false,
+                "recover": true,
                 "config_path": "./configfiles/asl100/R(2+1)D_18_007.ini",
                 "save_path": "runs/asl100/R(2+1)D_18_exp007/checkpoints"
             },
@@ -117,6 +115,7 @@
             }
         }
     ],
+    "cur_run": [],
     "old_runs": [
         {
             "admin": {
