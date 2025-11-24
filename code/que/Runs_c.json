@@ -1,6 +1,242 @@
 {
-    "to_run": [],
-    "cur_run": [
+    "to_run": [
+        {
+            "admin": {
+                "model": "R3D_18",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "006",
+                "recover": false,
+                "config_path": "./configfiles/asl100/R3D_18_006.ini",
+                "save_path": "runs/asl100/R3D_18_exp006/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "R3D_18",
+                    "exp-006"
+                ],
+                "run_id": null
+            }
+        },
+        {
+            "admin": {
+                "model": "R(2+1)D_18",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "007",
+                "recover": true,
+                "config_path": "./configfiles/asl100/R(2+1)D_18_007.ini",
+                "save_path": "runs/asl100/R(2+1)D_18_exp007/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "R(2+1)D_18",
+                    "exp-007"
+                ],
+                "run_id": null
+            }
+        }
+    ],
+    "cur_run": [],
+    "old_runs": [
+        {
+            "admin": {
+                "model": "MViTv2_S",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "010",
+                "recover": false,
+                "config_path": "./configfiles/asl100/MViTv2_S_010.ini",
+                "save_path": "runs/asl100/MViTv2_S_exp010/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "MViTv2_S",
+                    "exp-010"
+                ],
+                "run_id": "xuvgm50f"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 77.2189349112426,
+                "best_val_loss": 0.9204708667311503,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.741,
+                        "top5": 0.9216666666666667,
+                        "top10": 0.9483333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7325581395348837,
+                        "top5": 0.9147286821705426,
+                        "top10": 0.9457364341085271
+                    },
+                    "average_loss": 1.0663703592208056
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7443333333333334,
+                        "top5": 0.9358333333333334,
+                        "top10": 0.9725
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7396449704142012,
+                        "top5": 0.9319526627218935,
+                        "top10": 0.9704142011834319
+                    },
+                    "average_loss": 0.9204708667311503
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.48133333333333334,
+                        "top5": 0.8266666666666665,
+                        "top10": 0.8875
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.4689922480620155,
+                        "top5": 0.8178294573643411,
+                        "top10": 0.8798449612403101
+                    },
+                    "average_loss": 2.2392005321480397,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
+            }
+        },
         {
             "admin": {
                 "model": "MViTv2_S",
@@ -60,10 +296,71 @@
                     "exp-009"
                 ],
                 "run_id": "n76kbz8u"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 76.92307692307692,
+                "best_val_loss": 0.972953895469461,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7130000000000001,
+                        "top5": 0.9083333333333333,
+                        "top10": 0.9416666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7131782945736435,
+                        "top5": 0.9031007751937985,
+                        "top10": 0.937984496124031
+                    },
+                    "average_loss": 1.2293358092513156
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.77,
+                        "top5": 0.9283333333333332,
+                        "top10": 0.9525
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7692307692307693,
+                        "top5": 0.9260355029585798,
+                        "top10": 0.9526627218934911
+                    },
+                    "average_loss": 0.972953895469461
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5246666666666666,
+                        "top5": 0.7958333333333334,
+                        "top10": 0.89
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5155038759689923,
+                        "top5": 0.7868217054263565,
+                        "top10": 0.8837209302325582
+                    },
+                    "average_loss": 2.255135668377354,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
             }
-        }
-    ],
-    "old_runs": [
+        },
         {
             "admin": {
                 "model": "MViTv2_S",

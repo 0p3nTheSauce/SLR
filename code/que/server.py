@@ -44,7 +44,7 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueueManagerProtocol":
         
 def main():
     
-    state = {'que_instance': que()}
+    state = {'que_instance': que(logger)}
 
     def get_que():
         return state['que_instance']
@@ -55,10 +55,10 @@ def main():
         
         if preserve_state:
             old_que.save_state()
-            state['que_instance'] = que() #automatically loads saved state
+            state['que_instance'] = que(logger) #automatically loads saved state
             logger.info("Reloaded successfully (state preserved)")
         else:
-            state['que_instance'] = que()
+            state['que_instance'] = que(logger)
             logger.info("Reloaded successfully (fresh instance)")
     
     QueueManager.register('get_que', callable=get_que)
