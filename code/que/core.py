@@ -16,6 +16,7 @@ from typing import (
 from pathlib import Path
 import json
 from logging import Logger
+import logging
 #locals
 from run_types import (
 	ExpInfo, CompExpInfo,
@@ -23,6 +24,7 @@ from run_types import (
 )
 from testing import full_test, load_comp_res
 from configs import print_config, load_config
+from contextlib import contextmanager
 
 # constants
 # MR_NAME = "monitor"
@@ -70,33 +72,77 @@ class AllRuns(TypedDict):
 #     def load_config(self, admin: AdminInfo) -> RunInfo: ...
 #     def print_config(self, config: Dict) -> None: ...
 #     def get_avail_splits(self) -> List[str]: ...
-	
 class QueException(Exception):
     """Base exception for Que-related errors"""
     pass
 
+class QueDupExp(QueException):
+    """Duplicate run detected"""
+    def __init__(self, message: str = "Duplicate run detected"):
+        self.message = message
+        super().__init__(self.message)
+    
+    def __str__(self):
+        return self.message
+    
+    def __reduce__(self):
+        return (self.__class__, (self.message,))
+
 class QueEmpty(QueException):
     """Raised when no runs are available in the queue"""
-    def __init__(self, loc: QueLocation, message: str = "No runs available"):
-        super().__init__(f"{message} in {loc}")
-        self.loc = loc  # Store for potential programmatic access
+    def __init__(self, loc: QueLocation):
+        self.loc = loc
+        self.message = f"{loc} is empty"
+        super().__init__(self.message)
+    
+    def __str__(self):
+        return self.message
+    
+    def __reduce__(self):
+        return (self.__class__, (self.loc,))
 
 class QueIdxOOR(QueException):
     """Raised when index is out of range for a given location"""
-    
     def __init__(self, loc: QueLocation, idx: int, leng: int):
-        super().__init__(
-            f"Index {idx} is out of range for que location {loc} (length: {leng})"
-        )
         self.loc = loc
         self.idx = idx
         self.length = leng
+        self.message = f"Index {idx} is out of range for que location {loc} (length: {leng})"
+        super().__init__(self.message)
+    
+    def __str__(self):
+        return self.message
+    
+    def __reduce__(self):
+        return (self.__class__, (self.loc, self.idx, self.length))
+
+class QueIdxOORR(QueException):
+    """Raised when a range of values is out of range for a given location"""
+    def __init__(self, loc: QueLocation, oi_idx: int, of_idx: int, leng: int):
+        self.loc = loc
+        self.oi_idx = oi_idx
+        self.of_idx = of_idx
+        self.length = leng
+        self.message = f"Range: {oi_idx} - {of_idx} is an invalid range. Length of {loc} is: {leng}"
+        super().__init__(self.message)
+    
+    def __str__(self):
+        return self.message
+    
+    def __reduce__(self):
+        return (self.__class__, (self.loc, self.oi_idx, self.of_idx, self.length))
 
 class QueBusy(QueException):
     """Raised when attempting to add a run when one already exists"""
-    
     def __init__(self, message: str = "Run already exists in cur_run"):
-        super().__init__(message)
+        self.message = message
+        super().__init__(self.message)
+    
+    def __str__(self):
+        return self.message
+    
+    def __reduce__(self):
+        return (self.__class__, (self.message,))
 
 def retrieve_Data(path: Path) -> Any:
 	"""Retrieves data from a given path."""
@@ -126,8 +172,9 @@ class que:
 		self.to_run: List[ExpInfo] = []
 		self.fail_runs: List[FailedExp] = []
 		self.auto_save: bool = auto_save
-		self.load_state()
 		self.logger = logger
+		self.load_state()
+		
 
 	def _fetch_state(self, loc: QueLocation) -> ExpQue:
 		"""Return reference to the specified list"""
@@ -536,28 +583,38 @@ class que:
 		
 
 	#for QueShell interface
-
-
-	
+ 
+	@contextmanager
+	def log_and_raise(self, task: str = 'Operation'):
+		"""
+		Context manager that logs success or logs error and re-raises exception
+		
+		Args:
+			success_msg: Message to log on success
+			error_msg: Message to log on error (before re-raising)
+		"""
+		try:
+			yield
+			self.logger.info(f'{task} completed successfully')
+		except Exception as e:
+			self.logger.error(f"{task} failed: {e}")
+			raise e
 
 	def recover_run(self, move_to: QueLocation = TO_RUN) -> None:
 		"""Set the run in cur_run to recover, and move to to_run or cur_run"""
-		run = self.pop_cur_run()
-		run["admin"]["recover"] = True
-		self._set_run(move_to, 0, run)
-		self.logger.info('Recovered run')
+		with self.log_and_raise('recover'):
+			run = self.pop_cur_run()
+			run["admin"]["recover"] = True
+			self._set_run(move_to, 0, run)
 
 	def clear_runs(self, loc: QueLocation) -> None:
 		"""reset the runs queue"""
 		to_clear = self._fetch_state(loc)
-
-		if len(to_clear) > 0:
-			to_clear = []
-			self.logger.info(f"{loc} successfully cleared")
-		else:
-			self.logger.warning(f"{loc} already empty")
-
-	
+		with self.log_and_raise(f'clear {loc}'):
+			if len(to_clear) > 0:
+				to_clear.clear()
+			else:
+				raise QueEmpty(loc)
 
 	def create_run(
 		self,
@@ -571,22 +628,15 @@ class que:
 						wandb_dict (WandbInfo): Wandb information not included in arg_dict.
 						ask (bool, optional): Pre-check run before creation. Defaults to True.
 		"""
-
-		try:
+		with self.log_and_raise('create'):		
 			config = load_config(arg_dict)
-		except ValueError:
-			self.logger.warning(f"{arg_dict['config_path']} not found. Create cancelled")
-			return
 
-		if self._is_dup_exp(config):
-			self.logger.warning("Duplicate run detected. Create cancelled")
-			return
+			if self._is_dup_exp(config):
+				raise QueDupExp
 
-		# print_config(config)
-		config = cast(ExpInfo, config | {"wandb": wandb_dict})
-		self.to_run.append(config)
-		self.logger.info("Added new run")
-	
+			# print_config(config)
+			config = cast(ExpInfo, config | {"wandb": wandb_dict})
+			self.to_run.append(config)
 
 	def add_run(self, arg_dict: AdminInfo, wandb_dict: WandbInfo) -> None:
 		"""Add a completed (and full tested) run to the old_runs que for storage
@@ -595,41 +645,37 @@ class que:
 						arg_dict (AdminInfo): Basic information to load the config and find the results
 						wandb_dict (WandbInfo): Wandb information not included in the run config
 		"""
-		try:
+		with self.log_and_raise('add'):
 			config =  load_config(arg_dict)
-		except ValueError:
-			self.logger.warning(f"{arg_dict['config_path']} not found. Create cancelled")
-			return
 
-		if self._is_dup_exp(config):
-			self.logger.warning("Duplicate run detected. Create cancelled")
-			return
+			if self._is_dup_exp(config):
+				raise QueDupExp
 
-		save_path = Path(arg_dict["save_path"])
-		res_dir = save_path.parent / "results"
-		res_path = res_dir / "best_val_loss.json"
-		try:
-			results = load_comp_res(res_path)  
-			self.logger.info('Successfully loaded results')
-		except FileNotFoundError:
-			results = full_test(
-				admin=config['admin'],
-				data=config['data'],
-			)#NOTE: this will print to the terminal
-			self.logger.info('Could not find results, running full test')
-		comp_run = CompExpInfo(
-			admin=config["admin"],
-			training=config["training"],
-			optimizer=config["optimizer"],
-			model_params=config["model_params"],
-			data=config["data"],
-			scheduler=config["scheduler"],
-			early_stopping=config["early_stopping"],
-			wandb=wandb_dict,
-			results=results,
-		)
-		self.old_runs.insert(0, comp_run)
-		self.logger.info("New complete run added")
+			save_path = Path(arg_dict["save_path"])
+			res_dir = save_path.parent / "results"
+			res_path = res_dir / "best_val_loss.json"
+			try:
+				results = load_comp_res(res_path)  
+				self.logger.info('Successfully loaded results')
+			except FileNotFoundError:
+				results = full_test(
+					admin=config['admin'],
+					data=config['data'],
+				)#NOTE: this will print to the terminal
+				self.logger.info('Could not find results, running full test')
+			comp_run = CompExpInfo(
+				admin=config["admin"],
+				training=config["training"],
+				optimizer=config["optimizer"],
+				model_params=config["model_params"],
+				data=config["data"],
+				scheduler=config["scheduler"],
+				early_stopping=config["early_stopping"],
+				wandb=wandb_dict,
+				results=results,
+			)
+			self.old_runs.insert(0, comp_run)
+
 
 	def remove_run(self, loc: QueLocation, idx: int) -> None:
 		"""Removes a run from the given location safely
@@ -638,8 +684,9 @@ class que:
 			loc (QueLocation): to_run, cur_run or old_runs
 			idx (int): Index of run
 		"""
-		_ = self._pop_run(loc, idx)
-		self.logger.info('Successfully removed run')
+		with self.log_and_raise('remove'):
+			_ = self._pop_run(loc, idx)
+
 
 	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
 		"""Repositions a run from the que
@@ -648,10 +695,9 @@ class que:
 																		o_idx: original index of run
 																		n_idx: new index of run
 		"""
-		try:
+		with self.log_and_raise('shuffle'):
 			self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
-		except Exception as e:
-			self.print_v(str(e))
+
 
 	def move(
 		self,
@@ -668,35 +714,27 @@ class que:
 																		oi_idx (int): Old initial index
 																		of_idx (int): Old final index, if specifying a range.
 		"""
-		if of_idx is None:
-			try:
+		with self.log_and_raise('move'):
+			if of_idx is None:
 				self._set_run(n_loc, 0, self._pop_run(o_loc, oi_idx))
-				self.print_v("Move successful")
-			except Exception as e:
-				self.print_v(str(e))
-		else:
-			# Range move
-			old_location = self.fetch_state(o_loc)
-			new_location = self.fetch_state(n_loc)
+			else:
+				# Range move
+				old_location = self._fetch_state(o_loc)
+				new_location = self._fetch_state(n_loc)
 
-			# Validate range
-			if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
-				self.print_v(
-					f"Range: {oi_idx} - {of_idx} is an invalid range. "
-					f"Length of {o_loc} is: {len(old_location)}"
-				)
-				return
+				# Validate range
+				if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
+					raise QueIdxOORR(o_loc, oi_idx, of_idx, len(old_location))
 
-			# Extract the runs to move
-			tomv = []
-			for _ in range(oi_idx, of_idx + 1):
-				tomv.append(old_location.pop(oi_idx))
+				# Extract the runs to move
+				tomv = []
+				for _ in range(oi_idx, of_idx + 1):
+					tomv.append(old_location.pop(oi_idx))
 
-			# Insert into new location (in reverse to maintain order when inserting at 0)
-			for run in tomv:
-				new_location.insert(0, run)
+				# Insert into new location (in reverse to maintain order when inserting at 0)
+				for run in tomv:
+					new_location.insert(0, run)
 
-			self.print_v("multi-move successful")
 
 	def edit_run(
 		self,
@@ -706,17 +744,14 @@ class que:
 		value: Any,
 		key2: Optional[str] = None,
 	) -> None:
-		try:
+		with self.log_and_raise('edit'):
 			run = self._pop_run(loc, idx)
 			if key2 is not None:
 				run[key1][key2] = value
 			else:
 				run[key1] = value
 			self._set_run(loc, idx, run)
-			self.print_v("Edit successful")
-		except Exception as e:
-			self.print_v(str(e))
-   
+
 	def find_runs(
 		self,
 		loc: QueLocation,
@@ -745,5 +780,13 @@ class que:
 
 
 if __name__ == "__main__":
-	q = que()
+	logging.basicConfig(
+		level=logging.INFO,
+		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+		filename=SR_LOG_PATH  # Optional: log to file
+	)
+
+	logger = logging.getLogger(__name__)
+	
+	q = que(logger)
 	q.disp_runs(OLD_RUNS)

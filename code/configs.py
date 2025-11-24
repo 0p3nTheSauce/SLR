@@ -267,7 +267,8 @@ def load_config(admin: AdminInfo) -> RunInfo:
 	
 	conf_path = Path(admin["config_path"])
 	if not conf_path.exists():
-		raise ValueError(f"{conf_path} not found")
+		# raise ValueError(f"{conf_path} not found")
+		raise FileNotFoundError(f"{conf_path} not found")
 
 	config = parse_ini_config(admin["config_path"])
 	config = _add_eq_bs(config)
