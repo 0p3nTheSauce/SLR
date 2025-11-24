@@ -15,7 +15,7 @@ from typing import (
 )
 from pathlib import Path
 import json
-
+from logging import Logger
 #locals
 from run_types import (
 	ExpInfo, CompExpInfo,
@@ -23,22 +23,15 @@ from run_types import (
 )
 from testing import full_test, load_comp_res
 from configs import print_config, load_config
-# import ..utils
-from utils import  ask_nicely
+
 # constants
-SESH_NAME = "que_training"
-DN_NAME = "daemon"
-WR_NAME = "worker"
-SR_NAME = "server"
 # MR_NAME = "monitor"
 QUE_DIR = Path(__file__).parent
 
 RUN_PATH = QUE_DIR / "Runs.json"
 WR_LOG_PATH = QUE_DIR / "Worker.log"
-DN_LOG_PATH = QUE_DIR / "Daemon.log"
 SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = QUE_DIR / "worker.py"
-DN_PATH = QUE_DIR / "daemon.py"
 
 TO_RUN = "to_run"  # havent run yet
 CUR_RUN = "cur_run"  # busy running
@@ -78,35 +71,32 @@ class AllRuns(TypedDict):
 #     def print_config(self, config: Dict) -> None: ...
 #     def get_avail_splits(self) -> List[str]: ...
 	
-class QueEmpty(Exception):
-	"""No runs available"""
+class QueException(Exception):
+    """Base exception for Que-related errors"""
+    pass
 
-	def __init__(self, loc: QueLocation, message: str = "No runs available"):
-		super().__init__(f"{message} in {loc}")
+class QueEmpty(QueException):
+    """Raised when no runs are available in the queue"""
+    def __init__(self, loc: QueLocation, message: str = "No runs available"):
+        super().__init__(f"{message} in {loc}")
+        self.loc = loc  # Store for potential programmatic access
 
-class QueIdxOOR(IndexError):
-	"""Index is out of range for a given location"""
+class QueIdxOOR(QueException):
+    """Raised when index is out of range for a given location"""
+    
+    def __init__(self, loc: QueLocation, idx: int, leng: int):
+        super().__init__(
+            f"Index {idx} is out of range for que location {loc} (length: {leng})"
+        )
+        self.loc = loc
+        self.idx = idx
+        self.length = leng
 
-	def __init__(self, loc: QueLocation, idx: int, leng: int):
-		"""Create an index error for the specified location
-
-		Args:
-																		loc (QueLocation): location key
-																		idx (int): out of bounds index
-																		leng (int): length of location
-		"""
-		super().__init__(
-			f"Index {idx} is out of range for the que location: {loc} with length: {leng}"
-		)
-
-class QueBusy(Exception):
-	"""There is already a run (likely for cur_run)"""
-
-	def __init__(
-		self,
-		message: str = "There is already a run in cur_run, and there should only be one",
-	):
-		super().__init__(message)
+class QueBusy(QueException):
+    """Raised when attempting to add a run when one already exists"""
+    
+    def __init__(self, message: str = "Run already exists in cur_run"):
+        super().__init__(message)
 
 def retrieve_Data(path: Path) -> Any:
 	"""Retrieves data from a given path."""
@@ -125,27 +115,21 @@ def store_Data(path: Path, data: Any):
 class que:
 	def __init__(
 		self,
-		# conf_loader: ConfigLoader,
+		logger: Logger,
 		runs_path: str | Path = RUN_PATH,
-		verbose: bool = True,
 		auto_save: bool = False,
 		
 	) -> None:
 		self.runs_path: Path = Path(runs_path)
-		self.verbose: bool = verbose
 		self.old_runs: List[CompExpInfo] = []
 		self.cur_run: List[ExpInfo] = []
 		self.to_run: List[ExpInfo] = []
 		self.fail_runs: List[FailedExp] = []
 		self.auto_save: bool = auto_save
 		self.load_state()
+		self.logger = logger
 
-	def print_v(self, message: str) -> None:
-		"""Prints a message if verbose is True."""
-		if self.verbose:
-			print(message)
-
-	def fetch_state(self, loc: QueLocation) -> ExpQue:
+	def _fetch_state(self, loc: QueLocation) -> ExpQue:
 		"""Return reference to the specified list"""
 		if loc == TO_RUN:
 			return self.to_run
@@ -156,97 +140,22 @@ class que:
 		else:
 			return self.old_runs
 
-	def _load_Que(self):
-		"""Read que from file"""
-		try:
-			with open(self.runs_path, "r") as f:
-				data = json.load(f)
-			self.to_run = data.get(TO_RUN, [])
-			self.cur_run = data.get(CUR_RUN, [])
-			self.old_runs = data.get(OLD_RUNS, [])
-			self.fail_runs = data.get(FAIL_RUNS, [])
-			self.print_v(f"Loaded que state from {self.runs_path}")
-		except FileNotFoundError:
-			self.print_v(
-				f"No existing state found at {self.runs_path}. Starting fresh."
-			)
-			self.to_run = []
-			self.cur_run = []
-			self.old_runs = []
-			self.fail_runs = []
-
-	def _save_Que(self):
-		"""Write que to file"""
-		with open(self.runs_path, "w") as f:
-			all_runs = {
-				TO_RUN: self.to_run,
-				CUR_RUN: self.cur_run,
-				OLD_RUNS: self.old_runs,
-				FAIL_RUNS: self.fail_runs,
-			}
-			json.dump(all_runs, f, indent=4)
-
-	def _is_failed_exp(self, run: RunInfo) -> TypeGuard[FailedExp]:
-		"""Check if run is a FailedExp"""
-		return isinstance(run, dict) and "error" in run
-
-	def _is_comp_exp_info(self, run: GenExp) -> TypeGuard[CompExpInfo]:
-		"""Check if run is a CompExpInfo"""
-		return isinstance(run, dict) and "results" in run
-
-	def _peak_run(self, loc: QueLocation, idx: int) -> GenExp:
-		"""Get the run at the given location with the provided index, but don't remove
-
-		Args:
-																		loc (QueLocation): to_run, cur_run or old_runs
-																		idx (int): Index of the run
-
-		Raises:
-																		QueEmpty: len(loc) == 0
-																		QueIdxOOR: abs(idx) >= len(loc)
-
-		Returns:
-																		ExpInfo: The specified run
-		"""
-		to_get = self.fetch_state(loc)
-		if len(to_get) == 0:
-			raise QueEmpty(loc)
-		elif abs(idx) >= len(to_get):
-			raise QueIdxOOR(loc, idx, len(to_get))
-		return to_get[idx]
-	
-	def peak_run(self, loc: QueLocation, idx: int) -> Optional[GenExp]:
-		"""Get the run at the given location with the provided index, but don't remove
-
-		Args:
-																		loc (QueLocation): to_run, cur_run or old_runs
-																		idx (int): Index of the run
-
-		Returns:
-																		Optional[ExpInfo]: The specified run, or None if not found
-		"""
-		try:
-			return self._peak_run(loc, idx)
-		except (QueEmpty, QueIdxOOR) as e:
-			self.print_v(str(e))
-			return None
-
 
 	def _pop_run(self, loc: QueLocation, idx: int) -> GenExp:
 		"""Pop the run at the given location with the provided index
 
 		Args:
-																		loc (QueLocation): to_run, cur_run or old_runs
-																		idx (int): Index of the run
+			loc (QueLocation): to_run, cur_run or old_runs
+			idx (int): Index of the run
 
 		Raises:
-																		QueEmpty: len(loc) == 0
-																		QueIdxOOR: abs(idx) >= len(loc)
+			QueEmpty: len(loc) == 0
+			QueIdxOOR: abs(idx) >= len(loc)
 
 		Returns:
-																		ExpInfo: The specified run
+			ExpInfo: The specified run
 		"""
-		to_get = self.fetch_state(loc)
+		to_get = self._fetch_state(loc)
 		if len(to_get) == 0:
 			raise QueEmpty(loc)
 		elif abs(idx) >= len(to_get):
@@ -257,15 +166,15 @@ class que:
 		"""Set a run at a specified location and index
 
 		Args:
-						loc (QueLocation): to_run, cur_run or old_runs
-						idx (int): New index, must be within [-len(loc), len(loc)]
-						run (ExpInfo): Experiment info to add to loc
+			loc (QueLocation): to_run, cur_run or old_runs
+			idx (int): New index, must be within [-len(loc), len(loc)]
+			run (ExpInfo): Experiment info to add to loc
 
 		Raises:
-						QueIdxOOR: The provided index is out of range: [-len(loc), len(loc)]
-						TypeError: The run type doesn't match the queue location
+			QueIdxOOR: The provided index is out of range: [-len(loc), len(loc)]
+			TypeError: The run type doesn't match the queue location
 		"""
-		to_set = self.fetch_state(loc)
+		to_set = self._fetch_state(loc)
 		if len(to_set) < abs(idx):
 			raise QueIdxOOR(loc, idx, len(to_set))
 
@@ -278,10 +187,108 @@ class que:
 			if not self._is_comp_exp_info(run):
 				raise TypeError("old_runs requires CompExpInfo with 'results' field")
 			self.old_runs.insert(idx, run)
+		elif loc == CUR_RUN:
+			if len(self.cur_run) != 0:
+				raise QueBusy
 		elif loc == TO_RUN:
 			self.to_run.insert(idx, run)
 		else:  # CUR_RUN
 			self.cur_run.insert(idx, run)
+
+
+	def _is_failed_exp(self, run: RunInfo) -> TypeGuard[FailedExp]:
+		"""Check if run is a FailedExp"""
+		return isinstance(run, dict) and "error" in run
+
+	def _is_comp_exp_info(self, run: GenExp) -> TypeGuard[CompExpInfo]:
+		"""Check if run is a CompExpInfo"""
+		return isinstance(run, dict) and "results" in run
+
+	def _run_sum(self, run: RunInfo) -> Sumarised:
+		"""Extract key details from a run configuration.
+
+		Args:
+						run: Dictionary containing run configuration with admin details
+						exc: Optional list of keys to exclude from the summary
+		Returns:
+						Sumarised: Dictionary with model, exp_no, split, and config_path
+		"""
+		return Sumarised(
+			model=run["admin"]["model"],
+			exp_no=run["admin"]["exp_no"],
+			dataset=run["admin"]["dataset"],
+			split=run["admin"]["split"],
+			config_path=run["admin"]["config_path"],
+			run_id=run.get("wandb", {}).get("run_id") if "wandb" in run else None,
+			best_val_acc=(
+				run["results"]["best_val_acc"]
+				if "results" in run
+				else None
+			),
+			best_val_loss=(
+				run["results"]["best_val_loss"]
+				if "results" in run
+				else None
+			),
+			error=run.get("error") if self._is_failed_exp(run) else None,
+		)
+		
+	def _run_to_str(self, run_sum: Sumarised) -> str:
+		"""Convert a summarised run to a string for display
+
+		Args:
+						run_sum (Sumarised): Summarised run information
+
+		Returns:
+						str: Formatted string
+		"""
+		return (
+			f"Model: {run_sum['model']}, Exp No: {run_sum['exp_no']}, "
+			f"Dataset: {run_sum['dataset']}, Split: {run_sum['split']}, "
+			f"Config Path: {run_sum['config_path']}"
+		)
+  
+	def _is_dup_exp(self, new_run: RunInfo) -> bool:
+		"""Check if run is a duplicate experiment"""
+		
+		new_sum = self._run_sum(new_run)
+
+		for run in self.to_run + self.old_runs + self.cur_run:
+			run_sum = self._run_sum(run)
+			if new_sum["model"] == run_sum["model"] and \
+				new_sum["exp_no"] == run_sum["exp_no"] and \
+				new_sum["dataset"] == run_sum["dataset"] and \
+				new_sum["split"] == run_sum["split"]:
+				return True
+		return False
+
+	def _get_print_stats(self, runs: List[Sumarised]) -> Dict[str, int]:
+		"""Get statistics for string formatting"""
+		stats = {
+			"max_model_len": 0,
+			"max_exp_no_len": 0,
+			"max_run_id_len": 0,
+			"max_dataset_len": 0,
+			"max_split_len": 0,
+			"max_config_path_len": 0,
+		}
+  
+		for run in runs:
+			stats["max_model_len"] = max(stats["max_model_len"], len(run["model"]))
+			stats["max_exp_no_len"] = max(stats["max_exp_no_len"], len(run["exp_no"]))
+			if run["run_id"] is not None:
+				stats["max_run_id_len"] = max(stats["max_run_id_len"], len(run["run_id"]))
+			stats["max_dataset_len"] = max(stats["max_dataset_len"], len(run["dataset"]))
+			stats["max_split_len"] = max(stats["max_split_len"], len(run["split"]))
+			stats["max_config_path_len"] = max(
+				stats["max_config_path_len"], len(run["config_path"])
+			)
+		
+		if runs[0]["best_val_acc"] is not None:
+			stats["max_best_val_acc_len"] = len("Best Val Acc")
+			stats["max_best_val_loss_len"] = len("Best Val Loss")
+   
+		return stats
 
 	def _get_val(self, run: GenExp, keys: List[str]) -> Any:
 		"""Unpack the value in a run using a list of keys
@@ -319,87 +326,100 @@ class que:
 				runs.append(run)
 		return idxs, runs
 
-	def find_runs(
-		self,
-		loc: QueLocation,
-		key_set: List[List[str]],
-		criterions: List[Callable[[Any], bool]],
-	) -> Tuple[List[int], List[GenExp]]:
-		"""Find the set of runs which match all of the key list value pairs
-
-		Args:
-						loc (QueLocation): Location to search
-						key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
-						values (List[Any]): The corresponding values for each set of keys
-
-		Returns:
-						Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
-		"""
-
-		assert len(key_set) == len(criterions), (
-			f"Length of key_set: {len(key_set)} does not match length of values: {len(criterions)}"
-		)
-		runs = [run for run in self.fetch_state(loc)]
-		idxs = []
-		for k_lst, crit in zip(key_set, criterions):
-			idxs, runs = self._find_runs(runs, k_lst, crit)
-		return idxs, runs
+	def load_state(self):
+		"""Read que from file"""
+		try:
+			with open(self.runs_path, "r") as f:
+				data = json.load(f)
+			self.to_run = data.get(TO_RUN, [])
+			self.cur_run = data.get(CUR_RUN, [])
+			self.old_runs = data.get(OLD_RUNS, [])
+			self.fail_runs = data.get(FAIL_RUNS, [])
+			self.logger.info(f"Loaded que state from {self.runs_path}")
+		except FileNotFoundError:
+			self.logger.warning(
+				f"No existing state found at {self.runs_path}. Starting fresh."
+			)
+			self.to_run = []
+			self.cur_run = []
+			self.old_runs = []
+			self.fail_runs = []
 
 	def save_state(self):
-		"""Saves state to Runs.jso, with filelock"""
-		# with self.lock:
-		self._save_Que()
+		"""Write que to file"""
+		with open(self.runs_path, "w") as f:
+			all_runs = {
+				TO_RUN: self.to_run,
+				CUR_RUN: self.cur_run,
+				OLD_RUNS: self.old_runs,
+				FAIL_RUNS: self.fail_runs,
+			}
+			json.dump(all_runs, f, indent=4)
+		self.logger.info(f'Saved que to {self.runs_path}')
 
-	def load_state(self) -> None:
-		"""Loads state from Runs.json, with filelock"""
-		# with self.lock:
-		self._load_Que()
-
-	def peak_cur_run(self) -> ExpInfo:
-		"""Get the run stored in cur_run (assumes 1, dont pop)"""
-		return self._peak_run(CUR_RUN, 0)
+	# for worker
 
 	def pop_cur_run(self) -> ExpInfo:
-		"""Pop the run stored in cur_run (assumes 1)"""
+		"""Pops the current run
+
+		Returns:
+			ExpInfo: Dictionary of experiment info
+		"""
 		return self._pop_run(CUR_RUN, 0)
 
 	def set_cur_run(self, run: ExpInfo) -> None:
-		"""Set the run in cur_run (assumes 1)"""
-		# full cur_run
-		if (
-			len(self.cur_run) != 0
-		):  # NOTE at some point it might be possible to have multiple busy operations
-			self.print_v("Failed to set cur run")
-			raise QueBusy()
+		"""Sets the current run
 
+		Args:
+			run (ExpInfo): Dictionary of experiment info
+		"""
 		self._set_run(CUR_RUN, 0, run)
 
-	def stash_next_run(self) -> None:
-		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
+	def peak_run(self, loc: QueLocation, idx: int) -> GenExp:
+		"""Get the run at the given location with the provided index, but don't remove
+
+		Args:
+			loc (QueLocation): to_run, cur_run or old_runs
+			idx (int): Index of the run
 
 		Raises:
-						QueEmpty: If to_run is empty
-						QueBusy: If cur_run is full
-						Timeout: If cannot acquire file lock
+			QueEmpty: len(loc) == 0
+			QueIdxOOR: abs(idx) >= len(loc)
+
+		Returns:
+			ExpInfo: The specified run
+		"""
+		to_get = self._fetch_state(loc)
+		if len(to_get) == 0:
+			raise QueEmpty(loc)
+		elif abs(idx) >= len(to_get):
+			raise QueIdxOOR(loc, idx, len(to_get))
+		return to_get[idx]
+	
+
+	def stash_next_run(self) -> str:
+		"""Moves next run from to_run to cur_run. Saves state with lock over both read and write
 		"""
 		next_run = self._pop_run(TO_RUN, 0)
+		sum_str = self._run_to_str(self._run_sum(next_run))
 		try:
 			self.set_cur_run(next_run)
+			self.logger.info(f'Stashed new run: {sum_str}')
 		except QueBusy as qb:
 			# put back
+			self.logger.error(f'Failed to stash new run: {sum_str}')
 			self._set_run(TO_RUN, 0, next_run)
 			raise qb
-		self.print_v("Stashed next run")
+		return sum_str
 
 	def store_fin_run(self):
 		"""Moves finished run from cur_run to old_runs. Saves state with lock over both read and write
 
 		Raises:
-						QueEmpty: If cur_run is empty
-						Timeout: If cannot acquire file lock
+			QueEmpty: If cur_run is empty
 		"""
-
-		fin_run = self.pop_cur_run()
+		# fin_run = self._pop_run(CUR_RUN, 0)
+		fin_run = self.peak_run(CUR_RUN, 0) #safer incase crash during test
 		results = full_test(admin=fin_run["admin"], data=fin_run["data"])
 		comp_run = CompExpInfo(
 			admin=fin_run["admin"],
@@ -413,7 +433,8 @@ class que:
 			results=results,
 		)
 		self._set_run(OLD_RUNS, 0, comp_run)
-		self.print_v("Stored finished run")
+		_ = self._pop_run(CUR_RUN, 0) #still remove from cur
+		self.logger.info("Stored finished run")
 
 	def stash_failed_run(self, error: str) -> None:
 		"""Move a run to the failed que"""
@@ -428,50 +449,9 @@ class que:
 		admin = next_run["admin"]
 		return admin["config_path"]
 
-	def run_sum(self, run: RunInfo) -> Sumarised:
-		"""Extract key details from a run configuration.
-
-		Args:
-						run: Dictionary containing run configuration with admin details
-						exc: Optional list of keys to exclude from the summary
-		Returns:
-						Sumarised: Dictionary with model, exp_no, split, and config_path
-		"""
-		return Sumarised(
-			model=run["admin"]["model"],
-			exp_no=run["admin"]["exp_no"],
-			dataset=run["admin"]["dataset"],
-			split=run["admin"]["split"],
-			config_path=run["admin"]["config_path"],
-			run_id=run.get("wandb", {}).get("run_id") if "wandb" in run else None,
-			best_val_acc=(
-				run["results"]["best_val_acc"]
-				if "results" in run
-				else None
-			),
-			best_val_loss=(
-				run["results"]["best_val_loss"]
-				if "results" in run
-				else None
-			),
-			error=run.get("error") if self._is_failed_exp(run) else None,
-		)
-		
-	def run_str(self, run_sum: Sumarised) -> str:
-		"""Convert a summarised run to a string for display
-
-		Args:
-						run_sum (Sumarised): Summarised run information
-
-		Returns:
-						str: Formatted string
-		"""
-		return (
-			f"Model: {run_sum['model']}, Exp No: {run_sum['exp_no']}, "
-			f"Dataset: {run_sum['dataset']}, Split: {run_sum['split']}, "
-			f"Config Path: {run_sum['config_path']}"
-		)
-	# for queShell interface
+	def run_str(self, loc: QueLocation, idx: int) -> str:
+		"""Method to """
+		return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
 
 	def list_runs(self, loc: QueLocation) -> List[Sumarised]:
 		"""List runs at a given location in summarised format
@@ -482,43 +462,14 @@ class que:
 		Returns:
 						List[List[str]]: Summarised runs
 		"""
-		return [self.run_sum(run) for run in self.fetch_state(loc)]
-	
-	def _get_print_stats(self, runs: List[Sumarised]) -> Dict[str, int]:
-		"""Get statistics for string formatting"""
-		stats = {
-			"max_model_len": 0,
-			"max_exp_no_len": 0,
-			"max_run_id_len": 0,
-			"max_dataset_len": 0,
-			"max_split_len": 0,
-			"max_config_path_len": 0,
-		}
-  
-		for run in runs:
-			stats["max_model_len"] = max(stats["max_model_len"], len(run["model"]))
-			stats["max_exp_no_len"] = max(stats["max_exp_no_len"], len(run["exp_no"]))
-			if run["run_id"] is not None:
-				stats["max_run_id_len"] = max(stats["max_run_id_len"], len(run["run_id"]))
-			stats["max_dataset_len"] = max(stats["max_dataset_len"], len(run["dataset"]))
-			stats["max_split_len"] = max(stats["max_split_len"], len(run["split"]))
-			stats["max_config_path_len"] = max(
-				stats["max_config_path_len"], len(run["config_path"])
-			)
-		
-		if runs[0]["best_val_acc"] is not None:
-			stats["max_best_val_acc_len"] = len("Best Val Acc")
-			stats["max_best_val_loss_len"] = len("Best Val Loss")
-   
-		return stats
+		return [self._run_sum(run) for run in self._fetch_state(loc)]
 
- 
 	def disp_runs(self, loc: QueLocation, exc: Optional[List[str]] = None) -> None:
-		self.print_v(f"{loc} runs".title())
+		print(f"{loc} runs".title())
 		runs = self.list_runs(loc)
   
 		if len(runs) == 0:
-			self.print_v("  No runs available")
+			print("  No runs available")
 			return
 		stats = self._get_print_stats(runs)
 		header_parts = [
@@ -543,8 +494,8 @@ class que:
 			header_parts = [h for h in header_parts if h.strip().lower() not in exc]
    
 		header = " | ".join(header_parts)
-		self.print_v(header)
-		self.print_v("-" * len(header))
+		print(header)
+		print("-" * len(header))
 		for i, run in enumerate(runs):
 			row_parts = [
 				str(i).ljust(5),
@@ -572,54 +523,46 @@ class que:
 				row_parts = [r for r, h in zip(row_parts, header_parts) if h.strip().lower() not in exc]
   
 			row = " | ".join(row_parts)
-			self.print_v(row)
-
-
+			print(row)
 
 	def disp_run(self, loc: QueLocation, idx: int) -> None:
-		try:
-			print_config(self._peak_run(loc, idx))
-		except Exception as e:
-			print(f"Could not display run {idx} : {loc} due to: {e}")
+		"""Print a run config at a specific location}
+
+		Args:
+			loc (QueLocation): Location
+			idx (int): Index
+		"""
+		print_config(self.peak_run(loc, idx))
+		
+
+	#for QueShell interface
+
+
+	
 
 	def recover_run(self, move_to: QueLocation = TO_RUN) -> None:
 		"""Set the run in cur_run to recover, and move to to_run or cur_run"""
-		try:
-			run = self.pop_cur_run()
-			run["admin"]["recover"] = True
-			self._set_run(move_to, 0, run)
-		except Exception as e:
-			self.print_v(str(e))
+		run = self.pop_cur_run()
+		run["admin"]["recover"] = True
+		self._set_run(move_to, 0, run)
+		self.logger.info('Recovered run')
 
 	def clear_runs(self, loc: QueLocation) -> None:
 		"""reset the runs queue"""
-		to_clear = self.fetch_state(loc)
+		to_clear = self._fetch_state(loc)
 
 		if len(to_clear) > 0:
 			to_clear = []
-			self.print_v(f"{loc} successfully cleared")
+			self.logger.info(f"{loc} successfully cleared")
 		else:
-			self.print_v(f"{loc} already empty")
+			self.logger.warning(f"{loc} already empty")
 
-	def _is_dup_exp(self, new_run: RunInfo) -> bool:
-		"""Check if run is a duplicate experiment"""
-		
-		new_sum = self.run_sum(new_run)
-
-		for run in self.to_run + self.old_runs + self.cur_run:
-			run_sum = self.run_sum(run)
-			if new_sum["model"] == run_sum["model"] and \
-				new_sum["exp_no"] == run_sum["exp_no"] and \
-				new_sum["dataset"] == run_sum["dataset"] and \
-				new_sum["split"] == run_sum["split"]:
-				return True
-		return False
+	
 
 	def create_run(
 		self,
 		arg_dict: AdminInfo,
 		wandb_dict: WandbInfo,
-		ask: bool = True,
 	) -> None:
 		"""Create and add a new training run entry
 
@@ -632,27 +575,18 @@ class que:
 		try:
 			config = load_config(arg_dict)
 		except ValueError:
-			self.print_v(f"{arg_dict['config_path']} not found. Create cancelled")
+			self.logger.warning(f"{arg_dict['config_path']} not found. Create cancelled")
 			return
 
 		if self._is_dup_exp(config):
-			self.print_v(
-				"Duplicate run detected"
-			)
+			self.logger.warning("Duplicate run detected. Create cancelled")
 			return
 
-		if ask:
-			print_config(config)
-
-   
-		proceed = True
-		if proceed:
-			config = cast(ExpInfo, config | {"wandb": wandb_dict})
-
-			self.to_run.append(config)
-			self.print_v("Added new run")
-		else:
-			self.print_v("Training cancelled by user")
+		# print_config(config)
+		config = cast(ExpInfo, config | {"wandb": wandb_dict})
+		self.to_run.append(config)
+		self.logger.info("Added new run")
+	
 
 	def add_run(self, arg_dict: AdminInfo, wandb_dict: WandbInfo) -> None:
 		"""Add a completed (and full tested) run to the old_runs que for storage
@@ -664,21 +598,25 @@ class que:
 		try:
 			config =  load_config(arg_dict)
 		except ValueError:
-			self.print_v(f"{arg_dict['config_path']} not found. Add cancelled")
+			self.logger.warning(f"{arg_dict['config_path']} not found. Create cancelled")
 			return
 
 		if self._is_dup_exp(config):
-			self.print_v(
-				"Duplicate run detected. Add cancelled"
-			)
+			self.logger.warning("Duplicate run detected. Create cancelled")
 			return
 
 		save_path = Path(arg_dict["save_path"])
 		res_dir = save_path.parent / "results"
 		res_path = res_dir / "best_val_loss.json"
-		results = load_comp_res(
-			res_path
-		)  # TODO: this throws an error if testing has not been run
+		try:
+			results = load_comp_res(res_path)  
+			self.logger.info('Successfully loaded results')
+		except FileNotFoundError:
+			results = full_test(
+				admin=config['admin'],
+				data=config['data'],
+			)#NOTE: this will print to the terminal
+			self.logger.info('Could not find results, running full test')
 		comp_run = CompExpInfo(
 			admin=config["admin"],
 			training=config["training"],
@@ -691,19 +629,17 @@ class que:
 			results=results,
 		)
 		self.old_runs.insert(0, comp_run)
-		self.print_v("New complete run added")
+		self.logger.info("New complete run added")
 
 	def remove_run(self, loc: QueLocation, idx: int) -> None:
 		"""Removes a run from the given location safely
 
 		Args:
-																		loc (QueLocation): to_run, cur_run or old_runs
-																		idx (int): Index of run
+			loc (QueLocation): to_run, cur_run or old_runs
+			idx (int): Index of run
 		"""
-		try:
-			_ = self._pop_run(loc, idx)
-		except Exception as e:
-			self.print_v(str(e))
+		_ = self._pop_run(loc, idx)
+		self.logger.info('Successfully removed run')
 
 	def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
 		"""Repositions a run from the que
@@ -780,6 +716,33 @@ class que:
 			self.print_v("Edit successful")
 		except Exception as e:
 			self.print_v(str(e))
+   
+	def find_runs(
+		self,
+		loc: QueLocation,
+		key_set: List[List[str]],
+		criterions: List[Callable[[Any], bool]],
+	) -> Tuple[List[int], List[GenExp]]:
+		"""Find the set of runs which match all of the key list value pairs
+
+		Args:
+						loc (QueLocation): Location to search
+						key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
+						values (List[Any]): The corresponding values for each set of keys
+
+		Returns:
+						Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
+		"""
+
+		assert len(key_set) == len(criterions), (
+			f"Length of key_set: {len(key_set)} does not match length of values: {len(criterions)}"
+		)
+		runs = [run for run in self._fetch_state(loc)]
+		idxs = []
+		for k_lst, crit in zip(key_set, criterions):
+			idxs, runs = self._find_runs(runs, k_lst, crit)
+		return idxs, runs
+
 
 if __name__ == "__main__":
 	q = que()
