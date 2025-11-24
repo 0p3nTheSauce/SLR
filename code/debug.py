@@ -2,7 +2,7 @@ from que.core import que
 from que.server import connect_manager
 import json
 import subprocess
-
+import sys
 
 def test_dump_peak():
     #works fine
@@ -30,9 +30,18 @@ def test_subprocess():
     print("STDERR:")
     print(stderr)
     
+def test_subrocess2():
+    proc = subprocess.Popen(
+        [sys.executable, '-u', '-m', 'que.daemon'],
+        stdout=open('./que/Daemon.log', 'a'),
+        stderr=subprocess.STDOUT,
+        bufsize=0
+    )
+    return_code = proc.wait()
     
 if __name__ == '__main__':
     # test_dump_peak()
     # test_dump_peak_server()
     # test_subprocess()
+    test_subrocess2()
     pass
