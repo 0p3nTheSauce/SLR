@@ -1,8 +1,17 @@
 from multiprocessing.managers import BaseManager
-from typing import Protocol, TYPE_CHECKING
-from .core import que
-
 import time
+import logging
+from typing import Protocol, TYPE_CHECKING
+from .core import que, SR_LOG_PATH
+
+
+logging.basicConfig(
+	level=logging.INFO,
+	format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+	filename=SR_LOG_PATH  # Optional: log to file
+)
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     class QueueManagerProtocol(Protocol):
@@ -47,10 +56,10 @@ def main():
         if preserve_state:
             old_que.save_state()
             state['que_instance'] = que() #automatically loads saved state
-            return "Reloaded successfully (state preserved)"
+            logger.info("Reloaded successfully (state preserved)")
         else:
             state['que_instance'] = que()
-            return "Reloaded successfully (fresh instance)"
+            logger.info("Reloaded successfully (fresh instance)")
     
     QueueManager.register('get_que', callable=get_que)
     QueueManager.register('reload_que', callable=reload_que)
