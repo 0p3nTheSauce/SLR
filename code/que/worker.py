@@ -5,10 +5,7 @@ import logging
 #locals
 from .core import (
 	RUN_PATH,
-	CUR_RUN,
 	WR_LOG_PATH,
-	QueEmpty,
-	QueBusy,
 	QueException,
 	ExpInfo
 )
@@ -26,25 +23,7 @@ logging.basicConfig(
 )
 
 
-class daemon:
-	"""Class for the queue daemon process. The function works in a fetch execute repeat
-	cycle. The function reads runs from the queRuns.json file, then writes them to the
-	queTemp.json file for the worker process to find. The daemon spawns the worker, then
-	waits for it to complete before proceeding. The daemon runs in it's own tmux session,
-	while the worker outputs to a log file.
-
-	Args:
-					name: of own tmux window
-					wr_name: of worker tmux window (monitor)
-					sesh: tmux session name
-					runs_path: to queRuns.json
-					temp_path: to queTemp.json
-					imp_path: to implemented_info.json
-					exec_path: to quefeather.py
-					verbose: speaks to you
-					wr: supply its worker
-					q: supply its que
-	"""
+class Worker:
 
 	def __init__(
 		self,
@@ -70,8 +49,6 @@ class daemon:
 		else:
 			sep += "\n"
 		return sep.title()
-
-
    
 	def start(self):
 		while True: 
@@ -102,8 +79,6 @@ class daemon:
 				if self.stp_on_fail:
 					self.logger.info('Stopping from failure, tor stp_on_fail to True for continuation behaviour')
 					break
-   
-    
     
 	def train(self) ->  Optional[ExpInfo]:
 		
@@ -139,22 +114,10 @@ class daemon:
 		
 
 def main():
-	# parser = get_daemon_parser()
-	# args = parser.parse_args()
-
-	# daem = daemon()
-
-	# setting = args.setting
-
-	# if setting == 'sMonitor':
-	# 	daem.start_n_monitor()
-	# else:
-	# 	print('huh?')
-	# 	print(f'You gave me: {setting}')
-	# 	print('but i only accept: ["sWatch", "sMonitor"]')
 	server = connect_manager()
-	daem = daemon(server.get_que())
-
+	w = Worker(server.get_que())
+	w.start()
+	
   
 if __name__ == '__main__':
 	main()
