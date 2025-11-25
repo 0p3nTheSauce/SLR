@@ -1,4 +1,4 @@
-from que.core import que, QueEmpty
+from que.core import Que, QueEmpty
 from que.server import connect_manager
 import json
 import subprocess
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def test_dump_peak():
     #works fine
-    q = que(logger)
+    q = Que(logger)
     run = q.peak_run('cur_run', 0)
     print(json.dumps(run, indent=4))
     
@@ -61,7 +61,7 @@ def test_clear():
         print(e)
         
 def test_clear2():
-    q = que(logger)
+    q = Que(logger)
     try:
         q.clear_runs('cur_run')
     except Exception as e:
