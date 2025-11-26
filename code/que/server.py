@@ -44,20 +44,7 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueueManagerProtocol":
         "Start it with: python Que_server.py"
     )
     
-class daemon:
-    def __init__(self, worker_path: str | Path = WR_PATH, worker_log: str | Path = WR_LOG_PATH) -> None:
-        self.worker_path = worker_path
-        self.worker_log = worker_log
-        self.worker = self.run_worker()
-        
-    def run_worker(self) -> subprocess.Popen:
-        return subprocess.Popen(
-            [sys.executable, '-u', '-m', self.worker_path],
-            stdout=open(self.worker_log, 'a'), #this does not allow us to close the file, but that's okay - Luke         
-            stderr=subprocess.STDOUT,
-            bufsize=0
-        )
-    # return_code = proc.wait()
+    
     
     
 
