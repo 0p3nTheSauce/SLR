@@ -172,8 +172,15 @@ from contextlib import contextmanager
 # MR_NAME = "monitor"
 QUE_DIR = Path(__file__).parent
 
+QUE_NAME = "Que"
+DN_NAME = "Daemon"
+WR_NAME = "Worker"
+SR_NAME = "Server"
 RUN_PATH = QUE_DIR / "Runs.json"
 WR_LOG_PATH = QUE_DIR / "Worker.log"
+# DN_LOG_PATH = QUE_DIR / "Daemon.log"
+
+
 SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR}.worker"
