@@ -156,7 +156,8 @@ def get_data_loader(
     num_frames: int,
     set_info: DataSetInfo,
     shuffle: bool = False,
-    batch_size: Optional[int] = None
+    batch_size: Optional[int] = None,
+    no_norm: bool = False,
     
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     """Get test, validation and training dataloaders
@@ -185,14 +186,26 @@ def get_data_loader(
         perm = None
         sh_e = None
 
-    final_transform = v2.Compose(
-        [
-            maybe_shuffle_t,
-            v2.Lambda(lambda x: x.float() / 255.0),
-            v2.Normalize(mean=mean, std=std),
-            v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
-        ]
-    )
+    if not no_norm:
+        final_transform = v2.Compose(
+            [
+                maybe_shuffle_t,
+                v2.Lambda(lambda x: x.float() / 255.0),
+                v2.Normalize(mean=mean, std=std),
+                v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+            ]
+        )
+    else:
+        #temporary fix
+        final_transform = v2.Compose(
+            [
+                maybe_shuffle_t,
+                # v2.Lambda(lambda x: x.float() / 255.0),
+            
+                v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+            ]
+        )
+
 
     if set_info["set_name"] == "train":
         transform = v2.Compose(

@@ -5,8 +5,8 @@ import logging
 import sys
 from pathlib import Path
 from typing import Protocol, TYPE_CHECKING
-from .core import Que, SR_LOG_PATH, WR_PATH, WR_LOG_PATH
-
+from .core import Que, SR_LOG_PATH
+from .daemon import Daemon
 
 logging.basicConfig(
 	level=logging.INFO,
@@ -43,9 +43,6 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueueManagerProtocol":
         "Cannot connect to Queue server. "
         "Start it with: python Que_server.py"
     )
-    
-    
-    
     
 
 def main():

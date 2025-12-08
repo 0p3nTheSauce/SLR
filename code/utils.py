@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Union, Tuple
 import torch
 import cv2
+
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -37,7 +38,16 @@ class gpu_manager:
 			capture_output=True,
 			text=True,
 		)
-		used, total = map(float, result.stdout.strip().split(","))
+		if result.returncode != 0:
+			raise RuntimeError(f"nvidia-smi failed: {result.stderr.strip()}")
+		output = result.stdout.strip()
+		parts = output.split(",")
+		if len(parts) != 2:
+			raise ValueError(f"Unexpected nvidia-smi output: '{output}'")
+		try:
+			used, total = map(float, parts)
+		except Exception as e:
+			raise ValueError(f"Failed to parse GPU memory usage: '{output}'") from e
 
 		return used / 1024, total / 1024  # In GB
 
@@ -67,7 +77,7 @@ class gpu_manager:
 
 		used, total = cls.get_gpu_memory_usage(gpu_id)
 
-		proceed = used > max_util_gb  # Fixed logic
+		proceed = used > max_util_gb
 
 		while proceed:
 			if verbose:
@@ -148,7 +158,18 @@ class wandb_manager:
 		entity: str,
 		project: str,
 		disp: bool = False,
-	) -> list[str]:
+	) -> list:
+		"""
+		List all runs for a given entity and project.
+
+		Args:
+			entity (str): The wandb entity.
+			project (str): The wandb project.
+			disp (bool, optional): If True, prints details of each run.
+
+		Returns:
+			list: A list of wandb run objects, not strings.
+		"""
 		api = wandb.Api()
 		runs = api.runs(f"{entity}/{project}")
 
@@ -226,7 +247,7 @@ def str_dict(dic: Dict[str, Any], disp: bool = False) -> str:
 
 
 def print_dict(diction):
-    print(json.dumps(diction, indent=4))
+	print(json.dumps(diction, indent=4))
 
 ################# Loading #####################
 	
@@ -234,7 +255,7 @@ def load_rgb_frames_from_video(video_path : str, start : int, end : int
 															, all : bool =False) -> torch.Tensor:
 	return cv_to_torch(cv_load(video_path, start, end, all))
 
-def cv_load(video_path:str|Path, start:int, end:int, all:bool=False):
+def cv_load(video_path:str|Path, start:int, end:int, all:bool=False) -> np.ndarray:
 	video_path = Path(video_path)  
 	if not video_path.exists():
 		raise FileNotFoundError(f'File {video_path} does not exist')
@@ -290,14 +311,18 @@ def watch_video(frames=None, path='',wait=33, title='Video'):
 	if frames is None and not path:
 		raise ValueError('pass either a tensor or path')
 	elif frames is not None:
-		if not (type(frames) is torch.Tensor or type(frames) is np.ndarray):
+		if not (isinstance(frames, torch.Tensor) or isinstance(frames, np.ndarray)):
 			raise ValueError('frames must be torch.Tensor or np.ndarray')
 		if frames.dtype == torch.uint8:
 			frames = torch_to_cv(frames) #type: ignore
 		elif frames.dtype != np.uint8:
-			raise ValueError('frames must be torch.uint8 (T C H W) RGB OR np.uint8 (T H W C) BGR')
+			raise ValueError('frames must be either torch.Tensor with dtype torch.uint8 and shape (T, C, H, W) in RGB format, or np.ndarray with dtype np.uint8 and shape (T, H, W, C) in BGR format')
 		for img in frames:
 			cv2.imshow(f'{title} from tensor', img) #type: ignore
+			key = cv2.waitKey(wait) & 0xFF
+			if key == ord('q') or key == 27:
+				break
+			cv2.imshow(f'{title} from tensor', img)
 			key = cv2.waitKey(wait) & 0xFF
 			if key == ord('q') or key == 27:
 				break
@@ -332,48 +357,69 @@ def show_bbox(frames, bbox):
 		cv2.waitKey(0)  # Display each frame for 100 ms
 	cv2.destroyAllWindows()
 
-def cv_display_or_save(frames,output=None):
-	if output is None:
-		for i, frame in enumerate(frames):
-			cv2.imshow('Cropped Frames', frame)  # Display the first frame
-			cv2.waitKey(100)  # Wait for a key press to close the window
-		cv2.destroyAllWindows()
-	else:
-		Path(output).mkdir(parents=True, exist_ok=True)
-		for i, img in enumerate(frames):
-			cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
-		print(f"Cropped frames saved to {output}.")
 
-	###############   PLOT Based       #################
 
-def visualise_frames(frames,num, size=(5,5), adapt=False, output=None):
-	# permute and convert to numpy 
-	'''Args:
-		frames : torch.Tensor (T, C, H, W)
-		num : int, to be visualised'''
+def cv_display(frames: np.ndarray,  output: Optional[Union[str, Path]] = None):
+	for i, frame in enumerate(frames):
+		cv2.imshow('Cropped Frames', frame)  # Display the first frame
+		cv2.waitKey(100)  # Wait for a key press to close the window
+		if output is not None:
+			cv2.imwrite(f"{output}/frame_{i:04d}.jpg", frame)
+	cv2.destroyAllWindows()
+
+def cv_save(frames: np.ndarray, output: Union[str, Path]):
+	Path(output).mkdir(parents=True, exist_ok=True)
+	for i, img in enumerate(frames):
+		cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
+	print(f"Cropped frames saved to {output}.")
+
+def plt_display(frames: torch.Tensor, num: int, size: Tuple[float, float]=(5.0,5.0), adapt: bool=False, output: Optional[Union[str, Path]]=None):
+	"""
+	Visualise a subset of frames using matplotlib.
+
+	Args:
+		frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
+		num (int): Number of frames to display (evenly sampled). Must be >= 1.
+		size (tuple, optional): Figure size (width, height) in inches. Defaults to (5, 5).
+		adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
+		output (str | Path, optional): If provided, directory to save each plotted frame as 'frame{i}.png'.
+
+	Returns:
+		None
+
+	Raises:
+		ValueError: If num < 1 or frames has incompatible shape.
+	"""
 	if output:
 		output = Path(output)
 		output.mkdir(parents=True, exist_ok=True)
+	
 	if adapt:
-		#256 ~ 5
 		factor = 5 / 256
 		w, h = frames.shape[2], frames.shape[3]
 		size = (w * factor, h * factor)
 		
 	if num < 1:
 		raise ValueError("num must be >= 1")
+	
 	num_frames = len(frames)
 	if num_frames <= num:
 		step = 1
 	else:
 		step = num_frames // num
+	
 	for i, frame in enumerate(frames[::step]):
-		np_frame = frame.permute(1,2,0).cpu().numpy()
+		# Permute from (C, H, W) to (H, W, C)
+		np_frame = frame.permute(1, 2, 0).cpu().numpy()
+		
+		# Normalize to [0, 1] range
+		np_frame = (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
+		
 		plt.figure(figsize=size)
 		plt.imshow(np_frame)
 		plt.axis('off')
 		if output:
-			plt.savefig(output / f'frame{i}.png')
+			plt.savefig(output / f'frame{i}.png', bbox_inches='tight', pad_inches=0)
 		plt.show()
 	
 ################### Conversions #####################
@@ -492,8 +538,8 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
 				remove = True
 				if ask:
 					ans = 'none'
-					ans = print(f'{f} is set to be removed')
-					while ans != 'y' and ans != '' and ans != 'n':
+					print(f'{f} is set to be removed')
+					while ans not in ('y', '', 'n'):
 						ans = input('Delete [y]/n: ')
 					remove = ans != 'n'
 				if remove:
@@ -507,7 +553,7 @@ def clean_checkpoints(paths, ask=False, add_zfill=True, decimals=3, rem_empty=Fa
 			if ask and rem_empty:
 				print(f'No checkpoints found in {path}') 
 				ans = 'none'
-				while ans != 'y' and ans != '' and ans != 'n':
+				while ans not in ('y', '', 'n'):
 					ans = input('Delete [y]/n: ')
 				
 				if ans == 'n':

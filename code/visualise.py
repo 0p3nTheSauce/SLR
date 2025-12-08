@@ -6,12 +6,32 @@ import seaborn as sns
 import numpy as np
 from typing import Dict, Optional, Callable, List, Union
 from pathlib import Path
+import cv2
 #locals
 from configs import CLASSES_PATH
 # Set style for better-looking plots
 plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
+
+#eda and demos
+
+# def display_topk(frames: np.ndarray,  output: Optional[Union[str, Path]] = None):
+#     cv2.putText(
+#     frame,                          # Image to draw on
+#     'Hello, OpenCV!',               # Text to write
+#     (50, 100),                      # Position (x, y) - bottom-left corner of text
+#     cv2.FONT_HERSHEY_SIMPLEX,       # Font
+#     1.5,                            # Font scale (size)
+#     (255, 255, 255),                # Color in BGR (white)
+#     2,                              # Thickness
+#     cv2.LINE_AA                     # Line type (anti-aliased)
+# )
+
+
+
+
+#results
 
 def load_results(filepath: str) -> Dict:
 	"""Load results from JSON file."""
@@ -144,7 +164,6 @@ def plot_bar_graph(
     if disp:
         plt.show()
 
-
 def plot_confusion_matrix(
     y_true: Union[np.ndarray, List[int]],
     y_pred: Union[np.ndarray, List[int]],
@@ -271,7 +290,6 @@ def extract_metrics_df_sumed(results: Dict, split: str='as1100') -> pd.DataFrame
 		}
 		data.append(row)
 	return pd.DataFrame(data)
-
 
 def plot_model_comparison_bar(df: pd.DataFrame, dataset: str = 'asl100', 
 							  metric_type: str = 'avg', split: str = 'test'):
@@ -430,10 +448,6 @@ def plot_dataset_comparison_scatter(df: pd.DataFrame, metric: str = 'top1_avg', 
 	
 	plt.tight_layout()
 	plt.show()
-
-
-
-
 
 # Example usage
 def run_visualizations(filepath: str,
