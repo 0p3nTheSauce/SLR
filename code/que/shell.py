@@ -1,4 +1,5 @@
-from .core import Que, QUE_LOCATIONS, SYNONYMS, WR_PATH
+from typing import Dict, Any
+from .core import QUE_LOCATIONS, SYNONYMS
 
 # from .tmux import tmux_manager
 from .server import connect_manager
@@ -8,8 +9,6 @@ from typing import Optional
 import argparse
 import configs
 import time
-from pathlib import Path
-import subprocess
 from contextlib import contextmanager
 
 from rich.console import Console
@@ -24,7 +23,7 @@ import sys
 import json
 
 
-class queShell(cmdLib.Cmd):
+class QueShell(cmdLib.Cmd):
     def __init__(
         self,
         auto_save: bool = True,
@@ -32,8 +31,8 @@ class queShell(cmdLib.Cmd):
         super().__init__()
         self.console = Console()
         self.server = connect_manager()
-        self.que = self.server.get_que()
-
+        self.que = self.server.get_Que()
+        self.daemon = self.server.get_Daemon()
         # Display welcome banner
         self._show_banner()
 
@@ -165,7 +164,9 @@ class queShell(cmdLib.Cmd):
     def do_EOF(self, arg):
         """Exit on Ctrl+D"""
         self.console.print()
-        return self.do_quit(arg)
+        return self.do_quit(arg)    
+
+    #Que based
 
     def do_save(self, arg):
         """Save state with visual feedback"""
@@ -374,18 +375,58 @@ class queShell(cmdLib.Cmd):
             f"[bold green]✓[/bold green] Edited run {parsed_args.index} in {parsed_args.location}"
         )
 
-    # def do_daemon(self, arg):
+    #Hot reloads
 
-    # Helper functions
-
-    # def run_daemon(self) -> subprocess.Popen:
-    # 	"""Start the daemon process"""
-    # 	return subprocess.Popen(
-    # 		[sys.executable, "-u", "-m", "que.daemon"],
-    # 		stdout=open(self.dn_log_path, 'w'),
-    # 		stderr=subprocess.STDOUT,
-
-    # 	)
+    #Daemon based
+    
+    def _pretty_status(self, status: Dict[str, Any]):
+        if status['running']:
+            self.console.print(
+                f"Status: [bold green]Running[/bold green]"
+                f"PID: [bold green]{status['pid']}"
+            )
+        elif status["return_code"] is None:
+            self.console.print(
+                "Status: [bold yellow]Not running. No worker process[/bold yellow]"
+            )
+        elif status["return_code"] == 0:
+            self.console.print(
+                "Status: [bold blue]Stopped[/bold blue] (exited cleanly)"
+            )
+        elif status["return_code"] < 0:
+            self.console.print(
+                f"Status: [bold red]Killed[/bold red] (signal {-status['return_code']})"
+            )
+        else:
+            self.console.print(
+                f"Status: [bold red]Stopped[/bold red] (exit code {status['return_code']})"
+            )
+            
+    def do_daemon(self, arg):
+        """Interact with the worker"""
+        parsed_args = self._parse_args_or_cancel("daemon", arg)
+        if parsed_args is None:
+            return
+        
+        if parsed_args.command == 'start':
+            self.daemon.start_worker()
+        elif parsed_args.command == 'stop':
+            self.daemon.stop_worker(parsed_args.timeout)
+        elif parsed_args.command == 'restart':
+            self.daemon.restart_worker()
+        elif parsed_args.command == 'status':
+            self._pretty_status(self.daemon.get_worker_status())
+        elif parsed_args.command == 'tail':
+            lines = self.daemon.tail_worker_log(parsed_args.lines)
+            for line in lines:
+                self.console.print(line)
+        elif parsed_args.command == 'clear-log':
+            self.daemon.clear_worker_log()
+        else:
+            self.console.print(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")            
+    
+            
+    #Helper functions
 
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
 
@@ -406,7 +447,17 @@ class queShell(cmdLib.Cmd):
         return parsed_args
 
     def _parse_args_or_cancel(self, cmd: str, arg: str) -> Optional[argparse.Namespace]:
-        """Parse arguments or return None if parsing fails"""
+        """
+        Parse generic arguments
+        
+        :param self: QueShell instance
+        :param cmd: The name of the command, i.e. x in do_x function name
+        :type cmd: str
+        :param arg: Arg as collected by cmdlib (passed to do_* function)
+        :type arg: str
+        :return: Returns parsed args in argparse format, otherwise None if failure.
+        :rtype: Namespace | None
+        """
         args = shlex.split(arg)
         parser = self._get_parser(cmd)
         if parser:
@@ -433,38 +484,15 @@ class queShell(cmdLib.Cmd):
             "quit": self._get_quit_parser,
             "shuffle": self._get_shuffle_parser,
             "move": self._get_move_parser,
-            "attach": self._get_attach_parser,
-            "daemon": self._get_daemon_parser,
-            "worker": self._get_worker_parser,
             "edit": self._get_edit_parser,
             "display": self._get_display_parser,
+            "daemon": self._get_daemon_parser
         }
         if cmd in parsers:
             return parsers[cmd]()
         return None
 
-    def _get_daemon_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Start the que daemon with a given setting", prog="daemon"
-        )
-        parser.add_argument(
-            "setting", choices=["sWatch", "sMonitor", "monitorO", "idle", "idle_log"]
-        )
-        parser.add_argument("-re", "--recover", action="store_true")
-        parser.add_argument("-ri", "--run_id", type=str, default=None)
-        return parser
-
-    def _get_worker_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Start the que worker", prog="worker"
-        )
-        parser.add_argument("setting", choices=["work", "idle", "idle_log", "idle_gpu"])
-        return parser
-
-    def _get_attach_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Attach to tmux session")
-        parser.add_argument("window", choices=["worker", "daemon"])
-        return parser
+    #Que
 
     def _get_move_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -522,7 +550,46 @@ class queShell(cmdLib.Cmd):
         parser.add_argument("-k2", "--key2", type=str, default=None)
         return parser
 
-
+    #Hot reloads
+    
+    def _get_reload_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Hot reload the Daemon or Que instance held be the server"
+        )
+    
+    #Daemon
+    
+    def _get_daemon_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Interact with the worker process", 
+            prog="daemon"
+        )
+        
+        subparsers = parser.add_subparsers(dest='command', required=True, help='Daemon commands')
+        
+        # Start
+        subparsers.add_parser('start', help='Start the worker process')
+        
+        # Stop with timeout
+        stop_parser = subparsers.add_parser('stop', help='Stop the worker gracefully, force kill if necessary')
+        stop_parser.add_argument('--timeout', '-to', type=int, default=10, help='Timeout in seconds (default: 10)')
+        
+        # Restart
+        subparsers.add_parser('restart', help='Restart the worker process')
+        
+        # Status
+        subparsers.add_parser('status', help='Get worker status information')
+        
+        # Tail logs
+        tail_parser = subparsers.add_parser('tail', help='View last N lines of worker log')
+        tail_parser.add_argument('--lines', type=int, default=10, help='Number of lines to show (default: 10)')
+        
+        # Clear logs
+        subparsers.add_parser('clear-log', help='Clear the worker log file')
+        
+        return parser
+    
+    
 if __name__ == "__main__":
-    que_shell = queShell()
+    que_shell = QueShell()
     que_shell.cmdloop()

@@ -4,7 +4,7 @@ from pathlib import Path
 import logging
 
 # locals
-from .core import RUN_PATH, WR_LOG_PATH, QueException, ExpInfo
+from .core import RUN_PATH, WR_LOG_PATH, WR_NAME, QueException, ExpInfo
 
 from .server import connect_manager
 from .core import Que
@@ -12,11 +12,6 @@ from utils import gpu_manager
 from configs import _exp_to_run_info
 from training import train_loop, _setup_wandb
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    filename=WR_LOG_PATH,  # Optional: log to file
-)
 
 
 class Worker:
@@ -32,7 +27,13 @@ class Worker:
         self.verbose = verbose
         self.stp_on_fail = stp_on_fail
 
-        self.logger = logging.getLogger(__name__)
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=WR_LOG_PATH,  # Optional: log to file
+        )
+        
+        self.logger = logging.getLogger(WR_NAME)
 
     def seperator(self, r_str: str) -> str:
         sep = ""
@@ -109,7 +110,7 @@ class Worker:
 
 def main():
     server = connect_manager()
-    w = Worker(server.get_que())
+    w = Worker(server.get_Que())
     w.start()
 
 

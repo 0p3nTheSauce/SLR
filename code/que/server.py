@@ -1,38 +1,35 @@
+from typing import Protocol, TYPE_CHECKING, cast
 from multiprocessing.managers import BaseManager
-import subprocess 
 import time
 import logging
-import sys
-from pathlib import Path
-from typing import Protocol, TYPE_CHECKING
-from .core import Que, SR_LOG_PATH
+
+from .core import Que, SR_LOG_PATH, QUE_NAME, DN_NAME, SR_NAME
 from .daemon import Daemon
 
-logging.basicConfig(
-	level=logging.INFO,
-	format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-	filename=SR_LOG_PATH  # Optional: log to file
-)
 
-logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    class QueueManagerProtocol(Protocol):
-        def get_que(self) -> Que: ...
-        def reload_que(self, preserve_state: bool = True) -> str: ...
+    class QueManagerProtocol(Protocol):
+        def get_Que(self) -> Que: ...
+        def get_Daemon(self) -> Daemon: ...
+        def reload_Que(self, preserve_state: bool = True) -> None: ...
+        def reload_Daemon(self) -> None: ...
 
-class QueueManager(BaseManager): 
+
+class QueManager(BaseManager): 
     pass
 
 
-def connect_manager(max_retries=5, retry_delay=2) -> "QueueManagerProtocol":
+def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     """Connect to the Queue manager (returns manager, not Que instance)"""
-    QueueManager.register('get_que')
-    QueueManager.register('reload_que')
+    QueManager.register('get_Que')
+    QueManager.register('get_Daemon')
+    QueManager.register('reload_Que')
+    QueManager.register('reload_Daemon')
     
     for _ in range(max_retries):
         try:
-            m = QueueManager(address=('localhost', 50000), authkey=b'abracadabra')
+            m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
             m.connect()
             return m #type: ignore
         except ConnectionRefusedError:
@@ -47,27 +44,51 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueueManagerProtocol":
 
 def main():
     
-    state = {'Que_instance': Que(logger)}
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        filename=SR_LOG_PATH  # Optional: log to file
+    )
+
+    logger = logging.getLogger(SR_NAME)
+    que_logger = logging.getLogger(QUE_NAME)
+    dn_logger = logging.getLogger(DN_NAME)
+    
+    
+    state = {'Que_instance': Que(que_logger),
+             'Daemon_instance': Daemon(dn_logger)}
 
     def get_Que():
         return state['Que_instance']
     
+    def get_Daemon():
+        return state['Daemon_instance']
+    
     def reload_Que(preserve_state=True):
-        """Hot reload the Queue instance"""
-        old_Que = state['Que_instance']
+        """Hot reload the Que instance"""
+        old_Que = cast(Que, state['Que_instance'])
         
         if preserve_state:
             old_Que.save_state()
-            state['Que_instance'] = Que(logger) #automatically loads saved state
+            state['Que_instance'] = Que(que_logger) #automatically loads saved state
             logger.info("Reloaded successfully (state preserved)")
         else:
-            state['Que_instance'] = Que(logger)
+            state['Que_instance'] = Que(que_logger)
             logger.info("Reloaded successfully (fresh instance)")
+            
+    def reload_Daemon():
+        """Hot reload Daemon instance"""
+        old_Daemon = cast(Daemon, state['Daemon_instance'])
+        old_Daemon.stop_worker()
+        
+        state['Daemon_instance'] = Daemon(dn_logger)
+        
+    QueManager.register('get_Que', callable=get_Que)
+    QueManager.register('get_Daemon', callable=get_Daemon)
+    QueManager.register('reload_Que', callable=reload_Que)
+    QueManager.register('reload_Daemon', callable=reload_Daemon)
     
-    QueueManager.register('get_Que', callable=get_Que)
-    QueueManager.register('reload_Que', callable=reload_Que)
-    
-    m = QueueManager(address=('localhost', 50000), authkey=b'abracadabra')
+    m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
     s = m.get_server()
     print("Queue server started on localhost:50000")
     s.serve_forever()

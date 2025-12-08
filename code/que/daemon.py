@@ -1,6 +1,6 @@
-from typing import Optional, Union, TypeGuard
+from typing import Optional, Union, TypeGuard, Dict, Any
 import logging
-
+from logging import Logger
 from pathlib import Path
 import sys
 import time
@@ -21,14 +21,16 @@ def _log_is_open(log: Optional[TextIO]) -> TypeGuard[TextIO]:
 class Daemon:
     def __init__(
         self,
+        logger: Logger,
         worker_path: Union[str, Path] = WR_PATH,
         worker_log_path: Union[str, Path] = WR_LOG_PATH,
+        # daemon_log_path: Union[str, Path] = DN_LOG_PATH
     ) -> None:
         self.worker_path: str | Path = worker_path
         self.worker_log_path: str | Path = worker_log_path
         self.worker_log_file: Optional[TextIO] = None
         self.worker_process: Optional[subprocess.Popen] = None
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def start_worker(self) -> None:
         """Start the worker if not already running"""
@@ -37,13 +39,41 @@ class Daemon:
             return
 
         self.worker_log_file = open(self.worker_log_path, "a")
-        self.worker_process = subprocess.Popen(
-            [sys.executable, "-u", "-m", str(self.worker_path)],
-            stdout=self.worker_log_file,
-            stderr=subprocess.STDOUT,
-            bufsize=0,
-        )
-        self.logger.info(f"Worker started with PID: {self.worker_process.pid}")
+        
+        try:
+            self.worker_process = subprocess.Popen(
+                [sys.executable, "-u", "-m", str(self.worker_path)],
+                stdout=self.worker_log_file,
+                stderr=subprocess.STDOUT,
+                bufsize=0,
+            )
+            self.logger.info(f"Worker started with PID: {self.worker_process.pid}")
+            
+            # Give it a moment to crash if there's an immediate problem
+            time.sleep(0.1)
+            
+            # Check if it's still running
+            if self.worker_process.poll() is not None:
+                # Process already exited
+                return_code = self.worker_process.returncode
+                self.logger.error(f"Worker failed to start (exit code: {return_code})")
+                self.worker_process = None
+                self.worker_log_file.close()
+                self.worker_log_file = None
+                raise RuntimeError(f"Worker process terminated immediately with exit code {return_code}")
+                
+        except FileNotFoundError as e:
+            self.logger.error(f"Failed to start worker: {e}")
+            if self.worker_log_file and not self.worker_log_file.closed:
+                self.worker_log_file.close()
+            self.worker_log_file = None
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error starting worker: {e}")
+            if self.worker_log_file and not self.worker_log_file.closed:
+                self.worker_log_file.close()
+            self.worker_log_file = None
+            raise
 
     def stop_worker(self, timeout: int = 10) -> bool:
         """Stop the worker gracefully, force kill if necessary"""
@@ -78,7 +108,7 @@ class Daemon:
         time.sleep(1)  # Brief delay before restart
         self.start_worker()
 
-    def get_worker_status(self) -> dict:
+    def get_worker_status(self) -> Dict[str, Any]:
         """Get detailed worker status information"""
         if not _proc_is_running(self.worker_process):
             return {
@@ -89,27 +119,6 @@ class Daemon:
                 else None,
             }
         return {"running": True, "pid": self.worker_process.pid, "return_code": None}
-
-    def monitor_worker(self, restart_on_crash: bool = True) -> None:
-        """Monitor worker and optionally restart on crash"""
-        while True:
-            if not _proc_is_running(self.worker_process):
-                if self.worker_process is not None:
-                    # Worker crashed
-                    return_code = self.worker_process.returncode
-                    self.logger.error(f"Worker crashed with return code: {return_code}")
-
-                    if restart_on_crash:
-                        self.logger.info("Attempting to restart worker...")
-                        self.start_worker()
-                    else:
-                        break
-                else:
-                    # Worker never started
-                    self.logger.info("Starting worker...")
-                    self.start_worker()
-
-            time.sleep(5)  # Check every 5 seconds
 
     def tail_worker_log(self, lines: int = 10) -> list[str]:
         """Get last N lines from worker log"""
@@ -129,16 +138,3 @@ class Daemon:
         except Exception as e:
             self.logger.error(f"Failed to clear log: {e}")
 
-    def health_check(self) -> dict:
-        """Comprehensive health check of daemon and worker"""
-        return {
-            "worker": self.get_worker_status(),
-            "log_file_exists": Path(self.worker_log_path).exists(),
-            "worker_script_exists": Path(self.worker_path).exists(),
-        }
-
-    def safe_shutdown(self) -> None:
-        """Safely shut down daemon and worker"""
-        self.logger.info("Initiating safe shutdown...")
-        self.stop_worker(timeout=30)  # Longer timeout for graceful shutdown
-        self.logger.info("Daemon shutdown complete")
