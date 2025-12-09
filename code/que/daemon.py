@@ -4,7 +4,7 @@ from logging import Logger
 from pathlib import Path
 import sys
 import time
-from .core import WR_LOG_PATH, WR_PATH
+from .core import WR_LOG_PATH, WR_PATH, WR_MODULE_PATH
 
 import subprocess
 from typing import TextIO
@@ -22,7 +22,7 @@ class Daemon:
     def __init__(
         self,
         logger: Logger,
-        worker_path: Union[str, Path] = WR_PATH,
+        worker_path: Union[str, Path] = WR_MODULE_PATH,
         worker_log_path: Union[str, Path] = WR_LOG_PATH,
         # daemon_log_path: Union[str, Path] = DN_LOG_PATH
     ) -> None:
