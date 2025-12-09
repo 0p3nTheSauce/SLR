@@ -335,8 +335,9 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.console.status("[bold cyan]Creating run...", spinner="dots"):
-            self.que.create_run(admin_info, wandb_info)
-        self.console.print("[bold green]✓[/bold green] Run created successfully")
+            with self.unwrap_exception("Run created successfully", "Failed to create new run"):
+                self.que.create_run(admin_info, wandb_info)
+        # self.console.print("[bold green]✓[/bold green] Run created successfully")
 
     def do_add(self, arg):
         """Add run with feedback"""
@@ -375,14 +376,12 @@ class QueShell(cmdLib.Cmd):
             f"[bold green]✓[/bold green] Edited run {parsed_args.index} in {parsed_args.location}"
         )
 
-    #Hot reloads
-
     #Daemon based
     
     def _pretty_status(self, status: Dict[str, Any]):
         if status['running']:
             self.console.print(
-                f"Status: [bold green]Running[/bold green]"
+                f"Status: [bold green]Running[/bold green]\n"
                 f"PID: [bold green]{status['pid']}"
             )
         elif status["return_code"] is None:
@@ -409,7 +408,8 @@ class QueShell(cmdLib.Cmd):
             return
         
         if parsed_args.command == 'start':
-            self.daemon.start_worker()
+            with self.unwrap_exception("Worker process started", "Failed to start worker"):
+                self.daemon.start_worker()
         elif parsed_args.command == 'stop':
             self.daemon.stop_worker(parsed_args.timeout)
         elif parsed_args.command == 'restart':
@@ -426,7 +426,7 @@ class QueShell(cmdLib.Cmd):
             self.console.print(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")            
     
             
-    #Helper functions
+    #Helper function
 
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
 
@@ -550,12 +550,6 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("-k2", "--key2", type=str, default=None)
         return parser
 
-    #Hot reloads
-    
-    def _get_reload_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Hot reload the Daemon or Que instance held be the server"
-        )
     
     #Daemon
     

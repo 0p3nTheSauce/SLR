@@ -183,7 +183,7 @@ WR_LOG_PATH = QUE_DIR / "Worker.log"
 
 SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = QUE_DIR / "worker.py"
-WR_MODULE_PATH = f"{QUE_DIR}.worker"
+WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
 
 
 TO_RUN = "to_run"  # havent run yet
