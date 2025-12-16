@@ -177,8 +177,9 @@ DN_NAME = "Daemon"
 WR_NAME = "Worker"
 SR_NAME = "Server"
 RUN_PATH = QUE_DIR / "Runs.json"
+DAEMON_STATE_PATH = QUE_DIR / "Daemon.json"
 WR_LOG_PATH = QUE_DIR / "Worker.log"
-# DN_LOG_PATH = QUE_DIR / "Daemon.log"
+DN_LOG_PATH = QUE_DIR / "Daemon.log"
 
 
 SR_LOG_PATH = QUE_DIR / "Server.log"
@@ -579,22 +580,6 @@ class Que:
 
     # for worker
 
-    def pop_cur_run(self) -> ExpInfo:
-        """Pops the current run
-
-        Returns:
-                ExpInfo: Dictionary of experiment info
-        """
-        return self._pop_run(CUR_RUN, 0)
-
-    def set_cur_run(self, run: ExpInfo) -> None:
-        """Sets the current run
-
-        Args:
-                run (ExpInfo): Dictionary of experiment info
-        """
-        self._set_run(CUR_RUN, 0, run)
-
     def peak_run(self, loc: QueLocation, idx: int) -> GenExp:
         """Get the run at the given location with the provided index, but don't remove
 
@@ -615,7 +600,30 @@ class Que:
         elif abs(idx) >= len(to_get):
             raise QueIdxOOR(loc, idx, len(to_get))
         return to_get[idx]
+    
+    def peak_cur_run(self) -> ExpInfo:
+        """Peaks the current run
+        
+        Returns:
+            ExpInfo: Dictionary of experiment info"""
+        return self.peak_run(CUR_RUN, 0)
+    
+    def pop_cur_run(self) -> ExpInfo:
+        """Pops the current run
 
+        Returns:
+                ExpInfo: Dictionary of experiment info
+        """
+        return self._pop_run(CUR_RUN, 0)
+
+    def set_cur_run(self, run: ExpInfo) -> None:
+        """Sets the current run
+
+        Args:
+                run (ExpInfo): Dictionary of experiment info
+        """
+        self._set_run(CUR_RUN, 0, run)
+    
     def stash_next_run(self) -> str:
         """Moves next run from to_run to cur_run. Saves state with lock over both read and write"""
         next_run = self._pop_run(TO_RUN, 0)
