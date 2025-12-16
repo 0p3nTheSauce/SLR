@@ -409,7 +409,8 @@ class QueShell(cmdLib.Cmd):
         
         if parsed_args.command == 'start':
             with self.unwrap_exception("Worker process started", "Failed to start worker"):
-                self.daemon.start_worker()
+                # self.daemon.start_worker()
+                self.daemon.start()
         elif parsed_args.command == 'stop':
             self.daemon.stop_worker(parsed_args.timeout)
         elif parsed_args.command == 'restart':
