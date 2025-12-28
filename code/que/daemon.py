@@ -4,7 +4,7 @@ from multiprocessing import Process
 from logging import Logger
 import json
 import os
-
+import signal
 
 from .core import WR_LOG_PATH, WR_PATH, WR_MODULE_PATH, DN_LOG_PATH, DN_NAME, DAEMON_STATE_PATH
 from .worker import Worker
@@ -115,6 +115,20 @@ class DaemonStateHandler:
         with open(self.state_path, 'w') as f:
             json.dump(state, f)
         self.logger.info(f'Saved state to: {self.state_path}')
+        
+    def get_state(self) -> DaemonState:
+        return {
+            'pid': self.pid,
+            'worker_pid': self.worker_pid,
+            'stop_on_fail': self.stop_on_fail,
+            'awake': self.awake
+        }
+        
+    def set_state(self, state: DaemonState) -> None:
+        self.pid = state['pid']
+        self.worker_pid = state['worker_pid']
+        self.stop_on_fail = state['stop_on_fail']
+        self.awake = state['awake']
 
     def get_pid(self) -> Optional[int]:
         return self.pid
@@ -142,37 +156,52 @@ class DaemonStateHandler:
 
 
 class Daemon:
-    def __init__(
-        self,
-        worker: Worker,
-        logger: Logger,
-        state_proxy: DaemonStateHandler,
-    ) -> None:
-        self.worker: Worker = worker
+    def __init__(self, worker, logger, state_proxy):
+        self.worker = worker
+        self.logger = logger
+        self.state_proxy = state_proxy
         self.worker_process: Optional[Process] = None
-        self.logger: Logger = logger
-        self.state_proxy: DaemonStateHandler = state_proxy
-        #setup initial state
-        self.state_proxy.set_pid(None) #if just inistalised, then no pid
-        self.state_proxy.set_worker_pid(None)
-    
+
+    def handle_signal(self, signum, frame):
+        """Signal handler only sets the flag and kills the sub-process"""
+        self.logger.info("Termination signal received...")
+        self.state_proxy.set_awake(False)
+        if self.worker_process and self.worker_process.is_alive():
+            self.worker_process.terminate()
+
     def start(self):
-        """Start the training cycle"""
-        self.logger.info("Daemon started")
+        # Attach the signal handler
+        signal.signal(signal.SIGTERM, self.handle_signal)
+        signal.signal(signal.SIGINT, self.handle_signal) # Handle Ctrl+C too
+
         self.state_proxy.set_pid(os.getpid())
         self.state_proxy.set_awake(True)
-        self.state_proxy.save_state()
-        while True:
+
+        while self.state_proxy.get_awake(): # Check the flag here
             try:
                 self.worker_process = Process(target=self.worker.start)
                 self.worker_process.start()
                 self.state_proxy.set_worker_pid(self.worker_process.pid)
-                self.logger.info(f"Started worker process with PID: {self.worker_process.pid}")
-                self.worker_process.join()
-                self.logger.info("Worker process has finished")
+                
+                # Wait for worker, but check 'running' flag periodically
+                while self.worker_process.is_alive():
+                    self.worker_process.join(timeout=1.0)
+                    if not self.state_proxy.get_awake():
+                        break
+
             except Exception as e:
-                self.logger.error(f"stopping because of error: {e}")
+                self.logger.error(f"Error: {e}")
                 break
+
+        self.cleanup()
+
+    def cleanup(self):
+        """Standardized cleanup after the loop breaks"""
+        if self.worker_process and self.worker_process.is_alive():
+            self.worker_process.join()
+        self.state_proxy.set_pid(None)
+        self.state_proxy.set_awake(False)
+        self.logger.info("Daemon shutdown complete")
     
     
 class DaemonInterface:
@@ -190,6 +219,14 @@ class DaemonInterface:
         """Save the daemon state to file"""
         self.state_proxy.save_state()
         
+    def get_state(self) -> DaemonState:
+        """Get the current daemon state"""
+        return self.state_proxy.get_state()
+    
+    def set_state(self, state: DaemonState):
+        """Set the current daemon state"""
+        self.state_proxy.set_state(state)
+        
     def start_daemon(self, daemon: Daemon):
         """Start the daemon process"""
         self.daemon_process = Process(target=daemon.start)
@@ -198,13 +235,21 @@ class DaemonInterface:
         self.logger.info(f'Started daemon process with PID: {self.daemon_pid}')
         self.save_state()
         
+    def stop_daemon(self):
+        """Stop the daemon process"""
+        if self.daemon_process is not None:
+            self.daemon_process.terminate()
+            self.logger.info(f'Stopped daemon process with PID: {self.daemon_pid}')
+            self.state_proxy.set_pid(None)
+            self.state_proxy.set_worker_pid(None)
+            self.state_proxy.set_awake(False)
+            self.save_state()
+        else:
+            self.logger.warning('No daemon process to stop')
+
 """
 Things to do (Test after each):
-
-
-
 - Add methods to stop the daemon and worker processes
-- use a shared dictionary (proxy held by the server) to store state
 - Add methods to check the state of the daemon and worker processes
 
 """

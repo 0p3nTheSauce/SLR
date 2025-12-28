@@ -1,6 +1,6 @@
 from .server import connect_manager
 import multiprocessing as mp
-
+import time
 def shared_dict1():
     """Test the used of a dictionary hosted by a multiprocessing.Manager
     Process 1
@@ -41,7 +41,37 @@ def idle_daemon():
     """
     server = connect_manager()
     server.start_daemon()
+
+def daemon_state_stop():
+    """Test the Daemon process from the server:
+    Check if daemon is idle, then stop it.
+    
+    """
+    server = connect_manager()
+    state = server.get_daemon_state()
+    print("Daemon state :", state)
+    if state['awake']:
+        server.stop_daemon()
+        time.sleep(2)  # Wait for daemon to stop
+        state = server.get_daemon_state()
+        print("Daemon state after stopping:", state)
+
+def idle_daemon_state_stop():
+    """Test the Daemon process from the server:
+    Start the daemon, check its state, then stop it.
+    
+    """
+    server = connect_manager()
+    server.start_daemon()
+    time.sleep(2)  # Wait for daemon to start
+    state = server.get_daemon_state()
+    print("Daemon state after starting:", state)
+    server.stop_daemon()
+    time.sleep(2)  # Wait for daemon to stop
+    state = server.get_daemon_state()
+    print("Daemon state after stopping:", state)
     
 if __name__ == '__main__':
     # process_opener()
-    idle_daemon()
+    # idle_daemon()
+    daemon_state_stop()
