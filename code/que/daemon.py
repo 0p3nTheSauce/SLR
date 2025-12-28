@@ -69,43 +69,104 @@ default_state: DaemonState = {
     'awake': False 
 }
 
-class Daemon:
+class DaemonStateHandler:
     def __init__(
         self,
-        worker: Worker,
         logger: Logger,
+        pid: Optional[int] = None,
+        worker_pid: Optional[int] = None,
+        stop_on_fail: bool = False,
+        awake: bool = False,
         state_path: Union[Path, str] = DAEMON_STATE_PATH,
     ) -> None:
-        self.worker: Worker = worker
-        self.worker_process: Optional[Process] = None
-        self.logger: Logger = logger
+        self.logger = logger
+        self.pid: Optional[int] = pid
+        self.worker_pid: Optional[int] = worker_pid
+        self.stop_on_fail: bool = stop_on_fail
+        self.awake: bool = awake
         self.state_path: Path = Path(state_path)
-        self.state: DaemonState = default_state.copy()
         self.load_state()
-
-    def load_state(self):
+        
+    def load_state(self) -> None:
         try:
-            self.state = read_daemon_state(self.state_path)
-            self.state['pid'] = os.getpid()
-            self.state['worker_pid'] = None
+            state = read_daemon_state(self.state_path)
+            self.pid = state['pid']
+            self.worker_pid = state['worker_pid']
+            self.stop_on_fail = state['stop_on_fail']
+            self.awake = state['awake']
             self.logger.info(f'Loaded state from: {self.state_path}')
         except Exception as e:
             self.logger.warning(
                 f'Ran into an error when loading state: {e}\n'
                 "loading from scratch"
             )
-            self.state = default_state.copy()
-            self.state['pid'] = os.getpid()
+            self.pid = None
+            self.worker_pid = None
+            self.stop_on_fail = False
+            self.awake = False
+            
+    def save_state(self) -> None:
+        state: DaemonState = {
+            'pid': self.pid,
+            'worker_pid': self.worker_pid,
+            'stop_on_fail': self.stop_on_fail,
+            'awake': self.awake
+        }
+        with open(self.state_path, 'w') as f:
+            json.dump(state, f)
+        self.logger.info(f'Saved state to: {self.state_path}')
 
+    def get_pid(self) -> Optional[int]:
+        return self.pid
+    
+    def set_pid(self, pid: Optional[int]) -> None:
+        self.pid = pid
+        
+    def get_worker_pid(self) -> Optional[int]:
+        return self.worker_pid
+    
+    def set_worker_pid(self, worker_pid: Optional[int]) -> None:
+        self.worker_pid = worker_pid
+        
+    def get_stop_on_fail(self) -> bool:
+        return self.stop_on_fail
+    
+    def set_stop_on_fail(self, stop_on_fail: bool) -> None:
+        self.stop_on_fail = stop_on_fail
+        
+    def get_awake(self) -> bool:
+        return self.awake
+    
+    def set_awake(self, awake: bool) -> None:
+        self.awake = awake
+
+
+class Daemon:
+    def __init__(
+        self,
+        worker: Worker,
+        logger: Logger,
+        state_proxy: DaemonStateHandler,
+    ) -> None:
+        self.worker: Worker = worker
+        self.worker_process: Optional[Process] = None
+        self.logger: Logger = logger
+        self.state_proxy: DaemonStateHandler = state_proxy
+        #setup initial state
+        self.state_proxy.set_pid(None) #if just inistalised, then no pid
+        self.state_proxy.set_worker_pid(None)
+    
     def start(self):
         """Start the training cycle"""
-        self.state['awake'] = True
-        self.state['pid'] = os.getpid()
+        self.logger.info("Daemon started")
+        self.state_proxy.set_pid(os.getpid())
+        self.state_proxy.set_awake(True)
+        self.state_proxy.save_state()
         while True:
             try:
                 self.worker_process = Process(target=self.worker.start)
                 self.worker_process.start()
-                self.state['worker_pid'] = self.worker_process.pid
+                self.state_proxy.set_worker_pid(self.worker_process.pid)
                 self.logger.info(f"Started worker process with PID: {self.worker_process.pid}")
                 self.worker_process.join()
                 self.logger.info("Worker process has finished")
@@ -115,54 +176,19 @@ class Daemon:
     
     
 class DaemonInterface:
-    def __init__(self, logger: Logger, state_path: Union[Path, str] = DAEMON_STATE_PATH) -> None:
+    def __init__(self, logger: Logger, state_proxy: DaemonStateHandler) -> None:
         self.logger = logger
-        self.state_path: Path = Path(state_path)
         self.daemon_process: Optional[Process] = None
         #Daemon state variables
-        self.awake: bool = False 
-        self.stop_on_fail: bool = False
-        self.worker_pid: Optional[int] = None
-        self.daemon_pid: Optional[int] = None
-        self.load_state()
-
-    def get_state(self) -> DaemonState:
-        """Return state as dictionary"""
-        return DaemonState(
-            pid=self.pid,
-            worker_pid=self.worker_pid,
-            stop_on_fail=self.stop_on_fail,
-            awake=self.awake
-        )
+        self.state_proxy: DaemonStateHandler = state_proxy
         
-    def set_state(self, state: DaemonState):
-        """Set state from dictionary"""
-        self.awake = state['awake']
-        self.stop_on_fail = state['stop_on_fail']
-        self.worker_pid = state['worker_pid']
-        self.pid = state['pid']
-    
     def load_state(self):
-        """Read state from file"""
-        try:
-            state = read_daemon_state(self.state_path)
-            self.set_state(state)
-            self.logger.info(f'Loaded state from: {self.state_path}')
-        except Exception as e:
-            self.logger.warning(
-                f'Ran into an error when loading state: {e}\n'
-                "loading from scratch"
-            )
-            self.awake = False
-            self.stop_on_fail = False
-            self.worker_pid = None
-            self.pid = None
+        """Load the daemon state from file"""
+        self.state_proxy.load_state()
         
     def save_state(self):
-        """Save state to file"""
-        with open(self.state_path, 'w') as f:
-            json.dump(self.get_state(), f)
-        self.logger.info(f'Saved state to: {self.state_path}')
+        """Save the daemon state to file"""
+        self.state_proxy.save_state()
         
     def start_daemon(self, daemon: Daemon):
         """Start the daemon process"""
@@ -173,8 +199,10 @@ class DaemonInterface:
         self.save_state()
         
 """
-Things to do:
-- Refactor using a new DaemonState class with saving/loading methods
+Things to do (Test after each):
+
+
+
 - Add methods to stop the daemon and worker processes
 - use a shared dictionary (proxy held by the server) to store state
 - Add methods to check the state of the daemon and worker processes
