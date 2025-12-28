@@ -7,7 +7,7 @@ import logging
 from logging import Logger
 
 from .core import Que, SR_LOG_PATH, QUE_NAME, DN_NAME, SR_NAME, WR_NAME
-from .daemon import Daemon, DaemonInterface
+from .daemon import Daemon, DaemonInterface, DaemonStateHandler
 from .worker import Worker
 
 
@@ -61,14 +61,16 @@ logging.basicConfig(
 logger = logging.getLogger(SR_NAME)
 que_logger = logging.getLogger(QUE_NAME)
 dn_logger = logging.getLogger(DN_NAME)
+dn_state_logger = logging.getLogger(f"{DN_NAME} State")
 dn_int_logger = logging.getLogger(f"{DN_NAME} Interface")
 wr_logger = logging.getLogger(WR_NAME)
 
 que = Que(logger=que_logger)
 worker = Worker(que=que, logger=wr_logger)
 
-daemon = Daemon(worker=worker, logger=dn_logger)
-daemon_interface = DaemonInterface(logger=dn_int_logger)
+daemon_state = DaemonStateHandler(logger=dn_state_logger)
+daemon = Daemon(worker=worker, logger=dn_logger, state_proxy=daemon_state)
+daemon_interface = DaemonInterface(logger=dn_int_logger, state_proxy=daemon_state)
     
 _shared_dict = {
     't1': 0,
