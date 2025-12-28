@@ -7,16 +7,14 @@ import logging
 from logging import Logger
 
 from .core import Que, SR_LOG_PATH, QUE_NAME, DN_NAME, SR_NAME, WR_NAME
-from .daemon import Daemon
+from .daemon import Daemon, DaemonInterface
 from .worker import Worker
 
 
 if TYPE_CHECKING:
     class QueManagerProtocol(Protocol):
-        # def get_Que(self) -> Que: ...
-        # def get_Daemon(self) -> Daemon: ..
         def get_shared_dict(self) -> dict: ...
-        
+        def start_daemon(self) -> None: ...
 
 class QueManager(BaseManager): 
     pass
@@ -24,9 +22,8 @@ class QueManager(BaseManager):
 
 def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     """Connect to the Queue manager (returns manager, not Que instance)"""
-    # QueManager.register('get_Que')
-    # QueManager.register('get_Daemon')
     QueManager.register('get_shared_dict')
+    QueManager.register('start_daemon')
     
     for _ in range(max_retries):
         try:
@@ -62,10 +59,16 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(SR_NAME)
-# que_logger = logging.getLogger(QUE_NAME)
-# dn_logger = logging.getLogger(DN_NAME)
-# wr_logger = logging.getLogger(WR_NAME)
+que_logger = logging.getLogger(QUE_NAME)
+dn_logger = logging.getLogger(DN_NAME)
+dn_int_logger = logging.getLogger(f"{DN_NAME} Interface")
+wr_logger = logging.getLogger(WR_NAME)
 
+que = Que(logger=que_logger)
+worker = Worker(que=que, logger=wr_logger)
+
+daemon = Daemon(worker=worker, logger=dn_logger)
+daemon_interface = DaemonInterface(logger=dn_int_logger)
     
 _shared_dict = {
     't1': 0,
@@ -77,8 +80,12 @@ def get_shared_dict():
     """Return the shared dict instance"""
     return _shared_dict
 
-QueManager.register('get_shared_dict', callable=get_shared_dict, proxytype=DictProxy)
+def start_daemon():
+    """Start the daemon process"""
+    daemon_interface.start_daemon(daemon)
 
+QueManager.register('get_shared_dict', callable=get_shared_dict, proxytype=DictProxy)
+QueManager.register('start_daemon', callable=start_daemon)
     
 if __name__ == '__main__':
     start_server()

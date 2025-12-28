@@ -9,7 +9,7 @@ def shared_dict1():
     server = connect_manager()
     shared_dict = server.get_shared_dict()
     print("Initial shared dict:", shared_dict)
-    for key in shared_dict:
+    for key in shared_dict.keys():
         shared_dict[key] += 10
     print("Updated shared dict:", shared_dict)
     
@@ -21,7 +21,7 @@ def shared_dict2():
     server = connect_manager()
     shared_dict = server.get_shared_dict()
     print("Accessed shared dict:", shared_dict)
-    for key in shared_dict:
+    for key in shared_dict.keys():
         shared_dict[key] *= 2
     print("Modified shared dict:", shared_dict)
     
@@ -35,5 +35,13 @@ def process_opener():
     p2.start()
     p2.join()
     
+def idle_daemon():
+    """Test the Daemon process from the server
+    
+    """
+    server = connect_manager()
+    server.start_daemon()
+    
 if __name__ == '__main__':
-    process_opener()
+    # process_opener()
+    idle_daemon()
