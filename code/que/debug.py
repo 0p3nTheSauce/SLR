@@ -9,7 +9,8 @@ def shared_dict1():
     server = connect_manager()
     shared_dict = server.get_shared_dict()
     print("Initial shared dict:", shared_dict)
-    shared_dict['test_key'] = 'test_value'
+    for key in shared_dict:
+        shared_dict[key] += 10
     print("Updated shared dict:", shared_dict)
     
 def shared_dict2():
@@ -20,8 +21,9 @@ def shared_dict2():
     server = connect_manager()
     shared_dict = server.get_shared_dict()
     print("Accessed shared dict:", shared_dict)
-    value = shared_dict.get('test_key', 'not found')
-    print("Value for 'test_key':", value)
+    for key in shared_dict:
+        shared_dict[key] *= 2
+    print("Modified shared dict:", shared_dict)
     
 def process_opener():
     p1 = mp.Process(target=shared_dict1)
