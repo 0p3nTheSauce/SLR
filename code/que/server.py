@@ -68,9 +68,9 @@ logger = logging.getLogger(SR_NAME)
 
     
 _shared_dict = {
-    't1': 123,
-    't2': 'hello',
-    't3': [1, 2, 3]
+    't1': 0,
+    't2': 1,
+    't3': 2,
 }
 
 def get_shared_dict():
