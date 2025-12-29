@@ -231,6 +231,7 @@ class Daemon:
 
 
     def supervise(self) -> None:
+        #TODO: add max retries
         """
         This runs inside the CHILD process.
         The worker process is started and monitored here. After it completes successfully, it is restarted.

@@ -13,8 +13,10 @@ from .worker import Worker
 
 if TYPE_CHECKING:
     class DaemonControllerProtocol(Protocol):
+        def save_state(self) -> None: ...
+        def load_state(self) -> None: ...
         def start(self) -> None: ...
-        def stop(self) -> None: ...
+        def stop(self, timeout: float = 5.0, hard: bool = False) -> None: ...
         def get_state(self) -> DaemonState: ...
         def set_stop_on_fail(self, value: bool) -> None: ...
         def set_awake(self, value: bool) -> None: ...
@@ -65,12 +67,19 @@ class DaemonController:
     """
     def __init__(self, context: ServerContext):
         self.ctx = context
-
+        
+    def save_state(self):
+        self.ctx.daemon_state.to_disk()
+        
+    def load_state(self):
+        self.ctx.daemon_state.from_disk()
+    
     def start(self):
         self.ctx.daemon.start_supervisor()
 
-    def stop(self):
-        self.ctx.daemon.stop_supervisor()
+    def stop(self, timeout: float = 5.0, hard: bool = False):
+        
+        self.ctx.daemon.stop_supervisor(timeout=timeout, hard=hard)
         
     def get_state(self) -> DaemonState:
         return self.ctx.daemon_state.get_state()

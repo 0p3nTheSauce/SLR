@@ -128,7 +128,8 @@ class Worker:
         self.logger.info('finished working')
         
     def start(self, event: EventClass ):
-        self.idle(event) #dummy method to plug actual functionality
+        # self.idle(event) #dummy method to plug actual functionality
+        self.work(event)
         
     
         

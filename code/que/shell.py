@@ -3,6 +3,7 @@ from .core import QUE_LOCATIONS, SYNONYMS
 
 # from .tmux import tmux_manager
 from .server import connect_manager
+from .daemon import DaemonState
 import cmd as cmdLib
 import shlex
 from typing import Optional
@@ -31,8 +32,8 @@ class QueShell(cmdLib.Cmd):
         super().__init__()
         self.console = Console()
         self.server = connect_manager()
-        self.que = self.server.get_Que()
-        self.daemon = self.server.get_Daemon()
+        self.que = self.server.get_que() #proxy object
+        self.daemon_controller = self.server.DaemonController() #object server (hold processes)
         # Display welcome banner
         self._show_banner()
 
@@ -378,28 +379,24 @@ class QueShell(cmdLib.Cmd):
 
     #Daemon based
     
-    def _pretty_status(self, status: Dict[str, Any]):
-        if status['running']:
-            self.console.print(
-                f"Status: [bold green]Running[/bold green]\n"
-                f"PID: [bold green]{status['pid']}"
-            )
-        elif status["return_code"] is None:
-            self.console.print(
-                "Status: [bold yellow]Not running. No worker process[/bold yellow]"
-            )
-        elif status["return_code"] == 0:
-            self.console.print(
-                "Status: [bold blue]Stopped[/bold blue] (exited cleanly)"
-            )
-        elif status["return_code"] < 0:
-            self.console.print(
-                f"Status: [bold red]Killed[/bold red] (signal {-status['return_code']})"
-            )
+    def _pretty_status(self, status: DaemonState):
+        if status["awake"]:
+            self.console.print("Daemon is currently: [bold green]Awake[/bold green]")
         else:
-            self.console.print(
-                f"Status: [bold red]Stopped[/bold red] (exit code {status['return_code']})"
-            )
+            self.console.print("Daemon is currently: [bold yellow]Asleep[/bold yellow]")
+        if status["stop_on_fail"]:
+            self.console.print("Stop on fail is: [bold red]Enabled[/bold red]")
+        else:
+            self.console.print("Stop on fail is: [bold green]Disabled[/bold green]")
+        if status["pid"]:
+            self.console.print(f"Daemon PID: [bold cyan]{status['pid']}[/bold cyan]")
+        else:
+            self.console.print("Daemon PID: [bold yellow]N/A[/bold yellow]")
+        if status["worker_pid"]:
+            self.console.print(f"Worker PID: [bold cyan]{status['worker_pid']}[/bold cyan]")
+        else:
+            self.console.print("Worker PID: [bold yellow]N/A[/bold yellow]")
+            
             
     def do_daemon(self, arg):
         """Interact with the worker"""
@@ -407,22 +404,26 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
         
-        if parsed_args.command == 'start':
+        if parsed_args.command == 'save':
+            with self.unwrap_exception("Daemon state saved", "Failed to save daemon state"):
+                self.daemon_controller.save_state()
+        elif parsed_args.command == 'load':
+            with self.unwrap_exception("Daemon state loaded", "Failed to load daemon state"):
+                self.daemon_controller.load_state()
+        elif parsed_args.command == 'start':
             with self.unwrap_exception("Worker process started", "Failed to start worker"):
                 # self.daemon.start_worker()
-                self.daemon.start()
+                self.daemon_controller.start()
         elif parsed_args.command == 'stop':
-            self.daemon.stop_worker(parsed_args.timeout)
-        elif parsed_args.command == 'restart':
-            self.daemon.restart_worker()
+            self.daemon_controller.stop(timeout=parsed_args.timeout, hard=parsed_args.hard)
         elif parsed_args.command == 'status':
-            self._pretty_status(self.daemon.get_worker_status())
-        elif parsed_args.command == 'tail':
-            lines = self.daemon.tail_worker_log(parsed_args.lines)
-            for line in lines:
-                self.console.print(line)
-        elif parsed_args.command == 'clear-log':
-            self.daemon.clear_worker_log()
+            self._pretty_status(self.daemon_controller.get_state())
+        elif parsed_args.command == 'set-stop-on-fail':
+            self.daemon_controller.set_stop_on_fail(parsed_args.value)
+            self.console.print(f"[bold green]✓[/bold green] Set stop on fail to {parsed_args.value}")
+        elif parsed_args.command == 'set-awake':
+            self.daemon_controller.set_awake(parsed_args.value)
+            self.console.print(f"[bold green]✓[/bold green] Set awake to {parsed_args.value}")
         else:
             self.console.print(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")            
     
@@ -542,11 +543,12 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_edit_parser(self) -> argparse.ArgumentParser:
-        opts_keys = list(map(str, self.que.old_runs[0].keys()))
+        # opts_keys = list(map(str, self.que.old_runs[0].keys()))
         parser = argparse.ArgumentParser(description="Edit run", prog="edit")
         parser.add_argument("location", choices=self.avail_locs)
         parser.add_argument("index", type=int)
-        parser.add_argument("key1", type=str, choices=opts_keys)
+        # parser.add_argument("key1", type=str, choices=opts_keys)
+        parser.add_argument("key1", type=str)
         parser.add_argument("value", type=str)
         parser.add_argument("-k2", "--key2", type=str, default=None)
         return parser
@@ -562,25 +564,30 @@ class QueShell(cmdLib.Cmd):
         
         subparsers = parser.add_subparsers(dest='command', required=True, help='Daemon commands')
         
+        #Save state
+        subparsers.add_parser('save', help='Save daemon state to disk')
+        #Load state
+        subparsers.add_parser('load', help='Load daemon state from disk')
+        
         # Start
         subparsers.add_parser('start', help='Start the worker process')
         
         # Stop with timeout
         stop_parser = subparsers.add_parser('stop', help='Stop the worker gracefully, force kill if necessary')
         stop_parser.add_argument('--timeout', '-to', type=int, default=10, help='Timeout in seconds (default: 10)')
-        
-        # Restart
-        subparsers.add_parser('restart', help='Restart the worker process')
+        stop_parser.add_argument('--hard', '-hd', action='store_true', help='Force kill the worker after timeout')
         
         # Status
         subparsers.add_parser('status', help='Get worker status information')
         
-        # Tail logs
-        tail_parser = subparsers.add_parser('tail', help='View last N lines of worker log')
-        tail_parser.add_argument('--lines', type=int, default=10, help='Number of lines to show (default: 10)')
+        #Set stop on fail
+        set_stop_on_fail_parser = subparsers.add_parser('set-stop-on-fail', help='Set stop on fail option')
+        set_stop_on_fail_parser.add_argument('value', type=bool, help='Boolean value to set')
         
-        # Clear logs
-        subparsers.add_parser('clear-log', help='Clear the worker log file')
+        #Set awake
+        set_awake_parser = subparsers.add_parser('set-awake', help='Set awake option')
+        set_awake_parser.add_argument('value', type=bool, help='Boolean value to set')
+        
         
         return parser
     
