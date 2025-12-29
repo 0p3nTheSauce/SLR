@@ -12,100 +12,130 @@ from .worker import Worker
 
 
 if TYPE_CHECKING:
+    class DaemonControllerProtocol(Protocol):
+        def start(self) -> None: ...
+        def stop(self) -> None: ...
+
     class QueManagerProtocol(Protocol):
         def get_shared_dict(self) -> dict: ...
-        def start_daemon(self) -> None: ...
-        def stop_daemon(self) -> None: ...
-        def get_daemon_state(self) -> DaemonState: ...
-
+        # Notice we now return Objects, not just void functions
+        def DaemonStateHandler(self) -> DaemonStateHandler: ...
+        def DaemonController(self) -> DaemonControllerProtocol: ...
 
 class QueManager(BaseManager): 
     pass
 
 
+class ServerContext:
+    """
+    Holds the Singleton instances of the Daemon, Worker, and State.
+    This prevents relying on loose global variables.
+    """
+    def __init__(self):
+        # Setup Logging
+        # logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            filename=SR_LOG_PATH
+        )
+
+        que_logger = logging.getLogger(QUE_NAME)
+        dn_logger = logging.getLogger(DN_NAME)
+        dn_state_logger = logging.getLogger(f"{DN_NAME} State")
+        dn_int_logger = logging.getLogger(f"{DN_NAME} Interface")
+        wr_logger = logging.getLogger(WR_NAME)
+
+        # Initialize Logic
+        self.que = Que(logger=que_logger)
+        self.worker = Worker(que=self.que, logger=wr_logger)
+        self._shared_dict = {'t1': 0, 't2': 1, 't3': 2}
+
+        # State and Daemon
+        self.daemon_state = DaemonStateHandler(logger=dn_state_logger)
+        self.daemon = Daemon(worker=self.worker, logger=dn_logger, state_proxy=self.daemon_state)
+        self.daemon_interface = DaemonInterface(logger=dn_int_logger, state_proxy=self.daemon_state)
+
+class DaemonController:
+    """
+    The Object Server wrapper.
+    Instead of registering functions, we register this class.
+    """
+    def __init__(self, context: ServerContext):
+        self.ctx = context
+
+    def start(self):
+        self.ctx.daemon_interface.start_daemon(self.ctx.daemon)
+
+    def stop(self):
+        self.ctx.daemon_interface.stop_daemon()
+
+# --- Registration Logic ---
+
+def setup_manager():
+    """
+    Configures the QueManager with the ServerContext.
+    """
+    # Initialize the context once (Singleton pattern)
+    context = ServerContext()
+
+    # 1. Register DaemonStateHandler (Object Server)
+    # Allows client to call: manager.DaemonStateHandler().get_state()
+    QueManager.register(
+        'DaemonStateHandler', 
+        callable=lambda: context.daemon_state
+    )
+
+    # 2. Register DaemonController (Object Server)
+    # Allows client to call: manager.DaemonController().start()
+    QueManager.register(
+        'DaemonController',
+        callable=lambda: DaemonController(context)
+    )
+
+    # 3. Register Shared Dict (Resource)
+    QueManager.register(
+        'get_shared_dict', 
+        callable=lambda: context._shared_dict, 
+        proxytype=DictProxy
+    )
+
+# --- Server Startup ---
+
+def start_server():
+    setup_manager()
+    
+    # Note: We bind to localhost for security, change to 0.0.0.0 to expose externally
+    m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
+    s = m.get_server()
+    
+    print("Object Server started on localhost:50000")
+    print("Exposed Objects: DaemonStateHandler, DaemonController")
+    
+    try:
+        s.serve_forever()
+    except KeyboardInterrupt:
+        print("Server shutdown by user")
+
+# --- Client Connection Helper ---
+
 def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
-    """Connect to the Queue manager (returns manager, not Que instance)"""
+    # Need to register the names on the client side too so Python knows they exist
+    QueManager.register('DaemonStateHandler')
+    QueManager.register('DaemonController')
     QueManager.register('get_shared_dict')
-    QueManager.register('start_daemon')
-    QueManager.register('stop_daemon')
-    QueManager.register('get_daemon_state')
-    
-    
-    
+
     for _ in range(max_retries):
         try:
             m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
             m.connect()
-            return m  # type: ignore
+            return m # type: ignore
         except ConnectionRefusedError:
             print(f"Queue server not ready, retrying in {retry_delay}s...")
             time.sleep(retry_delay)
             
-    raise RuntimeError(
-        "Cannot connect to Queue server. "
-        "Start it with: python Que_server.py"
-    )
+    raise RuntimeError("Cannot connect to Queue server.")
 
-def start_server():
-    m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
-    s = m.get_server()
-    print("Debug server started on localhost:50000")
-    try:
-        s.serve_forever()
-    except KeyboardInterrupt:
-        print("Debug server shutdown by user")
-    except Exception as e:
-        print(f' Debug Server failed due to {e}')
-        return
-
-    
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename=SR_LOG_PATH
-)
-
-logger = logging.getLogger(SR_NAME)
-que_logger = logging.getLogger(QUE_NAME)
-dn_logger = logging.getLogger(DN_NAME)
-dn_state_logger = logging.getLogger(f"{DN_NAME} State")
-dn_int_logger = logging.getLogger(f"{DN_NAME} Interface")
-wr_logger = logging.getLogger(WR_NAME)
-
-que = Que(logger=que_logger)
-worker = Worker(que=que, logger=wr_logger)
-
-daemon_state = DaemonStateHandler(logger=dn_state_logger)
-daemon = Daemon(worker=worker, logger=dn_logger, state_proxy=daemon_state)
-daemon_interface = DaemonInterface(logger=dn_int_logger, state_proxy=daemon_state)
-    
-_shared_dict = {
-    't1': 0,
-    't2': 1,
-    't3': 2,
-}
-
-def get_shared_dict():
-    """Return the shared dict instance"""
-    return _shared_dict
-
-def start_daemon():
-    """Start the daemon process"""
-    daemon_interface.start_daemon(daemon)
-    
-def stop_daemon():
-    """Stop the daemon process"""
-    daemon_interface.stop_daemon()
-    
-def get_daemon_state():
-    """Get the current state of the daemon"""
-    return daemon_state.get_state()
-
-QueManager.register('get_shared_dict', callable=get_shared_dict, proxytype=DictProxy)
-QueManager.register('start_daemon', callable=start_daemon)
-QueManager.register('stop_daemon', callable=stop_daemon)
-QueManager.register('get_daemon_state', callable=get_daemon_state)
-    
 if __name__ == '__main__':
     start_server()
-    
+
