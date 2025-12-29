@@ -35,43 +35,43 @@ def process_opener():
     p2.start()
     p2.join()
     
-def idle_daemon():
-    """Test the Daemon process from the server
-    
-    """
-    server = connect_manager()
-    server.start_daemon()
+def client_logic1():
+    manager = connect_manager()
 
-def daemon_state_stop():
-    """Test the Daemon process from the server:
-    Check if daemon is idle, then stop it.
+    # 1. Get the Controller Object
+    controller = manager.DaemonController()
     
-    """
-    server = connect_manager()
-    state = server.get_daemon_state()
-    print("Daemon state :", state)
-    if state['awake']:
-        server.stop_daemon()
-        time.sleep(2)  # Wait for daemon to stop
-        state = server.get_daemon_state()
-        print("Daemon state after stopping:", state)
+    # 2. Get the State Object
+    state_handler = manager.DaemonStateHandler()
 
-def idle_daemon_state_stop():
-    """Test the Daemon process from the server:
-    Start the daemon, check its state, then stop it.
+    print("Initial State:", state_handler.get_state())
+
+    # 3. Operate on the Controller
+    print("Starting daemon...")
+    controller.start()
     
-    """
-    server = connect_manager()
-    server.start_daemon()
-    time.sleep(2)  # Wait for daemon to start
-    state = server.get_daemon_state()
-    print("Daemon state after starting:", state)
-    server.stop_daemon()
-    time.sleep(2)  # Wait for daemon to stop
-    state = server.get_daemon_state()
-    print("Daemon state after stopping:", state)
+    print("Updated State:", state_handler.get_state())
+    
+def client_logic2():
+    manager = connect_manager()
+
+    # 1. Get the Controller Object
+    controller = manager.DaemonController()
+    
+    # 2. Get the State Object
+    state_handler = manager.DaemonStateHandler()
+
+    print("Current State:", state_handler.get_state())
+
+    # 3. Operate on the Controller
+    print("Stopping daemon...")
+    controller.stop()
+    
+    print("Final State:", state_handler.get_state())
+
     
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
-    daemon_state_stop()
+    # client_logic1()
+    client_logic2()
