@@ -5,7 +5,8 @@ import logging
 from logging import Logger
 from contextlib import redirect_stdout
 import io
-
+import sys
+from multiprocessing.synchronize import Event as EventClass
 from typing import Protocol, runtime_checkable
 # locals
 from .core import RUN_PATH, WR_LOG_PATH, WR_NAME, QueException, ExpInfo
@@ -54,7 +55,7 @@ class Worker:
             sep += "\n"
         return sep.title()
 
-    def _work(self) -> Optional[ExpInfo]:
+    def _work(self, event: EventClass) -> Optional[ExpInfo]:
         gpu_manager.wait_for_completion()
         self.logger.info("starting work")
         # prepare next run (move from to_run -> cur_run)
@@ -89,17 +90,23 @@ class Worker:
         self.logger.info(f"Run path: {run.path}")  # entity/project/run_id format
         
         with redirect_stdout(self.log_adapter):
+            train_loop(admin["model"], config, run, recover=admin["recover"], event=event)
             
-            train_loop(admin["model"], config, run, recover=admin["recover"])
+        if not event.is_set():
+            
+            self.logger.info("Training finished successfully")
+            self.que.store_fin_run()
+            self.que.save_state()
+        else:
+            self.logger.warning("Training was interrupted before completion.")
+            self.que.save_state() #keep current run for recovery
+            #pause wandb run without finishing
+            
         run.finish()
-        
-        self.logger.info("Training finished successfully")
-        self.que.store_fin_run()
-        self.que.save_state()
 
-    def work(self) -> Optional[ExpInfo]:
+    def work(self, event: EventClass) -> Optional[ExpInfo]:
         try:
-            self._work()
+            self._work(event)
         except QueException as Qe:
             self.logger.info(f"que based error, cannot continue: {Qe}")
             raise 
@@ -110,15 +117,18 @@ class Worker:
             self.que.stash_failed_run(str(e))
             self.que.save_state()
 
-    def idle(self):
+    def idle(self, event: EventClass ):
         self.logger.info(f"Busy with: \n {self.que.run_str('cur_run', 0)}")
         for i in range(10):
             self.logger.info(f'working...{i}')
             time.sleep(1)
+            if event.is_set():
+                self.logger.info('stop event detected, finishing work early')
+                break
         self.logger.info('finished working')
         
-    def start(self):
-        self.idle() #dummy method to plug actual functionality
+    def start(self, event: EventClass ):
+        self.idle(event) #dummy method to plug actual functionality
         
     
         

@@ -1,7 +1,7 @@
 from typing import  List, Tuple, Union , Optional
 from wandb.sdk.wandb_run import Run
 from run_types import StopperOn, StopperState
-
+from multiprocessing.synchronize import Event as EventClass
 
     
 class EarlyStopper:
@@ -56,6 +56,7 @@ class EarlyStopper:
         min_delta: float=0.01,
         on: bool=True,
         wandb_run: Optional[Run]=None,
+        event: Optional[EventClass]=None, #if in a multiprocessing context, can pass an Event to signal stopping
     ):
         """Initialize the EarlyStopper."""
         
@@ -91,6 +92,7 @@ class EarlyStopper:
         self.counter = 0
         self.wandb_run = wandb_run
         self.stop = False
+        self.event = event
 
     def step(self, score) -> None:
         """Update early stopping state based on current score.
@@ -98,6 +100,10 @@ class EarlyStopper:
         Args:
             score: The current metric value to evaluate.
         """
+        if self.event is not None and self.event.is_set():
+            self.stop = True
+            return
+        
         if not self.on:
             self.curr_epoch += 1
             return 

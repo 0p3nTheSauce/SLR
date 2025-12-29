@@ -195,14 +195,7 @@ class Daemon:
         indicate no restart should occur.
         """
         assert isinstance(self.worker_process, Process)
-        while self.worker_process.is_alive():
-            self.worker_process.join(timeout=1.0)
-            
-            if self.stop_event.is_set():
-                self.logger.info("Stop event received. Shutting down worker...")
-                self.worker_process.terminate()
-                self.worker_process.join()
-                break 
+        self.worker_process.join()
 
         # If worker died naturally (crash or finish)
         exit_code = self.worker_process.exitcode
@@ -222,6 +215,19 @@ class Daemon:
                 
         return True
 
+    def hard_cleanup(self) -> None:
+        """
+        Forcefully terminate the worker and supervisor processes if they are running.
+        """
+        if self.worker_process and self.worker_process.is_alive():
+            self.logger.info("Forcefully terminating worker process...")
+            self.worker_process.terminate()
+            self.worker_process.join()
+
+        if self.supervisor_process and self.supervisor_process.is_alive():
+            self.logger.info("Forcefully terminating supervisor process...")
+            self.supervisor_process.terminate()
+            self.supervisor_process.join()
 
 
     def supervise(self) -> None:
@@ -237,7 +243,7 @@ class Daemon:
 
         while not self.stop_event.is_set():
             try:
-                self.worker_process = Process(target=self.worker.start)
+                self.worker_process = Process(target=self.worker.start, args=(self.stop_event,))
                 self.worker_process.start()
                 
                 self.state_proxy.set_worker_pid(self.worker_process.pid)
@@ -275,23 +281,21 @@ class Daemon:
          
         self.logger.info(f"Supervisor launched (Child PID: {self.supervisor_process.pid})")
 
-    def stop_supervisor(self):
+    def stop_supervisor(self, timeout: float = 5.0, hard: bool = True) -> None:
         """Gracefully stop the supervisor process"""
         if self.supervisor_process and self.supervisor_process.is_alive():
-            self.logger.info("Signaling supervisor to stop...")
+            self.logger.info("Signaling worker and supervisor to stop...")
             
             # 1. Signal the event
             self.stop_event.set()
             
             # 2. Wait for it to finish gracefully
-            self.supervisor_process.join(timeout=5.0)
+            self.supervisor_process.join(timeout=timeout)
             
             # 3. Force kill if it's stuck (optional safety net)
-            if self.supervisor_process.is_alive():
-                self.logger.warning("Supervisor did not stop gracefully. Forcing termination.")
-                self.supervisor_process.terminate()
-                self.supervisor_process.join()
-
+            if hard:
+                self.hard_cleanup()
+            
             self.state_proxy.set_awake(False)
             self.state_proxy.to_disk()
             self.logger.info("Supervisor stopped.")
