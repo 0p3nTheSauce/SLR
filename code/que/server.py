@@ -1,13 +1,13 @@
 from typing import Protocol, TYPE_CHECKING, Optional
 from multiprocessing.managers import BaseManager, DictProxy
 
-from multiprocessing import Process
+from multiprocessing import Process, Event
 import time
 import logging
 from logging import Logger
 
 from .core import Que, SR_LOG_PATH, QUE_NAME, DN_NAME, SR_NAME, WR_NAME
-from .daemon import Daemon, DaemonInterface, DaemonStateHandler, DaemonState
+from .daemon import Daemon, DaemonStateHandler, DaemonState
 from .worker import Worker
 
 
@@ -43,18 +43,21 @@ class ServerContext:
         que_logger = logging.getLogger(QUE_NAME)
         dn_logger = logging.getLogger(DN_NAME)
         dn_state_logger = logging.getLogger(f"{DN_NAME} State")
-        dn_int_logger = logging.getLogger(f"{DN_NAME} Interface")
         wr_logger = logging.getLogger(WR_NAME)
+
+
 
         # Initialize Logic
         self.que = Que(logger=que_logger)
         self.worker = Worker(que=self.que, logger=wr_logger)
         self._shared_dict = {'t1': 0, 't2': 1, 't3': 2}
+        self.stop_event = Event()
+
 
         # State and Daemon
         self.daemon_state = DaemonStateHandler(logger=dn_state_logger)
-        self.daemon = Daemon(worker=self.worker, logger=dn_logger, state_proxy=self.daemon_state)
-        self.daemon_interface = DaemonInterface(logger=dn_int_logger, state_proxy=self.daemon_state)
+        self.daemon = Daemon(worker=self.worker, logger=dn_logger, state_proxy=self.daemon_state, stop_event=self.stop_event)
+     
 
 class DaemonController:
     """
@@ -65,10 +68,10 @@ class DaemonController:
         self.ctx = context
 
     def start(self):
-        self.ctx.daemon_interface.start_daemon(self.ctx.daemon)
+        self.ctx.daemon.start_supervisor()
 
     def stop(self):
-        self.ctx.daemon_interface.stop_daemon()
+        self.ctx.daemon.stop_supervisor()
 
 # --- Registration Logic ---
 
@@ -120,7 +123,14 @@ def start_server():
 # --- Client Connection Helper ---
 
 def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
-    # Need to register the names on the client side too so Python knows they exist
+    """
+    Useful helper for clients to connect to the QueManager server.
+    
+    :param max_retries: Maximum number of connection attempts
+    :param retry_delay: Delay between retries in seconds
+    :return: Connected QueManager instance
+    :rtype: QueManagerProtocol
+    """
     QueManager.register('DaemonStateHandler')
     QueManager.register('DaemonController')
     QueManager.register('get_shared_dict')
