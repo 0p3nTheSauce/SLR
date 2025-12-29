@@ -7,6 +7,7 @@ from torch.optim.lr_scheduler import LRScheduler
 from pathlib import Path
 import wandb
 from wandb.sdk.wandb_run import Run
+# from multiprocessing.synchronize import Event as EventClass
 # local imports
 
 from video_dataset import get_data_loader, get_wlasl_info
@@ -187,6 +188,7 @@ def train_loop(
     save_every: int = 5,
     recover: bool = False,
     seed: Optional[int] = SEED,
+    # event: Optional[EventClass] = None,
 ) -> Optional[Dict[str, float]]:
     """Train loop for video classification model.
 

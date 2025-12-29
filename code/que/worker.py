@@ -89,6 +89,7 @@ class Worker:
         self.logger.info(f"Run path: {run.path}")  # entity/project/run_id format
         
         with redirect_stdout(self.log_adapter):
+            
             train_loop(admin["model"], config, run, recover=admin["recover"])
         run.finish()
         
@@ -104,7 +105,6 @@ class Worker:
             raise 
         except KeyboardInterrupt:
             self.logger.info("Worker killed by user")
-            
         except Exception as e:
             self.logger.info(f"Training run failed due to an error: {e}")
             self.que.stash_failed_run(str(e))
