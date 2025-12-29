@@ -15,11 +15,12 @@ if TYPE_CHECKING:
     class DaemonControllerProtocol(Protocol):
         def start(self) -> None: ...
         def stop(self) -> None: ...
+        def get_state(self) -> DaemonState: ...
+        def set_stop_on_fail(self, value: bool) -> None: ...
+        def set_awake(self, value: bool) -> None: ...
 
     class QueManagerProtocol(Protocol):
-        def get_shared_dict(self) -> dict: ...
-        # Notice we now return Objects, not just void functions
-        def DaemonStateHandler(self) -> DaemonStateHandler: ...
+        def get_que(self) -> Que: ...
         def DaemonController(self) -> DaemonControllerProtocol: ...
 
 class QueManager(BaseManager): 
@@ -46,11 +47,9 @@ class ServerContext:
         wr_logger = logging.getLogger(WR_NAME)
 
 
-
         # Initialize Logic
         self.que = Que(logger=que_logger)
         self.worker = Worker(que=self.que, logger=wr_logger)
-        self._shared_dict = {'t1': 0, 't2': 1, 't3': 2}
         self.stop_event = Event()
 
 
@@ -72,6 +71,15 @@ class DaemonController:
 
     def stop(self):
         self.ctx.daemon.stop_supervisor()
+        
+    def get_state(self) -> DaemonState:
+        return self.ctx.daemon_state.get_state()
+
+    def set_stop_on_fail(self, value: bool) -> None:
+        self.ctx.daemon_state.set_stop_on_fail(value)
+        
+    def set_awake(self, value: bool) -> None:
+        self.ctx.daemon_state.set_awake(value)
 
 # --- Registration Logic ---
 
@@ -82,13 +90,6 @@ def setup_manager():
     # Initialize the context once (Singleton pattern)
     context = ServerContext()
 
-    # 1. Register DaemonStateHandler (Object Server)
-    # Allows client to call: manager.DaemonStateHandler().get_state()
-    QueManager.register(
-        'DaemonStateHandler', 
-        callable=lambda: context.daemon_state
-    )
-
     # 2. Register DaemonController (Object Server)
     # Allows client to call: manager.DaemonController().start()
     QueManager.register(
@@ -96,11 +97,10 @@ def setup_manager():
         callable=lambda: DaemonController(context)
     )
 
-    # 3. Register Shared Dict (Resource)
+    # 3. Register Shared Que Proxy
     QueManager.register(
-        'get_shared_dict', 
-        callable=lambda: context._shared_dict, 
-        proxytype=DictProxy
+        'get_que',
+        callable=lambda: context.que,
     )
 
 # --- Server Startup ---
@@ -134,6 +134,7 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     QueManager.register('DaemonStateHandler')
     QueManager.register('DaemonController')
     QueManager.register('get_shared_dict')
+    QueManager.register('get_que')
 
     for _ in range(max_retries):
         try:
