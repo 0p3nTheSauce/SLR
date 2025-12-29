@@ -479,7 +479,8 @@ class Que:
                 return True
         return False
 
-    def _get_print_stats(self, runs: List[Sumarised]) -> Dict[str, int]:
+    @classmethod
+    def _get_print_stats(cls, runs: List[Sumarised]) -> Dict[str, int]:
         """Get statistics for string formatting"""
         stats = {
             "max_model_len": 0,
@@ -750,6 +751,84 @@ class Que:
                         if run["best_val_loss"] is not None
                         else "N/A"
                     ).ljust(stats["max_best_val_loss_len"] + 2)
+                )
+
+            row_parts.append(run["config_path"].ljust(stats["max_config_path_len"] + 2))
+
+            if "error" in run:
+                row_parts.append(run["error"] if run["error"] is not None else "N/A")
+
+            if exc is not None:
+                row_parts = [
+                    r
+                    for r, h in zip(row_parts, header_parts)
+                    if h.strip().lower() not in exc
+                ]
+
+            row = " | ".join(row_parts)
+            print(row)
+
+    @classmethod
+    def print_runs(cls, runs: List[Sumarised], exc: Optional[List[str]] = None) -> None:
+        """If you are working through the proxy and have already got the runs list"""
+
+
+        if len(runs) == 0:
+            print("  No runs available")
+            return
+        stats = cls._get_print_stats(runs)
+        header_parts = [
+            "Idx".ljust(5),
+            "Run ID".ljust(stats.get("max_run_id_len", len("Run Id")) + 2),
+            "Model".ljust(stats["max_model_len"] + 2),
+            "Exp No".ljust(stats["max_exp_no_len"] + 2),
+            "Dataset".ljust(stats["max_dataset_len"] + 2),
+            "Split".ljust(stats["max_split_len"] + 2),
+        ]
+
+        if "best_val_acc" in runs[0]:
+            header_parts.append("Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2))
+            header_parts.append(
+                "Best Val Loss".ljust(stats.get("max_best_val_loss_len", 4) + 2)
+            )
+
+        header_parts.append("Config Path".ljust(stats["max_config_path_len"] + 2))
+
+        if "error" in runs[0]:
+            header_parts.append("Error")
+
+        if exc is not None:
+            header_parts = [h for h in header_parts if h.strip().lower() not in exc]
+
+        header = " | ".join(header_parts)
+        print(header)
+        print("-" * len(header))
+        for i, run in enumerate(runs):
+            row_parts = [
+                str(i).ljust(5),
+                (run["run_id"] if run["run_id"] is not None else "N/A").ljust(
+                    stats.get("max_run_id_len", len("Run Id")) + 2
+                ),
+                run["model"].ljust(stats["max_model_len"] + 2),
+                run["exp_no"].ljust(stats["max_exp_no_len"] + 2),
+                run["dataset"].ljust(stats["max_dataset_len"] + 2),
+                run["split"].ljust(stats["max_split_len"] + 2),
+            ]
+
+            if "best_val_acc" in run:
+                row_parts.append(
+                    (
+                        f"{run['best_val_acc']:.4f}"
+                        if run["best_val_acc"] is not None
+                        else "N/A"
+                    ).ljust(stats.get("max_best_val_acc_len", 4) + 2)
+                )
+                row_parts.append(
+                    (
+                        f"{run['best_val_loss']:.4f}"
+                        if run["best_val_loss"] is not None
+                        else "N/A"
+                    ).ljust(stats.get("max_best_val_loss_len", 4) + 2)
                 )
 
             row_parts.append(run["config_path"].ljust(stats["max_config_path_len"] + 2))
