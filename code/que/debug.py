@@ -1,7 +1,7 @@
-from .server import connect_manager
+# from .server import connect_manager
 import multiprocessing as mp
 import time
-from .core import Que
+from .core import Que, connect_manager
 from typing import cast    
 def client_logic1():
     manager = connect_manager()

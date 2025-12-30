@@ -1,8 +1,7 @@
 from typing import Dict, Any
-from .core import QUE_LOCATIONS, SYNONYMS
+from .core import QUE_LOCATIONS, SYNONYMS, connect_manager
 
 # from .tmux import tmux_manager
-from .server import connect_manager
 from .daemon import DaemonState
 import cmd as cmdLib
 import shlex
@@ -22,6 +21,7 @@ from rich import box
 import io
 import sys
 import json
+
 
 
 class QueShell(cmdLib.Cmd):
@@ -173,13 +173,18 @@ class QueShell(cmdLib.Cmd):
         """Save state with visual feedback"""
         with self.unwrap_exception("Queue state saved to file"):
             self.que.save_state()
+        with self.unwrap_exception("Daemon state saved to file"):
+            self.daemon_controller.save_state()
         # self.console.print("[bold green]✓[/bold green] Queue state saved to file")
 
     def do_load(self, arg):
         """Load state with visual feedback"""
-        with self.unwrap_exception("Que state loaded from file"):
-            with self.console.status("[bold cyan]Loading state...", spinner="dots"):
-                self.que.load_state()
+        with self.console.status("[bold cyan]Loading state...", spinner="dots"):
+            with self.unwrap_exception("Que state loaded from file"):
+                    self.que.load_state()
+            with self.unwrap_exception("Daemon state loaded from file"):
+                    self.daemon_controller.load_state()        
+                
         # self.console.print("[bold green]✓[/bold green] Queue state loaded from file")
 
     def do_recover(self, arg):
@@ -269,9 +274,9 @@ class QueShell(cmdLib.Cmd):
         parsed_args = self._parse_args_or_cancel("display", arg)
         if parsed_args is None:
             return
-
-        run = self.que.peak_run(parsed_args.location, parsed_args.index)
-        if run:
+        try:
+            run = self.que.peak_run(parsed_args.location, parsed_args.index)
+        
             # Format as JSON-like syntax
 
             run_json = json.dumps(run, indent=2)
@@ -285,9 +290,9 @@ class QueShell(cmdLib.Cmd):
                     padding=(1, 2),
                 )
             )
-        else:
+        except Exception as e:
             self.console.print(
-                f"[red]Run {parsed_args.index} not found in {parsed_args.location}[/red]"
+                f"[red]Display failed : {e}[/red]"
             )
 
     def do_shuffle(self, arg):
@@ -296,11 +301,10 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        self.que.shuffle(parsed_args.location, parsed_args.o_index, parsed_args.n_index)
-        self.console.print(
-            f"[bold green]✓[/bold green] Moved run from position {parsed_args.o_index} "
-            f"to {parsed_args.n_index} in {parsed_args.location}"
-        )
+        with self.unwrap_exception(
+            f"Moved run from position {parsed_args.o_index} to {parsed_args.n_index} in {parsed_args.location}"
+        ):
+            self.que.shuffle(parsed_args.location, parsed_args.o_index, parsed_args.n_index)
 
     def do_move(self, arg):
         """Move run with visual feedback"""
@@ -308,16 +312,17 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        self.que.move(
-            parsed_args.o_location,
-            parsed_args.n_location,
-            parsed_args.oi_index,
-            parsed_args.of_index,
-        )
-        self.console.print(
-            f"[bold green]✓[/bold green] Moved run from {parsed_args.o_location} "
-            f"to {parsed_args.n_location}"
-        )
+        with self.unwrap_exception(
+            f"Moved run from {parsed_args.o_location} to {parsed_args.n_location}"
+        ):
+            self.que.move(
+                parsed_args.o_location,
+                parsed_args.n_location,
+                parsed_args.oi_index,
+                parsed_args.of_index,
+            )
+        
+        
 
     def do_create(self, arg):
         """Create with progress indication"""
@@ -418,10 +423,16 @@ class QueShell(cmdLib.Cmd):
             self.daemon_controller.stop(timeout=parsed_args.timeout, hard=parsed_args.hard)
         elif parsed_args.command == 'status':
             self._pretty_status(self.daemon_controller.get_state())
-        elif parsed_args.command == 'set-stop-on-fail':
+        elif parsed_args.command == 'stop-on-fail':
+            if parsed_args.value == 'on':
+                parsed_args.value = True
+            else:
+                parsed_args.value = False
             self.daemon_controller.set_stop_on_fail(parsed_args.value)
             self.console.print(f"[bold green]✓[/bold green] Set stop on fail to {parsed_args.value}")
-        elif parsed_args.command == 'set-awake':
+        elif parsed_args.command == 'awake':
+            if parsed_args.value == 'on':
+                parsed_args.value = True
             self.daemon_controller.set_awake(parsed_args.value)
             self.console.print(f"[bold green]✓[/bold green] Set awake to {parsed_args.value}")
         else:
@@ -581,15 +592,20 @@ class QueShell(cmdLib.Cmd):
         subparsers.add_parser('status', help='Get worker status information')
         
         #Set stop on fail
-        set_stop_on_fail_parser = subparsers.add_parser('set-stop-on-fail', help='Set stop on fail option')
-        set_stop_on_fail_parser.add_argument('value', type=bool, help='Boolean value to set')
+        set_stop_on_fail_parser = subparsers.add_parser('stop-on-fail', help='Set stop on fail option')
+        set_stop_on_fail_parser.add_argument('value', choices=['on', 'off'], help='Boolean value to set')
         
         #Set awake
         set_awake_parser = subparsers.add_parser('set-awake', help='Set awake option')
-        set_awake_parser.add_argument('value', type=bool, help='Boolean value to set')
+        set_awake_parser.add_argument('value', choices=['on', 'off'], help='Boolean value to set')
         
         
         return parser
+    
+"""To dos:
+- There are some functions which do not have exception handling - add those
+
+"""
     
     
 if __name__ == "__main__":

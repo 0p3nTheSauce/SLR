@@ -194,12 +194,12 @@ def train_loop(
     """Train loop for video classification model.
 
     Args:
-                                                                    model_name (str): Name of the model to train.
-                                                                    wandb_run (Run): Wandb run instance for logging, and config.
-                                                                    load (Optional[Union[Path, str]], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
-                                                                    save_every (int, optional): Period of saving (epochs). Defaults to 5.
-                                                                    recover (bool, optional): Continue from a failed run. Defaults to False.
-                                                                    seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
+        model_name (str): Name of the model to train.
+        wandb_run (Run): Wandb run instance for logging, and config.
+        load (Optional[Union[Path, str]], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
+        save_every (int, optional): Period of saving (epochs). Defaults to 5.
+        recover (bool, optional): Continue from a failed run. Defaults to False.
+        seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
 
     """
 
@@ -263,6 +263,9 @@ def train_loop(
                 scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
             if "stopper_state_dict" in checkpoint:
                 stopper.load_state_dict(checkpoint["stopper_state_dict"])
+                if stopper.stopped_by_event:
+                    stopper.stop = False  # reset stop if was set by event before
+                    stopper.stopped_by_event = False
             epoch = checkpoint["epoch"] + 1
             steps = checkpoint["steps"]
             # best_val_loss = checkpoint["best_val_score"]

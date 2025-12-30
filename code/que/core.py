@@ -137,6 +137,8 @@ This docstring describes the intended behaviour and the main public API surface.
 """
 
 from typing import (
+    TYPE_CHECKING,
+    Protocol,
     Optional,
     Callable,
     List,
@@ -154,7 +156,8 @@ from pathlib import Path
 import json
 from logging import Logger
 import logging
-
+from multiprocessing.managers import BaseManager
+import time
 # locals
 from run_types import (
     ExpInfo,
@@ -305,20 +308,6 @@ class QueBusy(QueException):
 
     def __reduce__(self):
         return (self.__class__, (self.message,))
-
-
-def retrieve_Data(path: Path) -> Any:
-    """Retrieves data from a given path."""
-    with open(path, "r") as file:
-        data = json.load(file)
-    return data
-
-
-def store_Data(path: Path, data: Any):
-    """Stores data to a given path."""
-    with open(path, "w") as file:
-        json.dump(data, file, indent=4)
-
 
 @contextmanager
 def log_and_raise(logger: Logger, task: str = "Operation"):
@@ -1031,6 +1020,198 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
+# --- Daemon State Management --- #
+
+class DaemonState(TypedDict):
+    pid: Optional[int]
+    worker_pid: Optional[int]
+    stop_on_fail: bool
+    awake: bool
+
+
+def is_daemon_state(val: Any) -> TypeGuard[DaemonState]:
+    """
+    Type guard to check if an arbitrary value is structurally
+    compatible with the DaemonState TypedDict.
+    """
+    # 1. Check if the value is a dictionary
+    if not isinstance(val, dict):
+        return False
+
+    # 2. Check for the presence of all required keys
+    # Since all keys are technically *optional* in the Python dictionary sense
+    # but *required* by TypedDict (unless explicitly marked NotRequired),
+    # we check for all keys listed in the TypedDict.
+    required_keys = DaemonState.__annotations__.keys()
+    if not all(key in val for key in required_keys):
+        return False
+
+    # 3. Check the type of each value
+    # We use .get() here defensively, although the previous check makes it safe
+    # to use val[key].
+
+    # Check 'pid' and 'worker_pid' (Optional[int])
+    if not (val.get("pid") is None or isinstance(val["pid"], int)):
+        return False
+
+    if not (val.get("worker_pid") is None or isinstance(val["worker_pid"], int)):
+        return False
+
+    # Check 'stop_on_fail' and 'awake' (bool)
+    if not isinstance(val.get("stop_on_fail"), bool):
+        return False
+
+    if not isinstance(val.get("awake"), bool):
+        return False
+
+    # If all checks pass, it is a DaemonState
+    return True
+
+
+def read_daemon_state(state_path: Union[Path, str] = DAEMON_STATE_PATH) -> DaemonState:
+    with open(state_path, "r") as f:
+        data = json.load(f)
+    if is_daemon_state(data):
+        return data
+    else:
+        raise ValueError(
+            f"Data read from: {state_path} is not compatible with DaemonState"
+        )
+
+default_state: DaemonState = {
+    "pid": None,
+    "worker_pid": None,
+    "stop_on_fail": False,
+    "awake": False,
+}
+
+class DaemonStateHandler:
+    def __init__(
+        self,
+        logger: Logger,
+        pid: Optional[int] = None,
+        worker_pid: Optional[int] = None,
+        stop_on_fail: bool = True,
+        awake: bool = False,
+        state_path: Union[Path, str] = DAEMON_STATE_PATH,
+    ) -> None:
+        self.logger = logger
+        self.pid: Optional[int] = pid
+        self.worker_pid: Optional[int] = worker_pid
+        self.stop_on_fail: bool = stop_on_fail
+        self.awake: bool = awake
+        self.state_path: Path = Path(state_path)
+        self.from_disk()
+
+    def from_disk(self) -> None:
+        try:
+            state = read_daemon_state(self.state_path)
+            self.pid = state["pid"]
+            self.worker_pid = state["worker_pid"]
+            self.stop_on_fail = state["stop_on_fail"]
+            self.awake = state["awake"]
+            self.logger.info(f"Loaded state from: {self.state_path}")
+        except Exception as e:
+            self.logger.warning(
+                f"Ran into an error when loading state: {e}\nloading from scratch"
+            )
+            self.pid = None
+            self.worker_pid = None
+            self.stop_on_fail = False
+            self.awake = False
+
+    def to_disk(self) -> None:
+        state: DaemonState = {
+            "pid": self.pid,
+            "worker_pid": self.worker_pid,
+            "stop_on_fail": self.stop_on_fail,
+            "awake": self.awake,
+        }
+        with open(self.state_path, "w") as f:
+            json.dump(state, f)
+        self.logger.info(f"Saved state to: {self.state_path}")
+
+    def get_state(self) -> DaemonState:
+        return {
+            "pid": self.pid,
+            "worker_pid": self.worker_pid,
+            "stop_on_fail": self.stop_on_fail,
+            "awake": self.awake,
+        }
+
+    def set_state(self, state: DaemonState) -> None:
+        self.pid = state["pid"]
+        self.worker_pid = state["worker_pid"]
+        self.stop_on_fail = state["stop_on_fail"]
+        self.awake = state["awake"]
+
+    def get_pid(self) -> Optional[int]:
+        return self.pid
+
+    def set_pid(self, pid: Optional[int]) -> None:
+        self.pid = pid
+
+    def get_worker_pid(self) -> Optional[int]:
+        return self.worker_pid
+
+    def set_worker_pid(self, worker_pid: Optional[int]) -> None:
+        self.worker_pid = worker_pid
+
+    def get_stop_on_fail(self) -> bool:
+        return self.stop_on_fail
+
+    def set_stop_on_fail(self, stop_on_fail: bool) -> None:
+        self.stop_on_fail = stop_on_fail
+
+    def get_awake(self) -> bool:
+        return self.awake
+
+    def set_awake(self, awake: bool) -> None:
+        self.awake = awake
+
+#------- Basmanager connections -------#
+
+if TYPE_CHECKING:
+    class DaemonControllerProtocol(Protocol):
+        def save_state(self) -> None: ...
+        def load_state(self) -> None: ...
+        def start(self) -> None: ...
+        def stop(self, timeout: float = 5.0, hard: bool = False) -> None: ...
+        def get_state(self) -> DaemonState: ...
+        def set_stop_on_fail(self, value: bool) -> None: ...
+        def set_awake(self, value: bool) -> None: ...
+
+    class QueManagerProtocol(Protocol):
+        def get_que(self) -> Que: ...
+        def get_daemon_state(self) -> DaemonStateHandler: ...
+        def DaemonController(self) -> DaemonControllerProtocol: ...
+
+class QueManager(BaseManager): 
+    pass
+
+def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
+    """
+    Useful helper for clients to connect to the QueManager server.
+    
+    :param max_retries: Maximum number of connection attempts
+    :param retry_delay: Delay between retries in seconds
+    :return: Connected QueManager instance
+    :rtype: QueManagerProtocol
+    """
+    QueManager.register('DaemonController')
+    QueManager.register('get_que')
+    QueManager.register('get_daemon_state')
+
+    for _ in range(max_retries):
+        try:
+            m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
+            m.connect()
+            return m # type: ignore
+        except ConnectionRefusedError:
+            print(f"Queue server not ready, retrying in {retry_delay}s...")
+            time.sleep(retry_delay)
+            
+    raise RuntimeError("Cannot connect to Queue server.")
 
 def main():
     logging.basicConfig(
