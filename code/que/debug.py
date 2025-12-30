@@ -2,6 +2,7 @@
 import multiprocessing as mp
 import time
 from .core import Que, connect_manager
+from .tmux import tmux_manager
 from typing import cast    
 def client_logic1():
     manager = connect_manager()
@@ -46,10 +47,18 @@ def que_client():
 
 
 
+def tmuxer():
+    tman = tmux_manager()
+    tman.join_session_pane()
+
+
+    
     
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
     # client_logic1()
     # client_logic2()
-    que_client()
+    # que_client()
+    tmuxer()
+    

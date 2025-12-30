@@ -1,8 +1,6 @@
-from typing import Dict, Any
-from .core import QUE_LOCATIONS, SYNONYMS, connect_manager
+from .core import QUE_LOCATIONS, SYNONYMS, connect_manager, DaemonState
 
-# from .tmux import tmux_manager
-from .daemon import DaemonState
+from .tmux import tmux_manager
 import cmd as cmdLib
 import shlex
 from typing import Optional
@@ -31,13 +29,15 @@ class QueShell(cmdLib.Cmd):
     ) -> None:
         super().__init__()
         self.console = Console()
+        self.tmux_man = tmux_manager()
+        self.auto_save = auto_save
         self.server = connect_manager()
         self.que = self.server.get_que() #proxy object
         self.daemon_controller = self.server.DaemonController() #object server (hold processes)
         # Display welcome banner
         self._show_banner()
 
-        self.auto_save = auto_save
+       
 
         # Override prompt with rich styling
         # self.prompt = "(que)$"  # We'll handle this with rich
@@ -60,6 +60,8 @@ class QueShell(cmdLib.Cmd):
         self.console.print(
             "\nType [bold cyan]help[/bold cyan] or [bold cyan]?[/bold cyan] to list commands.\n"
         )
+
+    
 
     def do_help(self, arg):
         """Override help to provide Rich formatted help"""
@@ -321,8 +323,6 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.oi_index,
                 parsed_args.of_index,
             )
-        
-        
 
     def do_create(self, arg):
         """Create with progress indication"""
@@ -382,6 +382,12 @@ class QueShell(cmdLib.Cmd):
             f"[bold green]✓[/bold green] Edited run {parsed_args.index} in {parsed_args.location}"
         )
 
+    #Tmux
+    def do_attach(self, arg):
+        """Attach to the que_training tmux session"""
+        with self.unwrap_exception("Attached to tmux session", "Failed to attach to tmux session"):
+            self.tmux_man.join_session_pane()
+
     #Daemon based
     
     def _pretty_status(self, status: DaemonState):
@@ -402,7 +408,6 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("Worker PID: [bold yellow]N/A[/bold yellow]")
             
-            
     def do_daemon(self, arg):
         """Interact with the worker"""
         parsed_args = self._parse_args_or_cancel("daemon", arg)
@@ -417,10 +422,14 @@ class QueShell(cmdLib.Cmd):
                 self.daemon_controller.load_state()
         elif parsed_args.command == 'start':
             with self.unwrap_exception("Worker process started", "Failed to start worker"):
-                # self.daemon.start_worker()
                 self.daemon_controller.start()
         elif parsed_args.command == 'stop':
-            self.daemon_controller.stop(timeout=parsed_args.timeout, hard=parsed_args.hard)
+            if parsed_args.supervisor:
+                with self.unwrap_exception("Supervisor process stopped", "Failed to stop supervisor"):
+                    self.daemon_controller.stop_supervisor(timeout=parsed_args.timeout, hard=parsed_args.hard, and_worker=parsed_args.worker)
+            else:
+                with self.unwrap_exception("Worker process stopped", "Failed to stop worker"):
+                    self.daemon_controller.stop_worker(timeout=parsed_args.timeout, hard=parsed_args.hard)
         elif parsed_args.command == 'status':
             self._pretty_status(self.daemon_controller.get_state())
         elif parsed_args.command == 'stop-on-fail':
@@ -585,6 +594,8 @@ class QueShell(cmdLib.Cmd):
         
         # Stop with timeout
         stop_parser = subparsers.add_parser('stop', help='Stop the worker gracefully, force kill if necessary')
+        stop_parser.add_argument('--worker', '-w', action='store_true', help='Stop the worker process')
+        stop_parser.add_argument('--supervisor', '-s', action='store_true', help='Stop the supervisor process. Include -w to stop worker as well, otherwise wait for trainloop to complete')
         stop_parser.add_argument('--timeout', '-to', type=int, default=10, help='Timeout in seconds (default: 10)')
         stop_parser.add_argument('--hard', '-hd', action='store_true', help='Force kill the worker after timeout')
         
@@ -601,7 +612,11 @@ class QueShell(cmdLib.Cmd):
         
         
         return parser
+
+    #Tmux
     
+
+
 """To dos:
 - There are some functions which do not have exception handling - add those
 

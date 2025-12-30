@@ -1,6 +1,5 @@
 from typing import Optional, Union, cast, Dict, Any, Tuple
 import torch  # type: ignore
-import json
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import LRScheduler
@@ -17,7 +16,6 @@ from configs import (
     get_train_parser,
     take_args,
     set_seed,
-    DataInfo,
     SEED,
     RunInfo,
     WandbInfo,
