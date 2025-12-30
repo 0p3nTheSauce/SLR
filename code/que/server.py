@@ -140,9 +140,7 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     :return: Connected QueManager instance
     :rtype: QueManagerProtocol
     """
-    QueManager.register('DaemonStateHandler')
     QueManager.register('DaemonController')
-    QueManager.register('get_shared_dict')
     QueManager.register('get_que')
 
     for _ in range(max_retries):

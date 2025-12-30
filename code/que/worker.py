@@ -34,6 +34,9 @@ class LoggerWriter(io.TextIOBase):
         # We need to explicitly implement flush, but it doesn't need to do anything
         pass
 
+
+
+
 class Worker:
     def __init__(
         self,
@@ -119,7 +122,7 @@ class Worker:
 
     def idle(self, event: EventClass ):
         self.logger.info(f"Busy with: \n {self.que.run_str('cur_run', 0)}")
-        for i in range(10):
+        for i in range(100):
             self.logger.info(f'working...{i}')
             time.sleep(1)
             if event.is_set():
@@ -128,8 +131,8 @@ class Worker:
         self.logger.info('finished working')
         
     def start(self, event: EventClass ):
-        # self.idle(event) #dummy method to plug actual functionality
-        self.work(event)
+        self.idle(event) #dummy method to plug actual functionality
+        # self.work(event)
         
     
         
