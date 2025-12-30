@@ -1,15 +1,12 @@
 from typing import Optional, IO, cast
-from pathlib import Path
 import time
 import logging
 from logging import Logger
 from contextlib import redirect_stdout
 import io
-import sys
 from multiprocessing.synchronize import Event as EventClass
-from typing import Protocol, runtime_checkable
 # locals
-from .core import RUN_PATH, WR_LOG_PATH, WR_NAME, QueException, ExpInfo
+from .core import QueException, ExpInfo
 
 
 from .core import Que, connect_manager
@@ -139,10 +136,11 @@ class LoggerWriter(io.TextIOBase):
 class Worker:
     def __init__(
         self,
-        logger: Logger
+        server_logger: Logger,
+        training_logger: Logger
     ) -> None:
-        self.logger = logger
-        self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(logger))
+        self.logger = server_logger
+        self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(training_logger))
 
     def seperator(self, r_str: str) -> str:
         sep = ""

@@ -177,8 +177,8 @@ QUE_DIR = Path(__file__).parent
 
 QUE_NAME = "Que"
 DN_NAME = "Daemon"
-WR_NAME = "Worker"
-SR_NAME = "Server"
+WORKER_NAME = "Worker"
+SERVER_NAME = "Server"
 RUN_PATH = QUE_DIR / "Runs.json"
 DAEMON_STATE_PATH = QUE_DIR / "Daemon.json"
 WR_LOG_PATH = QUE_DIR / "Worker.log"
@@ -207,6 +207,9 @@ SYNONYMS = {
     "fr": "fail_runs",
 }
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
+
+#tmux
+SESH_NAME = "train"
 
 
 class FailedExp(ExpInfo):
@@ -1176,7 +1179,8 @@ if TYPE_CHECKING:
         def save_state(self) -> None: ...
         def load_state(self) -> None: ...
         def start(self) -> None: ...
-        def stop(self, timeout: float = 5.0, hard: bool = False) -> None: ...
+        def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None: ...
+        def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False) -> None: ...
         def get_state(self) -> DaemonState: ...
         def set_stop_on_fail(self, value: bool) -> None: ...
         def set_awake(self, value: bool) -> None: ...
