@@ -93,6 +93,7 @@ class EarlyStopper:
         self.wandb_run = wandb_run
         self.stop = False
         self.event = event
+        self.stopped_by_event = False
 
     def step(self, score) -> None:
         """Update early stopping state based on current score.
@@ -102,6 +103,7 @@ class EarlyStopper:
         """
         if self.event is not None and self.event.is_set():
             self.stop = True
+            self.stopped_by_event = True
             return
         
         if not self.on:

@@ -6,27 +6,9 @@ import time
 import logging
 from logging import Logger
 
-from .core import Que, SR_LOG_PATH, QUE_NAME, DN_NAME, SR_NAME, WR_NAME
+from .core import Que, QueManager, SR_LOG_PATH, QUE_NAME, DN_NAME, SR_NAME, WR_NAME
 from .daemon import Daemon, DaemonStateHandler, DaemonState
 from .worker import Worker
-
-
-if TYPE_CHECKING:
-    class DaemonControllerProtocol(Protocol):
-        def save_state(self) -> None: ...
-        def load_state(self) -> None: ...
-        def start(self) -> None: ...
-        def stop(self, timeout: float = 5.0, hard: bool = False) -> None: ...
-        def get_state(self) -> DaemonState: ...
-        def set_stop_on_fail(self, value: bool) -> None: ...
-        def set_awake(self, value: bool) -> None: ...
-
-    class QueManagerProtocol(Protocol):
-        def get_que(self) -> Que: ...
-        def DaemonController(self) -> DaemonControllerProtocol: ...
-
-class QueManager(BaseManager): 
-    pass
 
 
 class ServerContext:
@@ -51,13 +33,13 @@ class ServerContext:
 
         # Initialize Logic
         self.que = Que(logger=que_logger)
-        self.worker = Worker(que=self.que, logger=wr_logger)
+        self.worker = Worker(logger=wr_logger)
         self.stop_event = Event()
 
 
         # State and Daemon
         self.daemon_state = DaemonStateHandler(logger=dn_state_logger)
-        self.daemon = Daemon(worker=self.worker, logger=dn_logger, state_proxy=self.daemon_state, stop_event=self.stop_event)
+        self.daemon = Daemon(worker=self.worker, logger=dn_logger, local_state=self.daemon_state, stop_event=self.stop_event)
      
 
 class DaemonController:
@@ -111,6 +93,12 @@ def setup_manager():
         'get_que',
         callable=lambda: context.que,
     )
+    
+    # 4. Register shared Daemon State Proxy
+    QueManager.register(
+        'get_daemon_state',
+        callable=lambda: context.daemon_state,
+    )
 
 # --- Server Startup ---
 
@@ -129,30 +117,7 @@ def start_server():
     except KeyboardInterrupt:
         print("Server shutdown by user")
 
-# --- Client Connection Helper ---
 
-def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
-    """
-    Useful helper for clients to connect to the QueManager server.
-    
-    :param max_retries: Maximum number of connection attempts
-    :param retry_delay: Delay between retries in seconds
-    :return: Connected QueManager instance
-    :rtype: QueManagerProtocol
-    """
-    QueManager.register('DaemonController')
-    QueManager.register('get_que')
-
-    for _ in range(max_retries):
-        try:
-            m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
-            m.connect()
-            return m # type: ignore
-        except ConnectionRefusedError:
-            print(f"Queue server not ready, retrying in {retry_delay}s...")
-            time.sleep(retry_delay)
-            
-    raise RuntimeError("Cannot connect to Queue server.")
 
 
 
