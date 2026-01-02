@@ -9,7 +9,7 @@ from multiprocessing.synchronize import Event as EventClass
 from .core import QueException, ExpInfo
 
 
-from .core import Que, connect_manager
+from .core import Que, connect_manager, QueException 
 from utils import gpu_manager
 from configs import _exp_to_run_info
 from training import train_loop, _setup_wandb
@@ -170,9 +170,7 @@ class Worker:
         config = _exp_to_run_info(info)
 
         # setup wandb run
-        run = _setup_wandb(config, wandb_info)
-        if run is None:
-            return
+        run = _setup_wandb(config, wandb_info, run_id_required=True)
 
         # save run_id for recovering
         wandb_info["run_id"] = run.id

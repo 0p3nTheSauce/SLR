@@ -194,7 +194,6 @@ class QueShell(cmdLib.Cmd):
         with self.unwrap_exception("Run recovered successfully"):
             with self.console.status("[bold yellow]Recovering run...", spinner="dots"):
                 self.que.recover_run()
-        self.console.print("[bold green]✓[/bold green] Run recovered successfully")
 
     def do_clear(self, arg):
         """Clear runs with confirmation"""

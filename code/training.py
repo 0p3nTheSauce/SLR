@@ -115,7 +115,7 @@ def get_stopper(
         return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run, event=event)
 
 
-def _setup_wandb(config: RunInfo, wandb_info: WandbInfo) -> Optional[Run]:
+def _setup_wandb(config: RunInfo, wandb_info: WandbInfo, run_id_required: bool = True) -> Run:
     # wandb_info = config["wandb"]
     admin = config["admin"]
 
@@ -130,31 +130,35 @@ def _setup_wandb(config: RunInfo, wandb_info: WandbInfo) -> Optional[Run]:
                 wandb_info["project"],
                 idx=-1,  # last if same name
             )
-        if run_id is None:
-            print("Run id not found automatically, pass as arg instead")
-            return
+        if run_id is not None:
+            print(f"Resuming run with ID: {run_id}")
 
-        print(f"Resuming run with ID: {run_id}")
+            run = wandb.init(
+                entity=wandb_info["entity"],
+                project=wandb_info["project"],
+                name=run_name,
+                tags=wandb_info["tags"],
+                config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
+                id=run_id,
+                resume="must",
+            )
+            print(f"Run ID: {run.id}")
+            print(f"Run name: {run.name}")  # Human-readable name
+            print(f"Run path: {run.path}")  # entity/project/run_id format
+            return run
+        elif run_id_required:
+            raise ValueError("Run ID is required for recovery but could not be found.")
+        
+    
+    print(f"Starting new run with name: {run_name}")
 
-        run = wandb.init(
-            entity=wandb_info["entity"],
-            project=wandb_info["project"],
-            name=run_name,
-            tags=wandb_info["tags"],
-            config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
-            id=run_id,
-            resume="must",
-        )
-    else:
-        print(f"Starting new run with name: {run_name}")
-
-        run = wandb.init(
-            entity=wandb_info["entity"],
-            project=wandb_info["project"],
-            name=run_name,
-            tags=wandb_info["tags"],
-            config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
-        )
+    run = wandb.init(
+        entity=wandb_info["entity"],
+        project=wandb_info["project"],
+        name=run_name,
+        tags=wandb_info["tags"],
+        config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
+    )
     print(f"Run ID: {run.id}")
     print(f"Run name: {run.name}")  # Human-readable name
     print(f"Run path: {run.path}")  # entity/project/run_id format
@@ -188,6 +192,7 @@ def train_loop(
     recover: bool = False,
     seed: Optional[int] = SEED,
     event: Optional[EventClass] = None,
+    prompt: bool = False
 ) -> Optional[Dict[str, float]]:
     """Train loop for video classification model.
 
@@ -274,7 +279,7 @@ def train_loop(
 
             print(f"Resuming from epoch {epoch}, steps {steps}")
             print(f"Loaded model from {load}")
-        else:
+        elif prompt:
             cont = input(
                 f"Checkpoint {load} does not exist, starting from scratch? [y]"
             )
@@ -282,6 +287,8 @@ def train_loop(
                 return
             epoch = 0
             steps = 0
+        else:
+            raise ValueError(f'Load path not found: {load}')
 
     # train it
     while epoch < config["training"]["max_epoch"] and not stopper.stop:
