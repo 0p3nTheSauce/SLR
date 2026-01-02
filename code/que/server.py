@@ -89,7 +89,7 @@ class DaemonController:
     def stop_worker(self, timeout: Optional[float] = None, hard: bool = False):
         self.ctx.daemon.stop_worker(timeout=timeout, hard=hard)
 
-    def stop_superviseor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False):
+    def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False):
         self.ctx.daemon.stop_supervisor(timeout=timeout, hard=hard, and_worker=and_worker)
 
     def get_state(self) -> DaemonState:

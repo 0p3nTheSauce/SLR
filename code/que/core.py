@@ -850,10 +850,13 @@ class Que:
     # for QueShell interface
 
     def recover_run(self, move_to: QueLocation = TO_RUN) -> None:
-        """Set the run in cur_run to recover, and move to to_run or cur_run"""
+        """Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present"""
         with log_and_raise(self.logger, "recover"):
-            run = self.pop_cur_run()
+            run = self.peak_cur_run()
             run["admin"]["recover"] = True
+            if run["wandb"]["run_id"] is None: #NOTE: run id could become optional if required
+                raise QueException("Run was set to recover, but no run id was provided")
+            _ = self.pop_cur_run()
             self._set_run(move_to, 0, run)
 
     def clear_runs(self, loc: QueLocation) -> None:
