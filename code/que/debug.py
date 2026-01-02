@@ -32,7 +32,7 @@ def client_logic2():
 
     # 3. Operate on the Controller
     print("Stopping daemon...")
-    controller.stop()
+    controller.stop_supervisor()
     
     print("Final State:", controller.get_state())
 

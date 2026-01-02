@@ -243,7 +243,6 @@ class QueShell(cmdLib.Cmd):
 
         # runs are a list of Summarised dicts
 
-        # TODO: there is probably a list comprehension way to do thi
         for idx, row in enumerate(runs):
             row_values = []
             for value in row.values():
