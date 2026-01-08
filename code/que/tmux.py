@@ -102,40 +102,37 @@ class tmux_manager:
             print(e.stderr)
             return 
 
+    def _send(
+        self, cmd: str, wndw: str
+    ) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
+        """Send a command to the given window
 
+        Args:
+            cmd (str): The command as you would type in the terminal
+            wndw (str): The tmux window
 
-
-    # def _send(
-    #     self, cmd: str, wndw: str
-    # ) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
-    #     """Send a command to the given window
-
-    #     Args:
-    #                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     cmd (str): The command as you would type in the terminal
-    #                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     wndw (str): The tmux window
-
-    #     Returns:
-    #                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
-    #     """
-    #     avail_wndws = [self.server_name, self.worker_name]
-    #     if wndw not in avail_wndws:
-    #         print(
-    #             f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}"
-    #         )
-    #         return None
-    #     tmux_cmd = [
-    #         "tmux",
-    #         "send-keys",
-    #         "-t",
-    #         f"{self.sesh_name}:{wndw}",
-    #         cmd,
-    #         "Enter",
-    #     ]
-    #     try:
-    #         return subprocess.run(tmux_cmd, check=True)
-    #     except subprocess.CalledProcessError as e:
-    #         print("Send ran into an error when spawning the worker process: ")
-    #         print(e.stderr)
+        Returns:
+            Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
+        """
+        avail_wndws = [self.server_name, self.worker_name]
+        if wndw not in avail_wndws:
+            print(
+                f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}"
+            )
+            return None
+        tmux_cmd = [
+            "tmux",
+            "send-keys",
+            "-t",
+            f"{self.sesh_name}:{wndw}",
+            cmd,
+            "Enter",
+        ]
+        try:
+            return subprocess.run(tmux_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print("Send ran into an error when spawning the worker process: ")
+            print(e.stderr)
 
     # def setup_tmux_session_windows(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
     #     """Create the que_training tmux session is set up, with windows daemon and worker
