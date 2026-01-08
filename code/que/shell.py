@@ -37,8 +37,6 @@ class QueShell(cmdLib.Cmd):
         # Display welcome banner
         self._show_banner()
 
-       
-
         # Override prompt with rich styling
         # self.prompt = "(que)$"  # We'll handle this with rich
         self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
@@ -60,8 +58,6 @@ class QueShell(cmdLib.Cmd):
         self.console.print(
             "\nType [bold cyan]help[/bold cyan] or [bold cyan]?[/bold cyan] to list commands.\n"
         )
-
-    
 
     def do_help(self, arg):
         """Override help to provide Rich formatted help"""

@@ -4,6 +4,7 @@ import logging
 from logging import Logger
 from contextlib import redirect_stdout
 import io
+import os
 from multiprocessing.synchronize import Event as EventClass
 # locals
 from .core import QueException, ExpInfo
@@ -154,51 +155,58 @@ class Worker:
         return sep.title()
 
     def _work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
-        gpu_manager.wait_for_completion()
-        self.logger.info("starting work")
-        # prepare next run (move from to_run -> cur_run)
-        run_sum = que.stash_next_run()
-        que.save_state()
-        
-        # self.logger.info a seperator between runs
-        self.logger.info(self.seperator(run_sum))
-        # get next run
-        info = que.peak_cur_run()
-
-        wandb_info = info["wandb"]
-        admin = info["admin"]
-        config = _exp_to_run_info(info)
-
-        # setup wandb run
-        run = _setup_wandb(config, wandb_info, run_id_required=True)
-
-        # save run_id for recovering
-        wandb_info["run_id"] = run.id
-        info["wandb"] = wandb_info
-
-        self.logger.info("saving my id")
-        _ = que.pop_cur_run()
-        que.set_cur_run(info)
-        que.save_state()
-
-        self.logger.info(f"Run ID: {run.id}")
-        self.logger.info(f"Run name: {run.name}")  # Human-readable name
-        self.logger.info(f"Run path: {run.path}")  # entity/project/run_id format
-        
-        with redirect_stdout(self.log_adapter):
-            train_loop(admin["model"], config, run, recover=admin["recover"], event=event)
-            
-        if not event.is_set():
-            
-            self.logger.info("Training finished successfully")
-            que.store_fin_run()
+        try:
+            gpu_manager.wait_for_completion()
+            self.logger.info(f"starting work with pid: {os.getpid()}")
+            # prepare next run (move from to_run -> cur_run)
+            run_sum = que.stash_next_run()
             que.save_state()
-        else:
-            self.logger.warning("Training was interrupted before completion.")
-            que.save_state() #keep current run for recovery
-            #pause wandb run without finishing
+        
+            # self.logger.info a seperator between runs
+            self.logger.info(self.seperator(run_sum))
+            # get next run
+            info = que.peak_cur_run()
+
+            wandb_info = info["wandb"]
+            admin = info["admin"]
+            config = _exp_to_run_info(info)
+
+            # setup wandb run
+            run = _setup_wandb(config, wandb_info, run_id_required=True)
+
+            # save run_id for recovering
+            wandb_info["run_id"] = run.id
+            info["wandb"] = wandb_info
+
+            self.logger.info("saving my id")
+            _ = que.pop_cur_run()
+            que.set_cur_run(info)
+            que.save_state()
+
+            self.logger.info(f"Run ID: {run.id}")
+            self.logger.info(f"Run name: {run.name}")  # Human-readable name
+            self.logger.info(f"Run path: {run.path}")  # entity/project/run_id format
+        
+            with redirect_stdout(self.log_adapter):
+                train_loop(admin["model"], config, run, recover=admin["recover"], event=event)
             
-        run.finish()
+            if not event.is_set():
+            
+                self.logger.info("Training finished successfully")
+                que.store_fin_run()
+                que.save_state()
+            else:
+                self.logger.warning("Training was interrupted before completion.")
+                que.save_state() #keep current run for recovery
+                #pause wandb run without finishing
+            
+            run.finish(exit_code=0, quiet=True)
+
+            self.logger.info("_work method completed successfully")  # ADD THIS
+            return None  # ADD EXPLICIT RETURN
+            
+        finally:
+            self.logger.info("Exiting _work method")
 
     def work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
         try:

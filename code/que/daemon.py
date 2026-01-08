@@ -43,7 +43,15 @@ class Daemon:
         indicate no restart should occur.
         """
         assert isinstance(self.worker_process, Process)
-        self.worker_process.join()
+        #self.worker_process.join()
+
+
+        # Check periodically to provide status updates
+        while self.worker_process.is_alive():
+            self.worker_process.join(timeout=600.0)  # Check every 10 minutes
+            if self.worker_process.is_alive():
+                self.logger.debug(f"Worker still running (PID: {self.worker_process.pid})")
+
 
         # If worker died naturally (crash or finish)
         exit_code = self.worker_process.exitcode
