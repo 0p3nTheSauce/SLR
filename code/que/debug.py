@@ -1,7 +1,7 @@
 # from .server import connect_manager
 import multiprocessing as mp
 import time
-from .core import Que, connect_manager
+from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
 from typing import cast    
 def client_logic1():
@@ -51,7 +51,10 @@ def tmuxer():
     tman = tmux_manager()
     tman.join_session_pane()
 
-
+def timestamp():
+    q = Que(_get_basic_logger())
+    print(q._timestamp('code/que/Runs.json'))
+    
     
     
 if __name__ == '__main__':
@@ -60,5 +63,7 @@ if __name__ == '__main__':
     # client_logic1()
     # client_logic2()
     # que_client()
-    tmuxer()
+    # tmuxer()
+    timestamp()
+    
     

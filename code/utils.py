@@ -1,7 +1,7 @@
 from typing import List, Union, Tuple
 import torch
 import cv2
-
+from logging import Logger
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -25,7 +25,7 @@ from typing import Callable, Optional, Dict, Any
 
 class gpu_manager:
 	@classmethod
-	def get_gpu_memory_usage(cls, gpu_id=0):
+	def get_gpu_memory_usage(cls, gpu_id: int=0):
 		"""Get GPU memory usage across all processes"""
 
 		result = subprocess.run(
@@ -51,6 +51,14 @@ class gpu_manager:
 
 		return used / 1024, total / 1024  # In GB
 
+
+	@classmethod
+	def output(cls, logger: Optional[Logger], message: str) -> None:
+		if logger is None:
+			print(message)
+		else:
+			logger.info(message)
+
 	@classmethod
 	def wait_for_completion(
 		cls,
@@ -60,16 +68,18 @@ class gpu_manager:
 		verbose: bool = False,
 		gpu_id: int = 0,
 		max_util_gb: float = 1.0,  # Maximum memory usage in GB
-	) -> bool:
+		logger: Optional[Logger] = None,
+	) -> bool: 
 		"""Wait for GPU memory to be free before proceeding
 
 		Args:
 				check_interval (int, optional): Wait period before checking again. Defaults to 3600 (1 hour).
 				confirm_interval (int, optional): Wait period before checking again when confirming. Defaults to 60 (1 minute).
 				num_checks: (int, optional): Confirm consistency over how many checks. Defaults to 5 (5 minutes).
+				verbose: (bool, optional): Verbose output
 				gpu_id (int, optional): CUDA GPU. Defaults to 0.
 				max_util_gb (float, optional): Threshold GPU usage to trigger waiting. Defaults to 1.0 (GB).
-
+				logger: (Logger, optional): Optionally supply a logger
 		Returns:
 				bool: Whether monitoring was killed by the user.
 		"""
@@ -81,17 +91,17 @@ class gpu_manager:
 
 		while proceed:
 			if verbose:
-				print()
-				print(
+				cls.output(logger, "")
+				cls.output(logger,
 					f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
 				)
-				print(f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+				cls.output(logger,f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 			try:
 				time.sleep(check_interval)
 				used, _ = cls.get_gpu_memory_usage(gpu_id)
 			except KeyboardInterrupt:
-				print()
-				print("Monitoring interrupted by user")
+				cls.output(logger,"")
+				cls.output(logger,"Monitoring interrupted by user")
 				return False
 
 			if used <= max_util_gb and cls._confirm_usage(
@@ -100,8 +110,8 @@ class gpu_manager:
 				break
 
 		if verbose:
-			print()
-			print(
+			cls.output(logger,"")
+			cls.output(logger,
 				f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
 			)
 
