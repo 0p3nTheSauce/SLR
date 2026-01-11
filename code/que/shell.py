@@ -1,4 +1,4 @@
-from .core import QUE_LOCATIONS, SYNONYMS, connect_manager, DaemonState
+from .core import QUE_LOCATIONS, SYNONYMS, connect_manager, DaemonState, WR_LOG_PATH, SR_LOG_PATH
 
 from .tmux import tmux_manager
 import cmd as cmdLib
@@ -20,7 +20,7 @@ import io
 import sys
 import json
 
-
+import subprocess
 
 class QueShell(cmdLib.Cmd):
     def __init__(
@@ -102,7 +102,8 @@ class QueShell(cmdLib.Cmd):
             ("shuffle", "Reposition a run within a location"),
             ("clear", "Clear all runs from a location"),
             ("daemon", "Start/manage the daemon process"),
-            ("worker", "Start/manage the worker process"),
+            ("logs", "View the Que log files"),
+            ("copy", "Store a copy of the Que"),
             ("attach", "Attach to tmux session"),
             ("save", "Save queue state to file"),
             ("load", "Load queue state from file"),
@@ -441,7 +442,45 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")            
     
+    def do_logs(self, arg):
+        """Tail the worker or daemon logs"""
+        parsed_args = self._parse_args_or_cancel("logs", arg)
+        if parsed_args is None:
+            return
+        
+        if parsed_args.worker:
+            log_file = str(WR_LOG_PATH)  # your constant
+        elif parsed_args.server:
+            log_file = str(SR_LOG_PATH)  # your constant
+        else:
+            print("Please specify --worker or --server")
+            return
+        
+        try:
+            # Use tail -f to follow the log file
+            subprocess.run(["tail", "-f", log_file])
+        except KeyboardInterrupt:
+            # Allow user to exit with Ctrl+C
+            print("\nStopped tailing log file")
+        except FileNotFoundError:
+            print(f"Error: Log file not found at {log_file}")
+        except Exception as e:
+            print(f"Error reading log file: {e}")
             
+            
+    def do_copy(self, arg):
+        parsed_args = self._parse_args_or_cancel("copy", arg)
+        if parsed_args is None:
+            return
+        
+        with self.unwrap_exception("Made copy successfully"):
+            if parsed_args.out_path is None:
+                self.que.make_copy()
+            else:
+                self.que.make_copy(parsed_args.out_path)
+        
+    
+    
     #Helper function
 
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -502,7 +541,9 @@ class QueShell(cmdLib.Cmd):
             "move": self._get_move_parser,
             "edit": self._get_edit_parser,
             "display": self._get_display_parser,
-            "daemon": self._get_daemon_parser
+            "daemon": self._get_daemon_parser,
+            "logs": self._get_log_parser,
+            "copy": self._get_copy_parser
         }
         if cmd in parsers:
             return parsers[cmd]()
@@ -607,12 +648,31 @@ class QueShell(cmdLib.Cmd):
         
         return parser
 
+    def _get_log_parser(self) -> argparse.ArgumentParser:
+    
+        parser = argparse.ArgumentParser(description="Interact with Que log files", prog="logs")
+        
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument("--worker", "-w", action='store_true', help='Tail the Worker.log file')
+        group.add_argument("--server", "-s", action='store_true', help='Tail the Server.log file')
+        
+        return parser
+        
+    def _get_copy_parser(self) -> argparse.ArgumentParser:
+        
+        parser = argparse.ArgumentParser(description="Make a copy of the Que", prog = "copy")
+        
+        parser.add_argument('--out_path', '-op', type=str, help='Output path, otherwise defaults to the run path with _c')
+        return parser
+
+
     #Tmux
     
 
 
 """To dos:
 - There are some functions which do not have exception handling - add those
+- Add probe to check server is running/start server + restart server
 
 """
     

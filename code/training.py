@@ -96,6 +96,18 @@ def get_scheduler(
             T_mult=sched_conf["tmult"],
             eta_min=sched_conf["eta_min"],
         )
+    elif sched_conf["type"] == "ReduceLROnPlateau":
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode=sched_conf["mode"],
+            factor=sched_conf["factor"],
+            patience=sched_conf["patience"],
+            threshold=sched_conf["threshold"],
+            threshold_mode=sched_conf["threshold_mode"],
+            cooldown=sched_conf["cooldown"],
+            min_lr=sched_conf["min_lr"], 
+            eps=sched_conf["eps"]
+        )
     else:
         # should not be possible to get here
         raise ValueError(f"Scheduler type {sched_conf['type']} not recognized.")

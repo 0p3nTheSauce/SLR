@@ -158,6 +158,7 @@ from logging import Logger
 import logging
 from multiprocessing.managers import BaseManager
 import time
+from datetime import datetime
 # locals
 from run_types import (
     ExpInfo,
@@ -540,28 +541,50 @@ class Que:
                 runs.append(run)
         return idxs, runs
 
-    def load_state(self):
-        """Read que from file"""
+    def load_state(self, in_path: Optional[Union[str, Path]]= None):
+        """
+        Load Que from file. Default load from RUNS_PATH, unless in_path is provided
+        
+        :param in_path: Overide default load path. 
+        :type in_path: Optional[Union[str, Path]]
+        """
+        if in_path is None:
+            in_path = self.runs_path
+        elif not Path(in_path).exists():
+            self.logger.warning(f"No existing state found at {in_path}. Load unsuccessful.")
+            return
+            
         try:
-            with open(self.runs_path, "r") as f:
+            with open(in_path, "r") as f:
                 data = json.load(f)
             self.to_run = data.get(TO_RUN, [])
             self.cur_run = data.get(CUR_RUN, [])
             self.old_runs = data.get(OLD_RUNS, [])
             self.fail_runs = data.get(FAIL_RUNS, [])
-            self.logger.info(f"Loaded que state from {self.runs_path}")
+            self.logger.info(f"Loaded que state from {in_path}")
         except FileNotFoundError:
             self.logger.warning(
-                f"No existing state found at {self.runs_path}. Starting fresh."
+                f"No existing state found at {in_path}. Starting fresh."
             )
             self.to_run = []
             self.cur_run = []
             self.old_runs = []
             self.fail_runs = []
 
-    def save_state(self):
-        """Write que to file"""
-        with open(self.runs_path, "w") as f:
+    def _timestamp(self, path: Union[str, Path]) -> str:
+        formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+        return str(path).replace(".json", f"{formatted}_.json")
+
+    def save_state(self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False):
+        if out_path is None:
+            out_path = self.runs_path
+        elif Path(out_path).exists() and not timestamp:
+            self.logger.warning(f"Overwriting existing state file: {out_path}")        
+
+        # if timestamp:
+            
+
+        with open(out_path, "w") as f:
             all_runs = {
                 TO_RUN: self.to_run,
                 CUR_RUN: self.cur_run,
@@ -569,7 +592,7 @@ class Que:
                 FAIL_RUNS: self.fail_runs,
             }
             json.dump(all_runs, f, indent=4)
-        self.logger.info(f"Saved que to {self.runs_path}")
+        self.logger.info(f"Saved que to {out_path}")
 
     # for worker
 
@@ -1026,6 +1049,24 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
+    def make_copy(self, out_path: str = f"{str(RUN_PATH).replace('.json', '_c.json')}") -> None:
+        """
+        Store a copy of the Runs json file 
+        
+        :param out_path: Copy path
+        :type out_name: str
+        """
+        with open(out_path, 'w') as f:
+            all_runs = {
+                TO_RUN: self.to_run,
+                CUR_RUN: self.cur_run,
+                OLD_RUNS: self.old_runs,
+                FAIL_RUNS: self.fail_runs
+            }
+            json.dump(all_runs ,f, indent=4)
+        self.logger.info(f"Saved copy of Que to: {out_path}")
+        
+
 # --- Daemon State Management --- #
 
 class DaemonState(TypedDict):
@@ -1220,9 +1261,7 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
             
     raise RuntimeError("Cannot connect to Queue server.")
 
-
-
-def main():
+def _get_basic_logger() -> Logger:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -1230,9 +1269,29 @@ def main():
     )
 
     logger = logging.getLogger(__name__)
+    return logger
+
+
+def main():
+    # logging.basicConfig(
+    #     level=logging.INFO,
+    #     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    #     filename=SR_LOG_PATH,  # Optional: log to file
+    # )
+
+    logger = _get_basic_logger()
 
     q = Que(logger)
     q.disp_runs(OLD_RUNS)
+
+#TODO:
+#- add more options to logs, (e.g. clear)
+#- add more options for que copies (e.g. load)
+#- add auto experiment num
+#- add remote shell connection
+
+
+
 
 if __name__ == "__main__":
     main()

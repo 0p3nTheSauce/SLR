@@ -127,6 +127,7 @@ def print_config(config_dict):
 
 ###################### Config generation ###############################
 
+
 def _schedular_precheck(sched_info: Optional[SchedInfo]) -> None:
 	"""Fail early if scheduler config is invalid. 
 
@@ -144,22 +145,24 @@ def _schedular_precheck(sched_info: Optional[SchedInfo]) -> None:
 		return
  
 	#these have already been implemented
-	# valid_types = [
-	# 	'WarmOnly', #warm up only
-	# 	'CosineAnnealingLR',
-	# 	'CosineAnnealingWarmRestarts',
-	# ]
+	valid_types = [
+		'WarmOnly', #warm up only
+		'ReduceLROnPlateau',
+		'CosineAnnealingLR',
+		'CosineAnnealingWarmRestarts',
+	]
 	
-	# if sched_info["type"] not in valid_types:
-	# 	raise ValueError(
-	# 		f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
-	# 	)
+	if sched_info["type"] not in valid_types:
+		raise ValueError(
+			f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
+		)
 		
 	if 'warmup_epochs' in sched_info:
 		if sched_info["warmup_epochs"] < 0:
 			raise ValueError("warmup_epochs must be non-negative")
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
+
 
 
 
