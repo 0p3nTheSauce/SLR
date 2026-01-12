@@ -714,7 +714,10 @@ class QueShell(cmdLib.Cmd):
 """To dos:
 - There are some functions which do not have exception handling - add those
 - Add probe to check server is running/start server + restart server
-
+- Add better checking when starting daemon/worker (check it is actually working instead of just reporting
+    that the process started successfully)
+- Figure out issue with relieving cuda context (NB)
+- Add more options to logs
 """
     
     
