@@ -184,12 +184,19 @@ class QueShell(cmdLib.Cmd):
 
     def do_load(self, arg):
         """Load state with visual feedback"""
-        with self.console.status("[bold cyan]Loading state...", spinner="dots"):
-            with self.unwrap_exception("Que state loaded from file"):
-                    self.que.load_state()
-            with self.unwrap_exception("Daemon state loaded from file"):
-                    self.daemon_controller.load_state()        
-                
+        parsed_args = self._parse_args_or_cancel("load", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == 'que':
+            with self.unwrap_exception("Que state loaded from file", "Failed to load Que state from file"):
+                self.que.load_state(parsed_args.Input_Path)
+        elif parsed_args.command == 'daemon':
+            with self.unwrap_exception("Daemon state loaded from file", "Failed to load daemon state from file"):
+                self.daemon_controller.load_state()        
+        else:
+            raise ValueError('neither Que nor Daemon specified, this should not be possible')                
+
         # self.console.print("[bold green]✓[/bold green] Queue state loaded from file")
 
     def do_recover(self, arg):
@@ -567,7 +574,7 @@ class QueShell(cmdLib.Cmd):
         parser = argparse.ArgumentParser(
             description="Load the state of the Que or Daemon", prog="load"
         )
-        subparsers = parser.add_subparsers(dest="target", required=True, help="Target to load")
+        subparsers = parser.add_subparsers(dest="command", required=True, help="Target to load")
 
         # Que Subparser
         que_load = subparsers.add_parser("que", aliases=["-q"], help="Load Que state")
