@@ -13,7 +13,7 @@ from .core import QueException, ExpInfo
 
 
 from .core import Que, connect_manager, QueException 
-# from utils import gpu_manager
+from utils import gpu_manager
 from configs import _exp_to_run_info
 from training import train_loop, _setup_wandb
 import wandb
@@ -57,7 +57,17 @@ class Worker:
     def _work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
         try:
             self.logger.info(f"starting work with pid: {os.getpid()}")
-            # gpu_manager.wait_for_completion(check_interval=10, verbose=True, logger=self.logger)
+            self.logger.info("Checking GPU usage")
+
+            if not gpu_manager.wait_for_completion(
+                check_interval=10,
+                logger=self.logger,
+                event=event,
+            ):
+                self.logger.info("GPU not available, exiting")
+                return
+            else:
+                self.logger.info("GPU is available")
             
             # prepare next run (move from to_run -> cur_run)
             run_sum = que.stash_next_run()
