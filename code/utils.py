@@ -13,7 +13,7 @@ import wandb
 import time
 import subprocess
 from typing import Callable, Optional, Dict, Any
-
+from multiprocessing.synchronize import Event as EventClass
 
 
 ################ GPU ###################
@@ -65,10 +65,10 @@ class gpu_manager:
 		check_interval: int = 3600,  # 1 hour
 		confirm_interval: int = 60,  # 1 minute
 		num_checks: int = 5,  # confirm consistency over 5 minutes
-		verbose: bool = False,
 		gpu_id: int = 0,
 		max_util_gb: float = 1.0,  # Maximum memory usage in GB
 		logger: Optional[Logger] = None,
+		daemon_event: Optional[EventClass] = None
 	) -> bool: 
 		"""Wait for GPU memory to be free before proceeding
 
@@ -76,12 +76,12 @@ class gpu_manager:
 				check_interval (int, optional): Wait period before checking again. Defaults to 3600 (1 hour).
 				confirm_interval (int, optional): Wait period before checking again when confirming. Defaults to 60 (1 minute).
 				num_checks: (int, optional): Confirm consistency over how many checks. Defaults to 5 (5 minutes).
-				verbose: (bool, optional): Verbose output
 				gpu_id (int, optional): CUDA GPU. Defaults to 0.
 				max_util_gb (float, optional): Threshold GPU usage to trigger waiting. Defaults to 1.0 (GB).
 				logger: (Logger, optional): Optionally supply a logger
+				daemon_event: (Optional[EventClass], optional): Optionally supply a multiprocessing stopping event.
 		Returns:
-				bool: Whether monitoring was killed by the user.
+				bool: Whether monitoring was killed by the user, either through CTRL+C or stop event.
 		"""
 		assert torch.cuda.is_available(), "CUDA is not available"
 
@@ -90,12 +90,11 @@ class gpu_manager:
 		proceed = used > max_util_gb
 
 		while proceed:
-			if verbose:
-				cls.output(logger, "")
-				cls.output(logger,
-					f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
-				)
-				cls.output(logger,f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+			cls.output(logger, "")
+			cls.output(logger,
+				f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
+			)
+			cls.output(logger,f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 			try:
 				time.sleep(check_interval)
 				used, _ = cls.get_gpu_memory_usage(gpu_id)
@@ -108,12 +107,15 @@ class gpu_manager:
 				confirm_interval, num_checks, gpu_id, max_util_gb
 			):
 				break
+			elif daemon_event is not None and daemon_event.is_set():
+				cls.output(logger, "")
+				cls.output(logger, "Stop event detected")
+				return False
 
-		if verbose:
-			cls.output(logger,"")
-			cls.output(logger,
-				f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
-			)
+		cls.output(logger,"")
+		cls.output(logger,
+			f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
+		)
 
 		return True
 

@@ -4,7 +4,7 @@ from multiprocessing.synchronize import Event as EventClass
 from logging import Logger
 import os
 import time
-
+from utils import gpu_manager
 from .core import (
     connect_manager,
     DaemonStateHandler,
@@ -105,6 +105,13 @@ class Daemon:
 
         while not self.stop_daemon_event.is_set():
             try:
+                self.logger.info("Checking GPU usage")
+
+                if not gpu_manager.wait_for_completion(check_interval=10,logger=self.logger, daemon_event=self.stop_daemon_event):
+                    self.logger.info("GPU not available, exiting supervise method")
+                    break
+                
+                self.logger.info("GPU is available")
                 self.worker_process = Process(target=self.worker.start, args=(self.stop_worker_event,))
                 self.worker_process.start()
                 
