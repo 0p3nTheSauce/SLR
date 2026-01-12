@@ -466,19 +466,29 @@ class QueShell(cmdLib.Cmd):
         elif parsed_args.server:
             log_file = str(SR_LOG_PATH)  # your constant
         else:
-            print("Please specify --worker or --server")
-            return
-        
+            raise ValueError("Please specify --worker or --server")
+            
+        if parsed_args.clear:
+            
+            if Confirm.ask(
+               f"[bold red]Clear all logs in {log_file}?[/bold red]"
+            ):
+                with self.unwrap_exception(f"Cleared {log_file}", f"Failed to clear log file: {log_file}"):
+                    with open(log_file, 'w') as f:
+                        f.truncate(0)
+                return
+            else:
+                self.console.print("[yellow]Action cancelled[/yellow].")
+                return
+
         try:
-            # Use tail -f to follow the log file
             subprocess.run(["tail", "-f", log_file])
         except KeyboardInterrupt:
-            # Allow user to exit with Ctrl+C
-            print("\nStopped tailing log file")
+            self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
         except FileNotFoundError:
-            print(f"Error: Log file not found at {log_file}")
+            self.console.print(f"[red]Error: Log file not found at {log_file}[/red]")
         except Exception as e:
-            print(f"Error reading log file: {e}")
+            self.console.print(f"[red]Error reading log file: {e}[/red]")
         
     
     
@@ -691,6 +701,8 @@ class QueShell(cmdLib.Cmd):
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument("--worker", "-w", action='store_true', help='Tail the Worker.log file')
         group.add_argument("--server", "-s", action='store_true', help='Tail the Server.log file')
+
+        parser.add_argument('--clear', '-c', action='store_true', help='Clear the log file instead of tailing')
         
         return parser
         
