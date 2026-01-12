@@ -329,6 +329,10 @@ def log_and_raise(logger: Logger, task: str = "Operation"):
         logger.error(f"{task} failed: {e}")
         raise e
 
+def timestamp_path(path: Union[str, Path]) -> str:
+    formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    return str(path).replace(".json", f"_{formatted}.json")
+
 
 class Que:
     def __init__(
@@ -543,7 +547,7 @@ class Que:
 
     def load_state(self, in_path: Optional[Union[str, Path]]= None):
         """
-        Load Que from file. Default load from RUNS_PATH, unless in_path is provided
+        Load Que from file. Default load from RUN_PATH, unless in_path is provided
         
         :param in_path: Overide default load path. 
         :type in_path: Optional[Union[str, Path]]
@@ -571,19 +575,15 @@ class Que:
             self.old_runs = []
             self.fail_runs = []
 
-    def _timestamp(self, path: Union[str, Path]) -> str:
-        formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        return str(path).replace(".json", f"{formatted}_.json")
-
     def save_state(self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False):
         if out_path is None:
             out_path = self.runs_path
         elif Path(out_path).exists() and not timestamp:
             self.logger.warning(f"Overwriting existing state file: {out_path}")        
 
-        # if timestamp:
+        if timestamp:
+            out_path = timestamp_path(out_path)
             
-
         with open(out_path, "w") as f:
             all_runs = {
                 TO_RUN: self.to_run,
@@ -1049,22 +1049,7 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
-    def make_copy(self, out_path: str = f"{str(RUN_PATH).replace('.json', '_c.json')}") -> None:
-        """
-        Store a copy of the Runs json file 
-        
-        :param out_path: Copy path
-        :type out_name: str
-        """
-        with open(out_path, 'w') as f:
-            all_runs = {
-                TO_RUN: self.to_run,
-                CUR_RUN: self.cur_run,
-                OLD_RUNS: self.old_runs,
-                FAIL_RUNS: self.fail_runs
-            }
-            json.dump(all_runs ,f, indent=4)
-        self.logger.info(f"Saved copy of Que to: {out_path}")
+
         
 
 # --- Daemon State Management --- #
@@ -1151,6 +1136,7 @@ class DaemonStateHandler:
         self.from_disk()
 
     def from_disk(self) -> None:
+
         try:
             state = read_daemon_state(self.state_path)
             self.pid = state["pid"]

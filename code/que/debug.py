@@ -53,7 +53,7 @@ def tmuxer():
 
 def timestamp():
     q = Que(_get_basic_logger())
-    print(q._timestamp('code/que/Runs.json'))
+    q.save_state(timestamp=True)
     
     
     

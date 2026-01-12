@@ -1,4 +1,4 @@
-from .core import QUE_LOCATIONS, SYNONYMS, connect_manager, DaemonState, WR_LOG_PATH, SR_LOG_PATH
+from .core import QUE_LOCATIONS, SYNONYMS, connect_manager, DaemonState, WR_LOG_PATH, SR_LOG_PATH, RUN_PATH, DAEMON_STATE_PATH
 
 from .tmux import tmux_manager
 import cmd as cmdLib
@@ -103,7 +103,6 @@ class QueShell(cmdLib.Cmd):
             ("clear", "Clear all runs from a location"),
             ("daemon", "Start/manage the daemon process"),
             ("logs", "View the Que log files"),
-            ("copy", "Store a copy of the Que"),
             ("attach", "Attach to tmux session"),
             ("save", "Save queue state to file"),
             ("load", "Load queue state from file"),
@@ -134,17 +133,15 @@ class QueShell(cmdLib.Cmd):
 
     def do_quit(self, arg):
         """Exit the shell with style"""
-        args = shlex.split(arg) if arg else []
-        parser = self._get_quit_parser()
-        try:
-            parsed_args = parser.parse_args(args)
-        except SystemExit:
-            self.console.print("[yellow]Quit cancelled[/yellow]")
+
+        parsed_args = self._parse_args_or_cancel("quit", arg)
+        if parsed_args is None:
             return
 
         if not parsed_args.no_save:
             with self.console.status("[bold green]Saving state...", spinner="dots"):
-                self.do_save(arg)
+                self.do_save('que')
+                self.do_save('daemon')
                 time.sleep(0.5)  # Brief pause for visual feedback
         else:
             self.console.print("[yellow]Exiting without saving[/yellow]")
@@ -168,12 +165,21 @@ class QueShell(cmdLib.Cmd):
 
     #Que based
 
+
     def do_save(self, arg):
         """Save state with visual feedback"""
-        with self.unwrap_exception("Queue state saved to file"):
-            self.que.save_state()
-        with self.unwrap_exception("Daemon state saved to file"):
-            self.daemon_controller.save_state()
+        parsed_args = self._parse_args_or_cancel("save", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == 'que':
+            with self.unwrap_exception("Queue state saved to file", "Failed to save que state"):
+                self.que.save_state(out_path=parsed_args.Output_Path, timestamp=parsed_args.Timestamp)
+        elif parsed_args.command == 'daemon':
+            with self.unwrap_exception("Daemon state saved to file", "Failed to save daemon state"):
+                self.daemon_controller.save_state()
+        else:
+            raise ValueError('neither Que nor Daemon specified, this should not be possible')
         # self.console.print("[bold green]✓[/bold green] Queue state saved to file")
 
     def do_load(self, arg):
@@ -466,18 +472,6 @@ class QueShell(cmdLib.Cmd):
             print(f"Error: Log file not found at {log_file}")
         except Exception as e:
             print(f"Error reading log file: {e}")
-            
-            
-    def do_copy(self, arg):
-        parsed_args = self._parse_args_or_cancel("copy", arg)
-        if parsed_args is None:
-            return
-        
-        with self.unwrap_exception("Made copy successfully"):
-            if parsed_args.out_path is None:
-                self.que.make_copy()
-            else:
-                self.que.make_copy(parsed_args.out_path)
         
     
     
@@ -543,13 +537,48 @@ class QueShell(cmdLib.Cmd):
             "display": self._get_display_parser,
             "daemon": self._get_daemon_parser,
             "logs": self._get_log_parser,
-            "copy": self._get_copy_parser
+            "load": self._get_load_parser,
+            "save": self._get_save_parser
         }
         if cmd in parsers:
             return parsers[cmd]()
         return None
 
     #Que
+
+    def _get_save_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Save the state of the Que or Daemon", prog="save"
+        )
+        subparsers = parser.add_subparsers(dest="command", required=True, help="Target to save")
+
+        # Que Subparser
+        que_parser = subparsers.add_parser("que", aliases=["-q"], help="Save Que state")
+        que_parser.add_argument("--Timestamp", "-t", action="store_true", help='Timestamp the output file')
+        que_parser.add_argument("--Output_Path", '-op', type=str, default=RUN_PATH, 
+                                help=f'Output path (default: {RUN_PATH})')
+
+        # Daemon Subparser
+        daemon_parser = subparsers.add_parser("daemon", aliases=["-d"], help="Save Daemon state")
+        #TODO: Maybe add this if desired
+        return parser
+    
+    def _get_load_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Load the state of the Que or Daemon", prog="load"
+        )
+        subparsers = parser.add_subparsers(dest="target", required=True, help="Target to load")
+
+        # Que Subparser
+        que_load = subparsers.add_parser("que", aliases=["-q"], help="Load Que state")
+        que_load.add_argument("--Input_Path", "-ip", type=str, default=RUN_PATH,
+                            help=f'Input path (default: {RUN_PATH})')
+
+        # Daemon Subparser
+        daemon_load = subparsers.add_parser("daemon", aliases=["-d"], help="Load Daemon state")
+        #TODO: Maybe add this if desired
+
+        return parser
 
     def _get_move_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -658,13 +687,6 @@ class QueShell(cmdLib.Cmd):
         
         return parser
         
-    def _get_copy_parser(self) -> argparse.ArgumentParser:
-        
-        parser = argparse.ArgumentParser(description="Make a copy of the Que", prog = "copy")
-        
-        parser.add_argument('--out_path', '-op', type=str, help='Output path, otherwise defaults to the run path with _c')
-        return parser
-
 
     #Tmux
     
