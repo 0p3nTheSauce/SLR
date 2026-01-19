@@ -25,8 +25,20 @@ from multiprocessing.synchronize import Event as EventClass
 
 class gpu_manager:
 	@classmethod
-	def get_gpu_memory_usage(cls, gpu_id: int=0):
-		"""Get GPU memory usage across all processes"""
+	def get_gpu_memory_usage(cls, gpu_id: int=0) -> Tuple[float, float]:
+		"""Get GPU usage across all processes
+
+		Args:
+			gpu_id (int, optional): ID of GPU. Defaults to 0.
+
+		Raises:
+			RuntimeError: nvidia-smi failed with subprocess
+			ValueError: Unexpected nvidia-smi output
+			ValueError: Failed to parse GPU memory usage:
+
+		Returns:
+			Tuple[float, float]: used, total in GiB
+		"""
 
 		result = subprocess.run(
 			[

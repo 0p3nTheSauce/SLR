@@ -4,6 +4,11 @@ import time
 from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
 from typing import cast    
+import torch
+import torch.nn as nn
+import gc
+
+
 def client_logic1():
     manager = connect_manager()
 
@@ -55,8 +60,72 @@ def timestamp():
     q = Que(_get_basic_logger())
     q.save_state(timestamp=True)
     
+
+
+def check_gpu_memory():
+    """Helper to check GPU memory usage"""
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated() / 1024**3
+        reserved = torch.cuda.memory_reserved() / 1024**3
+        print(f"GPU Memory - Allocated: {allocated:.2f} GB, Reserved: {reserved:.2f} GB")
+
+def gpu_worker_fixed():
+    """Simulates PyTorch GPU work with proper cleanup"""
+    print("Worker: Starting GPU work...")
     
+    try:
+        model = nn.Sequential(
+            nn.Linear(1000, 2000),
+            nn.ReLU(),
+            nn.Linear(2000, 2000),
+            nn.ReLU(),
+            nn.Linear(2000, 1000)
+        ).cuda()
+        
+        data = torch.randn(100, 1000).cuda()
+        
+        for i in range(10):
+            output = model(data)
+            loss = output.sum()
+            loss.backward()
+        
+        print("Worker: Work complete")
+        check_gpu_memory()
+        
+    finally:
+        # Proper cleanup
+        print("Worker: Cleaning up...")
+        # del model, data
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        torch.cuda.ipc_collect()
+
+def sim_leak():
+    # CRITICAL: Use 'spawn' method
+    # mp.set_start_method('spawn', force=True)
     
+    print("=== Initial State ===")
+    # check_gpu_memory()
+    
+    print("\n=== Starting Process (with fix) ===")
+    p = mp.Process(target=gpu_worker_fixed)
+    p.start()
+    p.join()
+    
+    print("\n=== Starting Process (with fix2) ===")
+    p = mp.Process(target=gpu_worker_fixed)
+    p.start()
+    p.join()
+
+
+    print("\n=== Memory should be cleared! ===")
+    print("\n=== After Process Completes ===")
+    time.sleep(1)
+    check_gpu_memory()
+    
+
+
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -64,6 +133,7 @@ if __name__ == '__main__':
     # client_logic2()
     # que_client()
     # tmuxer()
-    timestamp()
+    # timestamp()
+    sim_leak()
     
     

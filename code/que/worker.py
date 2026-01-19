@@ -54,14 +54,30 @@ class Worker:
             sep += "\n"
         return sep.title()
 
+    def cleanup(self):
+        gc.collect()
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+        torch.cuda.ipc_collect() # Clears memory shared between processes
+
+
     def _work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
         try:
             self.logger.info(f"starting work with pid: {os.getpid()}")
+
+            self.logger.info("Attempting to clean first")
+            used, total = gpu_manager.get_gpu_memory_usage()
+            self.logger.info(f"Current usage: {used}/{total} GiB")
+            self.cleanup()
+            used, total = gpu_manager.get_gpu_memory_usage()
+            self.logger.info(f"After cleanup: {used}/{total} GiB")
+
             self.logger.info("Checking GPU usage")
 
             if not gpu_manager.wait_for_completion(
                 check_interval=10,
                 logger=self.logger,
+                # max_util_gb=0.5, #debugging
                 event=event,
             ):
                 self.logger.info("GPU not available, exiting")
@@ -109,12 +125,11 @@ class Worker:
             else:
                 self.logger.warning("Training was interrupted before completion.")
                 que.save_state() #keep current run for recovery
-                #pause wandb run without finishing
             
             run.finish(exit_code=0, quiet=True)
-            wandb.finish()
+        
             self.logger.info("_work method completed successfully")  # ADD THIS
-            return None  # ADD EXPLICIT RETURN
+            return None  
             
         finally:
             self.logger.info("Exiting _work method")
@@ -133,12 +148,9 @@ class Worker:
             que.save_state()
             #exit with error
             raise
-        finally:
-            self.logger.info("Cleaning up")
-            wandb.finish()
-            gc.collect()
-            torch.cuda.empty_cache()
-            torch.cuda.ipc_collect() # Clears memory shared between processes
+        # finally:
+        #     self.logger.info("Cleaning up")
+        #     self.cleanup()
 
     def idle(self, event: EventClass, que: Que):
         

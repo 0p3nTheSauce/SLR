@@ -105,7 +105,8 @@ class Daemon:
 
         while not self.stop_daemon_event.is_set():
             try:
-                
+
+
                 self.worker_process = Process(
                     target=self.worker.start, args=(self.stop_worker_event,)
                 )
