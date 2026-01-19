@@ -718,6 +718,8 @@ class QueShell(cmdLib.Cmd):
     that the process started successfully)
 - Figure out issue with relieving cuda context (NB)
 - Add more options to logs
+- Add an failed run recovery option (automatically remove error)
+- Make training output go to a seperate file, but other worker logging go to server log file
 """
     
     

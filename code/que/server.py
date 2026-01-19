@@ -1,4 +1,5 @@
 from multiprocessing import Event
+import multiprocessing as mp
 import logging
 from typing import Optional
 
@@ -23,8 +24,11 @@ class ServerContext:
     """
 
     def __init__(self):
+        #for handling CUDA context
+        mp.set_start_method('spawn', force=True)
+        # mp.set_start_method('forkserver', force=True)
+
         # Setup Logging
-        # logging.basicConfig(level=logging.INFO)
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
