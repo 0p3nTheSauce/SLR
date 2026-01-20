@@ -8,7 +8,8 @@ from typing import Optional
 import statistics
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as ts
-
+import torchvision.transforms.v2 as transforms_v2
+import numpy as np
 
 def bench_mark_enhanced(
     data,
@@ -116,7 +117,14 @@ def sample(frames, target_length, randomise=False):
     return torch.stack(sampled_frames, dim=0)
 
 
-def correct_num_frames(frames, target_length=64, randomise=False):
+def crop_frames(frames, bbox):
+	#frames hase shape (num_frames, channels, height, width)
+	#bbox is a list of [x1, y1, x2, y2]
+	x1, y1, x2, y2 = bbox
+	return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
+
+
+def correct_num_frames(frames: torch.Tensor, target_length: int=64, randomise: bool=False):
     """Corrects the number of frames to match the target length.
     Args:
       frames (torch.Tensor): The input frames tensor. (T x C x H x W)
@@ -175,6 +183,37 @@ def pad_frames(frames, target_length):
     else:
         # Trim the frames if the number of frames is greater than the target length
         return frames[:target_length, :, :, :]
+
+# in the WLASL paper, they first resize the frames so that
+# the person bounding box diagnol length is 256 pixels
+# this douesnt work for us
+#TODO: investigate this
+
+def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
+    """
+    Resize frame so person bounding box diagonal equals target_diagonal
+
+    Args:
+        frame: input video frame
+        bbox: (x1, y1, x2, y2) of person bounding box
+        target_diagonal: desired diagonal size in pixels
+    """
+    x1, y1, x2, y2 = bbox
+
+    orig_width = x2 - x1
+    orig_height = y2 - y1
+
+    curr_diag = np.sqrt(orig_width**2 + orig_height**2)
+
+    scale_factor = target_diag / curr_diag
+
+    # resize the tensor
+    new_width = int(frames.shape[2] * scale_factor)
+    new_height = int(frames.shape[3] * scale_factor)
+
+    transform = transforms_v2.Resize((new_height, new_width))
+
+    return transform(frames)
 
 
 class Shuffle(Transform):

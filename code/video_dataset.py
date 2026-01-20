@@ -4,44 +4,91 @@ from torch.utils.data import Dataset, DataLoader
 import json
 import torch
 from pathlib import Path
-from typing import Callable, Optional, Tuple, Literal, TypedDict, Union, List
+from typing import Callable, Optional, Tuple, Literal, TypedDict, Union, List, TypeGuard
 from torchvision.transforms import v2
 from video_transforms import Shuffle
 
 # local imports
-from utils import load_rgb_frames_from_video, crop_frames
+from utils import load_rgb_frames_from_video
 from video_transforms import correct_num_frames
-import torchvision.transforms.v2 as transforms_v2
-import numpy as np
+
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits 
+from models import NormDict
 
+############################# Dictionaries and Types #############################
 
-def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
-    """
-    Resize frame so person bounding box diagonal equals target_diagonal
+class InstanceDict(TypedDict):
+    video_id: str
+    frame_start: int
+    frame_end: int
+    label_name: str
+    label_num: int
+    bbox: list[int]  # [x1, y1, x2, y2]
+    
+class DataSetInfo(TypedDict):
+    """Necessary info to import datast"""
+    root: Path
+    labels: Path
+    label_suff: str
+    set_name: Literal["train", "test", "val"]
+
+def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
+    """Type guard to check if a dict is an InstanceDict
 
     Args:
-        frame: input video frame
-        bbox: (x1, y1, x2, y2) of person bounding box
-        target_diagonal: desired diagonal size in pixels
+        obj (dict): Object to check
+    Returns:
+        TypeGuard[InstanceDict]: True if obj is an InstanceDict, False otherwise
     """
-    x1, y1, x2, y2 = bbox
+    required_keys = {"video_id", "frame_start", "frame_end", "label_name", "label_num", "bbox"}
+    return required_keys.issubset(obj.keys())
 
-    orig_width = x2 - x1
-    orig_height = y2 - y1
+############################ Helper Functions ############################
 
-    curr_diag = np.sqrt(orig_width**2 + orig_height**2)
+def load_data_from_json(json_path: Union[str, Path]) -> List[InstanceDict]:
+    """Load list of InstanceDict from a json file
 
-    scale_factor = target_diag / curr_diag
+    Args:
+        json_path (Union[str, Path]): Path to json file
+    Returns:
+        List[InstanceDict]: List of InstanceDicts
+    """
+    with open(json_path, "r") as f:
+        data = json.load(f)
+    
+    if not isinstance(data, list):
+        raise ValueError(f"Data in {json_path} is not a list.")
+    
+    #NOTE: Commenting out type guard check for performance reasons
+    # for item in data:
+    #     if not is_instance_dict(item):
+    #         raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
+    
+    return data
 
-    # resize the tensor
-    new_width = int(frames.shape[2] * scale_factor)
-    new_height = int(frames.shape[3] * scale_factor)
+def get_wlasl_info(split: str, set_name: Literal["train", "test", "val"]) -> DataSetInfo:
+    """Get wlasl dataset loading information in a tpyed dict
 
-    transform = transforms_v2.Resize((new_height, new_width))
+    Args:
+        split (str): One of avail_splits, E.g. asl100
+        set_name (Literal['train', 'test', 'val']): Set to use
 
-    return transform(frames)
+    Raises:
+        ValueError: If split is not available
 
+    Returns:
+        DataSetInfo: For get_dataloader
+    """
+    avail_sp = get_avail_splits()
+    if split not in avail_sp:
+        raise ValueError(f"Supplied split: {split} not one of available splits: {', '.join(avail_sp)}")
+    
+    return {
+        "root": Path(WLASL_ROOT) / RAW_DIR, 
+        "labels": Path(LABELS_PATH) / split,
+        "label_suff": LABEL_SUFFIX,
+        "set_name": set_name  
+    }
 
 ############################ Dataset Classes ############################
 
@@ -52,12 +99,10 @@ class VideoDataset(Dataset):
         root: Path,
         instances_path: Path,
         classes_path: Path,
-        crop: bool = False,
-        num_frames: int = 64,
+        num_frames: Optional[int] = None,
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
+        item_transforms: Optional[Callable[[torch.Tensor, InstanceDict], torch.Tensor]] = None,
         include_meta: bool = False,
-        resize: bool = False,
-        all_frames: bool = False
     ) -> None:
         """
         Custom video dataset, based on the structure of the WLASL dataset
@@ -86,17 +131,10 @@ class VideoDataset(Dataset):
         else:
             self.root = root
         self.transforms = transforms
-        self.crop = crop
-        self.resize = resize
-        self.all_frames = all_frames
         self.num_frames = num_frames
         self.include_meta = include_meta
-        with open(instances_path, "r") as f:
-            self.data = json.load(f)  # created by preprocess.py
-            if self.data is None:
-                raise ValueError(
-                    f"No data found in {instances_path}. Please check the file."
-                )
+        self.item_transforms = item_transforms
+        self.data = load_data_from_json(instances_path)
         with open(classes_path, "r") as f:
             self.classes = json.load(f)
 
@@ -106,12 +144,13 @@ class VideoDataset(Dataset):
             raise FileNotFoundError(f"Video file {video_path} does not exist.")
 
         frames = load_rgb_frames_from_video(
-            video_path=video_path, start=item["frame_start"], end=item["frame_end"],all= self.all_frames
+            video_path=video_path, start=item["frame_start"], end=item["frame_end"],
         )
-        sampled_frames = correct_num_frames(frames, self.num_frames)
-
-        if self.crop:
-            sampled_frames = crop_frames(frames, item["bbox"])
+        if self.num_frames is not None:
+            sampled_frames = correct_num_frames(frames, self.num_frames)
+        else:
+            sampled_frames = frames
+        
 
         return sampled_frames.to(torch.uint8)
 
@@ -119,12 +158,8 @@ class VideoDataset(Dataset):
         item = self.data[idx]
         frames = self.__manual_load__(item)
 
-        # in the WLASL paper, they first resize the frames so that
-        # the person bounding box diagnol length is 256 pixels
-        # this douesnt work for us
-        #TODO: investigate this
-        if self.resize:
-            frames = resize_by_diag(frames, item["bbox"], 256)
+        if self.item_transforms is not None:
+            frames = self.item_transforms(frames, item)
 
         if self.transforms is not None:
             frames = self.transforms(frames)
@@ -141,37 +176,6 @@ class VideoDataset(Dataset):
 ################################## Helper functions #######################################
 
 
-class DataSetInfo(TypedDict):
-    """Necessary info to import datast"""
-    root: Path
-    labels: Path
-    label_suff: str
-    set_name: Literal["train", "test", "val"]
-    
-def get_wlasl_info(split: str, set_name: Literal["train", "test", "val"]) -> DataSetInfo:
-    """Get wlasl dataset loading information in a tpyed dict
-
-    Args:
-        split (str): One of avail_splits, E.g. asl100
-        set_name (Literal['train', 'test', 'val']): Set to use
-
-    Raises:
-        ValueError: If split is not available
-
-    Returns:
-        DataSetInfo: For get_dataloader
-    """
-    avail_sp = get_avail_splits()
-    if split not in avail_sp:
-        raise ValueError(f"Supplied split: {split} not one of available splits: {', '.join(avail_sp)}")
-    
-    return {
-        "root": Path(WLASL_ROOT) / RAW_DIR, 
-        "labels": Path(LABELS_PATH) / split,
-        "label_suff": LABEL_SUFFIX,
-        "set_name": set_name  
-    }
-
 def _identity_transform(x):
     """Identity transform - returns input unchanged"""
     return x
@@ -184,18 +188,12 @@ def _permute_time_channel(x):
     """Permute tensor from (C, T, H, W) to (T, C, H, W)"""
     return x.permute(1, 0, 2, 3)
 
-
 def get_data_set(
-    mean: Tuple[float, float, float],
-    std: Tuple[float, float, float],
-    frame_size: int,
-    num_frames: int,
     set_info: DataSetInfo,
+    norm_dict: Optional[NormDict] = None,
+    frame_size: Optional[int] = None,
+    num_frames: Optional[int] = None,
     shuffle: bool = False,
-    do_norm: bool = True,
-    do_crop: bool = True,
-    all_frames: bool = False
-
 ) -> Tuple[VideoDataset, int, Optional[List[int]], Optional[float]]:
     """
     Get test, validation and training datasets
@@ -221,6 +219,7 @@ def get_data_set(
     """
 
     if shuffle:
+        assert num_frames is not None, "num_frames must be specified if shuffle is True"
         maybe_shuffle_t = Shuffle(num_frames)
         perm = maybe_shuffle_t.permutation
         sh_e = Shuffle.shannon_entropy(perm)
@@ -230,12 +229,12 @@ def get_data_set(
         perm = None
         sh_e = None
 
-    if do_norm:
+    if norm_dict is not None:
         final_transform = v2.Compose(
             [
                 maybe_shuffle_t,
                 v2.Lambda(_normalize_to_float),
-                v2.Normalize(mean=mean, std=std),
+                v2.Normalize(mean=norm_dict["mean"], std=norm_dict["std"]),
                 v2.Lambda(_permute_time_channel),
             ]
         )
@@ -246,8 +245,8 @@ def get_data_set(
                 v2.Lambda(_permute_time_channel),
             ]
         )
-        
-    if do_crop:
+
+    if frame_size is not None:
         if set_info["set_name"] == "train":
             transform = v2.Compose(
                 [
@@ -270,7 +269,6 @@ def get_data_set(
         classes,
         num_frames=num_frames,
         transforms=transform,
-        all_frames=all_frames
     )
     num_classes = len(set(dataset.classes))
 
@@ -285,12 +283,10 @@ def get_data_loader(
     shuffle: bool = False,
     batch_size: Optional[int] = None,
     do_norm: bool = True,
-    do_crop: bool = True,
-    all_frames: bool = False
     
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     """
-    Get test, validation and training dataloaders
+    Get test, validation and training dataloaders. Here for backwards compatibility.
     
     :param mean: Model specific mean (normalisation)
     :type mean: Tuple[float, float, float]
@@ -315,15 +311,11 @@ def get_data_loader(
     """
 
     dataset, num_classes, perm, sh_e = get_data_set(
-        mean,
-        std,
-        frame_size,
-        num_frames,
         set_info,
-        shuffle,
-        do_norm,
-        do_crop,
-        all_frames
+        norm_dict= NormDict(mean=mean, std=std) if do_norm else None,
+        frame_size=frame_size,
+        num_frames=num_frames,
+        shuffle=shuffle,
     )
 
     if set_info["set_name"] == "train":

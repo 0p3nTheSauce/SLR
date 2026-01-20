@@ -651,11 +651,6 @@ def clean_runs(path, ask=False, rem_empty=False, rem_files=[]):
 	for p in sub_paths:
 		clean_experiments(p, ask, rem_empty, rem_files)
 	
-def crop_frames(frames, bbox):
-	#frames hase shape (num_frames, channels, height, width)
-	#bbox is a list of [x1, y1, x2, y2]
-	x1, y1, x2, y2 = bbox
-	return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
 def enum_dir(path:str|Path, make:bool=False, decimals:int=3):
 	'''Enumerate filenames'''
