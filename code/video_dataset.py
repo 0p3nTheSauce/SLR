@@ -57,8 +57,30 @@ class VideoDataset(Dataset):
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         include_meta: bool = False,
         resize: bool = False,
+        all_frames: bool = False
     ) -> None:
-        """root is the path to the root directory where the video files are located."""
+        """
+        Custom video dataset, based on the structure of the WLASL dataset
+        
+        :param root: Path to the root directory where the video files are located.
+        :type root: Path
+        :param instances_path: Path to the json file with data points inside 
+        :type instances_path: Path
+        :param classes_path: Path to the json file with class names ordered by label
+        :type classes_path: Path
+        :param crop: Switch to turn pre-cropping on. The crop is based on YOLO predictions for where people are. 
+        :type crop: bool
+        :param num_frames: The desired number of frames.
+        :type num_frames: int
+        :param transforms: A Transform function to apply to raw videos. 
+        :type transforms: Optional[Callable[[torch.Tensor], torch.Tensor]]
+        :param include_meta: Boolean flag to include extra meta information
+        :type include_meta: bool
+        :param resize: Boolean flag to resize by the diagonal (wlasl strategy)
+        :type resize: bool
+        :param all_frames: Boolean flag to instead keep all the flags
+        :type all_frames: bool
+        """
         if not root.exists():
             raise FileNotFoundError(f"Root directory {root} does not exist.")
         else:
@@ -66,6 +88,7 @@ class VideoDataset(Dataset):
         self.transforms = transforms
         self.crop = crop
         self.resize = resize
+        self.all_frames = all_frames
         self.num_frames = num_frames
         self.include_meta = include_meta
         with open(instances_path, "r") as f:
@@ -83,7 +106,7 @@ class VideoDataset(Dataset):
             raise FileNotFoundError(f"Video file {video_path} does not exist.")
 
         frames = load_rgb_frames_from_video(
-            video_path=video_path, start=item["frame_start"], end=item["frame_end"]
+            video_path=video_path, start=item["frame_start"], end=item["frame_end"],all= self.all_frames
         )
         sampled_frames = correct_num_frames(frames, self.num_frames)
 
@@ -99,6 +122,7 @@ class VideoDataset(Dataset):
         # in the WLASL paper, they first resize the frames so that
         # the person bounding box diagnol length is 256 pixels
         # this douesnt work for us
+        #TODO: investigate this
         if self.resize:
             frames = resize_by_diag(frames, item["bbox"], 256)
 
@@ -147,34 +171,54 @@ def get_wlasl_info(split: str, set_name: Literal["train", "test", "val"]) -> Dat
         "label_suff": LABEL_SUFFIX,
         "set_name": set_name  
     }
-    
-#NOTE: This is probably uneccessary, and should just be, get dataset or something
-def get_data_loader(
+
+def _identity_transform(x):
+    """Identity transform - returns input unchanged"""
+    return x
+
+def _normalize_to_float(x):
+    """Convert tensor to float and normalize to [0, 1]"""
+    return x.float() / 255.0
+
+def _permute_time_channel(x):
+    """Permute tensor from (C, T, H, W) to (T, C, H, W)"""
+    return x.permute(1, 0, 2, 3)
+
+
+def get_data_set(
     mean: Tuple[float, float, float],
     std: Tuple[float, float, float],
     frame_size: int,
     num_frames: int,
     set_info: DataSetInfo,
     shuffle: bool = False,
-    batch_size: Optional[int] = None,
-    no_norm: bool = False,
-    
-) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
-    """Get test, validation and training dataloaders
+    do_norm: bool = True,
+    do_crop: bool = True,
+    all_frames: bool = False
 
-    Args:
-        mean (Tuple[float, float, float]): Model specific mean (normalisation)
-        std (Tuple[float, float, float]): Model specific standard deviation (normalisation)
-        frame_size (int): Length of Square frame.
-        num_frames (int): Number of frames.
-        set_info (DataSetInfo): Dictionary containing information to load the dataset.
-        shuffle (bool, optional): Whether to shuffle frames. Defaults to False.
-        batch_size (Optional[int], optional): Batch size for dataloader. Defaults to None.
-
-    Returns:
-        Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]: dataloader, number of classes, permutation and shannon entropy
+) -> Tuple[VideoDataset, int, Optional[List[int]], Optional[float]]:
     """
-
+    Get test, validation and training datasets
+    
+    :param mean: Model specific mean (normalisation)
+    :type mean: Tuple[float, float, float]
+    :param std: Model specific standard deviation (normalisation)
+    :type std: Tuple[float, float, float]
+    :param frame_size: Length of Square frame.
+    :type frame_size: int
+    :param num_frames: Number of frames.
+    :type num_frames: int
+    :param set_info: Dictionary containing information to load the dataset.
+    :type set_info: DataSetInfo
+    :param shuffle: Whether to shuffle frames. Defaults to False.
+    :type shuffle: bool
+    :param do_norm: Whether to apply normalisation, overides mean and std. Defaults to True.
+    :type do_norm: bool
+    :param do_crop: Whether to apply cropping, overides num_frames and frame_size. Defaults to True.
+    :type do_crop: bool
+    :return: dataset, number of classes, permutation and shannon entropy
+    :rtype: Tuple[VideoDataset, int, List[int] | None, float | None]
+    """
 
     if shuffle:
         maybe_shuffle_t = Shuffle(num_frames)
@@ -182,41 +226,40 @@ def get_data_loader(
         sh_e = Shuffle.shannon_entropy(perm)
         perm = list(map(int, perm.numpy()))
     else:
-        maybe_shuffle_t = v2.Lambda(lambda x: x)
+        maybe_shuffle_t = v2.Lambda(_identity_transform)
         perm = None
         sh_e = None
 
-    if not no_norm:
+    if do_norm:
         final_transform = v2.Compose(
             [
                 maybe_shuffle_t,
-                v2.Lambda(lambda x: x.float() / 255.0),
+                v2.Lambda(_normalize_to_float),
                 v2.Normalize(mean=mean, std=std),
-                v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+                v2.Lambda(_permute_time_channel),
             ]
         )
     else:
-        #temporary fix
         final_transform = v2.Compose(
             [
                 maybe_shuffle_t,
-                # v2.Lambda(lambda x: x.float() / 255.0),
-            
-                v2.Lambda(lambda x: x.permute(1, 0, 2, 3)),
+                v2.Lambda(_permute_time_channel),
             ]
         )
-
-
-    if set_info["set_name"] == "train":
-        transform = v2.Compose(
-            [
-                v2.RandomCrop(frame_size),
-                v2.RandomHorizontalFlip(),
-                final_transform,
-            ]
-        )
+        
+    if do_crop:
+        if set_info["set_name"] == "train":
+            transform = v2.Compose(
+                [
+                    v2.RandomCrop(frame_size),
+                    v2.RandomHorizontalFlip(),
+                    final_transform,
+                ]
+            )
+        else:
+            transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
     else:
-        transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
+        transform = final_transform
 
     instances = set_info['labels'] / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
     classes = set_info['labels'] / f"{set_info['set_name']}_classes_{set_info['label_suff']}"
@@ -227,8 +270,61 @@ def get_data_loader(
         classes,
         num_frames=num_frames,
         transforms=transform,
+        all_frames=all_frames
     )
     num_classes = len(set(dataset.classes))
+
+    return dataset, num_classes, perm, sh_e
+
+def get_data_loader(
+    mean: Tuple[float, float, float],
+    std: Tuple[float, float, float],
+    frame_size: int,
+    num_frames: int,
+    set_info: DataSetInfo,
+    shuffle: bool = False,
+    batch_size: Optional[int] = None,
+    do_norm: bool = True,
+    do_crop: bool = True,
+    all_frames: bool = False
+    
+) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
+    """
+    Get test, validation and training dataloaders
+    
+    :param mean: Model specific mean (normalisation)
+    :type mean: Tuple[float, float, float]
+    :param std: Model specific standard deviation (normalisation)
+    :type std: Tuple[float, float, float]
+    :param frame_size: Length of Square frame.
+    :type frame_size: int
+    :param num_frames: Number of frames.
+    :type num_frames: int
+    :param set_info: Dictionary containing information to load the dataset.
+    :type set_info: DataSetInfo
+    :param shuffle: Whether to shuffle frames. Defaults to False.
+    :type shuffle: bool
+    :param batch_size: Batch size for dataloader. Defaults to None.
+    :type batch_size: Optional[int]
+    :param do_norm: Whether to apply normalisation, overides mean and std. Defaults to True.
+    :type do_norm: bool
+    :param do_crop: Whether to apply cropping, overides num_frames and frame_size. Defaults to True.
+    :type do_crop: bool
+    :return: dataloader, number of classes, permutation and shannon entropy
+    :rtype: Tuple[DataLoader[VideoDataset], int, List[int] | None, float | None]
+    """
+
+    dataset, num_classes, perm, sh_e = get_data_set(
+        mean,
+        std,
+        frame_size,
+        num_frames,
+        set_info,
+        shuffle,
+        do_norm,
+        do_crop,
+        all_frames
+    )
 
     if set_info["set_name"] == "train":
         dataloader = DataLoader(
@@ -249,7 +345,6 @@ def get_data_loader(
         )
 
     return dataloader, num_classes, perm, sh_e
-
 
 if __name__ == "__main__":
     # test_crop()

@@ -120,6 +120,8 @@ class Daemon:
                 if not self.monitor_worker(state_proxy):
                     break
 
+                self.worker.cleanup()
+                
             except Exception as e:
                 self.logger.error(f"Supervisor error: {e}")
                 if self.stop_daemon_event.is_set():

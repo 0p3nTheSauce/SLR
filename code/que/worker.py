@@ -9,7 +9,7 @@ import io
 import os
 from multiprocessing.synchronize import Event as EventClass
 # locals
-from .core import QueException, ExpInfo
+from .core import QueException, ExpInfo, WR_LOG_PATH, WORKER_NAME
 
 
 from .core import Que, connect_manager, QueException 
@@ -65,14 +65,9 @@ class Worker:
         try:
             self.logger.info(f"starting work with pid: {os.getpid()}")
 
-            self.logger.info("Attempting to clean first")
-            used, total = gpu_manager.get_gpu_memory_usage()
-            self.logger.info(f"Current usage: {used}/{total} GiB")
-            self.cleanup()
-            used, total = gpu_manager.get_gpu_memory_usage()
-            self.logger.info(f"After cleanup: {used}/{total} GiB")
-
             self.logger.info("Checking GPU usage")
+            used, total = gpu_manager.get_gpu_memory_usage()
+            self.logger.info(f"Current GPU usage: {used}/{total} GiB")
 
             if not gpu_manager.wait_for_completion(
                 check_interval=10,
@@ -209,6 +204,13 @@ class Worker:
         # self.idle(event, que) #dummy method to plug actual functionality
         # self.idle3(event, que)
         
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=WR_LOG_PATH,
+        )
+        wr_logger = logging.getLogger(WORKER_NAME)
+        self.logger = wr_logger
         
         self.work(event, que)
         

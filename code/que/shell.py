@@ -21,6 +21,7 @@ import sys
 import json
 
 import subprocess
+from utils import gpu_manager
 
 class QueShell(cmdLib.Cmd):
     def __init__(
@@ -452,6 +453,11 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.value = True
             self.daemon_controller.set_awake(parsed_args.value)
             self.console.print(f"[bold green]✓[/bold green] Set awake to {parsed_args.value}")
+        elif parsed_args.command == 'clear_mem':
+            self.daemon_controller.clear_cuda_memory()
+            self.console.print('[bold green]Cleared CUDA memory[/bold green]')
+            used, total = gpu_manager.get_gpu_memory_usage() 
+            self.console.print(f'CUDA memory: {used}/{total} GiB')
         else:
             self.console.print(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")            
     
@@ -691,6 +697,8 @@ class QueShell(cmdLib.Cmd):
         set_awake_parser = subparsers.add_parser('set-awake', help='Set awake option')
         set_awake_parser.add_argument('value', choices=['on', 'off'], help='Boolean value to set')
         
+        #Clear memory
+        clear_mem_parser = subparsers.add_parser('clear_mem',help='Clear CUDA memory')
         
         return parser
 
