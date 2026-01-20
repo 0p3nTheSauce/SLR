@@ -18,11 +18,6 @@ from multiprocessing.synchronize import Event as EventClass
 
 ################ GPU ###################
 
-
-
-
-
-
 class gpu_manager:
 	@classmethod
 	def get_gpu_memory_usage(cls, gpu_id: int=0) -> Tuple[float, float]:
@@ -146,8 +141,6 @@ class gpu_manager:
 			time.sleep(confirm_interval)
 		return True
 
-
-
 ############## wandb ##################
 class wandb_manager:
 	@classmethod
@@ -267,9 +260,6 @@ def str_dict(dic: Dict[str, Any], disp: bool = False) -> str:
 		print(st)
 	return st
 
-
-
-
 def print_dict(diction):
 	print(json.dumps(diction, indent=4))
 
@@ -381,8 +371,6 @@ def show_bbox(frames, bbox):
 		cv2.waitKey(0)  # Display each frame for 100 ms
 	cv2.destroyAllWindows()
 
-
-
 def cv_display(frames: np.ndarray,  output: Optional[Union[str, Path]] = None):
 	for i, frame in enumerate(frames):
 		cv2.imshow('Cropped Frames', frame)  # Display the first frame
@@ -396,6 +384,8 @@ def cv_save(frames: np.ndarray, output: Union[str, Path]):
 	for i, img in enumerate(frames):
 		cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
 	print(f"Cropped frames saved to {output}.")
+
+	################# Plot based #########################
 
 def plt_display(frames: torch.Tensor, num: int, size: Tuple[float, float]=(5.0,5.0), adapt: bool=False, output: Optional[Union[str, Path]]=None):
 	"""

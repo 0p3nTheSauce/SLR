@@ -105,6 +105,9 @@ class DaemonController:
     def set_awake(self, value: bool) -> None:
         self.ctx.daemon_state.set_awake(value)
 
+    def clear_cuda_memory(self) -> None:
+        self.ctx.worker.cleanup()
+
 
 # --- Registration Logic ---
 
@@ -131,6 +134,13 @@ def setup_manager():
         "get_daemon_state",
         callable=lambda: context.daemon_state,
     )
+    
+    #5. Register stop_worker_event (Test)
+    QueManager.register(
+        "get_worker_stop_event",
+        callable=lambda: context.stop_worker_event,
+    )
+    
 
 
 # --- Server Startup ---
