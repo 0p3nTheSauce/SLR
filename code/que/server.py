@@ -11,9 +11,10 @@ from .core import (
     DN_NAME,
     WR_LOG_PATH,
     WORKER_NAME,
-    DaemonState,
+    ServerState,
+    ServerStateHandler
 )
-from .daemon import Daemon, DaemonStateHandler
+from .daemon import Daemon
 from .worker import Worker
 
 
@@ -62,17 +63,17 @@ class ServerContext:
         self.stop_daemon_event = Event()
 
         # State and Daemon
-        self.daemon_state = DaemonStateHandler(logger=dn_state_logger)
+        self.state_handler = ServerStateHandler(logger=dn_state_logger)
         self.daemon = Daemon(
             worker=self.worker,
             logger=dn_logger,
-            local_state=self.daemon_state,
+            local_state=self.state_handler,
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
         )
 
 
-class DaemonController:
+class ServerController:
     """
     The Object Server wrapper.
     Instead of registering functions, we register this class.
@@ -82,10 +83,10 @@ class DaemonController:
         self.ctx = context
 
     def save_state(self):
-        self.ctx.daemon_state.to_disk()
+        self.ctx.state_handler.save_state()
 
     def load_state(self):
-        self.ctx.daemon_state.from_disk()
+        self.ctx.state_handler.load_state()
 
     def start(self):
         self.ctx.daemon.start_supervisor()
@@ -96,14 +97,14 @@ class DaemonController:
     def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False):
         self.ctx.daemon.stop_supervisor(timeout=timeout, hard=hard, and_worker=and_worker)
 
-    def get_state(self) -> DaemonState:
-        return self.ctx.daemon_state.get_state()
+    def get_state(self) -> ServerState:
+        return self.ctx.state_handler.get_state()
 
     def set_stop_on_fail(self, value: bool) -> None:
-        self.ctx.daemon_state.set_stop_on_fail(value)
+        self.ctx.state_handler.set_stop_on_fail(value)
 
     def set_awake(self, value: bool) -> None:
-        self.ctx.daemon_state.set_awake(value)
+        self.ctx.state_handler.set_awake(value)
 
     def clear_cuda_memory(self) -> None:
         self.ctx.worker.cleanup()
@@ -119,9 +120,9 @@ def setup_manager():
     # Initialize the context once (Singleton pattern)
     context = ServerContext()
 
-    # 2. Register DaemonController (Object Server)
-    # Allows client to call: manager.DaemonController().start()
-    QueManager.register("DaemonController", callable=lambda: DaemonController(context))
+    # 2. Register ServerController (Object Server)
+    # Allows client to call: manager.ServerController().start()
+    QueManager.register("ServerController", callable=lambda: ServerController(context))
 
     # 3. Register Shared Que Proxy
     QueManager.register(
@@ -129,10 +130,10 @@ def setup_manager():
         callable=lambda: context.que,
     )
 
-    # 4. Register shared Daemon State Proxy
+    # 4. Register shared Server State Proxy
     QueManager.register(
-        "get_daemon_state",
-        callable=lambda: context.daemon_state,
+        "get_server_state",
+        callable=lambda: context.state_handler,
     )
     
     #5. Register stop_worker_event (Test)
@@ -154,7 +155,7 @@ def start_server():
     s = m.get_server()
 
     print("Object Server started on localhost:50000")
-    print("Exposed Objects: DaemonStateHandler, DaemonController")
+    print("Exposed Objects: ServerStateHandler, ServerController")
 
     try:
         s.serve_forever()

@@ -1,7 +1,7 @@
 # from .server import connect_manager
 import multiprocessing as mp
 import time
-from .core import Que, connect_manager, _get_basic_logger
+from .core import Que, connect_manager, _get_basic_logger, SERVER_MODULE_PATH
 from .tmux import tmux_manager
 from typing import cast    
 import torch
@@ -54,7 +54,7 @@ def que_client():
 
 def tmuxer():
     tman = tmux_manager()
-    tman.join_session_pane()
+    tman.join_session()
 
 def timestamp():
     q = Que(_get_basic_logger())
@@ -124,7 +124,13 @@ def sim_leak():
     time.sleep(1)
     check_gpu_memory()
     
-
+def constant():
+    from .core import SERVER_MODULE_PATH
+    print(SERVER_MODULE_PATH)
+    
+def activate_conda_env(env_name: str):
+    tman = tmux_manager()
+    tman.activate_conda_env(env_name)
 
 if __name__ == '__main__':
     # process_opener()
@@ -134,6 +140,8 @@ if __name__ == '__main__':
     # que_client()
     # tmuxer()
     # timestamp()
-    sim_leak()
+    # sim_leak()
+    # constant()
+    activate_conda_env("wlasl")
     
     
