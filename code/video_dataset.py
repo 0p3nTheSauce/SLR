@@ -274,69 +274,6 @@ def get_data_set(
 
     return dataset, num_classes, perm, sh_e
 
-def get_data_loader(
-    mean: Tuple[float, float, float],
-    std: Tuple[float, float, float],
-    frame_size: int,
-    num_frames: int,
-    set_info: DataSetInfo,
-    shuffle: bool = False,
-    batch_size: Optional[int] = None,
-    do_norm: bool = True,
-    
-) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
-    """
-    Get test, validation and training dataloaders. Here for backwards compatibility.
-    
-    :param mean: Model specific mean (normalisation)
-    :type mean: Tuple[float, float, float]
-    :param std: Model specific standard deviation (normalisation)
-    :type std: Tuple[float, float, float]
-    :param frame_size: Length of Square frame.
-    :type frame_size: int
-    :param num_frames: Number of frames.
-    :type num_frames: int
-    :param set_info: Dictionary containing information to load the dataset.
-    :type set_info: DataSetInfo
-    :param shuffle: Whether to shuffle frames. Defaults to False.
-    :type shuffle: bool
-    :param batch_size: Batch size for dataloader. Defaults to None.
-    :type batch_size: Optional[int]
-    :param do_norm: Whether to apply normalisation, overides mean and std. Defaults to True.
-    :type do_norm: bool
-    :param do_crop: Whether to apply cropping, overides num_frames and frame_size. Defaults to True.
-    :type do_crop: bool
-    :return: dataloader, number of classes, permutation and shannon entropy
-    :rtype: Tuple[DataLoader[VideoDataset], int, List[int] | None, float | None]
-    """
-
-    dataset, num_classes, perm, sh_e = get_data_set(
-        set_info,
-        norm_dict= NormDict(mean=mean, std=std) if do_norm else None,
-        frame_size=frame_size,
-        num_frames=num_frames,
-        shuffle=shuffle,
-    )
-
-    if set_info["set_name"] == "train":
-        dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=2,
-            pin_memory=True,
-        )
-    else:
-        dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            num_workers=2,
-            pin_memory=False,
-            drop_last=False,
-        )
-
-    return dataloader, num_classes, perm, sh_e
 
 if __name__ == "__main__":
     # test_crop()

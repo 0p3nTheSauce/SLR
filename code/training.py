@@ -2,6 +2,7 @@ from typing import Optional, Union, cast, Dict, Any, Tuple
 import torch  # type: ignore
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LRScheduler
 from pathlib import Path
 import wandb
@@ -9,7 +10,7 @@ from wandb.sdk.wandb_run import Run
 from multiprocessing.synchronize import Event as EventClass
 # local imports
 
-from video_dataset import get_data_loader, get_wlasl_info
+from video_dataset import  VideoDataset, get_wlasl_info, get_data_set
 from configs import (
     load_config,
     print_config,
@@ -23,34 +24,48 @@ from configs import (
     OptimizerInfo,
 )
 from stopping import EarlyStopper, StopperOn
-from models import get_model, norm_vals
+from models import get_model, norm_vals, NormDict
 from utils import wandb_manager
 from testing import save_test_sizes
 
 
 def setup_data(
-    mean: Tuple[float, float, float], std: Tuple[float, float, float], config: RunInfo
-):
+    norm_dict: NormDict, config: RunInfo
+) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
     # NOTE: update for other datasets
     train_info = get_wlasl_info(config["admin"]["split"], set_name="train")
     val_info = get_wlasl_info(config["admin"]["split"], set_name="val")
 
-    train_loader, num_t_classes, _, _ = get_data_loader(
-        mean,
-        std,
-        config["data"]["frame_size"],
-        config["data"]["num_frames"],
+    train_dataset, num_t_classes, _, _ = get_data_set(
         set_info=train_info,
-        batch_size=config["training"]["batch_size"],
+        norm_dict=norm_dict,
+        frame_size=config["data"]["frame_size"],
+        num_frames=config["data"]["num_frames"],
     )
-    val_loader, num_v_classes, _, _ = get_data_loader(
-        mean,
-        std,
-        config["data"]["frame_size"],
-        config["data"]["num_frames"],
+    val_dataset, num_v_classes, _, _ = get_data_set(
         set_info=val_info,
-        batch_size=1,
+        norm_dict=norm_dict,
+        frame_size=config["data"]["frame_size"],
+        num_frames=config["data"]["num_frames"],
     )
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=True,
+        num_workers=2,
+        pin_memory=True,
+    )
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config["training"]["batch_size"],
+        shuffle=False,
+        num_workers=2,
+        pin_memory=True,
+        drop_last=False,
+    )
+
     assert num_t_classes == num_v_classes, (
         f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
     )
@@ -105,8 +120,8 @@ def get_scheduler(
             threshold=sched_conf["threshold"],
             threshold_mode=sched_conf["threshold_mode"],
             cooldown=sched_conf["cooldown"],
-            min_lr=sched_conf["min_lr"], 
-            eps=sched_conf["eps"]
+            min_lr=sched_conf["min_lr"],
+            eps=sched_conf["eps"],
         )
     else:
         # should not be possible to get here
@@ -118,16 +133,20 @@ def get_scheduler(
 
 
 def get_stopper(
-    arg_dict: Optional[StopperOn] = None, wandb_run: Optional[Run] = None, event: Optional[EventClass] = None
+    arg_dict: Optional[StopperOn] = None,
+    wandb_run: Optional[Run] = None,
+    event: Optional[EventClass] = None,
 ) -> EarlyStopper:
     if arg_dict is None:
         return EarlyStopper(on=False, event=event)
-     
+
     else:
         return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run, event=event)
 
 
-def _setup_wandb(config: RunInfo, wandb_info: WandbInfo, run_id_required: bool = True) -> Run:
+def _setup_wandb(
+    config: RunInfo, wandb_info: WandbInfo, run_id_required: bool = True
+) -> Run:
     # wandb_info = config["wandb"]
     admin = config["admin"]
 
@@ -150,7 +169,9 @@ def _setup_wandb(config: RunInfo, wandb_info: WandbInfo, run_id_required: bool =
                 project=wandb_info["project"],
                 name=run_name,
                 tags=wandb_info["tags"],
-                config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
+                config=cast(
+                    Dict[str, Any], config
+                ),  # cast to reguler dict for wandb init
                 id=run_id,
                 resume="must",
             )
@@ -160,8 +181,7 @@ def _setup_wandb(config: RunInfo, wandb_info: WandbInfo, run_id_required: bool =
             return run
         elif run_id_required:
             raise ValueError("Run ID is required for recovery but could not be found.")
-        
-    
+
     print(f"Starting new run with name: {run_name}")
 
     run = wandb.init(
@@ -204,7 +224,7 @@ def train_loop(
     recover: bool = False,
     seed: Optional[int] = SEED,
     event: Optional[EventClass] = None,
-    prompt: bool = False
+    prompt: bool = False,
 ) -> Optional[Dict[str, float]]:
     """Train loop for video classification model.
 
@@ -221,9 +241,7 @@ def train_loop(
     if seed is not None:
         set_seed(seed)
 
-    model_info = norm_vals(model_name)
-
-    dataloaders, num_classes = setup_data(model_info["mean"], model_info["std"], config)
+    dataloaders, num_classes = setup_data(norm_vals(model_name), config)
 
     drop_p = config["model_params"]["drop_p"]
     model = get_model(model_name, num_classes, drop_p)
@@ -300,7 +318,7 @@ def train_loop(
             epoch = 0
             steps = 0
         else:
-            raise ValueError(f'Load path not found: {load}')
+            raise ValueError(f"Load path not found: {load}")
 
     # train it
     while epoch < config["training"]["max_epoch"] and not stopper.stop:
@@ -460,9 +478,6 @@ def train_loop(
 
     print("Finished training successfully")
     return {"best_val_acc": best_val_acc, "best_val_loss": best_val_loss}
-
-
-
 
 
 def main():

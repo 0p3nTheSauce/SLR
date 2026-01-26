@@ -1,41 +1,75 @@
+import inspect
 from typing import (
     Optional,
-    List
+    List,
+    Callable,
 )
+from logging import Logger, INFO, ERROR
 import subprocess
+
+from contextlib import contextmanager
 #locals 
 from .core import (
-    WORKER_NAME,
-    SERVER_NAME,
     SESH_NAME,
 )
+
 
 
 class tmux_manager:
     def __init__(
         self,
-        worker_name: str = WORKER_NAME,
-        server_name: str = SERVER_NAME,
         sesh_name: str = SESH_NAME,
+        logger: Optional[Logger] = None,
     ) -> None:
-        self.worker_name = worker_name
-        self.server_name = server_name
         self.sesh_name = sesh_name
-        
+        self.logger = logger
         try:
-            res = self.check_tmux_session_panes()
+            res = self.check_tmux_session()
             if res is None:
-                print("Tmux session not found, creating new session...")
-                res = self.setup_tmux_session_panes()
+                self.print_logger("Tmux session not found, creating new session...")
+                res = self.setup_tmux_session()
                 if res is not None:
-                    print("Tmux session created.")
+                    self.print_logger("Tmux session created.")
         except Exception as e:
-            print(f"Error during tmux session check/setup: {e}")
-        
+            self.print_logger(f"Error during tmux session check/setup: {e}", level=ERROR)
 
-    def setup_tmux_session_panes(self) -> Optional[List[subprocess.CompletedProcess[bytes]]]:
+    def print_logger(self, msg: str, level: int = INFO, include_caller: bool = False) -> None:
+        """Print to logger if exists, else print to console
+
+        Args:
+            msg (str): Message to print
+            level (int): Logging level (default: INFO)
+            include_caller (bool): Whether to prepend caller function name
         """
-        Create the que_training tmux session is set up, with panes for daemon and worker
+        if include_caller:
+            caller = inspect.currentframe()
+            assert caller is not None
+            caller = caller.f_back
+            assert caller is not None
+            caller = caller.f_code.co_name
+            msg = f"[{caller}] {msg}"
+        
+        if self.logger is not None:
+            self.logger.log(level, msg)
+        else:
+            print(msg)
+            
+    @contextmanager
+    def subprocess_error_handler(self, cmd: str):
+        """Context manager to handle subprocess errors
+
+        Args:
+            cmd (str): The command being run
+        """
+        try:
+            yield
+        except subprocess.CalledProcessError as e:
+            self.print_logger(f"Error occurred while running command: {cmd}", ERROR, include_caller=True)
+            self.print_logger(f"Error details: {e.stderr}", ERROR, include_caller=True)
+
+    def setup_tmux_session(self) -> Optional[subprocess.CompletedProcess[bytes]]:
+        """
+        Create the train tmux session
         
         :return: CompletedProcess if successful, None if failed
         :rtype: CompletedProcess[bytes] | None
@@ -48,169 +82,79 @@ class tmux_manager:
             "-s",
             self.sesh_name
         ]
-        split_window_cmd = [
-            "tmux",
-            "split-window",
-            "-h", 
-            "-t",
-            f"{self.sesh_name}"
-        ]
             
-        try:
-            o1 = subprocess.run(create_sesh_cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            print(
-                "setup_tmux_session ran into an error when creating the session"
-            )
-            print(e.stderr)
-            return
-        
-        try:
-            o2 = subprocess.run(split_window_cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            print(
-                "setup_tmux_session ran into an error when splitting the window: "
-            )
-            print(e.stderr)
-            return
-        
-        return [o1, o2]
+        with self.subprocess_error_handler(" ".join(create_sesh_cmd)):
+            return subprocess.run(create_sesh_cmd, check=True)
 
-    def check_tmux_session_panes(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
-        
-        results = []
-        
+    def check_tmux_session(self) -> Optional[subprocess.CompletedProcess[bytes]]:
+        """
+        Check if the tmux session exists
+
+        :return: CompletedProcess if successful, None if failed
+        :rtype: CompletedProcess[bytes] | None
+        """
         tmux_cmd = ["tmux", "has-session", "-t", f"{self.sesh_name}"]
-        try:
-            results.append(
-                subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
-            )
-        except subprocess.CalledProcessError as e:
-            print(
-                f"check_tmux_session ran into an error when checking the seshion {self.sesh_name}: "
-            )
-            print(e.stderr)
-            return
-        return results
-    
-    def join_session_pane(self) -> Optional[subprocess.CompletedProcess[str]]:
+        with self.subprocess_error_handler(" ".join(tmux_cmd)):
+            return subprocess.run(tmux_cmd, check=True)
+        
+    def join_session(self) -> Optional[subprocess.CompletedProcess[bytes]]:
+        """
+        Join the tmux session
+
+        :return: CompletedProcess if successful, None if failed
+        :rtype: CompletedProcess[bytes] | None
+        """
+
         tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}"]
-        try:
-            return subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
-        except subprocess.CalledProcessError as e:
-            print("join_session ran into an error when spawning the worker process: ")
-            print(e.stderr)
-            return 
+    
+        with self.subprocess_error_handler(" ".join(tmux_cmd)):
+            return subprocess.run(tmux_cmd, check=True)
 
     def _send(
-        self, cmd: str, wndw: str
+        self, cmd: str
     ) -> Optional[subprocess.CompletedProcess[bytes]]:  # use with caution
         """Send a command to the given window
 
         Args:
             cmd (str): The command as you would type in the terminal
-            wndw (str): The tmux window
 
         Returns:
             Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
         """
-        avail_wndws = [self.server_name, self.worker_name]
-        if wndw not in avail_wndws:
-            print(
-                f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}"
-            )
-            return None
         tmux_cmd = [
             "tmux",
             "send-keys",
             "-t",
-            f"{self.sesh_name}:{wndw}",
+            f"{self.sesh_name}",
             cmd,
             "Enter",
         ]
-        try:
+        with self.subprocess_error_handler(" ".join(tmux_cmd)):
             return subprocess.run(tmux_cmd, check=True)
-        except subprocess.CalledProcessError as e:
-            print("Send ran into an error when spawning the worker process: ")
-            print(e.stderr)
+    
+    def activate_conda_env(self, env_name: str) -> Optional[subprocess.CompletedProcess[bytes]]:
+        """Activate the given conda environment in the tmux session
 
-    # def setup_tmux_session_windows(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
-    #     """Create the que_training tmux session is set up, with windows daemon and worker
+        Args:
+            env_name (str): The name of the conda environment to activate
 
-    #     Returns:
-	# 		Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
-    #     """
+        Returns:
+            Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
+        """
+        cmd = f"conda activate {env_name}"
+        return self._send(cmd)
+            
+    def start_python_module(self, executble_path: str) -> Optional[subprocess.CompletedProcess[bytes]]:
+        """Start the tmux session with the given command
 
-    #     create_sesh_cmd = [
-    #         "tmux",
-    #         "new-session",
-    #         "-d",
-    #         "-s",
-    #         self.sesh_name,  # -d for detach
-    #         "-n",
-    #         f"{self.server_name}",
-    #     ]
-    #     create_wWndw_cmd = [  # daemon window created in first command
-    #         "tmux",
-    #         "new-window",
-    #         "-t",
-    #         self.sesh_name,
-    #         "-n",
-    #         self.worker_name,
-    #     ]
+        Args:
+            exec_path (str): The command to execute in the tmux session
 
-    #     try:
-    #         o1 = subprocess.run(create_sesh_cmd, check=True)
-    #     except subprocess.CalledProcessError as e:
-    #         print(
-    #             "setup_tmux_session ran into an error when creating the session and daemon window: "
-    #         )
-    #         print(e.stderr)
-    #         return
-    #     try:
-    #         o2 = subprocess.run(create_wWndw_cmd, check=True)
-    #     except subprocess.CalledProcessError as e:
-    #         print(
-    #             "setup_tmux_session ran into an error when creating the worker window: "
-    #         )
-    #         print(e.stderr)
-    #         return
-    #     return [o1, o2]
-
-    # def check_tmux_session_windows(self) -> Optional[list[subprocess.CompletedProcess[bytes]]]:
-    #     """Verify that the que_training tmux session is set up, with windows daemon and worker
-
-    #     Returns:
-    #         Optional[list[subprocess.CompletedProcess[bytes]]]: A list of successful process outputs, or None if one or both failed.
-    #     """
-    #     window_names = [self.server_name, self.worker_name]
-    #     results = []
-    #     for win_name in window_names:
-    #         tmux_cmd = ["tmux", "has-session", "-t", f"{self.sesh_name}:{win_name}"]
-    #         try:
-    #             results.append(
-    #                 subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
-    #             )
-    #         except subprocess.CalledProcessError as e:
-    #             print(
-    #                 f"check_tmux_session ran into an error when checking the {win_name} window: "
-    #             )
-    #             print(e.stderr)
-    #             return
-    #     return results
-
-    # def join_session_windows(self, wndw: str):
-    #     avail_wndws = [self.server_name, self.worker_name]
-    #     if wndw not in avail_wndws:
-    #         print(
-    #             f"Window {wndw} not one of validated windows: {', '.join(avail_wndws)}"
-    #         )
-    #         return None
-
-    #     tmux_cmd = ["tmux", "attach-session", "-t", f"{self.sesh_name}:{wndw}"]
-    #     try:
-    #         return subprocess.run(tmux_cmd, check=True)
-    #     except subprocess.CalledProcessError as e:
-    #         print("join_session ran into an error when spawning the worker process: ")
-    #         print(e.stderr)
-    #         return None
+        Returns:
+            Optional[subprocess.CompletedProcess[bytes]]: The return object of the completed process, or None if failure.
+        """
+        cmd = f"python -m {executble_path}"
+        return self._send(cmd)  
+    
+    
+    

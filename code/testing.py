@@ -19,10 +19,10 @@ import gc
 
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
-from models import norm_vals, get_model
+from models import norm_vals, get_model, NormDict
 from configs import set_seed
 
-from video_dataset import VideoDataset, get_data_loader, get_wlasl_info
+from video_dataset import VideoDataset, get_data_set, get_wlasl_info
 from models import avail_models
 
 from configs import (
@@ -320,6 +320,25 @@ def load_info(dirp: Path, checkname: str):
 			resd[fn.name.replace(".json", "")] = json.load(f)
 	return resd
 
+def setup_data(norm_dict: NormDict, split: str, frame_size: int, num_frames: int, shuffle: bool) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
+	test_info = get_wlasl_info(split, set_name="test")
+	test_dataset, num_classes, perm, shanon_entropy = get_data_set(
+		set_info=test_info,
+		norm_dict=norm_dict,
+		frame_size=frame_size,
+		num_frames=num_frames,
+		shuffle=shuffle,
+	)
+	test_loader = DataLoader(
+		test_dataset,
+		batch_size=1,
+		shuffle=False,
+		num_workers=2,
+		pin_memory=True,
+		drop_last=False,
+	)
+	return test_loader, num_classes, perm, shanon_entropy
+
 
 def test_run(
 	admin: MinInfo,
@@ -362,7 +381,6 @@ def test_run(
 	model_name = admin["model"]
 	# data = config["data"]
 
-	model_norms = norm_vals(model_name)
 	results = {}
 
 	save_path = Path(admin["save_path"])
@@ -372,14 +390,12 @@ def test_run(
 	if save or save_img:
 		output.mkdir(exist_ok=True)
 
-	dloader, num_classes, m_permt, m_sh_et = get_data_loader(
-		model_norms["mean"],
-		model_norms["std"],
-		data["frame_size"],
-		data["num_frames"],
-		set_info=get_wlasl_info(admin["split"], set_name=set_name),
+	dloader, num_classes, m_permt, m_sh_et = setup_data(
+		norm_dict=norm_vals(model_name),
+		split=admin["split"],
+		frame_size=data["frame_size"],
+		num_frames=data["num_frames"],
 		shuffle=shuffle,
-		batch_size=1,
 	)
 
 	model = get_model(model_name, num_classes, drop_p=0.0)

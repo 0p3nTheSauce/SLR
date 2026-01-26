@@ -4,10 +4,9 @@ from multiprocessing.synchronize import Event as EventClass
 from logging import Logger
 import os
 import time
-from utils import gpu_manager
 from .core import (
     connect_manager,
-    DaemonStateHandler,
+    ServerStateHandler,
 )
 from .worker import Worker
 
@@ -17,7 +16,7 @@ class Daemon:
         self,
         worker: Worker,
         logger: Logger,
-        local_state: DaemonStateHandler,
+        local_state: ServerStateHandler,
         stop_worker_event: EventClass,
         stop_daemon_event: EventClass,
     ) -> None:
@@ -33,7 +32,7 @@ class Daemon:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
             self.start_supervisor()
 
-    def monitor_worker(self, state_proxy: DaemonStateHandler) -> bool:
+    def monitor_worker(self, state_proxy: ServerStateHandler) -> bool:
         """
         Monitor the worker process until it exits.
         If it exits with a non-zero code and 'stop_on_fail' is False,
@@ -97,9 +96,9 @@ class Daemon:
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
         """
         manager = connect_manager()
-        state_proxy = manager.get_daemon_state()
+        state_proxy = manager.get_server_state_handler()
         state_proxy.set_pid(os.getpid())
-        state_proxy.to_disk()
+        state_proxy.save_state()
 
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
 
@@ -113,7 +112,7 @@ class Daemon:
                 self.worker_process.start()
 
                 state_proxy.set_worker_pid(self.worker_process.pid)
-                state_proxy.to_disk()
+                state_proxy.save_state()
 
                 self.logger.info(f"Worker started with PID: {self.worker_process.pid}")
 
@@ -132,7 +131,7 @@ class Daemon:
         state_proxy.set_pid(None)
         state_proxy.set_worker_pid(None)
         state_proxy.set_awake(False)
-        state_proxy.to_disk()  # Save final state to disk
+        state_proxy.save_state()  # Save final state to disk
         self.logger.info("Supervisor process exiting.")
 
     def start_supervisor(self) -> None:
@@ -144,7 +143,7 @@ class Daemon:
         self.stop_daemon_event.clear()  # Reset event in case it was set previously
         self.stop_worker_event.clear()
         self.local_state.set_awake(True)  # child inherits local state
-        self.local_state.to_disk()
+        self.local_state.save_state()
 
         self.supervisor_process = Process(target=self.supervise)
         self.supervisor_process.start()
@@ -198,7 +197,7 @@ class Daemon:
             self.local_state.pid = None
             self.local_state.worker_pid = None
 
-            self.local_state.to_disk()
+            self.local_state.save_state()
             self.logger.info("Supervisor stopped.")
 
         else:

@@ -55,7 +55,7 @@ Important methods (summary)
                 move it into old_runs and remove it from cur_run. Raises QueEmpty if cur_run is empty.
 - stash_failed_run(error: str) -> None
                 Move the current run from cur_run to fail_runs and annotate with error.
-- recover_run(move_to: QueLocation = TO_RUN) -> None
+- recover_run(to_loc: QueLocation = TO_RUN) -> None
                 Mark the current run for recovery (admin.recover = True) and move it to the
                 specified location.
 - clear_runs(loc: QueLocation) -> None
@@ -181,15 +181,15 @@ DN_NAME = "Daemon"
 WORKER_NAME = "Worker"
 SERVER_NAME = "Server"
 RUN_PATH = QUE_DIR / "Runs.json"
-DAEMON_STATE_PATH = QUE_DIR / "Daemon.json"
+SERVER_STATE_PATH = QUE_DIR / "Server.json"
 WR_LOG_PATH = QUE_DIR / "Worker.log"
-DN_LOG_PATH = QUE_DIR / "Daemon.log"
+
 
 
 SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
-
+SERVER_MODULE_PATH = f"{QUE_DIR.name}.server"
 
 TO_RUN = "to_run"  # havent run yet
 CUR_RUN = "cur_run"  # busy running
@@ -872,15 +872,41 @@ class Que:
 
     # for QueShell interface
 
-    def recover_run(self, move_to: QueLocation = TO_RUN) -> None:
-        """Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present"""
+    def recover_run(self, to_loc: QueLocation = TO_RUN, from_loc: QueLocation = CUR_RUN, index: int = 0) -> None:
+        """
+        Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
+        
+        :param to_loc: Location to move recovered run to
+        :type to_loc: QueLocation
+        :param from_loc: Location to recover run from
+        :type from_loc: QueLocation
+        :param index: Index of run to recover
+        :type index: int
+        """
         with log_and_raise(self.logger, "recover"):
-            run = self.peak_cur_run()
+            run = self.peak_run(from_loc, index)
             run["admin"]["recover"] = True
-            if run["wandb"]["run_id"] is None: #NOTE: run id could become optional if required
+            if run["wandb"]["run_id"] is None:  # NOTE: run id
                 raise QueException("Run was set to recover, but no run id was provided")
-            _ = self.pop_cur_run()
-            self._set_run(move_to, 0, run)
+            
+            if from_loc == FAIL_RUNS:
+                # remove error
+                run = ExpInfo(
+                    admin=run["admin"],
+                    training=run["training"],
+                    optimizer=run["optimizer"],
+                    model_params=run["model_params"],
+                    data=run["data"],
+                    scheduler=run["scheduler"],
+                    early_stopping=run["early_stopping"],
+                    wandb=run["wandb"],
+                )
+
+            _ = self._pop_run(from_loc, index)
+            self._set_run(to_loc, 0, run)
+
+        self.logger.info(f"Recovered Run: {self.run_str(to_loc, 0)} with index: {index} from {from_loc} to {to_loc}")
+        self.logger.info("\n")
 
     def clear_runs(self, loc: QueLocation) -> None:
         """reset the runs queue"""
@@ -1052,19 +1078,23 @@ class Que:
 
         
 
-# --- Daemon State Management --- #
+# --- Server State Management --- #
 
-class DaemonState(TypedDict):
-    pid: Optional[int]
+class ServerState(TypedDict):
+    server_pid: Optional[int]
     worker_pid: Optional[int]
+    daemon_pid: Optional[int]
     stop_on_fail: bool
     awake: bool
+    
+    
+    
 
 
-def is_daemon_state(val: Any) -> TypeGuard[DaemonState]:
+def is_server_state(val: Any) -> TypeGuard[ServerState]:
     """
     Type guard to check if an arbitrary value is structurally
-    compatible with the DaemonState TypedDict.
+    compatible with the ServerState TypedDict.
     """
     # 1. Check if the value is a dictionary
     if not isinstance(val, dict):
@@ -1074,7 +1104,7 @@ def is_daemon_state(val: Any) -> TypeGuard[DaemonState]:
     # Since all keys are technically *optional* in the Python dictionary sense
     # but *required* by TypedDict (unless explicitly marked NotRequired),
     # we check for all keys listed in the TypedDict.
-    required_keys = DaemonState.__annotations__.keys()
+    required_keys = ServerState.__annotations__.keys()
     if not all(key in val for key in required_keys):
         return False
 
@@ -1100,46 +1130,53 @@ def is_daemon_state(val: Any) -> TypeGuard[DaemonState]:
     return True
 
 
-def read_daemon_state(state_path: Union[Path, str] = DAEMON_STATE_PATH) -> DaemonState:
+def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
     with open(state_path, "r") as f:
         data = json.load(f)
-    if is_daemon_state(data):
+    if is_server_state(data):
         return data
     else:
         raise ValueError(
             f"Data read from: {state_path} is not compatible with DaemonState"
         )
 
-default_state: DaemonState = {
-    "pid": None,
-    "worker_pid": None,
-    "stop_on_fail": False,
-    "awake": False,
-}
+# default_state: ServerState = {
+#     "pid": None,
+#     "worker_pid": None,
+#     "stop_on_fail": False,
+#     "awake": False,
+# }
 
-class DaemonStateHandler:
+class ServerStateHandler:
     def __init__(
         self,
         logger: Logger,
-        pid: Optional[int] = None,
+        server_pid: Optional[int] = None,
+        daemon_pid: Optional[int] = None,
         worker_pid: Optional[int] = None,
         stop_on_fail: bool = True,
         awake: bool = False,
-        state_path: Union[Path, str] = DAEMON_STATE_PATH,
+        state_path: Union[Path, str] = SERVER_STATE_PATH,
     ) -> None:
         self.logger = logger
-        self.pid: Optional[int] = pid
+        self.server_pid: Optional[int] = server_pid
+        self.daemon_pid: Optional[int] = daemon_pid
         self.worker_pid: Optional[int] = worker_pid
         self.stop_on_fail: bool = stop_on_fail
         self.awake: bool = awake
         self.state_path: Path = Path(state_path)
-        self.from_disk()
+        self.load_state()
 
-    def from_disk(self) -> None:
+    def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
+        if in_path is None:
+            in_path = self.state_path
+        elif not Path(in_path).exists():
+            self.logger.warning(f"No existing state found at {in_path}. Load unsuccessful.")
+            return
 
         try:
-            state = read_daemon_state(self.state_path)
-            self.pid = state["pid"]
+            state = read_server_state(self.state_path)
+            self.server_pid = state["server_pid"]
             self.worker_pid = state["worker_pid"]
             self.stop_on_fail = state["stop_on_fail"]
             self.awake = state["awake"]
@@ -1148,14 +1185,23 @@ class DaemonStateHandler:
             self.logger.warning(
                 f"Ran into an error when loading state: {e}\nloading from scratch"
             )
-            self.pid = None
+            self.server_pid = None
+            self.daemon_pid = None
             self.worker_pid = None
             self.stop_on_fail = False
             self.awake = False
 
-    def to_disk(self) -> None:
-        state: DaemonState = {
-            "pid": self.pid,
+    def save_state(self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False):
+        if out_path is None:
+            out_path = self.state_path
+        elif Path(out_path).exists() and not timestamp:
+            self.logger.warning(f"Overwriting existing state file: {out_path}")        
+
+        if timestamp:
+            out_path = timestamp_path(out_path)
+        state: ServerState = {
+            "server_pid": self.server_pid,
+            "daemon_pid": self.daemon_pid,
             "worker_pid": self.worker_pid,
             "stop_on_fail": self.stop_on_fail,
             "awake": self.awake,
@@ -1164,16 +1210,18 @@ class DaemonStateHandler:
             json.dump(state, f)
         self.logger.info(f"Saved state to: {self.state_path}")
 
-    def get_state(self) -> DaemonState:
+    def get_state(self) -> ServerState:
         return {
-            "pid": self.pid,
+            "server_pid": self.server_pid,
+            "daemon_pid": self.daemon_pid,
             "worker_pid": self.worker_pid,
             "stop_on_fail": self.stop_on_fail,
             "awake": self.awake,
         }
 
-    def set_state(self, state: DaemonState) -> None:
-        self.pid = state["pid"]
+    def set_state(self, state: ServerState) -> None:
+        self.server_pid = state["server_pid"]
+        self.daemon_pid = state["daemon_pid"]
         self.worker_pid = state["worker_pid"]
         self.stop_on_fail = state["stop_on_fail"]
         self.awake = state["awake"]
@@ -1211,14 +1259,14 @@ if TYPE_CHECKING:
         def start(self) -> None: ...
         def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None: ...
         def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False) -> None: ...
-        def get_state(self) -> DaemonState: ...
+        def get_state(self) -> ServerState: ...
         def set_stop_on_fail(self, value: bool) -> None: ...
         def set_awake(self, value: bool) -> None: ...
         def clear_cuda_memory(self) -> None: ...
 
     class QueManagerProtocol(Protocol):
         def get_que(self) -> Que: ...
-        def get_daemon_state(self) -> DaemonStateHandler: ...
+        def get_server_state_handler(self) -> ServerStateHandler: ...
         def DaemonController(self) -> DaemonControllerProtocol: ...
 
 class QueManager(BaseManager): 
