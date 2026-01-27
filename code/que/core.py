@@ -170,7 +170,7 @@ from run_types import (
     Sumarised,
 )
 from testing import full_test, load_comp_res
-from configs import print_config, load_config
+from configs import print_config, load_config, get_avail_splits, ENTITY, PROJECT_BASE
 from contextlib import contextmanager
 
 # constants
@@ -181,12 +181,13 @@ QUE_NAME = "Que"
 DN_NAME = "Daemon"
 WORKER_NAME = "Worker"
 SERVER_NAME = "Server"
+
 RUN_PATH = QUE_DIR / "Runs.json"
 SERVER_STATE_PATH = QUE_DIR / "Server.json"
-WR_LOG_PATH = QUE_DIR / "Worker.log"
 
-
+TRAINING_LOG_PATH = QUE_DIR / "Training.log"
 SR_LOG_PATH = QUE_DIR / "Server.log"
+
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
 SERVER_MODULE_PATH = f"{QUE_DIR.name}.server"
@@ -334,7 +335,6 @@ def log_and_raise(logger: Logger, task: str = "Operation"):
 def timestamp_path(path: Union[str, Path]) -> str:
     formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     return str(path).replace(".json", f"_{formatted}.json")
-
 
 class Que:
     def __init__(
@@ -1089,17 +1089,13 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
-
 # --- Server State Management --- #
-
-
 class ServerState(TypedDict):
     server_pid: Optional[int]
     worker_pid: Optional[int]
     daemon_pid: Optional[int]
     stop_on_fail: bool
     awake: bool
-
 
 def is_server_state(val: Any) -> TypeGuard[ServerState]:
     """
@@ -1139,7 +1135,6 @@ def is_server_state(val: Any) -> TypeGuard[ServerState]:
     # If all checks pass, it is a DaemonState
     return True
 
-
 def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
     with open(state_path, "r") as f:
         data = json.load(f)
@@ -1149,15 +1144,6 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
         raise ValueError(
             f"Data read from: {state_path} is not compatible with DaemonState"
         )
-
-
-# default_state: ServerState = {
-#     "pid": None,
-#     "worker_pid": None,
-#     "stop_on_fail": False,
-#     "awake": False,
-# }
-
 
 class ServerStateHandler:
     def __init__(

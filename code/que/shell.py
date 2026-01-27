@@ -5,9 +5,13 @@ from .core import (
     SYNONYMS,
     connect_manager,
     ServerState,
-    WR_LOG_PATH,
+    TRAINING_LOG_PATH,
+    
     SR_LOG_PATH,
     RUN_PATH,
+    get_avail_splits,
+    ENTITY,
+    PROJECT_BASE,
 )
 
 from .tmux import tmux_manager
@@ -79,6 +83,7 @@ class QueShell(cmdLib.Cmd):
             "load": self._get_load_parser,
             "save": self._get_save_parser,
             "recover": self._get_recover_parser,
+            "wandb": self._get_wandb_parser,
         }
     
 
@@ -434,15 +439,17 @@ class QueShell(cmdLib.Cmd):
             f"[bold green]✓[/bold green] Edited run {parsed_args.index} in {parsed_args.location}"
         )
 
-    # Tmux
+    def do_wandb(self, arg):
+        """Open the wandb page for a run"""
+
+    # Other
+    
     def do_attach(self, arg):
         """Attach to the que_training tmux session"""
         with self.unwrap_exception(
             "Attached to tmux session", "Failed to attach to tmux session"
         ):
             self.tmux_man.join_session()
-
-    # Daemon based
 
     def _pretty_status(self, status: ServerState):
         if status["awake"]:
@@ -543,7 +550,7 @@ class QueShell(cmdLib.Cmd):
             return
 
         if parsed_args.worker:
-            log_file = str(WR_LOG_PATH)  # your constant
+            log_file = str(TRAINING_LOG_PATH)  # your constant
         elif parsed_args.server:
             log_file = str(SR_LOG_PATH)  # your constant
         else:
@@ -569,6 +576,7 @@ class QueShell(cmdLib.Cmd):
             self.console.print(f"[red]Error: Log file not found at {log_file}[/red]")
         except Exception as e:
             self.console.print(f"[red]Error reading log file: {e}[/red]")
+
 
     # Helper functions for parsing
 
@@ -756,7 +764,7 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("-k2", "--key2", type=str, default=None)
         return parser
 
-    # Daemon
+    # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -846,19 +854,17 @@ class QueShell(cmdLib.Cmd):
 
         return parser
 
-    # Tmux
+    def _get_wandb_parser(self) -> argparse.ArgumentParser:
+        likely_projects = [f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()]
+        parser = argparse.ArgumentParser(
+            description="Open the wandb page for a run, or project", prog="wandb"
+        )
+        parser.add_argument("--location", "-l", choices=self.avail_locs)
+        parser.add_argument("--index", "-i", type=int)
+        parser.add_argument("--project", "-p", type=str, help="Wandb project name. Probably one of: " + ", ".join(likely_projects), default=PROJECT_BASE)
+        parser.add_argument("--entity", "-e", type=str, help=f"Wandb entity name. Default: {ENTITY}", default=ENTITY)
+        return parser
 
-
-"""To dos:
-- There are some functions which do not have exception handling - add those
-- Add probe to check server is running/start server + restart server
-- Add better checking when starting daemon/worker (check it is actually working instead of just reporting
-    that the process started successfully)
-- Figure out issue with relieving cuda context (NB)
-- Add more options to logs
-- Add an failed run recovery option (automatically remove error)
-- Make training output go to a seperate file, but other worker logging go to server log file
-"""
 
 
 if __name__ == "__main__":
