@@ -28,6 +28,8 @@ class Daemon:
         self.worker_process: Optional[Process] = None
         self.supervisor_process: Optional[Process] = None
 
+        self.logger.info("Daemon initialized")
+
         if self.local_state.awake:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
             self.start_supervisor()

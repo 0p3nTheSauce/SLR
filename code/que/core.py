@@ -181,6 +181,7 @@ QUE_NAME = "Que"
 DN_NAME = "Daemon"
 WORKER_NAME = "Worker"
 SERVER_NAME = "Server"
+TRAINING_NAME = "Training"
 
 RUN_PATH = QUE_DIR / "Runs.json"
 SERVER_STATE_PATH = QUE_DIR / "Server.json"

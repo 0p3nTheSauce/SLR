@@ -1,1 +1,1 @@
-{"server_pid": null, "daemon_pid": null, "worker_pid": null, "stop_on_fail": false, "awake": false}
+{"server_pid": null, "daemon_pid": null, "worker_pid": 3323232, "stop_on_fail": false, "awake": true}
