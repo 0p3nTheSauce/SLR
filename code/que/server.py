@@ -12,6 +12,7 @@ from .core import (
     QUE_NAME,
     SERVER_NAME,
     DN_NAME,
+    TRAINING_NAME,
     TRAINING_LOG_PATH,
     WORKER_NAME,
     ServerState,
@@ -25,7 +26,7 @@ class LoggingDict(TypedDict):
     daemon: logging.Logger
     server: logging.Logger
     worker: logging.Logger
-    
+    # training: logging.Logger
 
 class ServerContext:
     """
@@ -66,7 +67,7 @@ class ServerContext:
 
     def _setup_training_logger(self) -> logging.Logger:
         """Sets up a dedicated training logger with its own file handler."""
-        training_logger = logging.getLogger(WORKER_NAME)
+        training_logger = logging.getLogger(TRAINING_NAME)
 
         # Create a separate file handler for the training logger
         training_file_handler = logging.FileHandler(TRAINING_LOG_PATH)
@@ -96,13 +97,14 @@ class ServerContext:
         dn_logger = logging.getLogger(DN_NAME)
         server_logger = logging.getLogger(SERVER_NAME)
         worker_logger = logging.getLogger(WORKER_NAME)
-        training_logger = self._setup_training_logger()
+        # training_logger = self._setup_training_logger()
 
         return LoggingDict(
             que=que_logger,
             daemon=dn_logger,
             server=server_logger,
             worker=worker_logger,
+            # training=training_logger,
         )
 
     def _handle_shutdown(self, signum, frame):
