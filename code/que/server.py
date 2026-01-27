@@ -8,7 +8,7 @@ from typing import Dict, Optional, TypedDict
 from .core import (
     Que,
     QueManager,
-    SR_LOG_PATH,
+    SERVER_LOG_PATH,
     QUE_NAME,
     SERVER_NAME,
     DN_NAME,
@@ -86,7 +86,11 @@ class ServerContext:
 
     def _setup_logging(self) -> LoggingDict:
         """Sets up loggers for the server components."""
-        
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=SERVER_LOG_PATH,
+        )
         
         que_logger = logging.getLogger(QUE_NAME)
         dn_logger = logging.getLogger(DN_NAME)

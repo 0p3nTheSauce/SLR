@@ -1,7 +1,7 @@
 # from .server import connect_manager
 import multiprocessing as mp
 import time
-from .core import Que, connect_manager, _get_basic_logger, SERVER_MODULE_PATH
+from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
 from typing import cast    
 import torch

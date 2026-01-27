@@ -6,8 +6,8 @@ from .core import (
     connect_manager,
     ServerState,
     TRAINING_LOG_PATH,
-    
-    SR_LOG_PATH,
+
+    SERVER_LOG_PATH,
     RUN_PATH,
     get_avail_splits,
     ENTITY,
@@ -552,7 +552,7 @@ class QueShell(cmdLib.Cmd):
         if parsed_args.worker:
             log_file = str(TRAINING_LOG_PATH)  # your constant
         elif parsed_args.server:
-            log_file = str(SR_LOG_PATH)  # your constant
+            log_file = str(SERVER_LOG_PATH)  # your constant
         else:
             raise ValueError("Please specify --worker or --server")
 
