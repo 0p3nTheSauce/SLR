@@ -208,6 +208,22 @@ class wandb_manager:
 	def validate_runId(cls, run_id: str, entity: str, project: str) -> bool:
 		return cls.run_present(run_id, cls.list_runs(entity, project))
 
+	@classmethod
+	def open_wandb(cls, entity: str, project: str, run_id: Optional[str],) -> None:
+		"""Open wandb page in default browser.
+		Args:
+			entity (str): wandb entity
+			project (str): wandb project
+			run_id (Optional[str]): wandb run id. If None, opens project page.
+		"""
+  
+  
+		if run_id is None:
+			url = f"https://wandb.ai/{entity}/{project}/"
+		else:
+			url = f"https://wandb.ai/{entity}/{project}/runs/{run_id}"
+		subprocess.run(["xdg-open", url])
+
 ############### Input ##################
 
 def ask_nicely(message: str,

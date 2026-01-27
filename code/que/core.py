@@ -159,6 +159,7 @@ import logging
 from multiprocessing.managers import BaseManager
 import time
 from datetime import datetime
+
 # locals
 from run_types import (
     ExpInfo,
@@ -185,7 +186,6 @@ SERVER_STATE_PATH = QUE_DIR / "Server.json"
 WR_LOG_PATH = QUE_DIR / "Worker.log"
 
 
-
 SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
@@ -209,7 +209,7 @@ SYNONYMS = {
 }
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
 
-#tmux
+# tmux
 SESH_NAME = "train"
 
 
@@ -313,6 +313,7 @@ class QueBusy(QueException):
     def __reduce__(self):
         return (self.__class__, (self.message,))
 
+
 @contextmanager
 def log_and_raise(logger: Logger, task: str = "Operation"):
     """
@@ -328,6 +329,7 @@ def log_and_raise(logger: Logger, task: str = "Operation"):
     except Exception as e:
         logger.error(f"{task} failed: {e}")
         raise e
+
 
 def timestamp_path(path: Union[str, Path]) -> str:
     formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
@@ -545,19 +547,21 @@ class Que:
                 runs.append(run)
         return idxs, runs
 
-    def load_state(self, in_path: Optional[Union[str, Path]]= None):
+    def load_state(self, in_path: Optional[Union[str, Path]] = None):
         """
         Load Que from file. Default load from RUN_PATH, unless in_path is provided
-        
-        :param in_path: Overide default load path. 
+
+        :param in_path: Overide default load path.
         :type in_path: Optional[Union[str, Path]]
         """
         if in_path is None:
             in_path = self.runs_path
         elif not Path(in_path).exists():
-            self.logger.warning(f"No existing state found at {in_path}. Load unsuccessful.")
+            self.logger.warning(
+                f"No existing state found at {in_path}. Load unsuccessful."
+            )
             return
-            
+
         try:
             with open(in_path, "r") as f:
                 data = json.load(f)
@@ -575,15 +579,17 @@ class Que:
             self.old_runs = []
             self.fail_runs = []
 
-    def save_state(self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False):
+    def save_state(
+        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+    ):
         if out_path is None:
             out_path = self.runs_path
         elif Path(out_path).exists() and not timestamp:
-            self.logger.warning(f"Overwriting existing state file: {out_path}")        
+            self.logger.warning(f"Overwriting existing state file: {out_path}")
 
         if timestamp:
             out_path = timestamp_path(out_path)
-            
+
         with open(out_path, "w") as f:
             all_runs = {
                 TO_RUN: self.to_run,
@@ -616,14 +622,14 @@ class Que:
         elif abs(idx) >= len(to_get):
             raise QueIdxOOR(loc, idx, len(to_get))
         return to_get[idx]
-    
+
     def peak_cur_run(self) -> ExpInfo:
         """Peaks the current run
-        
+
         Returns:
             ExpInfo: Dictionary of experiment info"""
         return self.peak_run(CUR_RUN, 0)
-    
+
     def pop_cur_run(self) -> ExpInfo:
         """Pops the current run
 
@@ -639,7 +645,7 @@ class Que:
                 run (ExpInfo): Dictionary of experiment info
         """
         self._set_run(CUR_RUN, 0, run)
-    
+
     def stash_next_run(self) -> str:
         """Moves next run from to_run to cur_run. Saves state with lock over both read and write"""
         next_run = self._pop_run(TO_RUN, 0)
@@ -787,7 +793,6 @@ class Que:
     def print_runs(cls, runs: List[Sumarised], exc: Optional[List[str]] = None) -> None:
         """If you are working through the proxy and have already got the runs list"""
 
-
         if len(runs) == 0:
             print("  No runs available")
             return
@@ -802,7 +807,9 @@ class Que:
         ]
 
         if "best_val_acc" in runs[0]:
-            header_parts.append("Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2))
+            header_parts.append(
+                "Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2)
+            )
             header_parts.append(
                 "Best Val Loss".ljust(stats.get("max_best_val_loss_len", 4) + 2)
             )
@@ -872,10 +879,15 @@ class Que:
 
     # for QueShell interface
 
-    def recover_run(self, to_loc: QueLocation = TO_RUN, from_loc: QueLocation = CUR_RUN, index: int = 0) -> None:
+    def recover_run(
+        self,
+        to_loc: QueLocation = TO_RUN,
+        from_loc: QueLocation = CUR_RUN,
+        index: int = 0,
+    ) -> None:
         """
         Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
-        
+
         :param to_loc: Location to move recovered run to
         :type to_loc: QueLocation
         :param from_loc: Location to recover run from
@@ -888,7 +900,7 @@ class Que:
             run["admin"]["recover"] = True
             if run["wandb"]["run_id"] is None:  # NOTE: run id
                 raise QueException("Run was set to recover, but no run id was provided")
-            
+
             if from_loc == FAIL_RUNS:
                 # remove error
                 run = ExpInfo(
@@ -905,7 +917,9 @@ class Que:
             _ = self._pop_run(from_loc, index)
             self._set_run(to_loc, 0, run)
 
-        self.logger.info(f"Recovered Run: {self.run_str(to_loc, 0)} with index: {index} from {from_loc} to {to_loc}")
+        self.logger.info(
+            f"Recovered Run: {self.run_str(to_loc, 0)} with index: {index} from {from_loc} to {to_loc}"
+        )
         self.logger.info("\n")
 
     def clear_runs(self, loc: QueLocation) -> None:
@@ -1076,9 +1090,8 @@ class Que:
         return idxs, runs
 
 
-        
-
 # --- Server State Management --- #
+
 
 class ServerState(TypedDict):
     server_pid: Optional[int]
@@ -1086,9 +1099,6 @@ class ServerState(TypedDict):
     daemon_pid: Optional[int]
     stop_on_fail: bool
     awake: bool
-    
-    
-    
 
 
 def is_server_state(val: Any) -> TypeGuard[ServerState]:
@@ -1140,12 +1150,14 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
             f"Data read from: {state_path} is not compatible with DaemonState"
         )
 
+
 # default_state: ServerState = {
 #     "pid": None,
 #     "worker_pid": None,
 #     "stop_on_fail": False,
 #     "awake": False,
 # }
+
 
 class ServerStateHandler:
     def __init__(
@@ -1171,7 +1183,9 @@ class ServerStateHandler:
         if in_path is None:
             in_path = self.state_path
         elif not Path(in_path).exists():
-            self.logger.warning(f"No existing state found at {in_path}. Load unsuccessful.")
+            self.logger.warning(
+                f"No existing state found at {in_path}. Load unsuccessful."
+            )
             return
 
         try:
@@ -1191,11 +1205,13 @@ class ServerStateHandler:
             self.stop_on_fail = False
             self.awake = False
 
-    def save_state(self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False):
+    def save_state(
+        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+    ):
         if out_path is None:
             out_path = self.state_path
         elif Path(out_path).exists() and not timestamp:
-            self.logger.warning(f"Overwriting existing state file: {out_path}")        
+            self.logger.warning(f"Overwriting existing state file: {out_path}")
 
         if timestamp:
             out_path = timestamp_path(out_path)
@@ -1250,15 +1266,24 @@ class ServerStateHandler:
     def set_awake(self, awake: bool) -> None:
         self.awake = awake
 
-#------- Basmanager connections -------#
+
+# ------- Basmanager connections -------#
 
 if TYPE_CHECKING:
-    class DaemonControllerProtocol(Protocol):
+
+    class ServerControllerProtocol(Protocol):
         def save_state(self) -> None: ...
         def load_state(self) -> None: ...
         def start(self) -> None: ...
-        def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None: ...
-        def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False) -> None: ...
+        def stop_worker(
+            self, timeout: Optional[float] = None, hard: bool = False
+        ) -> None: ...
+        def stop_supervisor(
+            self,
+            timeout: Optional[float] = None,
+            hard: bool = False,
+            and_worker: bool = False,
+        ) -> None: ...
         def get_state(self) -> ServerState: ...
         def set_stop_on_fail(self, value: bool) -> None: ...
         def set_awake(self, value: bool) -> None: ...
@@ -1267,34 +1292,37 @@ if TYPE_CHECKING:
     class QueManagerProtocol(Protocol):
         def get_que(self) -> Que: ...
         def get_server_state_handler(self) -> ServerStateHandler: ...
-        def DaemonController(self) -> DaemonControllerProtocol: ...
+        def ServerController(self) -> ServerControllerProtocol: ...
 
-class QueManager(BaseManager): 
+
+class QueManager(BaseManager):
     pass
+
 
 def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     """
     Useful helper for clients to connect to the QueManager server.
-    
+
     :param max_retries: Maximum number of connection attempts
     :param retry_delay: Delay between retries in seconds
     :return: Connected QueManager instance
     :rtype: QueManagerProtocol
     """
-    QueManager.register('DaemonController')
-    QueManager.register('get_que')
-    QueManager.register('get_daemon_state')
+    QueManager.register("ServerController")
+    QueManager.register("get_que")
+    QueManager.register("get_server_state_handler")
 
     for _ in range(max_retries):
         try:
-            m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
+            m = QueManager(address=("localhost", 50000), authkey=b"abracadabra")
             m.connect()
-            return m # type: ignore
+            return m  # type: ignore
         except ConnectionRefusedError:
             print(f"Queue server not ready, retrying in {retry_delay}s...")
             time.sleep(retry_delay)
-            
+
     raise RuntimeError("Cannot connect to Queue server.")
+
 
 def _get_basic_logger() -> Logger:
     logging.basicConfig(
@@ -1319,13 +1347,12 @@ def main():
     q = Que(logger)
     q.disp_runs(OLD_RUNS)
 
-#TODO:
-#- add more options to logs, (e.g. clear)
-#- add more options for que copies (e.g. load)
-#- add auto experiment num
-#- add remote shell connection
 
-
+# TODO:
+# - add more options to logs, (e.g. clear)
+# - add more options for que copies (e.g. load)
+# - add auto experiment num
+# - add remote shell connection
 
 
 if __name__ == "__main__":

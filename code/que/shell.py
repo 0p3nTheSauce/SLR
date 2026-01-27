@@ -35,26 +35,52 @@ from utils import gpu_manager
 
 
 class QueShell(cmdLib.Cmd):
+    
+    avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
+    # recover_locs = [FAIL_RUNS, CUR_RUN] maybe make this if you feel like it
+    
     def __init__(
         self,
         auto_save: bool = True,
     ) -> None:
         super().__init__()
+        #Pretty stuff
         self.console = Console()
+        self._show_banner()
+        self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
+        self.intro = ""  
+        #Core Objects
         self.tmux_man = tmux_manager()
         self.auto_save = auto_save
-        self.server = connect_manager()
-        self.que = self.server.get_que()  # proxy object
-        self.daemon_controller = (
-            self.server.DaemonController()
-        )  # object server (hold processes)
-        # Display welcome banner
-        self._show_banner()
-
-        # Override prompt with rich styling
-        # self.prompt = "(que)$"  # We'll handle this with rich
-        self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
-        self.intro = ""  # We'll handle this with rich
+        # - proxy objects
+        self.server = connect_manager() 
+        self.que = self.server.get_que()  
+        self.server_controller = (
+            self.server.ServerController()
+        )
+        # - parsing  
+        self._parser_factories = {
+            "create": lambda: configs.get_train_parser(
+                prog="create", desc="Create a new training run"
+            ),
+            "add": lambda: configs.get_train_parser(
+                prog="add", desc="Add a completed training run to old_runs"
+            ),
+            "remove": self._get_remove_parser,
+            "clear": self._get_clear_parser,
+            "list": self._get_list_parser,
+            "quit": self._get_quit_parser,
+            "shuffle": self._get_shuffle_parser,
+            "move": self._get_move_parser,
+            "edit": self._get_edit_parser,
+            "display": self._get_display_parser,
+            "daemon": self._get_daemon_parser,
+            "logs": self._get_log_parser,
+            "load": self._get_load_parser,
+            "save": self._get_save_parser,
+            "recover": self._get_recover_parser,
+        }
+    
 
     def _show_banner(self):
         """Display a fancy welcome banner"""
@@ -104,28 +130,10 @@ class QueShell(cmdLib.Cmd):
         table.add_column("Command", style="bold yellow", width=12)
         table.add_column("Description", style="white")
 
-        commands = [
-            ("help", "Show this help message or detailed help for a command"),
-            ("list", "Display runs in a given location"),
-            ("create", "Create a new run and add to queue"),
-            ("add", "Add a completed run to old runs"),
-            ("remove", "Remove a run from the queue"),
-            ("display", "Show detailed config for a run"),
-            ("edit", "Edit a run's configuration"),
-            ("move", "Move a run between locations"),
-            ("shuffle", "Reposition a run within a location"),
-            ("clear", "Clear all runs from a location"),
-            ("daemon", "Start/manage the daemon process"),
-            ("logs", "View the Que log files"),
-            ("attach", "Attach to tmux session"),
-            ("save", "Save queue state to file"),
-            ("load", "Load queue state from file"),
-            ("recover", "Recover from a failed run"),
-            ("quit/exit", "Exit queShell"),
-        ]
-
-        for cmd, desc in commands:
-            table.add_row(cmd, desc)
+        for key, value in self._parser_factories.items():
+            cmd_parser = value()
+            desc = cmd_parser.description if cmd_parser.description else "No description"
+            table.add_row(key, desc)
 
         self.console.print(table)
         self.console.print(
@@ -196,7 +204,7 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Daemon state saved to file", "Failed to save daemon state"
             ):
-                self.daemon_controller.save_state()
+                self.server_controller.save_state()
         else:
             raise ValueError(
                 "neither Que nor Daemon specified, this should not be possible"
@@ -218,7 +226,7 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Daemon state loaded from file", "Failed to load daemon state from file"
             ):
-                self.daemon_controller.load_state()
+                self.server_controller.load_state()
         else:
             raise ValueError(
                 "neither Que nor Daemon specified, this should not be possible"
@@ -472,23 +480,23 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Daemon state saved", "Failed to save daemon state"
             ):
-                self.daemon_controller.save_state()
+                self.server_controller.save_state()
         elif parsed_args.command == "load":
             with self.unwrap_exception(
                 "Daemon state loaded", "Failed to load daemon state"
             ):
-                self.daemon_controller.load_state()
+                self.server_controller.load_state()
         elif parsed_args.command == "start":
             with self.unwrap_exception(
                 "Worker process started", "Failed to start worker"
             ):
-                self.daemon_controller.start()
+                self.server_controller.start()
         elif parsed_args.command == "stop":
             if parsed_args.supervisor:
                 with self.unwrap_exception(
                     "Supervisor process stopped", "Failed to stop supervisor"
                 ):
-                    self.daemon_controller.stop_supervisor(
+                    self.server_controller.stop_supervisor(
                         timeout=parsed_args.timeout,
                         hard=parsed_args.hard,
                         and_worker=parsed_args.worker,
@@ -497,29 +505,29 @@ class QueShell(cmdLib.Cmd):
                 with self.unwrap_exception(
                     "Worker process stopped", "Failed to stop worker"
                 ):
-                    self.daemon_controller.stop_worker(
+                    self.server_controller.stop_worker(
                         timeout=parsed_args.timeout, hard=parsed_args.hard
                     )
         elif parsed_args.command == "status":
-            self._pretty_status(self.daemon_controller.get_state())
+            self._pretty_status(self.server_controller.get_state())
         elif parsed_args.command == "stop-on-fail":
             if parsed_args.value == "on":
                 parsed_args.value = True
             else:
                 parsed_args.value = False
-            self.daemon_controller.set_stop_on_fail(parsed_args.value)
+            self.server_controller.set_stop_on_fail(parsed_args.value)
             self.console.print(
                 f"[bold green]✓[/bold green] Set stop on fail to {parsed_args.value}"
             )
         elif parsed_args.command == "awake":
             if parsed_args.value == "on":
                 parsed_args.value = True
-            self.daemon_controller.set_awake(parsed_args.value)
+            self.server_controller.set_awake(parsed_args.value)
             self.console.print(
                 f"[bold green]✓[/bold green] Set awake to {parsed_args.value}"
             )
         elif parsed_args.command == "clear_mem":
-            self.daemon_controller.clear_cuda_memory()
+            self.server_controller.clear_cuda_memory()
             self.console.print("[bold green]Cleared CUDA memory[/bold green]")
             used, total = gpu_manager.get_gpu_memory_usage()
             self.console.print(f"CUDA memory: {used}/{total} GiB")
@@ -562,10 +570,7 @@ class QueShell(cmdLib.Cmd):
         except Exception as e:
             self.console.print(f"[red]Error reading log file: {e}[/red]")
 
-    # Helper function
-
-    avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
-    # recover_locs = [FAIL_RUNS, CUR_RUN] maybe make this if you feel like it
+    # Helper functions for parsing
 
     def _apply_synonyms(self, parsed_args):
         """Apply synonyms to location arguments"""
@@ -608,30 +613,8 @@ class QueShell(cmdLib.Cmd):
 
     def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
         """Get argument parser for a given command"""
-        parsers = {
-            "create": lambda: configs.get_train_parser(
-                prog="create", desc="Create a new training run"
-            ),
-            "add": lambda: configs.get_train_parser(
-                prog="add", desc="Add a completed training run to old_runs"
-            ),
-            "remove": self._get_remove_parser,
-            "clear": self._get_clear_parser,
-            "list": self._get_list_parser,
-            "quit": self._get_quit_parser,
-            "shuffle": self._get_shuffle_parser,
-            "move": self._get_move_parser,
-            "edit": self._get_edit_parser,
-            "display": self._get_display_parser,
-            "daemon": self._get_daemon_parser,
-            "logs": self._get_log_parser,
-            "load": self._get_load_parser,
-            "save": self._get_save_parser,
-            "recover": self._get_recover_parser,
-        }
-        if cmd in parsers:
-            return parsers[cmd]()
-        return None
+        factory = self._parser_factories.get(cmd)
+        return factory() if factory else None
 
     # Que
 
