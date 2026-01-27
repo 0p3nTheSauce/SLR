@@ -11,3 +11,4 @@
 - Add more options to logs
 - There are some functions which do not have exception handling - add those
 - redirect wandb output to log file
+- add auto experiment num

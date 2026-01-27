@@ -186,7 +186,7 @@ RUN_PATH = QUE_DIR / "Runs.json"
 SERVER_STATE_PATH = QUE_DIR / "Server.json"
 
 TRAINING_LOG_PATH = QUE_DIR / "Training.log"
-SR_LOG_PATH = QUE_DIR / "Server.log"
+SERVER_LOG_PATH = QUE_DIR / "Server.log"
 
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
@@ -1314,7 +1314,7 @@ def _get_basic_logger() -> Logger:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        filename=SR_LOG_PATH,  # Optional: log to file
+        filename=SERVER_LOG_PATH,  # Optional: log to file
     )
 
     logger = logging.getLogger(__name__)
@@ -1322,23 +1322,12 @@ def _get_basic_logger() -> Logger:
 
 
 def main():
-    # logging.basicConfig(
-    #     level=logging.INFO,
-    #     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    #     filename=SR_LOG_PATH,  # Optional: log to file
-    # )
 
     logger = _get_basic_logger()
 
     q = Que(logger)
     q.disp_runs(OLD_RUNS)
 
-
-# TODO:
-# - add more options to logs, (e.g. clear)
-# - add more options for que copies (e.g. load)
-# - add auto experiment num
-# - add remote shell connection
 
 
 if __name__ == "__main__":
