@@ -1,0 +1,8 @@
+- update daemon command in shell
+- add logging for server main logger
+- add restart, or start command for the server
+- fix daemon start command reporting success after failure
+- make the shell work remotely
+- add flag to check if changes were made before saving 
+- add ability to open wandb from shell
+- make a persistent shell history file/ ability to drop in and out of shell like tmux

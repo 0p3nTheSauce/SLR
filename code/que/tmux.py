@@ -23,15 +23,15 @@ class tmux_manager:
     ) -> None:
         self.sesh_name = sesh_name
         self.logger = logger
-        try:
+
+        with self.subprocess_error_handler("Initial tmux session check"):
             res = self.check_tmux_session()
             if res is None:
                 self.print_logger("Tmux session not found, creating new session...")
                 res = self.setup_tmux_session()
                 if res is not None:
                     self.print_logger("Tmux session created.")
-        except Exception as e:
-            self.print_logger(f"Error during tmux session check/setup: {e}", level=ERROR)
+
 
     def print_logger(self, msg: str, level: int = INFO, include_caller: bool = False) -> None:
         """Print to logger if exists, else print to console

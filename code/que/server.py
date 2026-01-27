@@ -1,6 +1,8 @@
 from multiprocessing import Event
 import multiprocessing as mp
 import logging
+import signal
+import sys
 from typing import Optional
 
 from .core import (
@@ -24,10 +26,18 @@ class ServerContext:
     This prevents relying on loose global variables.
     """
 
-    def __init__(self):
+    def __init__(self, save_on_shutdown=True, cleanup_timeout=30.0):
+        self.save_on_shutdown = save_on_shutdown
+        self.cleanup_timeout = cleanup_timeout
+        
+        
         #for handling CUDA context
         mp.set_start_method('spawn', force=True)
-        # mp.set_start_method('forkserver', force=True)
+
+        # Setup signal handlers for graceful shutdown
+        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT, self._handle_shutdown)
+
 
         # Setup Logging
         logging.basicConfig(
@@ -56,6 +66,9 @@ class ServerContext:
         # This stops it from also writing to server.log
         wr_logger.propagate = False
 
+        # Store logger for signal handler
+        self.main_logger = logging.getLogger("ServerContext")
+
         # Initialize Logic
         self.que = Que(logger=que_logger)
         self.worker = Worker(server_logger=wr_logger, training_logger=wr_logger)
@@ -71,6 +84,30 @@ class ServerContext:
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
         )
+
+    def _handle_shutdown(self, signum, frame):
+        """Handle SIGTERM/SIGINT for graceful shutdown"""
+        signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+        self.main_logger.info(f"Received {signal_name}, initiating graceful shutdown...")
+        
+        try:
+            if self.save_on_shutdown:
+                self.main_logger.info("Saving server state...")
+                self.state_handler.save_state()
+            
+            self.main_logger.info("Stopping daemon and worker...")
+            self.daemon.stop_supervisor(
+                timeout=self.cleanup_timeout, 
+                hard=False, 
+                and_worker=True
+            )
+            
+            self.main_logger.info("Graceful shutdown complete")
+        except Exception as e:
+            self.main_logger.error(f"Error during shutdown: {e}", exc_info=True)
+        finally:
+            sys.exit(0)
+        
 
 
 class ServerController:
@@ -132,15 +169,15 @@ def setup_manager():
 
     # 4. Register shared Server State Proxy
     QueManager.register(
-        "get_server_state",
+        "get_server_state_handler",
         callable=lambda: context.state_handler,
     )
     
     #5. Register stop_worker_event (Test)
-    QueManager.register(
-        "get_worker_stop_event",
-        callable=lambda: context.stop_worker_event,
-    )
+    # QueManager.register(
+    #     "get_worker_stop_event",
+    #     callable=lambda: context.stop_worker_event,
+    # )
     
 
 

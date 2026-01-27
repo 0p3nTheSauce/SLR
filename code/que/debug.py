@@ -13,7 +13,7 @@ def client_logic1():
     manager = connect_manager()
 
     # 1. Get the Controller Object
-    controller = manager.DaemonController()
+    controller = manager.ServerController()
     
 
 
@@ -29,7 +29,7 @@ def client_logic2():
     manager = connect_manager()
 
     # 1. Get the Controller Object
-    controller = manager.DaemonController()
+    controller = manager.ServerController()
     
 
 
@@ -50,8 +50,6 @@ def que_client():
     print("Current Que State:")
     Que.print_runs(que.list_runs('cur_run'))
 
-
-
 def tmuxer():
     tman = tmux_manager()
     tman.join_session()
@@ -60,8 +58,6 @@ def timestamp():
     q = Que(_get_basic_logger())
     q.save_state(timestamp=True)
     
-
-
 def check_gpu_memory():
     """Helper to check GPU memory usage"""
     if torch.cuda.is_available():
@@ -132,6 +128,13 @@ def activate_conda_env(env_name: str):
     tman = tmux_manager()
     tman.activate_conda_env(env_name)
 
+def show_help():
+    from .shell import QueShell
+    shell = QueShell()
+    daemon_parser = shell._get_daemon_parser()
+    print(daemon_parser.description)
+
+
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -142,6 +145,7 @@ if __name__ == '__main__':
     # timestamp()
     # sim_leak()
     # constant()
-    activate_conda_env("wlasl")
+    # activate_conda_env("wlasl")
+    show_help()
     
     
