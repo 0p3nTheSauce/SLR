@@ -6,12 +6,12 @@ from .core import (
     connect_manager,
     ServerState,
     TRAINING_LOG_PATH,
-
     SERVER_LOG_PATH,
     RUN_PATH,
     get_avail_splits,
     ENTITY,
     PROJECT_BASE,
+    QueManagerProtocol,
 )
 
 from .tmux import tmux_manager
@@ -39,30 +39,29 @@ from utils import gpu_manager
 
 
 class QueShell(cmdLib.Cmd):
-    
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
     # recover_locs = [FAIL_RUNS, CUR_RUN] maybe make this if you feel like it
-    
+
     def __init__(
         self,
+        server: QueManagerProtocol,
         auto_save: bool = True,
+
     ) -> None:
         super().__init__()
-        #Pretty stuff
+        # Pretty stuff
         self.console = Console()
         self._show_banner()
         self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
-        self.intro = ""  
-        #Core Objects
+        self.intro = ""
+        # Core Objects
         self.tmux_man = tmux_manager()
         self.auto_save = auto_save
         # - proxy objects
-        self.server = connect_manager() 
-        self.que = self.server.get_que()  
-        self.server_controller = (
-            self.server.ServerController()
-        )
-        # - parsing  
+        self.que = server.get_que()
+        self.server_controller = server.ServerController()
+
+        # - parsing
         self._parser_factories = {
             "create": lambda: configs.get_train_parser(
                 prog="create", desc="Create a new training run"
@@ -85,7 +84,46 @@ class QueShell(cmdLib.Cmd):
             "recover": self._get_recover_parser,
             "wandb": self._get_wandb_parser,
         }
-    
+
+    # Exception handling
+
+    @contextmanager
+    def unwrap_exception(self, message: str, error: str = ""):
+        try:
+            yield
+            self.console.print(f"[bold green]✓ {message} [/bold green]")
+        except Exception as e:
+            if error:
+                self.console.print(
+                    f"[bold red]✗ {error} : {e} [/bold red]", style="red"
+                )
+            else:
+                self.console.print(f"[bold red]✗ {e} [/bold red]", style="red")
+
+    def _reconnect_proxies(self) -> None:
+        """Reconnect the server controller and que proxies"""
+        self.server_controller._close()#type: ignore
+        self.que._close()#type: ignore
+        server = connect_manager()
+        self.server_controller = server.ServerController()
+        self.que = server.get_que()
+
+    # Cmd overrides
+
+    def onecmd(self, line):
+        """Override to handle connection errors gracefully"""
+        try:
+            return super().onecmd(line)
+        except (EOFError, ConnectionError, BrokenPipeError, OSError) as e:
+            self.console.print(f"\n[bold yellow][WARNING][/bold yellow] Connection lost: {e}")
+            print("Attempting to reconnect...")
+            try:
+                self._reconnect_proxies()
+                self.console.print("[bold green][OK][/bold green] Reconnected!\n")
+                return super().onecmd(line)
+            except Exception as reconnect_error:
+                self.console.print(f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}")
+            return False  # Don't stop the cmdloop
 
     def _show_banner(self):
         """Display a fancy welcome banner"""
@@ -137,26 +175,15 @@ class QueShell(cmdLib.Cmd):
 
         for key, value in self._parser_factories.items():
             cmd_parser = value()
-            desc = cmd_parser.description if cmd_parser.description else "No description"
+            desc = (
+                cmd_parser.description if cmd_parser.description else "No description"
+            )
             table.add_row(key, desc)
 
         self.console.print(table)
         self.console.print(
             "\n[dim]Tip: Use 'help <command>' for detailed information about a specific command[/dim]\n"
         )
-
-    @contextmanager
-    def unwrap_exception(self, message: str, error: str = ""):
-        try:
-            yield
-            self.console.print(f"[bold green]✓ {message} [/bold green]")
-        except Exception as e:
-            if error:
-                self.console.print(
-                    f"[bold red]✗ {error} : {e} [/bold red]", style="red"
-                )
-            else:
-                self.console.print(f"[bold red]✗ {e} [/bold red]", style="red")
 
     def do_quit(self, arg):
         """Exit the shell with style"""
@@ -443,7 +470,7 @@ class QueShell(cmdLib.Cmd):
         """Open the wandb page for a run"""
 
     # Other
-    
+
     def do_attach(self, arg):
         """Attach to the que_training tmux session"""
         with self.unwrap_exception(
@@ -461,7 +488,9 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("Stop on fail is: [bold green]Disabled[/bold green]")
         if status["server_pid"]:
-            self.console.print(f"Server PID: [bold cyan]{status['server_pid']}[/bold cyan]")
+            self.console.print(
+                f"Server PID: [bold cyan]{status['server_pid']}[/bold cyan]"
+            )
         else:
             self.console.print("Server PID: [bold yellow]N/A[/bold yellow]")
         if status["daemon_pid"]:
@@ -576,7 +605,6 @@ class QueShell(cmdLib.Cmd):
             self.console.print(f"[red]Error: Log file not found at {log_file}[/red]")
         except Exception as e:
             self.console.print(f"[red]Error reading log file: {e}[/red]")
-
 
     # Helper functions for parsing
 
@@ -855,18 +883,56 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_wandb_parser(self) -> argparse.ArgumentParser:
-        likely_projects = [f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()]
+        likely_projects = [
+            f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()
+        ]
         parser = argparse.ArgumentParser(
             description="Open the wandb page for a run, or project", prog="wandb"
         )
         parser.add_argument("--location", "-l", choices=self.avail_locs)
         parser.add_argument("--index", "-i", type=int)
-        parser.add_argument("--project", "-p", type=str, help="Wandb project name. Probably one of: " + ", ".join(likely_projects), default=PROJECT_BASE)
-        parser.add_argument("--entity", "-e", type=str, help=f"Wandb entity name. Default: {ENTITY}", default=ENTITY)
+        parser.add_argument(
+            "--project",
+            "-p",
+            type=str,
+            help="Wandb project name. Probably one of: " + ", ".join(likely_projects),
+            default=PROJECT_BASE,
+        )
+        parser.add_argument(
+            "--entity",
+            "-e",
+            type=str,
+            help=f"Wandb entity name. Default: {ENTITY}",
+            default=ENTITY,
+        )
         return parser
 
-
+# def _recover_connection(shell: QueShell):
+#     server = connect_manager()
+#     shell.server_controller = server.ServerController()
+#     shell.que = server.get_que()
+#     return shell
 
 if __name__ == "__main__":
-    que_shell = QueShell()
-    que_shell.cmdloop()
+    server = connect_manager()
+    que_shell = QueShell(server)
+    # while True:
+    #     try:
+    #         que_shell.cmdloop()
+    #         break  # Exit if cmdloop exits normally
+    #     except (EOFError, ConnectionError, BrokenPipeError, OSError) as e:
+    #         print(f"\nConnection lost: {e}")
+    #         print("Attempting to reconnect...")
+    #         try:
+    #             # Reconnect to your proxy
+    #             que_shell = _recover_connection(que_shell)
+    #             print("Reconnected successfully!")
+    #         except Exception as reconnect_error:
+    #             print(f"Reconnection failed: {reconnect_error}")
+    #             response = input("Retry? (y/n): ")
+    #             if response.lower() != 'y':
+    #                 break
+    try:
+        que_shell.cmdloop()
+    except KeyboardInterrupt:
+        print("\n[INFO] Exiting queShell due to keyboard interrupt.")

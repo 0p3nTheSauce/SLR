@@ -1,16 +1,21 @@
-- daemon no longer stops on que based errors
-- Add better checking when starting daemon/worker (check it is actually working instead of just reporting
-    that the process started successfully)
-- update daemon command in shell
+Shell:
+- improved exception handling
+- update daemon command 
 - add logging for server main logger
 - add restart, or start command for the server
-- Add probe to check server is running/start server + restart server
-- make the shell work remotely
+- Add probe to check server is running/start server
 - add flag to check if changes were made before saving 
 - add ability to open wandb from shell
 - make a persistent shell history file/ ability to drop in and out of shell like tmux
 - Add more options to logs
-- There are some functions which do not have exception handling - add those
+
+Daemon
+- daemon no longer stops on que based errors
+- Add better checking when starting daemon/worker (check it is actually working instead of just reporting
+    that the process started successfully)
+
+Server:
+- make the shell work remotely
 - redirect wandb output to log file
 - add auto experiment num
 - redirect testing output to log file
