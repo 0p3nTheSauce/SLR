@@ -181,6 +181,18 @@ def server_controller_stop():
     server_controller = manager.ServerController()
     server_controller.stop_supervisor(stop_worker=True)
     
+def daemon_start_supervisor():
+    manager = connect_manager()
+    
+    daemon = manager.get_daemon()
+    daemon.start_supervisor()
+    
+def daemon_stop_supervisor(t:float, hard:bool=False):
+    manager = connect_manager()
+    
+    daemon = manager.get_daemon()
+    daemon.stop_supervisor(stop_worker=True, timeout=t, hard=hard)
+    
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -195,7 +207,9 @@ if __name__ == '__main__':
     # show_help()
     # reconnect()
     # server_context_daemon_start()
-    server_context_daemon_stop(t=1)
+    # server_context_daemon_stop(t=1)
     # server_controller_stop()
+    # daemon_start_supervisor()
+    daemon_stop_supervisor(t=1, hard=True)
     
     
