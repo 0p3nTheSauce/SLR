@@ -2,177 +2,6 @@
     "to_run": [
         {
             "admin": {
-                "model": "R(2+1)D_18",
-                "dataset": "WLASL",
-                "split": "asl1000",
-                "exp_no": "000",
-                "recover": true,
-                "config_path": "./configfiles/asl1000/R(2+1)D_18_000.ini",
-                "save_path": "runs/asl1000/R(2+1)D_18_exp000/checkpoints"
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5
-            },
-            "data": {
-                "num_frames": 16,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 0,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-1000",
-                "tags": [
-                    "asl1000",
-                    "R(2+1)D_18",
-                    "exp-000"
-                ],
-                "run_id": "92omfjow"
-            }
-        },
-        {
-            "admin": {
-                "model": "R3D_18",
-                "dataset": "WLASL",
-                "split": "asl1000",
-                "exp_no": "000",
-                "recover": false,
-                "config_path": "./configfiles/asl1000/R3D_18_000.ini",
-                "save_path": "runs/asl1000/R3D_18_exp000/checkpoints"
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5
-            },
-            "data": {
-                "num_frames": 16,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 0,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-1000",
-                "tags": [
-                    "asl1000",
-                    "R3D_18",
-                    "exp-000"
-                ],
-                "run_id": null
-            }
-        },
-        {
-            "admin": {
-                "model": "Swin3D_B",
-                "dataset": "WLASL",
-                "split": "asl1000",
-                "exp_no": "000",
-                "recover": false,
-                "config_path": "./configfiles/asl1000/Swin3D_B_000.ini",
-                "save_path": "runs/asl1000/Swin3D_B_exp000/checkpoints"
-            },
-            "training": {
-                "batch_size": 2,
-                "update_per_step": 4,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5
-            },
-            "data": {
-                "num_frames": 16,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 0,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-1000",
-                "tags": [
-                    "asl1000",
-                    "Swin3D_B",
-                    "exp-000"
-                ],
-                "run_id": null
-            }
-        },
-        {
-            "admin": {
                 "model": "Swin3D_S",
                 "dataset": "WLASL",
                 "split": "asl1000",
@@ -742,8 +571,306 @@
             }
         }
     ],
-    "cur_run": [],
+    "cur_run": [
+        {
+            "admin": {
+                "model": "Swin3D_B",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "exp_no": "000",
+                "recover": true,
+                "config_path": "./configfiles/asl1000/Swin3D_B_000.ini",
+                "save_path": "runs/asl1000/Swin3D_B_exp000/checkpoints"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "asl1000",
+                    "Swin3D_B",
+                    "exp-000"
+                ],
+                "run_id": "94kuihol"
+            }
+        }
+    ],
     "old_runs": [
+        {
+            "admin": {
+                "model": "R3D_18",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "./configfiles/asl1000/R3D_18_000.ini",
+                "save_path": "runs/asl1000/R3D_18_exp000/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "asl1000",
+                    "R3D_18",
+                    "exp-000"
+                ],
+                "run_id": "2xpkxinf"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 0.344976282880552,
+                "best_val_loss": 6.8965283129018875,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.00175,
+                        "top5": 0.004866666666666666,
+                        "top10": 0.010583333333333332
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0037313432835820895,
+                        "top5": 0.00906183368869936,
+                        "top10": 0.018656716417910446
+                    },
+                    "average_loss": 6.899708173930772
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.00175,
+                        "top5": 0.004866666666666666,
+                        "top10": 0.010583333333333332
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0037313432835820895,
+                        "top5": 0.00906183368869936,
+                        "top10": 0.018656716417910446
+                    },
+                    "average_loss": 6.899708173930772
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.002,
+                        "top5": 0.005533333333333333,
+                        "top10": 0.010916666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0042643923240938165,
+                        "top5": 0.010127931769722815,
+                        "top10": 0.019189765458422176
+                    },
+                    "average_loss": 6.899416126167851,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "R(2+1)D_18",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "exp_no": "000",
+                "recover": true,
+                "config_path": "./configfiles/asl1000/R(2+1)D_18_000.ini",
+                "save_path": "runs/asl1000/R(2+1)D_18_exp000/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "asl1000",
+                    "R(2+1)D_18",
+                    "exp-000"
+                ],
+                "run_id": "92omfjow"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 1.034928848641656,
+                "best_val_loss": 6.6347754280749145,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.001,
+                        "top5": 0.004333333333333333,
+                        "top10": 0.009666666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0021321961620469083,
+                        "top5": 0.00906183368869936,
+                        "top10": 0.01812366737739872
+                    },
+                    "average_loss": 6.908401061222752
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.001,
+                        "top5": 0.004333333333333333,
+                        "top10": 0.009666666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0021321961620469083,
+                        "top5": 0.00906183368869936,
+                        "top10": 0.01812366737739872
+                    },
+                    "average_loss": 6.908401061222752
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.001,
+                        "top5": 0.004666666666666666,
+                        "top10": 0.009833333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0021321961620469083,
+                        "top5": 0.009594882729211088,
+                        "top10": 0.01812366737739872
+                    },
+                    "average_loss": 6.9012575235956515,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
+            }
+        },
         {
             "admin": {
                 "model": "MViTv2_S",

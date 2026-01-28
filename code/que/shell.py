@@ -479,32 +479,40 @@ class QueShell(cmdLib.Cmd):
             self.tmux_man.join_session()
 
     def _pretty_status(self, status: ServerState):
-        if status["awake"]:
-            self.console.print("Daemon is currently: [bold green]Awake[/bold green]")
-        else:
-            self.console.print("Daemon is currently: [bold yellow]Asleep[/bold yellow]")
-        if status["stop_on_fail"]:
-            self.console.print("Stop on fail is: [bold red]Enabled[/bold red]")
-        else:
-            self.console.print("Stop on fail is: [bold green]Disabled[/bold green]")
-        if status["server_pid"]:
-            self.console.print(
-                f"Server PID: [bold cyan]{status['server_pid']}[/bold cyan]"
-            )
-        else:
-            self.console.print("Server PID: [bold yellow]N/A[/bold yellow]")
-        if status["daemon_pid"]:
-            self.console.print(
-                f"Daemon PID: [bold cyan]{status['daemon_pid']}[/bold cyan]"
-            )
-        else:
-            self.console.print("Daemon PID: [bold yellow]N/A[/bold yellow]")
-        if status["worker_pid"]:
-            self.console.print(
-                f"Worker PID: [bold cyan]{status['worker_pid']}[/bold cyan]"
-            )
-        else:
-            self.console.print("Worker PID: [bold yellow]N/A[/bold yellow]")
+        table = Table(
+            title="Server Status",
+            box=box.ROUNDED,
+            border_style="cyan",
+            show_header=True,
+            header_style="bold magenta",
+        )
+
+        table.add_column("Property", style="bold yellow")
+        table.add_column("Value", style="white")
+
+        awake_status = (
+            "[bold green]Awake[/bold green]" if status["awake"] else "[bold yellow]Asleep[/bold yellow]"
+        )
+        stop_on_fail_status = (
+            "[bold red]Enabled[/bold red]" if status["stop_on_fail"] else "[bold green]Disabled[/bold green]"
+        )
+        server_pid = (
+            f"[bold cyan]{status['server_pid']}[/bold cyan]" if status["server_pid"] else "[bold yellow]N/A[/bold yellow]"
+        )
+        daemon_pid = (
+            f"[bold cyan]{status['daemon_pid']}[/bold cyan]" if status["daemon_pid"] else "[bold yellow]N/A[/bold yellow]"
+        )
+        worker_pid = (
+            f"[bold cyan]{status['worker_pid']}[/bold cyan]" if status["worker_pid"] else "[bold yellow]N/A[/bold yellow]"
+        )
+
+        table.add_row("Daemon State", awake_status)
+        table.add_row("Stop on Fail", stop_on_fail_status)
+        table.add_row("Server PID", server_pid)
+        table.add_row("Daemon PID", daemon_pid)
+        table.add_row("Worker PID", worker_pid)
+
+        self.console.print(table)
 
     def do_daemon(self, arg):
         """Interact with the worker"""
@@ -535,7 +543,7 @@ class QueShell(cmdLib.Cmd):
                     self.server_controller.stop_supervisor(
                         timeout=parsed_args.timeout,
                         hard=parsed_args.hard,
-                        and_worker=parsed_args.worker,
+                        stop_worker=parsed_args.worker,
                     )
             else:
                 with self.unwrap_exception(

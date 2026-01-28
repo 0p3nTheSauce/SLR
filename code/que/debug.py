@@ -137,12 +137,7 @@ def show_help():
     daemon_parser = shell._get_daemon_parser()
     print(daemon_parser.description)
 
-def server_context_daemon_start():
-    manager = connect_manager()
-    
-    
-    context = manager.get_server_context()
-    context.start()
+
 
 def reconnect():
     server = connect_manager()
@@ -167,6 +162,24 @@ def _cleanup(old_server_controller=None):
         except:
             pass
     
+def server_context_daemon_start():
+    manager = connect_manager()
+    
+    
+    context = manager.get_server_context()
+    context.start()
+    
+def server_context_daemon_stop(t:int):
+    manager = connect_manager()
+    
+    context = manager.get_server_context()
+    context.stop_supervisor(stop_worker=True, timeout=t)
+    
+def server_controller_stop():
+    manager = connect_manager()
+    
+    server_controller = manager.ServerController()
+    server_controller.stop_supervisor(stop_worker=True)
     
 if __name__ == '__main__':
     # process_opener()
@@ -180,7 +193,9 @@ if __name__ == '__main__':
     # constant()
     # activate_conda_env("wlasl")
     # show_help()
+    # reconnect()
     # server_context_daemon_start()
-    reconnect()
+    server_context_daemon_stop(t=1)
+    # server_controller_stop()
     
     
