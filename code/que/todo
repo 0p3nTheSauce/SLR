@@ -1,9 +1,10 @@
+- daemon no longer stops on que based errors
+- Add better checking when starting daemon/worker (check it is actually working instead of just reporting
+    that the process started successfully)
 - update daemon command in shell
 - add logging for server main logger
 - add restart, or start command for the server
 - Add probe to check server is running/start server + restart server
-- Add better checking when starting daemon/worker (check it is actually working instead of just reporting
-    that the process started successfully)
 - make the shell work remotely
 - add flag to check if changes were made before saving 
 - add ability to open wandb from shell
@@ -13,4 +14,3 @@
 - redirect wandb output to log file
 - add auto experiment num
 - redirect testing output to log file
-- daemon no longer stops on que based errors
