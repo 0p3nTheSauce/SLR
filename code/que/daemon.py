@@ -5,6 +5,8 @@ from logging import Logger
 import os
 import time
 from .core import (
+    DAEMON_NAME,
+    WORKER_NAME,
     connect_manager,
     ServerStateHandler,
 )
@@ -98,9 +100,9 @@ class Daemon:
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
         """
         manager = connect_manager()
-        state_proxy = manager.get_server_state_handler()
-        state_proxy.set_pid(os.getpid())
-        state_proxy.save_state()
+        server_state_proxy = manager.get_server_state_handler()
+        server_state_proxy.set_pid(process=DAEMON_NAME, pid=os.getpid())
+        server_state_proxy.save_state()
 
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
 
@@ -113,12 +115,12 @@ class Daemon:
                 )
                 self.worker_process.start()
 
-                state_proxy.set_worker_pid(self.worker_process.pid)
-                state_proxy.save_state()
+                server_state_proxy.set_pid(process=DAEMON_NAME, pid=self.worker_process.pid)
+                server_state_proxy.save_state()
 
                 self.logger.info(f"Worker started with PID: {self.worker_process.pid}")
 
-                if not self.monitor_worker(state_proxy):
+                if not self.monitor_worker(server_state_proxy):
                     break
 
                 self.worker.cleanup()
@@ -130,10 +132,10 @@ class Daemon:
                 time.sleep(1.0)  # Prevent tight loop on error
 
         # Cleanup before process exit
-        state_proxy.set_pid(None)
-        state_proxy.set_worker_pid(None)
-        state_proxy.set_awake(False)
-        state_proxy.save_state()  # Save final state to disk
+        server_state_proxy.set_pid(process=DAEMON_NAME, pid=None)
+        server_state_proxy.set_pid(process=WORKER_NAME, pid=None)
+        server_state_proxy.set_awake(False)
+        server_state_proxy.save_state()  # Save final state to disk
         self.logger.info("Supervisor process exiting.")
 
     def start_supervisor(self) -> None:
@@ -176,7 +178,7 @@ class Daemon:
         self,
         timeout: Optional[float] = None,
         hard: bool = False,
-        and_worker: bool = False,
+        stop_worker: bool = False,
     ) -> None:
         """Gracefully stop the supervisor process"""
         if self.supervisor_process and self.supervisor_process.is_alive():
@@ -185,7 +187,7 @@ class Daemon:
             # 1. Signal the event
             self.stop_daemon_event.set()
 
-            if and_worker:
+            if stop_worker:
                 self.stop_worker_event.set()
 
             # 2. Wait for it to finish gracefully
@@ -196,7 +198,7 @@ class Daemon:
                 self.hard_cleanup()
 
             self.local_state.awake = False
-            self.local_state.pid = None
+            self.local_state.daemon_pid = None
             self.local_state.worker_pid = None
 
             self.local_state.save_state()

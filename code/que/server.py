@@ -11,7 +11,7 @@ from .core import (
     SERVER_LOG_PATH,
     QUE_NAME,
     SERVER_NAME,
-    DN_NAME,
+    DAEMON_NAME,
     TRAINING_NAME,
     TRAINING_LOG_PATH,
     WORKER_NAME,
@@ -94,7 +94,7 @@ class ServerContext:
         )
         
         que_logger = logging.getLogger(QUE_NAME)
-        dn_logger = logging.getLogger(DN_NAME)
+        dn_logger = logging.getLogger(DAEMON_NAME)
         server_logger = logging.getLogger(SERVER_NAME)
         worker_logger = logging.getLogger(WORKER_NAME)
         # training_logger = self._setup_training_logger()
@@ -121,7 +121,7 @@ class ServerContext:
             self.daemon.stop_supervisor(
                 timeout=self.cleanup_timeout, 
                 hard=False, 
-                and_worker=True
+                stop_worker=True
             )
             
             self.server_logger.info("Graceful shutdown complete")
@@ -153,8 +153,8 @@ class ServerController:
     def stop_worker(self, timeout: Optional[float] = None, hard: bool = False):
         self.ctx.daemon.stop_worker(timeout=timeout, hard=hard)
 
-    def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False):
-        self.ctx.daemon.stop_supervisor(timeout=timeout, hard=hard, and_worker=and_worker)
+    def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, stop_worker: bool = False):
+        self.ctx.daemon.stop_supervisor(timeout=timeout, hard=hard, stop_worker=stop_worker)
 
     def get_state(self) -> ServerState:
         return self.ctx.state_handler.get_state()

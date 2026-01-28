@@ -178,7 +178,7 @@ from contextlib import contextmanager
 QUE_DIR = Path(__file__).parent
 
 QUE_NAME = "Que"
-DN_NAME = "Daemon"
+DAEMON_NAME = "Daemon"
 WORKER_NAME = "Worker"
 SERVER_NAME = "Server"
 TRAINING_NAME = "Training"
@@ -199,6 +199,7 @@ OLD_RUNS = "old_runs"  # run already
 FAIL_RUNS = "fail_runs"  # runs that crashed
 # List for argparse choices
 QUE_LOCATIONS = [TO_RUN, CUR_RUN, OLD_RUNS]
+PROCESS_NAMES = [SERVER_NAME, DAEMON_NAME, WORKER_NAME]
 SYNONYMS = {
     "new": "to_run",
     "tr": "to_run",
@@ -210,7 +211,7 @@ SYNONYMS = {
     "fr": "fail_runs",
 }
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
-
+ProcessNames: TypeAlias = Literal["Server", "Daemon", "Worker"]
 # tmux
 SESH_NAME = "train"
 
@@ -1229,18 +1230,26 @@ class ServerStateHandler:
         self.stop_on_fail = state["stop_on_fail"]
         self.awake = state["awake"]
 
-    def get_pid(self) -> Optional[int]:
-        return self.pid
+    def get_pid(self, process: ProcessNames) -> Optional[int]:
+        if process == SERVER_NAME:
+            return self.server_pid
+        elif process == DAEMON_NAME:
+            return self.daemon_pid
+        elif process == WORKER_NAME:
+            return self.worker_pid
+        else:
+            raise ValueError(f"Unknown process name: {process}")
 
-    def set_pid(self, pid: Optional[int]) -> None:
-        self.pid = pid
-
-    def get_worker_pid(self) -> Optional[int]:
-        return self.worker_pid
-
-    def set_worker_pid(self, worker_pid: Optional[int]) -> None:
-        self.worker_pid = worker_pid
-
+    def set_pid(self, process: ProcessNames, pid: Optional[int]) -> None:
+        if process == SERVER_NAME:
+            self.server_pid = pid
+        elif process == DAEMON_NAME:
+            self.daemon_pid = pid
+        elif process == WORKER_NAME:
+            self.worker_pid = pid
+        else:
+            raise ValueError(f"Unknown process name: {process}")
+        
     def get_stop_on_fail(self) -> bool:
         return self.stop_on_fail
 
