@@ -54,6 +54,7 @@ class Worker:
         return sep.title()
 
     def cleanup(self):
+        self.server_logger.info("Cleaning up GPU memory")
         gc.collect()
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
@@ -129,6 +130,8 @@ class Worker:
             
         finally:
             self.server_logger.info("Exiting _work method")
+            
+            
     def work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
         try:
             self._work(event, que)
