@@ -242,6 +242,12 @@ def setup_manager():
         "get_server_context",
         callable=lambda: context,
     )
+    
+    # 6. Test, register the Daemon itself (for advanced control)
+    QueManager.register(
+        "get_daemon",
+        callable=lambda: context.daemon,
+    )
 
 
 # --- Server Startup ---
