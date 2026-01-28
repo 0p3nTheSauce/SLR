@@ -1,6 +1,8 @@
 # from .server import connect_manager
 import multiprocessing as mp
 import time
+from .shell import QueShell
+from que.shell import QueShell
 from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
 from typing import cast    
@@ -129,18 +131,43 @@ def activate_conda_env(env_name: str):
     tman.activate_conda_env(env_name)
 
 def show_help():
-    from .shell import QueShell
-    shell = QueShell()
+    
+    server = connect_manager()
+    shell = QueShell(server)
     daemon_parser = shell._get_daemon_parser()
     print(daemon_parser.description)
 
-def server_context():
+def server_context_daemon_start():
     manager = connect_manager()
     
-    server_controller = manager.ServerController()
+    
+    context = manager.get_server_context()
+    context.start()
+
+def reconnect():
+    server = connect_manager()
+    server_controller = server.ServerController()
+    print(server_controller.get_state())
+    ready = input("Retry? (y/n): ")
+    if ready.lower() == 'y':
+        _cleanup(server_controller)
+        print("Reconnecting...")
+        reconnect()
+    else:
+        print("Exiting.")
 
 
-
+def _cleanup(old_server_controller=None):
+    """Properly disconnect old proxies and reconnect"""
+    # Step 1: Try to clean up old proxy connections
+    if old_server_controller is not None:
+        try:
+            # Close the underlying connection
+            old_server_controller._close()
+        except:
+            pass
+    
+    
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -152,6 +179,8 @@ if __name__ == '__main__':
     # sim_leak()
     # constant()
     # activate_conda_env("wlasl")
-    show_help()
+    # show_help()
+    # server_context_daemon_start()
+    reconnect()
     
     
