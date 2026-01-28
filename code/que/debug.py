@@ -134,6 +134,12 @@ def show_help():
     daemon_parser = shell._get_daemon_parser()
     print(daemon_parser.description)
 
+def server_context():
+    manager = connect_manager()
+    
+    server_controller = manager.ServerController()
+
+
 
 if __name__ == '__main__':
     # process_opener()
