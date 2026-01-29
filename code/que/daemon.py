@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, TypedDict
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
 from logging import Logger
@@ -12,6 +12,11 @@ from .core import (
 )
 from .worker import Worker
 
+class DaemonState(TypedDict):
+    awake: bool
+    stop_on_fail: bool
+    supervisor_pid: Optional[int]
+    
 
 class Daemon:
     def __init__(

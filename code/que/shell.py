@@ -57,7 +57,7 @@ class QueShell(cmdLib.Cmd):
         self.auto_save = auto_save
         # - proxy objects
         self.que = server.get_que()
-        self.server_controller = server.get_server_context()
+        self.server_context = server.get_server_context()
 
         # - parsing
         self._parser_factories = {
@@ -100,10 +100,10 @@ class QueShell(cmdLib.Cmd):
 
     def _reconnect_proxies(self) -> None:
         """Reconnect the server controller and que proxies"""
-        self.server_controller._close()#type: ignore
+        self.server_context._close()#type: ignore
         self.que._close()#type: ignore
         server = connect_manager()
-        self.server_controller = server.get_server_context()
+        self.server_context = server.get_server_context()
         self.que = server.get_que()
 
     # Cmd overrides
@@ -234,7 +234,7 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Daemon state saved to file", "Failed to save daemon state"
             ):
-                self.server_controller.save_state()
+                self.server_context.save_state()
         else:
             raise ValueError(
                 "neither Que nor Daemon specified, this should not be possible"
@@ -256,7 +256,7 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Daemon state loaded from file", "Failed to load daemon state from file"
             ):
-                self.server_controller.load_state()
+                self.server_context.load_state()
         else:
             raise ValueError(
                 "neither Que nor Daemon specified, this should not be possible"
@@ -522,23 +522,23 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Daemon state saved", "Failed to save daemon state"
             ):
-                self.server_controller.save_state()
+                self.server_context.save_state()
         elif parsed_args.command == "load":
             with self.unwrap_exception(
                 "Daemon state loaded", "Failed to load daemon state"
             ):
-                self.server_controller.load_state()
+                self.server_context.load_state()
         elif parsed_args.command == "start":
             with self.unwrap_exception(
                 "Worker process started", "Failed to start worker"
             ):
-                self.server_controller.start()
+                self.server_context.start()
         elif parsed_args.command == "stop":
             if parsed_args.supervisor:
                 with self.unwrap_exception(
                     "Supervisor process stopped", "Failed to stop supervisor"
                 ):
-                    self.server_controller.stop_supervisor(
+                    self.server_context.stop_supervisor(
                         timeout=parsed_args.timeout,
                         hard=parsed_args.hard,
                         stop_worker=parsed_args.worker,
@@ -547,29 +547,29 @@ class QueShell(cmdLib.Cmd):
                 with self.unwrap_exception(
                     "Worker process stopped", "Failed to stop worker"
                 ):
-                    self.server_controller.stop_worker(
+                    self.server_context.stop_worker(
                         timeout=parsed_args.timeout, hard=parsed_args.hard
                     )
         elif parsed_args.command == "status":
-            self._pretty_status(self.server_controller.get_state())
+            self._pretty_status(self.server_context.get_state())
         elif parsed_args.command == "stop-on-fail":
             if parsed_args.value == "on":
                 parsed_args.value = True
             else:
                 parsed_args.value = False
-            self.server_controller.set_stop_on_fail(parsed_args.value)
+            self.server_context.set_stop_on_fail(parsed_args.value)
             self.console.print(
                 f"[bold green]✓[/bold green] Set stop on fail to {parsed_args.value}"
             )
         elif parsed_args.command == "awake":
             if parsed_args.value == "on":
                 parsed_args.value = True
-            self.server_controller.set_awake(parsed_args.value)
+            self.server_context.set_awake(parsed_args.value)
             self.console.print(
                 f"[bold green]✓[/bold green] Set awake to {parsed_args.value}"
             )
         elif parsed_args.command == "clear_mem":
-            self.server_controller.clear_cuda_memory()
+            self.server_context.clear_cuda_memory()
             self.console.print("[bold green]Cleared CUDA memory[/bold green]")
             used, total = gpu_manager.get_gpu_memory_usage()
             self.console.print(f"CUDA memory: {used}/{total} GiB")
@@ -915,7 +915,7 @@ class QueShell(cmdLib.Cmd):
 
 # def _recover_connection(shell: QueShell):
 #     server = connect_manager()
-#     shell.server_controller = server.ServerController()
+#     shell.server_context = server.ServerController()
 #     shell.que = server.get_que()
 #     return shell
 

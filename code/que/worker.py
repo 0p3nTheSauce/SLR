@@ -1,4 +1,4 @@
-from typing import Optional, IO, cast
+from typing import Literal, Optional, IO, cast, TypedDict
 import time
 import torch
 import gc
@@ -8,6 +8,8 @@ from contextlib import redirect_stdout
 import io
 import os
 from multiprocessing.synchronize import Event as EventClass
+
+import training
 # locals
 from .core import QueException, ExpInfo, WORKER_NAME, TRAINING_LOG_PATH
 
@@ -34,13 +36,22 @@ class LoggerWriter(io.TextIOBase):
         # We need to explicitly implement flush, but it doesn't need to do anything
         pass
 
+class WorkerState(TypedDict):
+    task: Literal['training'] # Currently only 'training' task is supported
+    current_run_id: Optional[str]  # ID of the current run being processed
+    pid: Optional[int]  # Process ID of the worker
+
 class Worker:
     def __init__(
         self,
         server_logger: Logger,
     ) -> None:
-        self.server_logger = server_logger
+        self.server_logger: Logger = server_logger
+        self.training_logger: Optional[Logger] = None
         self.server_logger.info("Worker initialized")
+        self.current_task: Optional[Literal['training']] = None
+        self.current_run_id: Optional[str] = None
+        self.subprocess_pid: Optional[int] = None
 
     def seperator(self, r_str: str) -> str:
         sep = ""
@@ -60,14 +71,11 @@ class Worker:
         torch.cuda.synchronize()
         torch.cuda.ipc_collect() # Clears memory shared between processes
 
-
-    def _work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
+    def _train(self, event: EventClass, que: Que) -> None:
         try:
-            self.server_logger.info(f"starting work with pid: {os.getpid()}")
-
-            self.server_logger.info("Checking GPU usage")
+            self.server_logger.debug("Checking GPU usage")
             used, total = gpu_manager.get_gpu_memory_usage()
-            self.server_logger.info(f"Current GPU usage: {used}/{total} GiB")
+            self.server_logger.debug(f"Current GPU usage: {used}/{total} GiB")
 
             if not gpu_manager.wait_for_completion(
                 check_interval=10,
@@ -127,27 +135,38 @@ class Worker:
         
             self.server_logger.info("_work method completed successfully")  
             return None  
-            
         finally:
-            self.server_logger.info("Exiting _work method")
+            self.server_logger.info("Exiting _train method")
+            self.cleanup()
             
-            
-    def work(self, event: EventClass, que: Que) -> Optional[ExpInfo]:
+    def train(self, event: EventClass, que: Que, logger: Logger) -> None:
+        """
+        The train method is the main entry point for training a model.
+        Currently implemented to be in a process started by the Daemon.
+        
+        :param event: Multiprocessing event to signal termination
+        :type event: EventClass
+        :param que: Shared Que object for managing training runs
+        :type que: Que
+        :param logger: Logger for logging messages
+        :type logger: Logger
+        :return: None
+        """
         try:
-            self._work(event, que)
+            self._train(event, que)
         except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
+            logger.info(f"que based error, cannot continue: {Qe}")
             raise 
         except KeyboardInterrupt:
-            self.server_logger.info("Worker killed by user")
+            logger.info("Worker killed by user")
         except Exception as e:
-            self.server_logger.error(f"Training run failed due to an error: {e}")
+            logger.error(f"Training run failed due to an error: {e}")
             que.stash_failed_run(str(e))
             que.save_state()
             #exit with error
             raise
                 
-    def start(self, event: EventClass ):
+    def start(self, event: EventClass):
         #this is likely started in a seperate process, so que requirs connecting
         
         manager = connect_manager()
@@ -161,8 +180,8 @@ class Worker:
         self.training_logger = logging.getLogger(WORKER_NAME)
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
         
-        self.work(event, que)
-        
+        self.train(event, que, self.training_logger)
+    
     
         
 
