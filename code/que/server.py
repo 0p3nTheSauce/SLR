@@ -1,14 +1,18 @@
 from multiprocessing import Event
 import multiprocessing as mp
 import logging
+from logging import Logger
+import os
 import signal
 import sys
-from typing import Dict, Optional, TypedDict
+from typing import Dict, Optional, TypedDict, Union, Tuple
+from pathlib import Path
 
 from .core import (
     Que,
     QueManager,
     SERVER_LOG_PATH,
+    SERVER_STATE_PATH,
     QUE_NAME,
     SERVER_NAME,
     DAEMON_NAME,
@@ -18,17 +22,8 @@ from .core import (
     ServerState,
     ServerStateHandler,
 )
-from .daemon import Daemon
-from .worker import Worker
-
-
-class LoggingDict(TypedDict):
-    que: logging.Logger
-    daemon: logging.Logger
-    server: logging.Logger
-    worker: logging.Logger
-    # training: logging.Logger
-
+from .daemon import Daemon, DaemonState
+from .worker import Worker, WorkerState
 
 class ServerContext:
     """
@@ -36,9 +31,23 @@ class ServerContext:
     This prevents relying on loose global variables.
     """
 
-    def __init__(self, save_on_shutdown=True, cleanup_timeout=30.0):
-        self.save_on_shutdown = save_on_shutdown
-        self.cleanup_timeout = cleanup_timeout
+    def __init__(
+        self,
+        save_on_shutdown: bool = True,
+        cleanup_timeout: float = 10.0,
+        stop_on_fail: bool = True,
+        awake: bool = False,
+        server_state_path: Union[str, Path] = SERVER_STATE_PATH,
+        
+    ):
+        #context attributes
+        self.save_on_shutdown: bool = save_on_shutdown
+        self.cleanup_timeout: float = cleanup_timeout
+        
+        # Pids
+        self.server_pid: Optional[int] = os.getpid()
+        self.daemon_pid: Optional[int] = None
+        self.worker_pid: Optional[int] = None
 
         # spawn for CUDA context
         mp.set_start_method("spawn", force=True)
@@ -48,20 +57,20 @@ class ServerContext:
         signal.signal(signal.SIGINT, self._handle_shutdown)
 
         # logging
-        logging_dict = self._setup_logging()
-        self.server_logger = logging_dict["server"]
+        que_logger, daemon_logger, server_logger, worker_logger = self._setup_logging()
+        self.server_logger = server_logger
 
         # Events for controlling Daemon and Worker
         self.stop_worker_event = Event()
         self.stop_daemon_event = Event()
 
         # Classes
-        self.que = Que(logger=logging_dict["que"])
-        self.worker = Worker(server_logger=logging_dict["worker"])
-        self.state_handler = ServerStateHandler(logger=logging_dict["server"])
+        self.que = Que(logger=que_logger)
+        self.worker = Worker(server_logger=worker_logger)
+        self.state_handler = ServerStateHandler(logger=server_logger)
         self.daemon = Daemon(
             worker=self.worker,
-            logger=logging_dict["daemon"],
+            logger=daemon_logger,
             local_state=self.state_handler,
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
@@ -87,7 +96,7 @@ class ServerContext:
         training_logger.propagate = False
         return training_logger
 
-    def _setup_logging(self) -> LoggingDict:
+    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger]:
         """Sets up loggers for the server components."""
         logging.basicConfig(
             level=logging.INFO,
@@ -101,13 +110,7 @@ class ServerContext:
         worker_logger = logging.getLogger(WORKER_NAME)
         # training_logger = self._setup_training_logger()
 
-        return LoggingDict(
-            que=que_logger,
-            daemon=dn_logger,
-            server=server_logger,
-            worker=worker_logger,
-            # training=training_logger,
-        )
+        return que_logger, dn_logger, server_logger, worker_logger
 
     def _handle_shutdown(self, signum, frame):
         """Handle SIGTERM/SIGINT for graceful shutdown"""
@@ -178,24 +181,21 @@ def setup_manager():
 
     context = ServerContext()
 
-
     QueManager.register(
         "get_que",
         callable=lambda: context.que,
     )
-
 
     QueManager.register(
         "get_server_state_handler",
         callable=lambda: context.state_handler,
     )
 
-
     QueManager.register(
         "get_server_context",
         callable=lambda: context,
     )
-    
+
     QueManager.register(
         "get_daemon",
         callable=lambda: context.daemon,
