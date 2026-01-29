@@ -1,5 +1,8 @@
 KISS:
-- remove ServerController and just pass ServerContext
+- remove ServerController and just pass ServerContext.
+    or perhaps even just pass daemon. A major refactor could
+    improve things by simplifying things. We may have gone a 
+    bit class crazy but just ended up with too many wrappers.
 
 Shell:
 - improved exception handling
@@ -20,6 +23,7 @@ Worker:
 - fix logging issue
 
 Server:
+- pass testing to daemon, and make it appear in status
 - make the shell work remotely
 - redirect wandb output to log file
 - add auto experiment num
