@@ -15,7 +15,7 @@ def client_logic1():
     manager = connect_manager()
 
     # 1. Get the Controller Object
-    controller = manager.ServerController()
+    controller = manager.get_server_context()
     
 
 
@@ -31,7 +31,7 @@ def client_logic2():
     manager = connect_manager()
 
     # 1. Get the Controller Object
-    controller = manager.ServerController()
+    controller = manager.get_server_context()
     
 
 
@@ -141,7 +141,7 @@ def show_help():
 
 def reconnect():
     server = connect_manager()
-    server_controller = server.ServerController()
+    server_controller = server.get_server_context()
     print(server_controller.get_state())
     ready = input("Retry? (y/n): ")
     if ready.lower() == 'y':
@@ -159,7 +159,7 @@ def _cleanup(old_server_controller=None):
         try:
             # Close the underlying connection
             old_server_controller._close()
-        except:
+        except Exception as _:
             pass
     
 def server_context_daemon_start():
@@ -178,7 +178,7 @@ def server_context_daemon_stop(t:int):
 def server_controller_stop():
     manager = connect_manager()
     
-    server_controller = manager.ServerController()
+    server_controller = manager.get_server_context()
     server_controller.stop_supervisor(stop_worker=True)
     
 def daemon_start_supervisor():

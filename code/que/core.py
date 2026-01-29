@@ -137,7 +137,7 @@ This docstring describes the intended behaviour and the main public API surface.
 """
 
 from typing import (
-    TYPE_CHECKING,
+    # TYPE_CHECKING,
     Protocol,
     Optional,
     Callable,
@@ -170,7 +170,8 @@ from run_types import (
     Sumarised,
 )
 from testing import full_test, load_comp_res
-from configs import print_config, load_config, get_avail_splits, ENTITY, PROJECT_BASE
+from configs import print_config, load_config
+  
 from contextlib import contextmanager
 
 # constants
@@ -1267,23 +1268,6 @@ class ServerStateHandler:
 
 # if TYPE_CHECKING:
 
-class ServerControllerProtocol(Protocol):
-    def save_state(self) -> None: ...
-    def load_state(self) -> None: ...
-    def start(self) -> None: ...
-    def stop_worker(
-        self, timeout: Optional[float] = None, hard: bool = False
-    ) -> None: ...
-    def stop_supervisor(
-        self,
-        timeout: Optional[float] = None,
-        hard: bool = False,
-        stop_worker: bool = False,
-    ) -> None: ...
-    def get_state(self) -> ServerState: ...
-    def set_stop_on_fail(self, value: bool) -> None: ...
-    def set_awake(self, value: bool) -> None: ...
-    def clear_cuda_memory(self) -> None: ...
 
 class ServerContextProtocol(Protocol):
     def save_state(self) -> None: ...
@@ -1314,7 +1298,6 @@ class DaemonProtocol(Protocol):
 class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
     def get_server_state_handler(self) -> ServerStateHandler: ...
-    def ServerController(self) -> ServerControllerProtocol: ...
     #Testing 
     def get_daemon(self) -> DaemonProtocol: ...
     def get_server_context(self) -> ServerContextProtocol: ...

@@ -8,12 +8,10 @@ from .core import (
     TRAINING_LOG_PATH,
     SERVER_LOG_PATH,
     RUN_PATH,
-    get_avail_splits,
-    ENTITY,
-    PROJECT_BASE,
+
     QueManagerProtocol,
 )
-
+from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
 import cmd as cmdLib
 import shlex
@@ -59,7 +57,7 @@ class QueShell(cmdLib.Cmd):
         self.auto_save = auto_save
         # - proxy objects
         self.que = server.get_que()
-        self.server_controller = server.ServerController()
+        self.server_controller = server.get_server_context()
 
         # - parsing
         self._parser_factories = {
@@ -105,7 +103,7 @@ class QueShell(cmdLib.Cmd):
         self.server_controller._close()#type: ignore
         self.que._close()#type: ignore
         server = connect_manager()
-        self.server_controller = server.ServerController()
+        self.server_controller = server.get_server_context()
         self.que = server.get_que()
 
     # Cmd overrides

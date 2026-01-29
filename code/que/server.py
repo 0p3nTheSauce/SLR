@@ -165,50 +165,6 @@ class ServerContext:
         self.worker.cleanup()
 
 
-class ServerController:
-    """
-    The Object Server wrapper.
-    Instead of registering functions, we register this class.
-    """
-
-    def __init__(self, context: ServerContext):
-        self.ctx = context
-
-    def save_state(self):
-        self.ctx.state_handler.save_state()
-
-    def load_state(self):
-        self.ctx.state_handler.load_state()
-
-    def start(self):
-        self.ctx.daemon.start_supervisor()
-
-    def stop_worker(self, timeout: Optional[float] = None, hard: bool = False):
-        self.ctx.daemon.stop_worker(timeout=timeout, hard=hard)
-
-    def stop_supervisor(
-        self,
-        timeout: Optional[float] = None,
-        hard: bool = False,
-        stop_worker: bool = False,
-    ):
-        self.ctx.daemon.stop_supervisor(
-            timeout=timeout, hard=hard, stop_worker=stop_worker
-        )
-
-    def get_state(self) -> ServerState:
-        return self.ctx.state_handler.get_state()
-
-    def set_stop_on_fail(self, value: bool) -> None:
-        self.ctx.state_handler.set_stop_on_fail(value)
-
-    def set_awake(self, value: bool) -> None:
-        self.ctx.state_handler.set_awake(value)
-
-    def clear_cuda_memory(self) -> None:
-        self.ctx.worker.cleanup()
-
-
 # --- Registration Logic ---
 
 
@@ -222,28 +178,24 @@ def setup_manager():
 
     context = ServerContext()
 
-    # 2. Register ServerController (Object Server)
-    QueManager.register("ServerController", callable=lambda: ServerController(context))
 
-    # 3. Register Shared Que Proxy
     QueManager.register(
         "get_que",
         callable=lambda: context.que,
     )
 
-    # 4. Register shared Server State Proxy
+
     QueManager.register(
         "get_server_state_handler",
         callable=lambda: context.state_handler,
     )
 
-    # 5. Test, register the ServerContext itself (comparison with ServerController)
+
     QueManager.register(
         "get_server_context",
         callable=lambda: context,
     )
     
-    # 6. Test, register the Daemon itself (for advanced control)
     QueManager.register(
         "get_daemon",
         callable=lambda: context.daemon,
