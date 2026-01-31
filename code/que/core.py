@@ -1092,7 +1092,10 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
-# --- Server State Management --- #
+
+# ------- Basmanager connections -------#
+
+
 class ServerState(TypedDict):
     server_pid: Optional[int]
     worker_pid: Optional[int]
@@ -1100,174 +1103,32 @@ class ServerState(TypedDict):
     stop_on_fail: bool
     awake: bool
 
-def is_server_state(val: Any) -> TypeGuard[ServerState]:
-    """
-    Type guard to check if an arbitrary value is structurally
-    compatible with the ServerState TypedDict.
-    """
-    # 1. Check if the value is a dictionary
-    if not isinstance(val, dict):
-        return False
+Worker_tasks: TypeAlias = Literal['training', 'inactive'] # Currently only 'training' task is supported
 
-    # 2. Check for the presence of all required keys
-    # Since all keys are technically *optional* in the Python dictionary sense
-    # but *required* by TypedDict (unless explicitly marked NotRequired),
-    # we check for all keys listed in the TypedDict.
-    required_keys = ServerState.__annotations__.keys()
-    if not all(key in val for key in required_keys):
-        return False
-
-    # 3. Check the type of each value
-    # We use .get() here defensively, although the previous check makes it safe
-    # to use val[key].
-
-    # Check 'pid' and 'worker_pid' (Optional[int])
-    if not (val.get("pid") is None or isinstance(val["pid"], int)):
-        return False
-
-    if not (val.get("worker_pid") is None or isinstance(val["worker_pid"], int)):
-        return False
-
-    # Check 'stop_on_fail' and 'awake' (bool)
-    if not isinstance(val.get("stop_on_fail"), bool):
-        return False
-
-    if not isinstance(val.get("awake"), bool):
-        return False
-
-    # If all checks pass, it is a DaemonState
-    return True
-
-def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
-    with open(state_path, "r") as f:
-        data = json.load(f)
-    if is_server_state(data):
-        return data
-    else:
-        raise ValueError(
-            f"Data read from: {state_path} is not compatible with DaemonState"
-        )
-
-class ServerStateHandler:
-    def __init__(
-        self,
-        logger: Logger,
-        server_pid: Optional[int] = None,
-        daemon_pid: Optional[int] = None,
-        worker_pid: Optional[int] = None,
-        stop_on_fail: bool = True,
-        awake: bool = False,
-        state_path: Union[Path, str] = SERVER_STATE_PATH,
-    ) -> None:
-        self.logger = logger
-        self.server_pid: Optional[int] = server_pid
-        self.daemon_pid: Optional[int] = daemon_pid
-        self.worker_pid: Optional[int] = worker_pid
-        self.stop_on_fail: bool = stop_on_fail
-        self.awake: bool = awake
-        self.state_path: Path = Path(state_path)
-        self.load_state()
-
-    def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
-        if in_path is None:
-            in_path = self.state_path
-        elif not Path(in_path).exists():
-            self.logger.warning(
-                f"No existing state found at {in_path}. Load unsuccessful."
-            )
-            return
-
-        try:
-            state = read_server_state(self.state_path)
-            self.server_pid = state["server_pid"]
-            self.worker_pid = state["worker_pid"]
-            self.stop_on_fail = state["stop_on_fail"]
-            self.awake = state["awake"]
-            self.logger.info(f"Loaded state from: {self.state_path}")
-        except Exception as e:
-            self.logger.warning(
-                f"Ran into an error when loading state: {e}\nloading from scratch"
-            )
-            self.server_pid = None
-            self.daemon_pid = None
-            self.worker_pid = None
-            self.stop_on_fail = False
-            self.awake = False
-
-    def save_state(
-        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
-    ):
-        if out_path is None:
-            out_path = self.state_path
-        elif Path(out_path).exists() and not timestamp:
-            self.logger.warning(f"Overwriting existing state file: {out_path}")
-
-        if timestamp:
-            out_path = timestamp_path(out_path)
-        state: ServerState = {
-            "server_pid": self.server_pid,
-            "daemon_pid": self.daemon_pid,
-            "worker_pid": self.worker_pid,
-            "stop_on_fail": self.stop_on_fail,
-            "awake": self.awake,
-        }
-        with open(self.state_path, "w") as f:
-            json.dump(state, f)
-        self.logger.info(f"Saved state to: {self.state_path}")
-
-    def get_state(self) -> ServerState:
-        return {
-            "server_pid": self.server_pid,
-            "daemon_pid": self.daemon_pid,
-            "worker_pid": self.worker_pid,
-            "stop_on_fail": self.stop_on_fail,
-            "awake": self.awake,
-        }
-
-    def set_state(self, state: ServerState) -> None:
-        self.server_pid = state["server_pid"]
-        self.daemon_pid = state["daemon_pid"]
-        self.worker_pid = state["worker_pid"]
-        self.stop_on_fail = state["stop_on_fail"]
-        self.awake = state["awake"]
-
-    def get_pid(self, process: ProcessNames) -> Optional[int]:
-        if process == SERVER_NAME:
-            return self.server_pid
-        elif process == DAEMON_NAME:
-            return self.daemon_pid
-        elif process == WORKER_NAME:
-            return self.worker_pid
-        else:
-            raise ValueError(f"Unknown process name: {process}")
-
-    def set_pid(self, process: ProcessNames, pid: Optional[int]) -> None:
-        if process == SERVER_NAME:
-            self.server_pid = pid
-        elif process == DAEMON_NAME:
-            self.daemon_pid = pid
-        elif process == WORKER_NAME:
-            self.worker_pid = pid
-        else:
-            raise ValueError(f"Unknown process name: {process}")
-        
-    def get_stop_on_fail(self) -> bool:
-        return self.stop_on_fail
-
-    def set_stop_on_fail(self, stop_on_fail: bool) -> None:
-        self.stop_on_fail = stop_on_fail
-
-    def get_awake(self) -> bool:
-        return self.awake
-
-    def set_awake(self, awake: bool) -> None:
-        self.awake = awake
-
-
-# ------- Basmanager connections -------#
+class WorkerState(TypedDict):
+    task: Worker_tasks # Currently only 'training' task is supported
+    current_run_id: Optional[str]  # ID of the current run being processed
+    working_pid: Optional[int]  # Process ID of the worker
+    exception: Optional[str]  # Exception message if any
 
 # if TYPE_CHECKING:
 
+
+
+
+
+class WorkerProtocol(Protocol):
+    def get_state(self) -> WorkerState: ...
+    def set_state(self, state: WorkerState) -> None: ...
+    
+class DaemonProtocol(Protocol):
+    def start_supervisor(self) -> None: ...
+    def stop_worker(
+        self, timeout: Optional[float] = None, hard: bool = False
+    ) -> None: ...
+    def stop_supervisor(
+        self, timeout: Optional[float] = None, hard: bool = False, stop_worker: bool = False
+    ) -> None: ...
 
 class ServerContextProtocol(Protocol):
     def save_state(self) -> None: ...
@@ -1281,25 +1142,18 @@ class ServerContextProtocol(Protocol):
         stop_worker: bool = False,
     ) -> None: ...
     def get_state(self) -> ServerState: ...
+    def set_state(self, state: ServerState) -> None: ...
+    def get_pid(self, process: ProcessNames) -> Optional[int]: ...
+    def set_pid(self, process: ProcessNames, pid: Optional[int]) -> None: ...
     def set_stop_on_fail(self, value: bool) -> None: ...
     def set_awake(self, value: bool) -> None: ...
     def clear_cuda_memory(self) -> None: ...
 
-class DaemonProtocol(Protocol):
-    def start_supervisor(self) -> None: ...
-    def stop_worker(
-        self, timeout: Optional[float] = None, hard: bool = False
-    ) -> None: ...
-    def stop_supervisor(
-        self, timeout: Optional[float] = None, hard: bool = False, stop_worker: bool = False
-    ) -> None: ...
-
-
 class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
-    def get_server_state_handler(self) -> ServerStateHandler: ...
     #Testing 
     def get_daemon(self) -> DaemonProtocol: ...
+    def get_worker(self) -> WorkerProtocol: ...
     def get_server_context(self) -> ServerContextProtocol: ...
         
 
