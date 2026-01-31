@@ -1093,7 +1093,7 @@ class Que:
         return idxs, runs
 
 
-# ------- Basmanager connections -------#
+# # ------- Basmanager connections -------#
 
 
 class ServerState(TypedDict):
@@ -1103,23 +1103,9 @@ class ServerState(TypedDict):
     stop_on_fail: bool
     awake: bool
 
-Worker_tasks: TypeAlias = Literal['training', 'inactive'] # Currently only 'training' task is supported
 
-class WorkerState(TypedDict):
-    task: Worker_tasks # Currently only 'training' task is supported
-    current_run_id: Optional[str]  # ID of the current run being processed
-    working_pid: Optional[int]  # Process ID of the worker
-    exception: Optional[str]  # Exception message if any
 
 # if TYPE_CHECKING:
-
-
-
-
-
-class WorkerProtocol(Protocol):
-    def get_state(self) -> WorkerState: ...
-    def set_state(self, state: WorkerState) -> None: ...
     
 class DaemonProtocol(Protocol):
     def start_supervisor(self) -> None: ...
@@ -1153,7 +1139,6 @@ class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
     #Testing 
     def get_daemon(self) -> DaemonProtocol: ...
-    def get_worker(self) -> WorkerProtocol: ...
     def get_server_context(self) -> ServerContextProtocol: ...
         
 

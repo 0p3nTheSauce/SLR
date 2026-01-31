@@ -1,4 +1,4 @@
-from typing import Literal, Optional, IO, cast, TypedDict
+from typing import Literal, Optional, IO, cast, TypedDict, TypeAlias
 import time
 import torch
 import gc
@@ -14,7 +14,7 @@ import training
 from .core import QueException, ExpInfo, WORKER_NAME, TRAINING_LOG_PATH
 
 
-from .core import Que, connect_manager, QueException 
+from .core import Que, QueException, connect_manager
 from utils import gpu_manager
 from configs import _exp_to_run_info
 from training import train_loop, _setup_wandb
@@ -36,10 +36,13 @@ class LoggerWriter(io.TextIOBase):
         # We need to explicitly implement flush, but it doesn't need to do anything
         pass
 
+Worker_tasks: TypeAlias = Literal['training', 'inactive'] # Currently only 'training' task is supported
+
 class WorkerState(TypedDict):
-    task: Literal['training'] # Currently only 'training' task is supported
+    task: Worker_tasks # Currently only 'training' task is supported
     current_run_id: Optional[str]  # ID of the current run being processed
     working_pid: Optional[int]  # Process ID of the worker
+    exception: Optional[str]  # Exception message if any
 
 class Worker:
     def __init__(
@@ -49,21 +52,24 @@ class Worker:
         self.server_logger: Logger = server_logger
         self.training_logger: Optional[Logger] = None
         self.server_logger.info("Worker initialized")
-        self.current_task: Optional[Literal['training']] = None
+        self.current_task: Worker_tasks = 'inactive'
         self.current_run_id: Optional[str] = None
-        self.subprocess_pid: Optional[int] = None
+        self.working_pid: Optional[int] = None
+        self.exception: Optional[str] = None
 
     def get_state(self) -> WorkerState:
         return WorkerState(
             task=self.current_task if self.current_task else 'training',
             current_run_id=self.current_run_id,
             working_pid=self.subprocess_pid,
+            exception=self.exception
         )
         
     def set_state(self, state: WorkerState) -> None:
         self.current_task = state['task']
         self.current_run_id = state['current_run_id']
         self.subprocess_pid = state['working_pid']
+        self.exception = state['exception']
 
     def seperator(self, r_str: str) -> str:
         sep = ""
