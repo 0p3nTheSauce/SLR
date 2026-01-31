@@ -2,7 +2,7 @@
 import multiprocessing as mp
 import time
 from .shell import QueShell
-from que.shell import QueShell
+# from que.shell import QueShell
 from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
 from typing import cast    
@@ -16,14 +16,14 @@ def client_logic1():
 
     # 1. Get the Controller Object
     controller = manager.get_server_context()
-    
+    daemon = manager.get_daemon()
 
 
     print("Initial State:", controller.get_state())
 
     # 3. Operate on the Controller
     print("Starting daemon...")
-    controller.start()
+    daemon.start_supervisor()
     
     print("Updated State:", controller.get_state())
     
@@ -32,14 +32,14 @@ def client_logic2():
 
     # 1. Get the Controller Object
     controller = manager.get_server_context()
-    
+    daemon = manager.get_daemon()
 
 
     print("Current State:", controller.get_state())
 
     # 3. Operate on the Controller
     print("Stopping daemon...")
-    controller.stop_supervisor()
+    daemon.stop_supervisor()
     
     print("Final State:", controller.get_state())
 
@@ -161,25 +161,6 @@ def _cleanup(old_server_controller=None):
             old_server_controller._close()
         except Exception as _:
             pass
-    
-def server_context_daemon_start():
-    manager = connect_manager()
-    
-    
-    context = manager.get_server_context()
-    context.start()
-    
-def server_context_daemon_stop(t:int):
-    manager = connect_manager()
-    
-    context = manager.get_server_context()
-    context.stop_supervisor(stop_worker=True, timeout=t)
-    
-def server_controller_stop():
-    manager = connect_manager()
-    
-    server_controller = manager.get_server_context()
-    server_controller.stop_supervisor(stop_worker=True)
     
 def daemon_start_supervisor():
     manager = connect_manager()

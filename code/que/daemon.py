@@ -8,14 +8,11 @@ from .core import (
     DAEMON_NAME,
     WORKER_NAME,
     connect_manager,
+    DaemonState,
 )
 from .worker import Worker
 
-class DaemonState(TypedDict):
-    awake: bool
-    stop_on_fail: bool
-    supervisor_pid: Optional[int]
-    
+
 
 class Daemon:
     def __init__(
@@ -27,14 +24,16 @@ class Daemon:
         stop_worker_event: EventClass,
         stop_daemon_event: EventClass,
     ) -> None:
+        self.awake = awake
+        self.stop_on_fail = stop_on_fail
         self.worker = worker
         self.logger = logger
         self.stop_worker_event = stop_worker_event
         self.stop_daemon_event = stop_daemon_event
         self.worker_process: Optional[Process] = None
         self.supervisor_process: Optional[Process] = None
-        self.awake = awake
-        self.stop_on_fail = stop_on_fail
+        self.supervisor_pid: Optional[int] = None
+
         
         self.logger.info("Daemon initialized")
 
@@ -46,10 +45,13 @@ class Daemon:
         return DaemonState(
             awake=self.awake,
             stop_on_fail=self.stop_on_fail,
-            supervisor_pid=self.supervisor_process.pid
-            if self.supervisor_process
-            else None,
+            supervisor_pid=self.supervisor_pid,
         )
+
+    def set_state(self, state: DaemonState) -> None:
+        self.awake = state['awake']
+        self.stop_on_fail = state['stop_on_fail']
+        self.supervisor_pid = state["supervisor_pid"]
 
     def monitor_worker(self) -> bool:
         """
@@ -59,15 +61,7 @@ class Daemon:
         indicate no restart should occur.
         """
         assert isinstance(self.worker_process, Process)
-        # self.worker_process.join()
-
-        # Check periodically to provide status updates
-        while self.worker_process.is_alive():
-            self.worker_process.join(timeout=600.0)  # Check every 10 minutes
-            if self.worker_process.is_alive():
-                self.logger.debug(
-                    f"Worker still running (PID: {self.worker_process.pid})"
-                )
+        self.worker_process.join()
 
         # If worker died naturally (crash or finish)
         exit_code = self.worker_process.exitcode
@@ -114,24 +108,14 @@ class Daemon:
         The worker process is started and monitored here. After it completes successfully, it is restarted.
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
         """
-        manager = connect_manager()
-        server_context_proxy = manager.get_server_context()
-        server_context_proxy.set_pid(process=DAEMON_NAME, pid=os.getpid())
-        server_context_proxy.save_state()
-
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
 
         while not self.stop_daemon_event.is_set():
             try:
-
-
                 self.worker_process = Process(
                     target=self.worker.start, args=(self.stop_worker_event,)
                 )
                 self.worker_process.start()
-
-                server_context_proxy.set_pid(process=DAEMON_NAME, pid=self.worker_process.pid)
-                server_context_proxy.save_state()
 
                 self.logger.info(f"Worker started with PID: {self.worker_process.pid}")
 
@@ -146,11 +130,6 @@ class Daemon:
                     break
                 time.sleep(1.0)  # Prevent tight loop on error
 
-        # Cleanup before process exit
-        server_context_proxy.set_pid(process=DAEMON_NAME, pid=None)
-        server_context_proxy.set_pid(process=WORKER_NAME, pid=None)
-        server_context_proxy.set_awake(False)
-        server_context_proxy.save_state()  # Save final state to disk
         self.logger.info("Supervisor process exiting.")
 
     def start_supervisor(self) -> None:
@@ -166,13 +145,13 @@ class Daemon:
 
         self.supervisor_process = Process(target=self.supervise)
         self.supervisor_process.start()
-
+        self.supervisor_pid = self.supervisor_process.pid
         self.logger.info(
             f"Supervisor launched (Child PID: {self.supervisor_process.pid})"
         )
 
     def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None:
-        if self.worker_process and self.worker_process.is_alive():
+        if self.worker_process is not None and self.worker_process.is_alive():
             self.logger.info("Signaling worker to stop...")
 
             # 1. Signal the event
@@ -184,6 +163,10 @@ class Daemon:
             # 3. Force kill if it's stuck (optional safety net)
             if hard:
                 self.hard_cleanup(supervisor=False, worker=True)
+
+            if not self.worker_process.is_alive():
+                self.worker_process = None
+                self.worker.working_pid = None
 
             self.logger.info("Worker stopped.")
         else:
@@ -203,9 +186,8 @@ class Daemon:
             self.stop_daemon_event.set()
 
             if stop_worker:
-                self.stop_worker_event.set()
-
-            # 2. Wait for it to finish gracefully
+                self.stop_worker(timeout=timeout, hard=hard)
+                
             self.supervisor_process.join(timeout=timeout)
 
             # 3. Force kill if it's stuck (optional safety net)
@@ -213,13 +195,23 @@ class Daemon:
                 self.hard_cleanup()
 
             self.awake = False
-            self.daemon_pid = None
-            self.worker_pid = None
-
+            
+            if not self.supervisor_process.is_alive():
+                self.supervisor_process = None
+                self.supervisor_pid = None
+                
             self.logger.info("Supervisor stopped.")
 
         else:
             self.logger.warning("No supervisor process to stop")
+            
+def start_worker(stop_worker_event: EventClass):
+        """Connexts to the server worker proxy and starts the worker"""
+        manager = connect_manager()
+        worker = manager.get_worker()
+        worker.start(stop_worker_event)
+
+
 
 
 # --- Manager Registration ---

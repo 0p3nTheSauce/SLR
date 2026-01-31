@@ -171,9 +171,9 @@ from run_types import (
 )
 from testing import full_test, load_comp_res
 from configs import print_config, load_config
-  
-from contextlib import contextmanager
 
+from contextlib import contextmanager
+from multiprocessing.synchronize import Event as EventClass
 # constants
 # MR_NAME = "monitor"
 QUE_DIR = Path(__file__).parent
@@ -338,6 +338,7 @@ def log_and_raise(logger: Logger, task: str = "Operation"):
 def timestamp_path(path: Union[str, Path]) -> str:
     formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     return str(path).replace(".json", f"_{formatted}.json")
+
 
 class Que:
     def __init__(
@@ -1094,53 +1095,70 @@ class Que:
 
 
 # # ------- Basmanager connections -------#
+Worker_tasks: TypeAlias = Literal["inactive", "training"]
+
+
+class WorkerState(TypedDict):
+    task: Worker_tasks
+    current_run_id: Optional[str]
+    working_pid: Optional[int]
+    exception: Optional[str]
+
+
+class DaemonState(TypedDict):
+    awake: bool
+    stop_on_fail: bool
+    supervisor_pid: Optional[int]
 
 
 class ServerState(TypedDict):
     server_pid: Optional[int]
-    worker_pid: Optional[int]
-    daemon_pid: Optional[int]
-    stop_on_fail: bool
-    awake: bool
+    daemon_state: DaemonState
+    worker_state: WorkerState
 
 
-
+Process_states: TypeAlias = Union[WorkerState, DaemonState, ServerState]
 # if TYPE_CHECKING:
-    
+
+
 class DaemonProtocol(Protocol):
+    # only making certain methods visible
     def start_supervisor(self) -> None: ...
     def stop_worker(
         self, timeout: Optional[float] = None, hard: bool = False
     ) -> None: ...
-    def stop_supervisor(
-        self, timeout: Optional[float] = None, hard: bool = False, stop_worker: bool = False
-    ) -> None: ...
-
-class ServerContextProtocol(Protocol):
-    def save_state(self) -> None: ...
-    def load_state(self) -> None: ...
-    def start(self) -> None: ...
-    def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None: ...
     def stop_supervisor(
         self,
         timeout: Optional[float] = None,
         hard: bool = False,
         stop_worker: bool = False,
     ) -> None: ...
+
+
+class WorkerProtocol(Protocol):
+    # only making certain methods visible
+    def cleanup(self) -> None: ...
+    def start(self, event: EventClass) ->None: ...
+
+class ServerContextProtocol(Protocol):
+    def save_state(self) -> None: ...
+    def load_state(self) -> None: ...
     def get_state(self) -> ServerState: ...
-    def set_state(self, state: ServerState) -> None: ...
-    def get_pid(self, process: ProcessNames) -> Optional[int]: ...
-    def set_pid(self, process: ProcessNames, pid: Optional[int]) -> None: ...
-    def set_stop_on_fail(self, value: bool) -> None: ...
-    def set_awake(self, value: bool) -> None: ...
-    def clear_cuda_memory(self) -> None: ...
+    def set_state(
+        self,
+        server: Optional[ServerState],
+        daemon: Optional[DaemonState],
+        worker: Optional[WorkerState],
+    ) -> None: ...
+
 
 class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
-    #Testing 
+    # Testing
     def get_daemon(self) -> DaemonProtocol: ...
+    def get_worker(self) -> WorkerProtocol: ...
     def get_server_context(self) -> ServerContextProtocol: ...
-        
+
 
 class QueManager(BaseManager):
     pass
@@ -1155,13 +1173,11 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     :return: Connected QueManager instance
     :rtype: QueManagerProtocol
     """
-    QueManager.register("ServerController")
     QueManager.register("get_que")
-    QueManager.register("get_server_state_handler")
-    #Testing
-    QueManager.register("get_daemon") 
+    # Testing
+    QueManager.register("get_worker")
+    QueManager.register("get_daemon")
     QueManager.register("get_server_context")
-    
 
     for _ in range(max_retries):
         try:
@@ -1187,12 +1203,10 @@ def _get_basic_logger() -> Logger:
 
 
 def main():
-
     logger = _get_basic_logger()
 
     q = Que(logger)
     q.disp_runs(OLD_RUNS)
-
 
 
 if __name__ == "__main__":
