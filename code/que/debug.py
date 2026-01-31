@@ -193,6 +193,16 @@ def daemon_stop_supervisor(t:float, hard:bool=False):
     daemon = manager.get_daemon()
     daemon.stop_supervisor(stop_worker=True, timeout=t, hard=hard)
     
+    
+def try_except_finally():
+    try:
+        print("In try block")
+        raise ValueError("An error occurred")
+    except ValueError as ve:
+        print(f"Caught exception: {ve}")
+    finally:
+        print("In finally block")
+
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -210,6 +220,7 @@ if __name__ == '__main__':
     # server_context_daemon_stop(t=1)
     # server_controller_stop()
     # daemon_start_supervisor()
-    daemon_stop_supervisor(t=1, hard=True)
+    # daemon_stop_supervisor(t=1, hard=True)
+    try_except_finally()
     
     

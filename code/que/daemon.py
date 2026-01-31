@@ -8,7 +8,6 @@ from .core import (
     DAEMON_NAME,
     WORKER_NAME,
     connect_manager,
-    ServerStateHandler,
 )
 from .worker import Worker
 
@@ -21,27 +20,38 @@ class DaemonState(TypedDict):
 class Daemon:
     def __init__(
         self,
+        awake: bool,
+        stop_on_fail: bool,
         worker: Worker,
         logger: Logger,
-        local_state: ServerStateHandler,
         stop_worker_event: EventClass,
         stop_daemon_event: EventClass,
     ) -> None:
         self.worker = worker
         self.logger = logger
-        self.local_state = local_state
         self.stop_worker_event = stop_worker_event
         self.stop_daemon_event = stop_daemon_event
         self.worker_process: Optional[Process] = None
         self.supervisor_process: Optional[Process] = None
-
+        self.awake = awake
+        self.stop_on_fail = stop_on_fail
+        
         self.logger.info("Daemon initialized")
 
-        if self.local_state.awake:
+        if self.awake:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
             self.start_supervisor()
 
-    def monitor_worker(self, state_proxy: ServerStateHandler) -> bool:
+    def get_state(self) -> DaemonState:
+        return DaemonState(
+            awake=self.awake,
+            stop_on_fail=self.stop_on_fail,
+            supervisor_pid=self.supervisor_process.pid
+            if self.supervisor_process
+            else None,
+        )
+
+    def monitor_worker(self) -> bool:
         """
         Monitor the worker process until it exits.
         If it exits with a non-zero code and 'stop_on_fail' is False,
@@ -66,7 +76,7 @@ class Daemon:
         else:
             self.logger.warning(f"Worker process ended with exit code: {exit_code}")
 
-            if state_proxy.get_stop_on_fail():
+            if self.stop_on_fail:
                 self.logger.info("stop_on_fail is True. Not restarting.")
                 return False
 
@@ -105,9 +115,9 @@ class Daemon:
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
         """
         manager = connect_manager()
-        server_state_proxy = manager.get_server_state_handler()
-        server_state_proxy.set_pid(process=DAEMON_NAME, pid=os.getpid())
-        server_state_proxy.save_state()
+        server_context_proxy = manager.get_server_context()
+        server_context_proxy.set_pid(process=DAEMON_NAME, pid=os.getpid())
+        server_context_proxy.save_state()
 
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
 
@@ -120,12 +130,12 @@ class Daemon:
                 )
                 self.worker_process.start()
 
-                server_state_proxy.set_pid(process=DAEMON_NAME, pid=self.worker_process.pid)
-                server_state_proxy.save_state()
+                server_context_proxy.set_pid(process=DAEMON_NAME, pid=self.worker_process.pid)
+                server_context_proxy.save_state()
 
                 self.logger.info(f"Worker started with PID: {self.worker_process.pid}")
 
-                if not self.monitor_worker(server_state_proxy):
+                if not self.monitor_worker():
                     break
 
                 self.worker.cleanup()
@@ -137,10 +147,10 @@ class Daemon:
                 time.sleep(1.0)  # Prevent tight loop on error
 
         # Cleanup before process exit
-        server_state_proxy.set_pid(process=DAEMON_NAME, pid=None)
-        server_state_proxy.set_pid(process=WORKER_NAME, pid=None)
-        server_state_proxy.set_awake(False)
-        server_state_proxy.save_state()  # Save final state to disk
+        server_context_proxy.set_pid(process=DAEMON_NAME, pid=None)
+        server_context_proxy.set_pid(process=WORKER_NAME, pid=None)
+        server_context_proxy.set_awake(False)
+        server_context_proxy.save_state()  # Save final state to disk
         self.logger.info("Supervisor process exiting.")
 
     def start_supervisor(self) -> None:
@@ -151,8 +161,8 @@ class Daemon:
 
         self.stop_daemon_event.clear()  # Reset event in case it was set previously
         self.stop_worker_event.clear()
-        self.local_state.set_awake(True)  # child inherits local state
-        self.local_state.save_state()
+        self.awake = True
+        
 
         self.supervisor_process = Process(target=self.supervise)
         self.supervisor_process.start()
@@ -202,11 +212,10 @@ class Daemon:
             if hard:
                 self.hard_cleanup()
 
-            self.local_state.awake = False
-            self.local_state.daemon_pid = None
-            self.local_state.worker_pid = None
+            self.awake = False
+            self.daemon_pid = None
+            self.worker_pid = None
 
-            self.local_state.save_state()
             self.logger.info("Supervisor stopped.")
 
         else:
