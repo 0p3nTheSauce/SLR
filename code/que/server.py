@@ -1,4 +1,6 @@
 from multiprocessing import Event
+
+# from multiprocessing.managers import BaseManager
 import multiprocessing as mp
 import logging
 from logging import Logger
@@ -6,14 +8,14 @@ import json
 import os
 import signal
 import sys
-from typing import Dict, Optional, TypedDict, Union, Tuple, Any, TypeGuard
+from typing import Optional, Union, Tuple, Any, TypeGuard
 from pathlib import Path
 
 from .core import (
     timestamp_path,
     Que,
     QueManager,
-    ProcessNames,
+    # ProcessNames,
     SERVER_LOG_PATH,
     SERVER_STATE_PATH,
     QUE_NAME,
@@ -23,10 +25,12 @@ from .core import (
     TRAINING_LOG_PATH,
     WORKER_NAME,
     ServerState,
+    WorkerState,
+    DaemonState,
+    # Process_states
 )
 from .daemon import Daemon, DaemonState
 from .worker import Worker, WorkerState
-
 
 
 def is_server_state(val: Any) -> TypeGuard[ServerState]:
@@ -67,6 +71,7 @@ def is_server_state(val: Any) -> TypeGuard[ServerState]:
     # If all checks pass, it is a DaemonState
     return True
 
+
 def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
     with open(state_path, "r") as f:
         data = json.load(f)
@@ -91,20 +96,16 @@ class ServerContext:
         stop_on_fail: bool = True,
         awake: bool = False,
         server_state_path: Union[str, Path] = SERVER_STATE_PATH,
-        
     ):
-        #context attributes
+        # context attributes
         self.save_on_shutdown: bool = save_on_shutdown
         self.cleanup_timeout: float = cleanup_timeout
         self.stop_on_fail: bool = stop_on_fail
         self.awake: bool = awake
         self.state_path: Union[str, Path] = server_state_path
-        
-        
+
         # Pids
         self.server_pid: Optional[int] = os.getpid()
-        self.daemon_pid: Optional[int] = None
-        self.worker_pid: Optional[int] = None
 
         # spawn for CUDA context
         mp.set_start_method("spawn", force=True)
@@ -114,7 +115,9 @@ class ServerContext:
         signal.signal(signal.SIGINT, self._handle_shutdown)
 
         # logging
-        que_logger, daemon_logger, server_logger, worker_logger = self._setup_logging()
+        que_logger, daemon_logger, server_logger, worker_logger, training_logger = (
+            self._setup_logging()
+        )
         self.server_logger = server_logger
 
         # Events for controlling Daemon and Worker
@@ -124,7 +127,9 @@ class ServerContext:
         # Classes
         self.load_state()
         self.que = Que(logger=que_logger)
-        self.worker = Worker(server_logger=worker_logger)
+        self.worker = Worker(
+            server_logger=worker_logger, training_logger=training_logger, que=self.que
+        )
         self.daemon = Daemon(
             awake=self.awake,
             stop_on_fail=self.stop_on_fail,
@@ -154,7 +159,7 @@ class ServerContext:
         training_logger.propagate = False
         return training_logger
 
-    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger]:
+    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger, Logger]:
         """Sets up loggers for the server components."""
         logging.basicConfig(
             level=logging.INFO,
@@ -166,9 +171,9 @@ class ServerContext:
         dn_logger = logging.getLogger(DAEMON_NAME)
         server_logger = logging.getLogger(SERVER_NAME)
         worker_logger = logging.getLogger(WORKER_NAME)
-        # training_logger = self._setup_training_logger()
+        training_logger = self._setup_training_logger()
 
-        return que_logger, dn_logger, server_logger, worker_logger
+        return que_logger, dn_logger, server_logger, worker_logger, training_logger
 
     def _handle_shutdown(self, signum, frame):
         """Handle SIGTERM/SIGINT for graceful shutdown"""
@@ -193,6 +198,28 @@ class ServerContext:
         finally:
             sys.exit(0)
 
+    def get_state(self) -> ServerState:
+        return ServerState(
+            server_pid=self.server_pid,
+            daemon_state=self.daemon.get_state(),
+            worker_state=self.worker.get_state(),
+        )
+
+    def set_state(
+        self,
+        server: Optional[ServerState] = None,
+        daemon: Optional[DaemonState] = None,
+        worker: Optional[WorkerState] = None,
+    ) -> None:
+        if server is not None:
+            self.server_pid = server["server_pid"]
+            daemon = server["daemon_state"]
+            worker = server["worker_state"]
+        if daemon is not None:
+            self.daemon.set_state(daemon)
+        if worker is not None:
+            self.worker.set_state(worker)
+
     def save_state(
         self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
     ):
@@ -203,15 +230,10 @@ class ServerContext:
 
         if timestamp:
             out_path = timestamp_path(out_path)
-        state: ServerState = {
-            "server_pid": self.server_pid,
-            "daemon_pid": self.daemon_pid,
-            "worker_pid": self.worker_pid,
-            "stop_on_fail": self.stop_on_fail,
-            "awake": self.awake,
-        }
+
         with open(out_path, "w") as f:
-            json.dump(state, f)
+            json.dump(self.get_state(), f)
+
         self.server_logger.info(f"Saved state to: {out_path}")
 
     def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
@@ -224,86 +246,12 @@ class ServerContext:
             return
 
         try:
-            state = read_server_state(self.state_path)
-            self.server_pid = state["server_pid"]
-            self.worker_pid = state["worker_pid"]
-            self.stop_on_fail = state["stop_on_fail"]
-            self.awake = state["awake"]
+            self.set_state(read_server_state(self.state_path))
             self.server_logger.info(f"Loaded state from: {self.state_path}")
         except Exception as e:
             self.server_logger.warning(
-                f"Ran into an error when loading state: {e}\nloading from scratch"
+                f"Ran into an error when loading state: {e}\nloading abandoned"
             )
-            self.server_pid = None
-            self.daemon_pid = None
-            self.worker_pid = None
-            self.stop_on_fail = False
-            self.awake = False
-
-    def get_state(self) -> ServerState:
-        return {
-            "server_pid": self.server_pid,
-            "daemon_pid": self.daemon_pid,
-            "worker_pid": self.worker_pid,
-            "stop_on_fail": self.stop_on_fail,
-            "awake": self.awake,
-        }
-
-    def set_state(self, state: ServerState) -> None:
-        self.server_pid = state["server_pid"]
-        self.daemon_pid = state["daemon_pid"]
-        self.worker_pid = state["worker_pid"]
-        self.stop_on_fail = state["stop_on_fail"]
-        self.awake = state["awake"]
-
-    def start(self):
-        self.daemon.start_supervisor()
-
-    def stop_worker(self, timeout: Optional[float] = None, hard: bool = False):
-        self.daemon.stop_worker(timeout=timeout, hard=hard)
-
-    def stop_supervisor(
-        self,
-        timeout: Optional[float] = None,
-        hard: bool = False,
-        stop_worker: bool = False,
-    ):
-        self.daemon.stop_supervisor(timeout=timeout, hard=hard, stop_worker=stop_worker)
-
-    def get_pid(self, process: ProcessNames) -> Optional[int]:
-        if process == SERVER_NAME:
-            return self.server_pid
-        elif process == DAEMON_NAME:
-            return self.daemon_pid
-        elif process == WORKER_NAME:
-            return self.worker_pid
-        else:
-            raise ValueError(f"Unknown process name: {process}")
-
-    def set_pid(self, process: ProcessNames, pid: Optional[int]) -> None:
-        if process == SERVER_NAME:
-            self.server_pid = pid
-        elif process == DAEMON_NAME:
-            self.daemon_pid = pid
-        elif process == WORKER_NAME:
-            self.worker_pid = pid
-        else:
-            raise ValueError(f"Unknown process name: {process}")
-        
-    def get_stop_on_fail(self) -> bool:
-        return self.stop_on_fail
-
-    def set_stop_on_fail(self, stop_on_fail: bool) -> None:
-        self.stop_on_fail = stop_on_fail
-
-    def get_awake(self) -> bool:
-        return self.awake
-
-    def set_awake(self, awake: bool) -> None:
-        self.awake = awake
-
-    def clear_cuda_memory(self) -> None:
-        self.worker.cleanup()
 
 
 # --- Registration Logic ---
@@ -336,8 +284,9 @@ def setup_manager():
 
     QueManager.register(
         "get_worker",
-        callable=lambda: context.worker
+        callable=lambda: context.worker,
     )
+
 
 # --- Server Startup ---
 

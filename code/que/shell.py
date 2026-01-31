@@ -5,6 +5,8 @@ from .core import (
     SYNONYMS,
     connect_manager,
     ServerState,
+    # WorkerState,
+    # DaemonState,
     TRAINING_LOG_PATH,
     SERVER_LOG_PATH,
     RUN_PATH,
@@ -57,6 +59,8 @@ class QueShell(cmdLib.Cmd):
         self.auto_save = auto_save
         # - proxy objects
         self.que = server.get_que()
+        self.daemon = server.get_daemon()
+        self.worker = server.get_worker()
         self.server_context = server.get_server_context()
 
         # - parsing
@@ -76,6 +80,8 @@ class QueShell(cmdLib.Cmd):
             "edit": self._get_edit_parser,
             "display": self._get_display_parser,
             "daemon": self._get_daemon_parser,
+            "server": self._get_server_parser,
+            "worker": self._get_worker_parser,
             "logs": self._get_log_parser,
             "load": self._get_load_parser,
             "save": self._get_save_parser,
@@ -193,7 +199,7 @@ class QueShell(cmdLib.Cmd):
         if not parsed_args.no_save:
             with self.console.status("[bold green]Saving state...", spinner="dots"):
                 self.do_save("que")
-                self.do_save("daemon")
+                self.do_save("server")
                 time.sleep(0.5)  # Brief pause for visual feedback
         else:
             self.console.print("[yellow]Exiting without saving[/yellow]")
@@ -230,14 +236,14 @@ class QueShell(cmdLib.Cmd):
                 self.que.save_state(
                     out_path=parsed_args.Output_Path, timestamp=parsed_args.Timestamp
                 )
-        elif parsed_args.command == "daemon":
+        elif parsed_args.command == "server":
             with self.unwrap_exception(
-                "Daemon state saved to file", "Failed to save daemon state"
+                "Server state saved to file", "Failed to save server state"
             ):
                 self.server_context.save_state()
         else:
             raise ValueError(
-                "neither Que nor Daemon specified, this should not be possible"
+                "neither Que nor Server specified, this should not be possible"
             )
         # self.console.print("[bold green]✓[/bold green] Queue state saved to file")
 
@@ -467,78 +473,41 @@ class QueShell(cmdLib.Cmd):
     def do_wandb(self, arg):
         """Open the wandb page for a run"""
 
-    # Other
+    #   Worker
 
-    def do_attach(self, arg):
-        """Attach to the que_training tmux session"""
-        with self.unwrap_exception(
-            "Attached to tmux session", "Failed to attach to tmux session"
-        ):
-            self.tmux_man.join_session()
+    def do_worker(self, arg):
+        parsed_args = self._parse_args_or_cancel("worker", arg)
+        if parsed_args is None:
+            return
 
-    def _pretty_status(self, status: ServerState):
-        table = Table(
-            title="Server Status",
-            box=box.ROUNDED,
-            border_style="cyan",
-            show_header=True,
-            header_style="bold magenta",
-        )
+        if parsed_args.command == "clear_mem":
+                self.worker.cleanup()
+                self.console.print("[bold green]Cleared CUDA memory[/bold green]")
+                used, total = gpu_manager.get_gpu_memory_usage()
+                self.console.print(f"CUDA memory: {used}/{total} GiB")
+        else:
+            self.console.print(
+                f"[bold red]Command not recognised: {parsed_args.command}[/bold red]"
+            )
 
-        table.add_column("Property", style="bold yellow")
-        table.add_column("Value", style="white")
-
-        awake_status = (
-            "[bold green]Awake[/bold green]" if status["awake"] else "[bold yellow]Asleep[/bold yellow]"
-        )
-        stop_on_fail_status = (
-            "[bold red]Enabled[/bold red]" if status["stop_on_fail"] else "[bold green]Disabled[/bold green]"
-        )
-        server_pid = (
-            f"[bold cyan]{status['server_pid']}[/bold cyan]" if status["server_pid"] else "[bold yellow]N/A[/bold yellow]"
-        )
-        daemon_pid = (
-            f"[bold cyan]{status['daemon_pid']}[/bold cyan]" if status["daemon_pid"] else "[bold yellow]N/A[/bold yellow]"
-        )
-        worker_pid = (
-            f"[bold cyan]{status['worker_pid']}[/bold cyan]" if status["worker_pid"] else "[bold yellow]N/A[/bold yellow]"
-        )
-
-        table.add_row("Daemon State", awake_status)
-        table.add_row("Stop on Fail", stop_on_fail_status)
-        table.add_row("Server PID", server_pid)
-        table.add_row("Daemon PID", daemon_pid)
-        table.add_row("Worker PID", worker_pid)
-
-        self.console.print(table)
-
+    # Daemon
+        
     def do_daemon(self, arg):
         """Interact with the worker"""
         parsed_args = self._parse_args_or_cancel("daemon", arg)
         if parsed_args is None:
             return
-
-        if parsed_args.command == "save":
-            with self.unwrap_exception(
-                "Daemon state saved", "Failed to save daemon state"
-            ):
-                self.server_context.save_state()
-        elif parsed_args.command == "load":
-            with self.unwrap_exception(
-                "Daemon state loaded", "Failed to load daemon state"
-            ):
-                self.server_context.load_state()
         elif parsed_args.command == "start":
             with self.unwrap_exception(
                 "Worker process started", "Failed to start worker"
             ):
-                self.server_context.start()
+                self.daemon.start_supervisor()
         elif parsed_args.command == "stop":
             if parsed_args.supervisor:
                 with self.unwrap_exception(
                     "Supervisor process stopped", "Failed to stop supervisor"
                 ):
-                    self.server_context.stop_supervisor(
+                    self.daemon.stop_supervisor(
                         timeout=parsed_args.timeout,
                         hard=parsed_args.hard,
                         stop_worker=parsed_args.worker,
@@ -547,36 +516,96 @@ class QueShell(cmdLib.Cmd):
                 with self.unwrap_exception(
                     "Worker process stopped", "Failed to stop worker"
                 ):
-                    self.server_context.stop_worker(
+                    self.daemon.stop_worker(
                         timeout=parsed_args.timeout, hard=parsed_args.hard
                     )
+
+    # Server
+    
+    def _pretty_status(self, status: ServerState):
+        
+        # Main status table
+        table = Table(title="Server Status", show_header=False, box=None, padding=(0, 2))
+        table.add_column("Section", style="bold cyan", width=20)
+        table.add_column("Details")
+        
+        # Server section
+        server_pid = status['server_pid']
+        server_status = Text()
+        if server_pid:
+            server_status.append("Running ", style="bold green")
+            server_status.append(f"(PID: {server_pid})", style="dim")
+        else:
+            server_status.append("Not Running", style="bold red")
+        table.add_row("Server", server_status)
+        
+        # Daemon section
+        daemon_state = status['daemon_state']
+        daemon_table = Table(show_header=False, box=None, padding=(0, 1))
+        daemon_table.add_column(style="yellow", width=15)
+        daemon_table.add_column()
+        
+        awake_icon = "✓" if daemon_state['awake'] else "✗"
+        awake_style = "green" if daemon_state['awake'] else "red"
+        daemon_table.add_row("Awake:", Text(awake_icon, style=awake_style))
+        
+        stop_icon = "✓" if daemon_state['stop_on_fail'] else "✗"
+        daemon_table.add_row("Stop on Fail:", Text(stop_icon, style="yellow" if daemon_state['stop_on_fail'] else "dim"))
+        
+        if daemon_state['supervisor_pid']:
+            daemon_table.add_row("Supervisor PID:", str(daemon_state['supervisor_pid']))
+        
+        table.add_row("Daemon", daemon_table)
+        
+        # Worker section
+        worker_state = status['worker_state']
+        worker_table = Table(show_header=False, box=None, padding=(0, 1))
+        worker_table.add_column(style="magenta", width=15)
+        worker_table.add_column()
+        
+        task_style = "bold green" if worker_state['task'] == 'training' else "dim"
+        worker_table.add_row("Task:", Text(worker_state['task'], style=task_style))
+        
+        if worker_state['current_run_id']:
+            worker_table.add_row("Run ID:", worker_state['current_run_id'])
+        
+        if worker_state['working_pid']:
+            worker_table.add_row("Worker PID:", str(worker_state['working_pid']))
+        
+        if worker_state['exception']:
+            error_text = Text(worker_state['exception'], style="bold red")
+            worker_table.add_row("Exception:", error_text)
+        
+        table.add_row("Worker", worker_table)
+        
+        self.console.print(table)
+
+    def do_server(self, arg):
+        parsed_args = self._parse_args_or_cancel("server", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == "save":
+            with self.unwrap_exception(
+                "Server state saved", "Failed to save server state"
+            ):
+                self.server_context.save_state()
+        elif parsed_args.command == "load":
+            with self.unwrap_exception(
+                "Server state loaded", "Failed to load server state"
+            ):
+                self.server_context.load_state()
         elif parsed_args.command == "status":
             self._pretty_status(self.server_context.get_state())
-        elif parsed_args.command == "stop-on-fail":
-            if parsed_args.value == "on":
-                parsed_args.value = True
-            else:
-                parsed_args.value = False
-            self.server_context.set_stop_on_fail(parsed_args.value)
-            self.console.print(
-                f"[bold green]✓[/bold green] Set stop on fail to {parsed_args.value}"
-            )
-        elif parsed_args.command == "awake":
-            if parsed_args.value == "on":
-                parsed_args.value = True
-            self.server_context.set_awake(parsed_args.value)
-            self.console.print(
-                f"[bold green]✓[/bold green] Set awake to {parsed_args.value}"
-            )
-        elif parsed_args.command == "clear_mem":
-            self.server_context.clear_cuda_memory()
-            self.console.print("[bold green]Cleared CUDA memory[/bold green]")
-            used, total = gpu_manager.get_gpu_memory_usage()
-            self.console.print(f"CUDA memory: {used}/{total} GiB")
-        else:
-            self.console.print(
-                f"[bold red]Command not recognised: {parsed_args.command}[/bold red]"
-            )
+
+    # Subprocess
+
+    def do_attach(self, arg):
+        """Attach to the que_training tmux session"""
+        with self.unwrap_exception(
+            "Attached to tmux session", "Failed to attach to tmux session"
+        ):
+            self.tmux_man.join_session()  
 
     def do_logs(self, arg):
         """Tail the worker or daemon logs"""
@@ -700,7 +729,7 @@ class QueShell(cmdLib.Cmd):
         )
 
         # Que Subparser
-        que_parser = subparsers.add_parser("que", aliases=["-q"], help="Save Que state")
+        que_parser = subparsers.add_parser("que", help="Save Que state")
         que_parser.add_argument(
             "--Timestamp", "-t", action="store_true", help="Timestamp the output file"
         )
@@ -713,8 +742,8 @@ class QueShell(cmdLib.Cmd):
         )
 
         # Daemon Subparser
-        subparsers.add_parser("daemon", aliases=["-d"], help="Save Daemon state")
-        # TODO: Maybe add this if desired
+        subparsers.add_parser("server", help="Save Server state")
+    
         return parser
 
     def _get_load_parser(self) -> argparse.ArgumentParser:
@@ -809,13 +838,9 @@ class QueShell(cmdLib.Cmd):
             dest="command", required=True, help="Daemon commands"
         )
 
-        # Save state
-        subparsers.add_parser("save", help="Save daemon state to disk")
-        # Load state
-        subparsers.add_parser("load", help="Load daemon state from disk")
 
         # Start
-        subparsers.add_parser("start", help="Start the worker process")
+        subparsers.add_parser("start", help="Start the supervisor")
 
         # Stop with timeout
         stop_parser = subparsers.add_parser(
@@ -844,27 +869,43 @@ class QueShell(cmdLib.Cmd):
             help="Force kill the worker after timeout",
         )
 
+
+        return parser
+
+    def _get_server_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Interact with the server context", prog="server"
+        )
+        
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Server commands"
+        )
+
+        # Save state
+        subparsers.add_parser("save", help="Save Server state to disk")
+        # Load state
+        subparsers.add_parser("load", help="Load Server state from disk")
+        
         # Status
         subparsers.add_parser("status", help="Get worker status information")
+        
+        return parser
 
-        # Set stop on fail
-        set_stop_on_fail_parser = subparsers.add_parser(
-            "stop-on-fail", help="Set stop on fail option"
+    def _get_worker_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Interact with the worker", prog="worker"
         )
-        set_stop_on_fail_parser.add_argument(
-            "value", choices=["on", "off"], help="Boolean value to set"
-        )
-
-        # Set awake
-        set_awake_parser = subparsers.add_parser("set-awake", help="Set awake option")
-        set_awake_parser.add_argument(
-            "value", choices=["on", "off"], help="Boolean value to set"
+        
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Server commands"
         )
 
         # Clear memory
-        subparsers.add_parser("clear_mem", help="Clear CUDA memory")
+        subparsers.add_parser("cleanup", help="Clear CUDA memory")
 
+        
         return parser
+
 
     def _get_log_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -913,31 +954,10 @@ class QueShell(cmdLib.Cmd):
         )
         return parser
 
-# def _recover_connection(shell: QueShell):
-#     server = connect_manager()
-#     shell.server_context = server.ServerController()
-#     shell.que = server.get_que()
-#     return shell
-
 if __name__ == "__main__":
     server = connect_manager()
     que_shell = QueShell(server)
-    # while True:
-    #     try:
-    #         que_shell.cmdloop()
-    #         break  # Exit if cmdloop exits normally
-    #     except (EOFError, ConnectionError, BrokenPipeError, OSError) as e:
-    #         print(f"\nConnection lost: {e}")
-    #         print("Attempting to reconnect...")
-    #         try:
-    #             # Reconnect to your proxy
-    #             que_shell = _recover_connection(que_shell)
-    #             print("Reconnected successfully!")
-    #         except Exception as reconnect_error:
-    #             print(f"Reconnection failed: {reconnect_error}")
-    #             response = input("Retry? (y/n): ")
-    #             if response.lower() != 'y':
-    #                 break
+
     try:
         que_shell.cmdloop()
     except KeyboardInterrupt:
