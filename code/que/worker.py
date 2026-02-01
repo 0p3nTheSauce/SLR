@@ -59,7 +59,7 @@ class Worker:
 
     def get_state(self) -> WorkerState:
         return WorkerState(
-            task=self.current_task if self.current_task else "training",
+            task=self.current_task,
             current_run_id=self.current_run_id,
             working_pid=self.working_pid,
             exception=self.exception,
@@ -94,76 +94,74 @@ class Worker:
         self.server_logger.debug(f"GPU memory after cleanup: {used}/{total} GiB")
 
     def _train(self) -> None:
-        try:
-            if not gpu_manager.wait_for_completion(
-                check_interval=10,
-                logger=self.server_logger,
-                # max_util_gb=0.5, #debugging
+
+        if not gpu_manager.wait_for_completion(
+            check_interval=10,
+            logger=self.server_logger,
+            # max_util_gb=0.5, #debugging
+            event=self.stop_event,
+        ):
+            self.server_logger.info("GPU not available, exiting")
+            return
+        else:
+            self.server_logger.info("GPU is available")
+
+        # prepare next run (move from to_run -> cur_run)
+        run_sum = self.que.stash_next_run()
+        self.que.save_state()
+
+        # self.logger.info a seperator between runs
+        self.server_logger.info(self.seperator(run_sum))
+        # get next run
+        info = self.que.peak_cur_run()
+
+        wandb_info = info["wandb"]
+        admin = info["admin"]
+        config = _exp_to_run_info(info)
+
+        # setup wandb run
+        with redirect_stdout(self.log_adapter):
+            run = _setup_wandb(config, wandb_info, run_id_required=True)
+
+        # save run_id for recovering
+        wandb_info["run_id"] = run.id
+        info["wandb"] = wandb_info
+
+        # save for server context
+        self.current_run_id = run.id
+        self._state_broadcast()
+
+        self.server_logger.info("saving my id")
+        _ = self.que.pop_cur_run()
+        self.que.set_cur_run(info)
+        self.que.save_state()
+
+        self.server_logger.info(f"Run ID: {run.id}")
+        self.server_logger.info(f"Run name: {run.name}")  # Human-readable name
+        self.server_logger.info(
+            f"Run path: {run.path}"
+        )  # entity/project/run_id format
+
+        with redirect_stdout(self.log_adapter):
+            train_loop(
+                admin["model"],
+                config,
+                run,
+                recover=admin["recover"],
                 event=self.stop_event,
-            ):
-                self.server_logger.info("GPU not available, exiting")
-                return
-            else:
-                self.server_logger.info("GPU is available")
+            )
+            run.finish(exit_code=0)
 
-            # prepare next run (move from to_run -> cur_run)
-            run_sum = self.que.stash_next_run()
+        if self.stop_event is not None and self.stop_event.is_set():
+            self.server_logger.warning(
+                "Training was interrupted by stopping event."
+            )
+            self.que.save_state()  # keep current run for recovery
+        else:
+            self.server_logger.info("Training finished successfully")
+            self.que.store_fin_run()
             self.que.save_state()
-
-            # self.logger.info a seperator between runs
-            self.server_logger.info(self.seperator(run_sum))
-            # get next run
-            info = self.que.peak_cur_run()
-
-            wandb_info = info["wandb"]
-            admin = info["admin"]
-            config = _exp_to_run_info(info)
-
-            # setup wandb run
-            with redirect_stdout(self.log_adapter):
-                run = _setup_wandb(config, wandb_info, run_id_required=True)
-
-            # save run_id for recovering
-            wandb_info["run_id"] = run.id
-            info["wandb"] = wandb_info
-
-            # save for server context
-            self.current_run_id = run.id
-
-            self.server_logger.info("saving my id")
-            _ = self.que.pop_cur_run()
-            self.que.set_cur_run(info)
-            self.que.save_state()
-
-            self.server_logger.info(f"Run ID: {run.id}")
-            self.server_logger.info(f"Run name: {run.name}")  # Human-readable name
-            self.server_logger.info(
-                f"Run path: {run.path}"
-            )  # entity/project/run_id format
-
-            with redirect_stdout(self.log_adapter):
-                train_loop(
-                    admin["model"],
-                    config,
-                    run,
-                    recover=admin["recover"],
-                    event=self.stop_event,
-                )
-                run.finish(exit_code=0)
-
-            if self.stop_event is not None and self.stop_event.is_set():
-                self.server_logger.warning(
-                    "Training was interrupted by stopping event."
-                )
-                self.que.save_state()  # keep current run for recovery
-            else:
-                self.server_logger.info("Training finished successfully")
-                self.que.store_fin_run()
-                self.que.save_state()
-            self.server_logger.info("_train method completed successfully")
-        finally:
-            self.server_logger.info("Exiting _train method")
-            self.cleanup()
+        self.server_logger.info("_train method completed successfully")
 
     def train(self) -> None:
         """
@@ -172,6 +170,7 @@ class Worker:
         """
         try:
             self.current_task = "training"
+            self._state_broadcast()
             self._train()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
@@ -188,16 +187,23 @@ class Worker:
             # exit with error
             raise
         finally:
-            self.current_task = "inactive"
+            self.cleanup()
+            self.working_pid = None
+            self.current_task = 'inactive'
+            self.current_run_id = None
+            self._state_broadcast()
+            
+    def _state_broadcast(self):
+        self.server_context.set_state(server=None, daemon=None,worker=self.get_state())
 
-    def start(self, event: EventClass):
+    def start(self):
         #this is likely started in a seperate process, so que requirs connecting
-
-        self.stop_event = event
-        self.working_pid = os.getpid()
         
         manager = connect_manager()
+        self.server_context = manager.get_server_context()
         self.que = manager.get_que()
+
+        self.working_pid = os.getpid()
 
         logging.basicConfig(
             level=logging.INFO,

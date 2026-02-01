@@ -1,3 +1,4 @@
+import webbrowser
 from .core import (
     TO_RUN,
     CUR_RUN,
@@ -108,9 +109,11 @@ class QueShell(cmdLib.Cmd):
         """Reconnect the server controller and que proxies"""
         self.server_context._close()#type: ignore
         self.que._close()#type: ignore
+        self.daemon._close()#type: ignore
         server = connect_manager()
         self.server_context = server.get_server_context()
         self.que = server.get_que()
+        self.daemon = server.get_daemon()
 
     # Cmd overrides
 
@@ -472,7 +475,23 @@ class QueShell(cmdLib.Cmd):
 
     def do_wandb(self, arg):
         """Open the wandb page for a run"""
-
+        parsed_args = self._parse_args_or_cancel("wandb", arg)
+        if parsed_args is None:
+            return
+        
+        url = "https://wandb.ai/"
+        
+        if parsed_args.location is not None and parsed_args.index is not None:
+            run = self.que.peak_run(loc=parsed_args.location, idx=parsed_args.index)
+            wandb_info = run['wandb']
+            url = url + f"{wandb_info['entity']}/{wandb_info['project']}/{wandb_info['run_id']}"
+        else:
+            url = url + f"{parsed_args.entity}/{parsed_args.project}"
+        
+        webbrowser.open(url)
+        
+        
+        
     #   Worker
 
     def do_worker(self, arg):
@@ -653,7 +672,7 @@ class QueShell(cmdLib.Cmd):
             parsed_args.n_location = SYNONYMS.get(
                 parsed_args.n_location.lower(), parsed_args.n_location
             )
-        if hasattr(parsed_args, "location"):
+        if hasattr(parsed_args, "location") and parsed_args.location is not None:
             parsed_args.location = SYNONYMS.get(
                 parsed_args.location.lower(), parsed_args.location
             )
@@ -943,7 +962,7 @@ class QueShell(cmdLib.Cmd):
             "-p",
             type=str,
             help="Wandb project name. Probably one of: " + ", ".join(likely_projects),
-            default=PROJECT_BASE,
+            default='projects'
         )
         parser.add_argument(
             "--entity",

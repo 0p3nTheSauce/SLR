@@ -108,12 +108,17 @@ class Daemon:
         The worker process is started and monitored here. After it completes successfully, it is restarted.
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
         """
+        
+        
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
 
         while not self.stop_daemon_event.is_set():
             try:
+                # self.worker_process = Process(
+                #     target=self.worker.start, args=(self.stop_worker_event,)
+                # )
                 self.worker_process = Process(
-                    target=self.worker.start, args=(self.stop_worker_event,)
+                    target=self.worker.start,
                 )
                 self.worker_process.start()
 
@@ -171,6 +176,8 @@ class Daemon:
             self.logger.info("Worker stopped.")
         else:
             self.logger.warning("No worker process to stop")
+            self.worker_process = None
+            self.worker.working_pid = None
 
     def stop_supervisor(
         self,
@@ -179,14 +186,12 @@ class Daemon:
         stop_worker: bool = False,
     ) -> None:
         """Gracefully stop the supervisor process"""
+        
         if self.supervisor_process and self.supervisor_process.is_alive():
             self.logger.info("Signaling supervisor to stop...")
 
             # 1. Signal the event
             self.stop_daemon_event.set()
-
-            if stop_worker:
-                self.stop_worker(timeout=timeout, hard=hard)
                 
             self.supervisor_process.join(timeout=timeout)
 
@@ -204,13 +209,11 @@ class Daemon:
 
         else:
             self.logger.warning("No supervisor process to stop")
+            self.supervisor_process = None
+            self.supervisor_pid = None
             
-def start_worker(stop_worker_event: EventClass):
-        """Connexts to the server worker proxy and starts the worker"""
-        manager = connect_manager()
-        worker = manager.get_worker()
-        worker.start(stop_worker_event)
-
+        if stop_worker:
+            self.stop_worker(timeout=timeout, hard=hard)
 
 
 

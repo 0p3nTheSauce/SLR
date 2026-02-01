@@ -128,7 +128,7 @@ class ServerContext:
         self.load_state()
         self.que = Que(logger=que_logger)
         self.worker = Worker(
-            server_logger=worker_logger, training_logger=training_logger, que=self.que
+            server_logger=worker_logger, training_logger=training_logger, que=self.que, stop_event=self.stop_worker_event
         )
         self.daemon = Daemon(
             awake=self.awake,
