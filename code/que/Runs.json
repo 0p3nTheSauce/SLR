@@ -512,6 +512,63 @@
                 ],
                 "run_id": null
             }
+        },
+        {
+            "admin": {
+                "model": "R(2+1)D_18",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "exp_no": "006",
+                "recover": false,
+                "config_path": "./configfiles/asl100/R(2+1)D_18_006.ini",
+                "save_path": "runs/asl100/R(2+1)D_18_exp006/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 0.001,
+                "backbone_init_lr": 1e-05,
+                "backbone_weight_decay": 0.0001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 1e-07
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingLR",
+                "tmax": 100,
+                "eta_min": 1e-05,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "asl100",
+                    "R(2+1)D_18",
+                    "exp-006",
+                    "comp_t2r2c412"
+                ],
+                "run_id": null
+            }
         }
     ],
     "cur_run": [
@@ -521,7 +578,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "exp_no": "000",
-                "recover": false,
+                "recover": true,
                 "config_path": "./configfiles/asl1000/Swin3D_S_000.ini",
                 "save_path": "runs/asl1000/Swin3D_S_exp000/checkpoints"
             },

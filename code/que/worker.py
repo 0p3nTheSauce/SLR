@@ -12,7 +12,7 @@ import io
 from multiprocessing.synchronize import Event as EventClass
 
 # locals
-from .core import connect_manager, TRAINING_LOG_PATH, WORKER_NAME, QueException, WorkerState, Worker_tasks
+from .core import connect_manager, TRAINING_LOG_PATH, WORKER_NAME, QueException, WorkerState, Worker_tasks, full_test, CompExpInfo
 
 
 from .core import Que
@@ -152,15 +152,7 @@ class Worker:
             )
             run.finish(exit_code=0)
 
-        if self.stop_event is not None and self.stop_event.is_set():
-            self.server_logger.warning(
-                "Training was interrupted by stopping event."
-            )
-            self.que.save_state()  # keep current run for recovery
-        else:
-            self.server_logger.info("Training finished successfully")
-            self.que.store_fin_run()
-            self.que.save_state()
+
         self.server_logger.info("_train method completed successfully")
 
     def train(self) -> None:
@@ -193,6 +185,63 @@ class Worker:
             self.current_run_id = None
             self._state_broadcast()
             
+    def _test(self) -> None:
+        if not gpu_manager.wait_for_completion(
+            check_interval=10,
+            logger=self.server_logger,
+            # max_util_gb=0.5, #debugging
+            event=self.stop_event,
+        ):
+            self.server_logger.info("GPU not available, exiting")
+            return
+        else:
+            self.server_logger.info("GPU is available")
+            
+        fin_run = self.que.peak_cur_run()
+        with redirect_stdout(self.log_adapter):
+            results = full_test(admin=fin_run['admin'], data=fin_run['data'])
+        comp_run = CompExpInfo(
+            admin=fin_run["admin"],
+            training=fin_run["training"],
+            optimizer=fin_run["optimizer"],
+            model_params=fin_run["model_params"],
+            data=fin_run["data"],
+            scheduler=fin_run["scheduler"],
+            early_stopping=fin_run["early_stopping"],
+            wandb=fin_run["wandb"],
+            results=results,
+        )
+        _ = self.que.pop_cur_run()
+        self.que.set_cur_run(comp_run)
+        self.que.store_fin_run()
+        self.server_logger.info("Exiting _test method")
+            
+    def test(self) -> None:
+        try:
+            self.current_task = "testing"
+            self._state_broadcast()
+            self._test()
+        except QueException as Qe:
+            self.server_logger.info(f"que based error, cannot continue: {Qe}")
+            self.exception = str(Qe)
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.exception = "KeyboardInterrupt"
+        except Exception as e:
+            self.server_logger.error(f"Testing run failed due to an error: {e}")
+            self.exception = str(e)
+            self.que.stash_failed_run(str(e))
+            self.que.save_state()
+            # exit with error
+            raise
+        finally:
+            self.cleanup()
+            self.working_pid = None
+            self.current_task = 'inactive'
+            self.current_run_id = None
+            self._state_broadcast()
+            
     def _state_broadcast(self):
         self.server_context.set_state(server=None, daemon=None,worker=self.get_state())
 
@@ -212,9 +261,18 @@ class Worker:
         )
         self.training_logger = logging.getLogger(WORKER_NAME)
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
-        self.logger = self.training_logger
 
         self.train()
+
+        if self.stop_event is not None and self.stop_event.is_set():
+            self.server_logger.warning(
+                "Training was interrupted by stopping event."
+            )
+            self.que.save_state()  # keep current run for recovery
+        else:
+            self.server_logger.info("Training finished successfully. Running tests")
+            self.test()
+            self.que.save_state()
 
 
 

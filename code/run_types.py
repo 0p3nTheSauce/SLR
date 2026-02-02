@@ -92,6 +92,7 @@ class DataInfo(TypedDict):
 	num_frames: int
 	frame_size: int
 
+
 class WandbInfo(TypedDict):
 	entity: str
 	project: str
@@ -152,6 +153,8 @@ class ExpInfo(RunInfo):
 class CompExpInfo(ExpInfo):
 	"""Inherits from ExpInfo, adds results"""
 	results: CompRes
+
+
 
  
 class Sumarised(TypedDict):

@@ -1,17 +1,9 @@
-KISS:
-- remove ServerController and just pass ServerContext.
-    or perhaps even just pass daemon. A major refactor could
-    improve things by simplifying things. We may have gone a 
-    bit class crazy but just ended up with too many wrappers.
-
 Shell:
 - improved exception handling
-- update daemon command 
 - add logging for server main logger
 - add restart, or start command for the server
 - Add probe to check server is running/start server
 - add flag to check if changes were made before saving 
-- add ability to open wandb from shell
 - make a persistent shell history file/ ability to drop in and out of shell like tmux
 - Add more options to logs
 
@@ -20,10 +12,10 @@ Daemon
     that the process started successfully)
 
 Worker:
-- fix logging issue
+- fix logging issue for server logger
+- pass testing to worker, and make it appear in status
 
 Server:
-- pass testing to daemon, and make it appear in status
 - make the shell work remotely
 - redirect wandb output to log file
 - add auto experiment num

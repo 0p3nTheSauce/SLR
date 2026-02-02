@@ -1,3 +1,5 @@
+import shlex
+import configs
 # from .server import connect_manager
 import multiprocessing as mp
 import time
@@ -184,6 +186,18 @@ def try_except_finally():
     finally:
         print("In finally block")
 
+def test_create():
+    que = Que(_get_basic_logger())
+    arg = "R(2+1)D_18 asl100 6"
+    args = shlex.split(arg)
+    maybe_args = configs.take_args(sup_args=args)
+    if isinstance(maybe_args, tuple):
+        admin_info, wandb_info = maybe_args
+        que.create_run(admin_info, wandb_info)
+    else:
+        print("oops")
+
+
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -202,6 +216,6 @@ if __name__ == '__main__':
     # server_controller_stop()
     # daemon_start_supervisor()
     # daemon_stop_supervisor(t=1, hard=True)
-    try_except_finally()
-    
+    # try_except_finally()
+    test_create()
     

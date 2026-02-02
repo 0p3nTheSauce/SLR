@@ -162,7 +162,7 @@ class ServerContext:
     def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger, Logger]:
         """Sets up loggers for the server components."""
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.DEBUG,
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             filename=SERVER_LOG_PATH,
         )
