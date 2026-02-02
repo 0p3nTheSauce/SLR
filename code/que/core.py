@@ -135,7 +135,7 @@ Example usage
                 q.save_state()
 This docstring describes the intended behaviour and the main public API surface.
 """
-
+import traceback
 from typing import (
     # TYPE_CHECKING,
     Protocol,
@@ -322,16 +322,18 @@ class QueBusy(QueException):
 def log_and_raise(logger: Logger, task: str = "Operation"):
     """
     Context manager that logs success or logs error and re-raises exception
-
-    Args:
-            success_msg: Message to log on success
-            error_msg: Message to log on error (before re-raising)
+    
+    :param logger: To log transaction
+    :type logger: Logger
+    :param task: The current task attempting to perform
+    :type task: str
     """
     try:
         yield
         logger.info(f"{task} completed successfully")
     except Exception as e:
         logger.error(f"{task} failed: {e}")
+        logger.error(traceback.format_exc())
         raise e
 
 
@@ -389,7 +391,7 @@ class Que:
         return to_get.pop(idx)
 
     def _set_run(self, loc: QueLocation, idx: int, run: GenExp) -> None:
-        """Set a run at a specified location and index
+        """Set a run at a specified location and index. Uses insert under the hood
 
         Args:
                 loc (QueLocation): to_run, cur_run or old_runs
@@ -670,22 +672,8 @@ class Que:
         Raises:
                 QueEmpty: If cur_run is empty
         """
-        # fin_run = self._pop_run(CUR_RUN, 0)
-        fin_run = self.peak_run(CUR_RUN, 0)  # safer incase crash during test
-        results = full_test(admin=fin_run["admin"], data=fin_run["data"])
-        comp_run = CompExpInfo(
-            admin=fin_run["admin"],
-            training=fin_run["training"],
-            optimizer=fin_run["optimizer"],
-            model_params=fin_run["model_params"],
-            data=fin_run["data"],
-            scheduler=fin_run["scheduler"],
-            early_stopping=fin_run["early_stopping"],
-            wandb=fin_run["wandb"],
-            results=results,
-        )
-        self._set_run(OLD_RUNS, 0, comp_run)
-        _ = self._pop_run(CUR_RUN, 0)  # still remove from cur
+
+        self._set_run(OLD_RUNS, 0, self.pop_cur_run())        
         self.logger.info("Stored finished run")
 
     def stash_failed_run(self, error: str) -> None:
@@ -948,8 +936,8 @@ class Que:
                                         ask (bool, optional): Pre-check run before creation. Defaults to True.
         """
         with log_and_raise(self.logger, "create"):
+            
             config = load_config(arg_dict)
-
             if self._is_dup_exp(config):
                 raise QueDupExp
 
@@ -1093,9 +1081,45 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
+    def update_runs(self, key1: str, key_value: Tuple[str, Any]) -> None:
+        """Update fields in the que. Useful if mass alterations are needed to runs
+
+        Args:
+            key1 (str): Top level key, e.g. data
+            key_value (Tuple[str, Any]): Key value pair, of secondary key, e.g. num_frames 16
+
+        Raises:
+            ValueError: If the top level key is faulty
+        """
+        with log_and_raise(self.logger, "que.update_runs"):
+            all_runs = {
+                TO_RUN: self.to_run,
+                CUR_RUN: self.cur_run,
+                FAIL_RUNS: self.fail_runs,
+                OLD_RUNS: self.old_runs
+            }
+            
+            for location_name, run_list in all_runs.items():
+                for idx, run in enumerate(run_list):
+                    if key1 not in run:
+                        raise ValueError(f"Top level key: {key1} not found in available keys: {run.keys()} for run: {idx} in: {location_name}")
+                    subdict = run[key1]
+                    key2, value = key_value
+                    # if key2 not in subdict:
+                    #     raise ValueError(f"Second level key: {key2} not found in available keys: {subdict.keys()} for run: {idx} in: {location_name}, with top level key: {key1}")
+                    subdict[key2] = value
+                    run[key1] = subdict
+                    all_runs[location_name][idx] = run
+                
+            self.to_run = all_runs[TO_RUN]
+            self.cur_run = all_runs[CUR_RUN]
+            self.fail_runs = all_runs[FAIL_RUNS]
+            self.old_runs = all_runs[OLD_RUNS]
+                
+
 
 # # ------- Basmanager connections -------#
-Worker_tasks: TypeAlias = Literal["inactive", "training"]
+Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 
 
 class WorkerState(TypedDict):

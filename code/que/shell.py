@@ -37,6 +37,7 @@ import json
 
 import subprocess
 from utils import gpu_manager
+import traceback
 
 
 class QueShell(cmdLib.Cmd):
@@ -104,6 +105,9 @@ class QueShell(cmdLib.Cmd):
                 )
             else:
                 self.console.print(f"[bold red]✗ {e} [/bold red]", style="red")
+            
+            # Print full traceback for debugging
+            self.console.print("[dim]" + traceback.format_exc() + "[/dim]")
 
     def _reconnect_proxies(self) -> None:
         """Reconnect the server controller and que proxies"""
