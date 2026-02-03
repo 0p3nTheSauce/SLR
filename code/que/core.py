@@ -156,7 +156,7 @@ from pathlib import Path
 import json
 from logging import Logger
 import logging
-from multiprocessing.managers import BaseManager
+from multiprocessing.managers import BaseManager, DictProxy
 import time
 from datetime import datetime
 import os
@@ -1217,90 +1217,6 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
             f"Data read from: {state_path} is not compatible with ServerState"
         )
 
-class ServerStateHandler:
-    def __init__(self, 
-                 logger: Logger,
-                 stop_on_fail: bool = True,
-        awake: bool = False,
-        server_state_path: Union[str, Path] = SERVER_STATE_PATH,) -> None:
-        self.logger = logger
-        self.stop_on_fail: bool = stop_on_fail
-        self.awake: bool = awake
-        self.state_path: Union[str, Path] = server_state_path
-        #Server state
-        self.server_pid: Optional[int] = os.getpid()
-        self.worker_state: WorkerState = WorkerState(
-            task='inactive',
-            current_run_id=None,
-            working_pid=None,
-            exception=None
-        )
-        self.daemon_state: DaemonState = DaemonState(
-            awake=awake,
-            stop_on_fail=stop_on_fail,
-            supervisor_pid=None
-        )
-        self.logger.info('Server State Handler Initialised')
-
-    def get_state(self) -> ServerState:
-        return ServerState(
-            server_pid=self.server_pid,
-            daemon_state=self.daemon_state,
-            worker_state=self.worker_state,
-        )
-
-    def set_state(
-        self,
-        server: Optional[ServerState] = None,
-        daemon: Optional[DaemonState] = None,
-        worker: Optional[WorkerState] = None,
-    ) -> None:
-        if server is not None:
-            self.logger.info('Setting server state')
-            self.server_pid = server["server_pid"]
-            daemon = server["daemon_state"]
-            worker = server["worker_state"]
-        if daemon is not None:
-            self.logger.info('Setting Daemon state')
-            self.daemon_state = daemon
-        if worker is not None:
-            self.logger.info('Setting worker state')
-            self.worker_state = worker
-
-    def save_state(
-        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
-    ):
-        if out_path is None:
-            out_path = self.state_path
-        elif Path(out_path).exists() and not timestamp:
-            self.logger.warning(f"Overwriting existing state file: {out_path}")
-
-        if timestamp:
-            out_path = timestamp_path(out_path)
-
-        with open(out_path, "w") as f:
-            json.dump(self.get_state(), f)
-
-        self.logger.info(f"Saved state to: {out_path}")
-
-    def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
-        if in_path is None:
-            in_path = self.state_path
-        elif not Path(in_path).exists():
-            self.logger.warning(
-                f"No existing state found at {in_path}. Load unsuccessful."
-            )
-            return
-
-        try:
-            self.set_state(read_server_state(self.state_path))
-            self.logger.info(f"Loaded state from: {self.state_path}")
-        except Exception as e:
-            self.logger.warning(
-                f"Ran into an error when loading state: {e}\nloading abandoned"
-            )
-
-
 Process_states: TypeAlias = Union[WorkerState, DaemonState, ServerState]
 # if TYPE_CHECKING:
 
@@ -1318,11 +1234,10 @@ class DaemonProtocol(Protocol):
         stop_worker: bool = False,
     ) -> None: ...
 
-
 class WorkerProtocol(Protocol):
     # only making certain methods visible
     def cleanup(self) -> None: ...
-    def start(self) ->None: ...
+    def start(self) -> None: ...
 
 class ServerContextProtocol(Protocol):
     def save_state(self) -> None: ...
@@ -1340,7 +1255,9 @@ class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
     # Testing
     def get_daemon(self) -> DaemonProtocol: ...
+    def get_daemon_state(self) -> DaemonState: ...
     def get_worker(self) -> WorkerProtocol: ...
+    def get_worker_state(self) -> WorkerState: ...
     def get_server_context(self) -> ServerContextProtocol: ...
 
 
@@ -1360,7 +1277,9 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     QueManager.register("get_que")
     # Testing
     QueManager.register("get_worker")
+    QueManager.register("get_worker_state", proxytype=DictProxy)
     QueManager.register("get_daemon")
+    QueManager.register("get_daemon_state", proxytype=DictProxy)
     QueManager.register("get_server_context")
 
     for _ in range(max_retries):
