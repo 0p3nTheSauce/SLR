@@ -199,7 +199,7 @@ def test_create():
 
 
 def test_is_daemon_state():
-    from .core2 import is_daemon_state, DaemonState
+    from .core import is_daemon_state, DaemonState
     
     eg = DaemonState(
         awake=True,
