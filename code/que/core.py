@@ -159,7 +159,7 @@ import logging
 from multiprocessing.managers import BaseManager
 import time
 from datetime import datetime
-
+import os
 # locals
 from run_types import (
     ExpInfo,
@@ -1139,6 +1139,166 @@ class ServerState(TypedDict):
     server_pid: Optional[int]
     daemon_state: DaemonState
     worker_state: WorkerState
+
+
+def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
+    """
+    Check if object is an instance of WorkerState
+    
+    :param obj: Object to check
+    :type obj: Any
+    :return: Boolean based on whether object is worker state
+    :rtype: TypeGuard[WorkerState]
+    """
+    if not isinstance(obj, dict):
+        return False
+    
+    for key, type_ in WorkerState.__annotations__.items():
+        if key not in obj:
+            return False
+        elif not isinstance(obj[key], type_):
+            return False
+        
+    return True
+
+def is_daemon_state(obj: Any) -> TypeGuard[DaemonState]:
+    """
+    Check if object is an instance of DaemonState
+    
+    :param obj: Object to check
+    :type obj: Any
+    :return: Description
+    :rtype: TypeGuard[DaemonState]
+    """
+    if not isinstance(obj, dict):
+        return False
+    
+    for key, type_ in DaemonState.__annotations__.items():
+        if key not in obj:
+            return False
+        elif not isinstance(obj[key], type_):
+            return False
+        
+    return True
+    
+
+def is_server_state(obj: Any) -> TypeGuard[ServerState]:
+    """
+    Type guard to check if an arbitrary object is structurally
+    compatible with the ServerState TypedDict.
+    """
+    
+    if not isinstance(obj, dict):
+        return False
+
+    required_keys = ServerState.__annotations__.keys()
+    if not all(key in obj for key in required_keys):
+        return False
+
+    sp = obj.get('server_pid')
+    if not (sp is None or isinstance(sp, int)):
+        return False
+    
+    if not is_daemon_state(obj.get('daemon_state')):
+        return False
+    
+    if not is_worker_state(obj.get('worker_state')):
+        return False
+    
+    return True
+
+def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
+    with open(state_path, "r") as f:
+        data = json.load(f)
+    if is_server_state(data):
+        return data
+    else:
+        raise ValueError(
+            f"Data read from: {state_path} is not compatible with ServerState"
+        )
+
+class ServerStateHandler:
+    def __init__(self, 
+                 logger: Logger,
+                 stop_on_fail: bool = True,
+        awake: bool = False,
+        server_state_path: Union[str, Path] = SERVER_STATE_PATH,) -> None:
+        self.logger = logger
+        self.stop_on_fail: bool = stop_on_fail
+        self.awake: bool = awake
+        self.state_path: Union[str, Path] = server_state_path
+        #Server state
+        self.server_pid: Optional[int] = os.getpid()
+        self.worker_state: WorkerState = WorkerState(
+            task='inactive',
+            current_run_id=None,
+            working_pid=None,
+            exception=None
+        )
+        self.daemon_state: DaemonState = DaemonState(
+            awake=awake,
+            stop_on_fail=stop_on_fail,
+            supervisor_pid=None
+        )
+        self.logger.info('Server State Handler Initialised')
+
+    def get_state(self) -> ServerState:
+        return ServerState(
+            server_pid=self.server_pid,
+            daemon_state=self.daemon_state,
+            worker_state=self.worker_state,
+        )
+
+    def set_state(
+        self,
+        server: Optional[ServerState] = None,
+        daemon: Optional[DaemonState] = None,
+        worker: Optional[WorkerState] = None,
+    ) -> None:
+        if server is not None:
+            self.logger.info('Setting server state')
+            self.server_pid = server["server_pid"]
+            daemon = server["daemon_state"]
+            worker = server["worker_state"]
+        if daemon is not None:
+            self.logger.info('Setting Daemon state')
+            self.daemon_state = daemon
+        if worker is not None:
+            self.logger.info('Setting worker state')
+            self.worker_state = worker
+
+    def save_state(
+        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+    ):
+        if out_path is None:
+            out_path = self.state_path
+        elif Path(out_path).exists() and not timestamp:
+            self.logger.warning(f"Overwriting existing state file: {out_path}")
+
+        if timestamp:
+            out_path = timestamp_path(out_path)
+
+        with open(out_path, "w") as f:
+            json.dump(self.get_state(), f)
+
+        self.logger.info(f"Saved state to: {out_path}")
+
+    def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
+        if in_path is None:
+            in_path = self.state_path
+        elif not Path(in_path).exists():
+            self.logger.warning(
+                f"No existing state found at {in_path}. Load unsuccessful."
+            )
+            return
+
+        try:
+            self.set_state(read_server_state(self.state_path))
+            self.logger.info(f"Loaded state from: {self.state_path}")
+        except Exception as e:
+            self.logger.warning(
+                f"Ran into an error when loading state: {e}\nloading abandoned"
+            )
 
 
 Process_states: TypeAlias = Union[WorkerState, DaemonState, ServerState]
