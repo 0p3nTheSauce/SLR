@@ -156,11 +156,12 @@ class Daemon:
         )
 
     def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None:
-        if self.worker_process is not None and self.worker_process.is_alive():
-            self.logger.info("Signaling worker to stop...")
+        self.logger.info("Signaling worker to stop...")
 
-            # 1. Signal the event
-            self.stop_worker_event.set()
+        # 1. Signal the event
+        self.stop_worker_event.set()
+        
+        if self.worker_process is not None and self.worker_process.is_alive():
 
             # 2. Wait for it to finish gracefully
             self.worker_process.join(timeout=timeout)
@@ -187,6 +188,10 @@ class Daemon:
     ) -> None:
         """Gracefully stop the supervisor process"""
         
+        if stop_worker:
+            self.stop_worker(timeout=timeout, hard=hard)
+
+        
         if self.supervisor_process and self.supervisor_process.is_alive():
             self.logger.info("Signaling supervisor to stop...")
 
@@ -212,9 +217,7 @@ class Daemon:
             self.supervisor_process = None
             self.supervisor_pid = None
             
-        if stop_worker:
-            self.stop_worker(timeout=timeout, hard=hard)
-
+        
 
 
 # --- Manager Registration ---

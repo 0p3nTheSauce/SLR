@@ -114,10 +114,12 @@ class QueShell(cmdLib.Cmd):
         self.server_context._close()#type: ignore
         self.que._close()#type: ignore
         self.daemon._close()#type: ignore
+        self.worker._close()#type: ignore
         server = connect_manager()
         self.server_context = server.get_server_context()
         self.que = server.get_que()
         self.daemon = server.get_daemon()
+        self.worker = server.get_worker()
 
     # Cmd overrides
 
