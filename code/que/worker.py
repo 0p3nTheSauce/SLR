@@ -251,7 +251,7 @@ class Worker:
         manager = connect_manager()
         self.server_context = manager.get_server_context()
         self.que = manager.get_que()
-
+        
         self.working_pid = os.getpid()
 
         logging.basicConfig(
