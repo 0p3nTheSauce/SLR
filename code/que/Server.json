@@ -1,1 +1,1 @@
-{"server_pid": 1078376, "daemon_state": {"awake": true, "stop_on_fail": true, "supervisor_pid": 1080282}, "worker_state": {"task": "training", "current_run_id": "n27qc5m6", "working_pid": 1080298, "exception": null}}
+{"server_pid": 1603758, "daemon_state": {"awake": false, "stop_on_fail": true, "supervisor_pid": null}, "worker_state": {"task": "inactive", "current_run_id": null, "working_pid": null, "exception": null}}
