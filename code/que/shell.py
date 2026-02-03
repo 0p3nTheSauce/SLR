@@ -145,7 +145,7 @@ class QueShell(cmdLib.Cmd):
             except (EOFError, ConnectionError, BrokenPipeError, OSError):
                 self.console.print("[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again.[/bold yellow]")
                 return False
-        return False
+
 
     def _show_banner(self):
         """Display a fancy welcome banner"""
