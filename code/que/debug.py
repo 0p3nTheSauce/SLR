@@ -198,6 +198,30 @@ def test_create():
         print("oops")
 
 
+def test_is_daemon_state():
+    from .core2 import is_daemon_state, DaemonState
+    
+    eg = DaemonState(
+        awake=True,
+        stop_on_fail=True,
+        supervisor_pid=None
+    )
+    
+    beg = {
+        'stop_on_fail': True,
+        'supervisor_pid': 1
+    }
+    
+    beg1 = {
+        'awake': 1,
+        'stop_on_fail': True,
+        'supervisor_pid': 1
+    }
+    
+    print(is_daemon_state(eg))
+    print(is_daemon_state(beg))
+    print(is_daemon_state(beg1))
+
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -217,5 +241,5 @@ if __name__ == '__main__':
     # daemon_start_supervisor()
     # daemon_stop_supervisor(t=1, hard=True)
     # try_except_finally()
-    test_create()
-    
+    # test_create()
+    test_is_daemon_state()

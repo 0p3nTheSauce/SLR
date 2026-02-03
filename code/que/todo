@@ -1,3 +1,5 @@
+- make better state handling for worker, eg dedicated class such as que
+
 Shell:
 - improved exception handling
 - add logging for server main logger

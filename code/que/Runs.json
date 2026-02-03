@@ -571,7 +571,8 @@
             }
         }
     ],
-    "cur_run": [
+    "cur_run": [],
+    "old_runs": [
         {
             "admin": {
                 "model": "Swin3D_S",
@@ -627,10 +628,71 @@
                     "exp-000"
                 ],
                 "run_id": "n27qc5m6"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 24.665804225959466,
+                "best_val_loss": 5.074488001158714,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.0885,
+                        "top5": 0.24925,
+                        "top10": 0.37245
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.08795309168443496,
+                        "top5": 0.2515991471215352,
+                        "top10": 0.3747334754797441
+                    },
+                    "average_loss": 5.114385279274591
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.0885,
+                        "top5": 0.24925,
+                        "top10": 0.37245
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.08795309168443496,
+                        "top5": 0.2515991471215352,
+                        "top10": 0.3747334754797441
+                    },
+                    "average_loss": 5.114385279274591
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.02758333333333333,
+                        "top5": 0.10128333333333334,
+                        "top10": 0.16461666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.025053304904051173,
+                        "top5": 0.09914712153518124,
+                        "top10": 0.16204690831556504
+                    },
+                    "average_loss": 7.132904426145084,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
             }
-        }
-    ],
-    "old_runs": [
+        },
         {
             "admin": {
                 "model": "Swin3D_B",

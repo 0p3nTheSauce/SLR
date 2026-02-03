@@ -125,9 +125,7 @@ def get_wlasl_info(
 class VideoDataset(Dataset):
     def __init__(
         self,
-        root: Path,
-        instances_path: Path,
-        classes_path: Path,
+        set_info: DataSetInfo,
         num_frames: Optional[int] = None,
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         item_transforms: Optional[
@@ -157,14 +155,21 @@ class VideoDataset(Dataset):
         :param all_frames: Boolean flag to instead keep all the flags
         :type all_frames: bool
         """
-        if not root.exists():
-            raise FileNotFoundError(f"Root directory {root} does not exist.")
-        else:
-            self.root = root
+        self.root = set_info["root"]
+        if not self.root.exists():
+            raise FileNotFoundError(f"Root directory {self.root} does not exist.")
         self.transforms = transforms
         self.num_frames = num_frames
         self.include_meta = include_meta
         self.item_transforms = item_transforms
+        instances_path = (
+            set_info["labels"]
+            / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
+        )
+        classes_path = (
+            set_info["labels"]
+            / f"{set_info['set_name']}_classes_{set_info['label_suff']}"
+        )
         self.data = load_data_from_json(instances_path)
         with open(classes_path, "r") as f:
             self.classes = json.load(f)
@@ -234,49 +239,18 @@ def _crop_frames(frames, item):
     return crop_frames(frames, item["bbox"])
 
 
-Cropping_Strategy: TypeAlias = Literal["bbox", "Centre", "Random", "Default"]
+Cropping_Strategy: TypeAlias = Literal["Centre", "Random"]
 
-
-def get_data_set(
-    set_info: DataSetInfo,
+def get_transform(
     norm_dict: Optional[NormDict] = None,
     frame_size: Optional[int] = None,
-    num_frames: Optional[int] = None,
     shuffle: bool = False,
-    resize_by_diagonal: bool = False,
-    cropping: Literal["Bbox", "Centre", "Random", "Default"] = "Default",
-) -> Tuple[VideoDataset, int, Optional[List[int]], Optional[float]]:
-    """
-    Get the training, val or test set. Optionally, load frames unchanged.
-
-    :param set_info: Dictionary containing information to load the dataset.
-    :type set_info: DataSetInfo
-    :param norm_dict: Dictionary containing mean and standard deviation. If None, don't apply normalisation.
-    :type norm_dict: Optional[NormDict]
-    :param frame_size: Length of Square frame. If None, no cropping applied.
-    :type frame_size: int
-    :param num_frames: Number of frames.
-    :type num_frames: int
-    :param shuffle: Whether to shuffle frames. Defaults to False.
-    :type shuffle: bool
-    :param resize_by_diagonal: Resize frame so person bounding box diagonal equals target_diagonal (in this case 256). (as per wlasl)
-    :type resize_by_diagonal: bool
-    :param cropping: Strategy to crop frames. Cut out the:
-        - Bounding box (minimum of person)
-        - Centre (frame size) 
-        - Random (frame size) 
-        - Default Random for train and Centre for testing/validation (frame size)
-    :type cropping: Literal['Bbox', 'Centre', 'Random', 'Default']
-    :return: dataset, number of classes, permutation and shannon entropy
-    :rtype: Tuple[VideoDataset, int, List[int] | None, float | None]
-    """
-    # item_transform(frames, item) -> frames
-    item_transforms = None
-    if resize_by_diagonal:
-        item_transforms = _resize_by_diagonal
-    elif cropping == "Bbox":
-        item_transforms = _crop_frames
-
+    num_frames: Optional[int] = None,
+    crop: Optional[Cropping_Strategy] = None
+    ) -> Tuple[Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]]:
+    
+    
+    
     # transform(frames) -> frames
     if shuffle:
         assert num_frames is not None, "num_frames must be specified if shuffle is True"
@@ -306,18 +280,11 @@ def get_data_set(
                 v2.Lambda(_permute_time_channel),
             ]
         )
-
     transform = final_transform
 
     if frame_size is not None:
-        if cropping == "Default":
-            if set_info["set_name"] == "train":
-                crop = "Random"
-            else:
-                crop = "Centre"
-        else:
-            crop = cropping
-
+        assert crop is not None, f'Specify crop, one of {Cropping_Strategy}'
+        
         if crop == "Random":
             transform = v2.Compose(
                 [
@@ -328,26 +295,75 @@ def get_data_set(
             )
         elif crop == "Centre":
             transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
+            
+    return transform, perm, sh_e
 
-    instances = (
-        set_info["labels"]
-        / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
-    )
-    classes = (
-        set_info["labels"] / f"{set_info['set_name']}_classes_{set_info['label_suff']}"
+
+
+def get_data_set(
+    set_info: DataSetInfo,
+    norm_dict: Optional[NormDict] = None,
+    frame_size: Optional[int] = None,
+    num_frames: Optional[int] = None,
+    shuffle: bool = False,
+    resize_by_diagonal: bool = False,
+    cropping: Literal["Bbox", "Centre", "Random", "Default"] = "Default",
+) -> Tuple[VideoDataset, Optional[List[int]], Optional[float]]:
+    """
+    Get the training, val or test set. Optionally, load frames unchanged.
+
+    :param set_info: Dictionary containing information to load the dataset.
+    :type set_info: DataSetInfo
+    :param norm_dict: Dictionary containing mean and standard deviation. If None, don't apply normalisation.
+    :type norm_dict: Optional[NormDict]
+    :param frame_size: Length of Square frame. If None, no cropping applied.
+    :type frame_size: int
+    :param num_frames: Number of frames.
+    :type num_frames: int
+    :param shuffle: Whether to shuffle frames. Defaults to False.
+    :type shuffle: bool
+    :param resize_by_diagonal: Resize frame so person bounding box diagonal equals target_diagonal (in this case 256). (as per wlasl)
+    :type resize_by_diagonal: bool
+    :param cropping: Strategy to crop frames. Cut out the:
+        - Bounding box (minimum of person)
+        - Centre (frame size)
+        - Random (frame size)
+        - Default Random for train and Centre for testing/validation (frame size)
+    :type cropping: Literal['Bbox', 'Centre', 'Random', 'Default']
+    :return: dataset, permutation and shannon entropy
+    :rtype: Tuple[VideoDataset, List[int] | None, float | None]
+    """
+    # item_transform(frames, item) -> frames
+    item_transforms = None
+    if resize_by_diagonal:
+        item_transforms = _resize_by_diagonal
+    elif cropping == "Bbox":
+        item_transforms = _crop_frames
+
+    if cropping == 'Default':
+        crop = 'Random' if set_info['set_name'] == 'train' else 'Centre'
+    elif cropping == 'Bbox':
+        crop = None
+    else:
+        crop = cropping
+
+    # transform(frames) -> frames
+    transform, perm, sh_e = get_transform(
+        norm_dict,
+        frame_size,
+        shuffle,
+        num_frames,
+        crop=crop
     )
 
     dataset = VideoDataset(
-        set_info["root"],
-        instances,
-        classes,
+        set_info,
         num_frames=num_frames,
         transforms=transform,
         item_transforms=item_transforms,
     )
-    num_classes = len(set(dataset.classes))
 
-    return dataset, num_classes, perm, sh_e
+    return dataset, perm, sh_e
 
 
 if __name__ == "__main__":
