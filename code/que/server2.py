@@ -1,5 +1,5 @@
 from multiprocessing import Event
-
+from multiprocessing.managers import DictProxy
 # from multiprocessing.managers import BaseManager
 import multiprocessing as mp
 import logging
@@ -28,7 +28,6 @@ from .core import (
     WorkerState,
     DaemonState,
     read_server_state,
-    ServerStateHandler,
     # Process_states
 )
 from .daemon2 import Daemon, DaemonState
@@ -161,8 +160,8 @@ class ServerContext:
     def get_state(self) -> ServerState:
         return ServerState(
             server_pid=self.server_pid,
-            daemon_state=self.daemon.get_state(),
-            worker_state=self.worker.get_state(),
+            daemon_state=self.daemon.state,
+            worker_state=self.worker.state,
         )
 
     def set_state(
@@ -176,9 +175,9 @@ class ServerContext:
             daemon = server["daemon_state"]
             worker = server["worker_state"]
         if daemon is not None:
-            self.daemon.set_state(daemon)
+            self.daemon.state = daemon
         if worker is not None:
-            self.worker.set_state(worker)
+            self.worker.state = worker
 
     def save_state(
         self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
@@ -243,8 +242,20 @@ def setup_manager():
     )
 
     QueManager.register(
+        "get_daemon_state",
+        callable=lambda: context.daemon.state,
+        proxytype=DictProxy,
+    )
+
+    QueManager.register(
         "get_worker",
         callable=lambda: context.worker,
+    )
+    
+    QueManager.register(
+        "get_worker",
+        callable=lambda: context.worker.state,
+        proxytype=DictProxy,
     )
 
 
