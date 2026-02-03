@@ -133,10 +133,19 @@ class QueShell(cmdLib.Cmd):
             try:
                 self._reconnect_proxies()
                 self.console.print("[bold green][OK][/bold green] Reconnected!\n")
-                return super().onecmd(line)
             except Exception as reconnect_error:
                 self.console.print(f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}")
-            return False  # Don't stop the cmdloop
+                return False
+
+            # Retry is now outside the inner try/except, so if it fails
+            # it loops back to the top-level handler on the next onecmd call
+            # instead of being misreported as a reconnection failure.
+            try:
+                return super().onecmd(line)
+            except (EOFError, ConnectionError, BrokenPipeError, OSError):
+                self.console.print("[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again.[/bold yellow]")
+                return False
+        return False
 
     def _show_banner(self):
         """Display a fancy welcome banner"""
