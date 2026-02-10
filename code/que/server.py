@@ -154,8 +154,8 @@ class ServerContext:
     ) -> None:
         if server is not None:
             self.server_pid = server["server_pid"]
-            daemon = server["daemon_state"]
-            worker = server["worker_state"]
+            self.daemon.set_state(server["daemon_state"])
+            self.worker.set_state(server["worker_state"])
         if daemon is not None:
             self.daemon.set_state(daemon)
         if worker is not None:

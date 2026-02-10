@@ -55,7 +55,9 @@ class Daemon:
         self.state = state
         if self.state['awake']:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
-            self.start_supervisor()
+            self.logger.warning("There was likely a power outage/system failure which triggered this")
+            #it is likely cur_run will have a run in it, so we must recover this run
+            self.start_supervisor(recover_run=True)
 
     def monitor_worker(self) -> bool:
         """
@@ -108,13 +110,21 @@ class Daemon:
             self.supervisor_process.terminate()
             self.supervisor_process.join()
 
-    def supervise(self) -> None:
+    def supervise(self, recover_run: bool =False) -> None:
         """
-        This runs inside the CHILD process.
+        This runs inside the CHILD process. It is naturally triggered by start_supervisor
         The worker process is started and monitored here. After it completes successfully, it is restarted.
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
+        :param self: Daemon
+        :param recover_run: Boolean flag to first recover the run in cur_run, before launching the worker. 
+        :type recover_run: bool
         """
         manager = connect_manager()
+        
+        if recover_run:
+            que = manager.get_que()
+            que.recover_run()
+        
         self.state = manager.get_daemon_state()
         self.worker.state = manager.get_worker_state()
         self._reattach_server_logger()
@@ -149,8 +159,14 @@ class Daemon:
         self.state['supervisor_pid'] = None
         
 
-    def start_supervisor(self) -> None:
-        """Start the supervisor process"""
+    def start_supervisor(self, recover_run: bool = False) -> None:
+        """
+        Start the supervisor process
+        
+        :param self: Daemon
+        :param recover_run: Boolean flag to first recover the run in cur_run, before launching the worker. 
+        :type recover_run: bool
+        """
         if self.supervisor_process and self.supervisor_process.is_alive():
             self.logger.warning("Supervisor is already running.")
             return
@@ -160,7 +176,7 @@ class Daemon:
         self.state['awake'] = True
         
 
-        self.supervisor_process = Process(target=self.supervise)
+        self.supervisor_process = Process(target=self.supervise, args=(recover_run,))
         self.supervisor_process.start()
         self.state['supervisor_pid'] = self.supervisor_process.pid
         self.logger.info(
