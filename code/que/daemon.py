@@ -37,7 +37,7 @@ class Daemon:
     
     def _reattach_server_logger(self):
         """Re-attach the server log file handler in a spawned child process."""
-        logger = logging.getLogger(WORKER_NAME)
+        logger = logging.getLogger(DAEMON_NAME)
         if not logger.handlers:  # avoid duplicate handlers on repeated calls
             handler = logging.FileHandler(SERVER_LOG_PATH)
             handler.setLevel(logging.DEBUG)
