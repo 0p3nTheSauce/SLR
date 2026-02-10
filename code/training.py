@@ -36,13 +36,13 @@ def setup_data(
     train_info = get_wlasl_info(config["admin"]["split"], set_name="train")
     val_info = get_wlasl_info(config["admin"]["split"], set_name="val")
 
-    train_dataset, num_t_classes, _, _ = get_data_set(
+    train_dataset, _, _ = get_data_set(
         set_info=train_info,
         norm_dict=norm_dict,
         frame_size=config["data"]["frame_size"],
         num_frames=config["data"]["num_frames"],
     )
-    val_dataset, num_v_classes, _, _ = get_data_set(
+    val_dataset, _, _ = get_data_set(
         set_info=val_info,
         norm_dict=norm_dict,
         frame_size=config["data"]["frame_size"],
@@ -66,11 +66,11 @@ def setup_data(
         drop_last=False,
     )
 
-    assert num_t_classes == num_v_classes, (
-        f"Number of training classes: {num_t_classes} does not match number of validation classes: {num_v_classes}"
+    assert train_dataset.classes == val_dataset.classes, (
+        f"Number of training classes: {train_dataset.classes} does not match number of validation classes: {val_dataset.classes}"
     )
     dataloaders = {"train": train_loader, "val": val_loader}
-    return dataloaders, num_t_classes
+    return dataloaders, train_dataset.classes
 
 
 def get_scheduler(

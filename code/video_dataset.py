@@ -298,8 +298,6 @@ def get_transform(
             
     return transform, perm, sh_e
 
-
-
 def get_data_set(
     set_info: DataSetInfo,
     norm_dict: Optional[NormDict] = None,

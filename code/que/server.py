@@ -1,5 +1,5 @@
 from multiprocessing import Event
-
+from multiprocessing.managers import DictProxy
 # from multiprocessing.managers import BaseManager
 import multiprocessing as mp
 import logging
@@ -27,60 +27,11 @@ from .core import (
     ServerState,
     WorkerState,
     DaemonState,
+    read_server_state,
     # Process_states
 )
 from .daemon import Daemon, DaemonState
 from .worker import Worker, WorkerState
-
-
-def is_server_state(val: Any) -> TypeGuard[ServerState]:
-    """
-    Type guard to check if an arbitrary value is structurally
-    compatible with the ServerState TypedDict.
-    """
-    # 1. Check if the value is a dictionary
-    if not isinstance(val, dict):
-        return False
-
-    # 2. Check for the presence of all required keys
-    # Since all keys are technically *optional* in the Python dictionary sense
-    # but *required* by TypedDict (unless explicitly marked NotRequired),
-    # we check for all keys listed in the TypedDict.
-    required_keys = ServerState.__annotations__.keys()
-    if not all(key in val for key in required_keys):
-        return False
-
-    # 3. Check the type of each value
-    # We use .get() here defensively, although the previous check makes it safe
-    # to use val[key].
-
-    # Check 'pid' and 'worker_pid' (Optional[int])
-    if not (val.get("pid") is None or isinstance(val["pid"], int)):
-        return False
-
-    if not (val.get("worker_pid") is None or isinstance(val["worker_pid"], int)):
-        return False
-
-    # Check 'stop_on_fail' and 'awake' (bool)
-    if not isinstance(val.get("stop_on_fail"), bool):
-        return False
-
-    if not isinstance(val.get("awake"), bool):
-        return False
-
-    # If all checks pass, it is a DaemonState
-    return True
-
-
-def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
-    with open(state_path, "r") as f:
-        data = json.load(f)
-    if is_server_state(data):
-        return data
-    else:
-        raise ValueError(
-            f"Data read from: {state_path} is not compatible with DaemonState"
-        )
 
 
 class ServerContext:
@@ -100,11 +51,9 @@ class ServerContext:
         # context attributes
         self.save_on_shutdown: bool = save_on_shutdown
         self.cleanup_timeout: float = cleanup_timeout
-        self.stop_on_fail: bool = stop_on_fail
-        self.awake: bool = awake
         self.state_path: Union[str, Path] = server_state_path
 
-        # Pids
+        # # Pids
         self.server_pid: Optional[int] = os.getpid()
 
         # spawn for CUDA context
@@ -115,7 +64,7 @@ class ServerContext:
         signal.signal(signal.SIGINT, self._handle_shutdown)
 
         # logging
-        que_logger, daemon_logger, server_logger, worker_logger, training_logger = (
+        que_logger, daemon_logger, server_logger, worker_logger = (
             self._setup_logging()
         )
         self.server_logger = server_logger
@@ -124,42 +73,32 @@ class ServerContext:
         self.stop_worker_event = Event()
         self.stop_daemon_event = Event()
 
+
         # Classes
-        self.load_state()
         self.que = Que(logger=que_logger)
         self.worker = Worker(
-            server_logger=worker_logger, training_logger=training_logger, que=self.que, stop_event=self.stop_worker_event
+            server_logger=worker_logger, que=self.que, stop_event=self.stop_worker_event,
+            state=WorkerState(
+            task='inactive',
+            current_run_id=None,
+            working_pid=None,
+            exception=None
+        )
         )
         self.daemon = Daemon(
-            awake=self.awake,
-            stop_on_fail=self.stop_on_fail,
             worker=self.worker,
             logger=daemon_logger,
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
+            state=DaemonState(
+            awake=awake,
+            stop_on_fail=stop_on_fail,
+            supervisor_pid=None
         )
-
-    def _setup_training_logger(self) -> logging.Logger:
-        """Sets up a dedicated training logger with its own file handler."""
-        training_logger = logging.getLogger(TRAINING_NAME)
-
-        # Create a separate file handler for the training logger
-        training_file_handler = logging.FileHandler(TRAINING_LOG_PATH)
-        training_file_handler.setLevel(logging.INFO)
-        training_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
         )
-        training_file_handler.setFormatter(training_formatter)
+        self.load_state()
 
-        # Add the handler to the training logger
-        training_logger.addHandler(training_file_handler)
-
-        # IMPORTANT: Prevent the training logger from propagating to the root logger
-        # This stops it from also writing to server.log
-        training_logger.propagate = False
-        return training_logger
-
-    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger, Logger]:
+    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger]:
         """Sets up loggers for the server components."""
         logging.basicConfig(
             level=logging.DEBUG,
@@ -171,9 +110,8 @@ class ServerContext:
         dn_logger = logging.getLogger(DAEMON_NAME)
         server_logger = logging.getLogger(SERVER_NAME)
         worker_logger = logging.getLogger(WORKER_NAME)
-        training_logger = self._setup_training_logger()
 
-        return que_logger, dn_logger, server_logger, worker_logger, training_logger
+        return que_logger, dn_logger, server_logger, worker_logger
 
     def _handle_shutdown(self, signum, frame):
         """Handle SIGTERM/SIGINT for graceful shutdown"""
@@ -183,15 +121,18 @@ class ServerContext:
         )
 
         try:
-            if self.save_on_shutdown:
-                self.server_logger.info("Saving server state...")
-                self.save_state()
-
+            self.server_pid = None
             self.server_logger.info("Stopping daemon and worker...")
             self.daemon.stop_supervisor(
                 timeout=self.cleanup_timeout, hard=False, stop_worker=True
             )
 
+            if self.save_on_shutdown:
+                self.server_logger.info("Saving server state...")
+                self.daemon.state["awake"] = False #if being stopped by signal, probably don't want to be awake when restarted
+                self.server_pid = None #similarly, we have no need to save an old pid
+                self.save_state()
+            
             self.server_logger.info("Graceful shutdown complete")
         except Exception as e:
             self.server_logger.error(f"Error during shutdown: {e}", exc_info=True)
@@ -246,11 +187,15 @@ class ServerContext:
             return
 
         try:
-            self.set_state(read_server_state(self.state_path))
+            # self.set_state(read_server_state(self.state_path))
+            state = read_server_state(self.state_path)
+            state["server_pid"] = self.server_pid #do not reset server_pid after loading
+            self.set_state(state)
             self.server_logger.info(f"Loaded state from: {self.state_path}")
         except Exception as e:
             self.server_logger.warning(
-                f"Ran into an error when loading state: {e}\nloading abandoned"
+                f"Ran into an error when loading state: {e}\nloading abandoned",
+                exc_info=True
             )
 
 
@@ -283,8 +228,20 @@ def setup_manager():
     )
 
     QueManager.register(
+        "get_daemon_state",
+        callable=lambda: context.daemon.state,
+        proxytype=DictProxy,
+    )
+
+    QueManager.register(
         "get_worker",
         callable=lambda: context.worker,
+    )
+    
+    QueManager.register(
+        "get_worker_state",
+        callable=lambda: context.worker.state,
+        proxytype=DictProxy,
     )
 
 
@@ -299,7 +256,6 @@ def start_server():
     s = m.get_server()
 
     print("Object Server started on localhost:50000")
-    print("Exposed Objects: ServerStateHandler, ServerController")
 
     try:
         s.serve_forever()
