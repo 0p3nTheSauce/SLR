@@ -877,7 +877,8 @@ class Que:
         self,
         to_loc: QueLocation = TO_RUN,
         from_loc: QueLocation = CUR_RUN,
-        index: int = 0
+        index: int = 0,
+        clean_slate: bool = False
     ) -> None:
         """
         Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
@@ -888,13 +889,20 @@ class Que:
         :type from_loc: QueLocation
         :param index: Index of run to recover
         :type index: int
+        :param clean_slate: Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.  
+        :type clean_state: bool
         """
+        self.logger.debug(f"clean slate is set to: {clean_slate}")
         with log_and_raise(self.logger, "recover"):
             run = self.peak_run(from_loc, index)
             
-            
-            run["admin"]["recover"] = True
-            
+            if not clean_slate:
+                self.logger.debug("setting recover to True")
+                run["admin"]["recover"] = True
+            else:
+                #ensure recover is false (e.g. run was set to recover then failed)
+                self.logger.debug("Ensuring recover is False")
+                run["admin"]["recover"] = False
 
             if from_loc == FAIL_RUNS:
                 # remove error
@@ -908,7 +916,7 @@ class Que:
                     early_stopping=run["early_stopping"],
                     wandb=run["wandb"],
                 )
-            elif run["wandb"]["run_id"] is None:  # NOTE: run id is currently required for recovery
+            elif run["wandb"]["run_id"] is None and not clean_slate:  # NOTE: run id is currently required for recovery
                 raise QueException("Run was set to recover, but no run id was provided")
             
             _ = self._pop_run(from_loc, index)
@@ -1054,6 +1062,24 @@ class Que:
         key2: Optional[str] = None,
         do_eval: bool = False
     ) -> None:
+        """
+        Edit a run in the Que
+        
+        :param self: Que
+        :param loc: Location to edit
+        :type loc: QueLocation
+        :param idx: Index of run in location
+        :type idx: int
+        :param key1: First level key of run config dictionary
+        :type key1: str
+        :param value: Value to use as replacement for original value
+        :type value: Any
+        :param key2: Optionally provide second level key
+        :type key2: Optional[str]
+        :param do_eval: Evaluate the provided value to a type (other wise defaults to string)
+        :type do_eval: bool
+        """
+        
         with log_and_raise(self.logger, "edit"):
             run = self._pop_run(loc, idx)
             if do_eval:

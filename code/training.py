@@ -66,11 +66,11 @@ def setup_data(
         drop_last=False,
     )
 
-    assert train_dataset.classes == val_dataset.classes, (
-        f"Number of training classes: {train_dataset.classes} does not match number of validation classes: {val_dataset.classes}"
+    assert train_dataset.num_classes == val_dataset.num_classes, (
+        f"Number of training classes: {train_dataset.num_classes} does not match number of validation classes: {val_dataset.num_classes}"
     )
     dataloaders = {"train": train_loader, "val": val_loader}
-    return dataloaders, train_dataset.classes
+    return dataloaders, train_dataset.num_classes
 
 
 def get_scheduler(

@@ -1,1 +1,1 @@
-{"server_pid": null, "daemon_state": {"awake": false, "stop_on_fail": true, "supervisor_pid": null}, "worker_state": {"task": "inactive", "current_run_id": null, "working_pid": null, "exception": "Run ID is required for recovery but could not be found."}}
+{"server_pid": 126653, "daemon_state": {"awake": true, "stop_on_fail": true, "supervisor_pid": 127298}, "worker_state": {"task": "training", "current_run_id": "rdmmkptp", "working_pid": 127331, "exception": null}}

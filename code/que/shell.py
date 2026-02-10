@@ -299,6 +299,7 @@ class QueShell(cmdLib.Cmd):
                     from_loc=parsed_args.o_location,
                     to_loc=parsed_args.n_location,
                     index=parsed_args.index,
+                    clean_slate=parsed_args.clean_slate
                 )
 
     def do_clear(self, arg):
@@ -751,6 +752,13 @@ class QueShell(cmdLib.Cmd):
             default=0,
             help="Index of run to recover (default: 0)",
         )
+        parser.add_argument(
+            "--clean_slate",
+            "-cs",
+            action='store_true',
+            help="Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work."
+        )
+
 
         return parser
 
