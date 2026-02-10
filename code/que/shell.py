@@ -276,14 +276,14 @@ class QueShell(cmdLib.Cmd):
                 "Que state loaded from file", "Failed to load Que state from file"
             ):
                 self.que.load_state(parsed_args.Input_Path)
-        elif parsed_args.command == "daemon":
+        elif parsed_args.command == "server":
             with self.unwrap_exception(
-                "Daemon state loaded from file", "Failed to load daemon state from file"
+                "Server state loaded from file", "Failed to load server state from file"
             ):
                 self.server_context.load_state()
         else:
             raise ValueError(
-                "neither Que nor Daemon specified, this should not be possible"
+                "neither Que nor Server specified, this should not be possible"
             )
 
         # self.console.print("[bold green]✓[/bold green] Queue state loaded from file")
@@ -477,16 +477,15 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        self.que.edit_run(
-            parsed_args.location,
-            parsed_args.index,
-            parsed_args.key1,
-            parsed_args.value,
-            parsed_args.key2,
-        )
-        self.console.print(
-            f"[bold green]✓[/bold green] Edited run {parsed_args.index} in {parsed_args.location}"
-        )
+        with self.unwrap_exception("Edit successful", "Edit failed"): 
+            self.que.edit_run(
+                parsed_args.location,
+                parsed_args.index,
+                parsed_args.key1,
+                parsed_args.value,
+                parsed_args.key2,
+                parsed_args.do_eval
+            )
 
     def do_wandb(self, arg):
         """Open the wandb page for a run"""
@@ -503,7 +502,8 @@ class QueShell(cmdLib.Cmd):
         else:
             url = url + f"{parsed_args.entity}/{parsed_args.project}"
         
-        webbrowser.open(url)
+        with self.unwrap_exception("Wandb opened successfully", "Opening wandb failed"):
+            webbrowser.open(url)
         
         
         
@@ -789,7 +789,7 @@ class QueShell(cmdLib.Cmd):
         )
 
         # Que Subparser
-        que_load = subparsers.add_parser("que", aliases=["-q"], help="Load Que state")
+        que_load = subparsers.add_parser("que", help="Load Que state")
         que_load.add_argument(
             "--Input_Path",
             "-ip",
@@ -799,7 +799,7 @@ class QueShell(cmdLib.Cmd):
         )
 
         # Daemon Subparser
-        subparsers.add_parser("daemon", aliases=["-d"], help="Load Daemon state")
+        subparsers.add_parser("server", help="Load Server state")
         # TODO: Maybe add this if desired
 
         return parser
@@ -858,7 +858,8 @@ class QueShell(cmdLib.Cmd):
         # parser.add_argument("key1", type=str, choices=opts_keys)
         parser.add_argument("key1", type=str)
         parser.add_argument("value", type=str)
-        parser.add_argument("-k2", "--key2", type=str, default=None)
+        parser.add_argument("--key2", "-k2", type=str, default=None)
+        parser.add_argument("--do_eval", "-de", action='store_true', help='Evaluate the provided value to a type.')
         return parser
 
     # Other

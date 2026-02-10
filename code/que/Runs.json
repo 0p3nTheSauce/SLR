@@ -6,7 +6,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "exp_no": "000",
-                "recover": false,
+                "recover": "true",
                 "config_path": "./configfiles/asl1000/Swin3D_T_000.ini",
                 "save_path": "runs/asl1000/Swin3D_T_exp000/checkpoints"
             },

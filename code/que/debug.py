@@ -221,6 +221,39 @@ def test_is_daemon_state():
     print(is_daemon_state(eg))
     print(is_daemon_state(beg))
     print(is_daemon_state(beg1))
+    
+    
+def test_shared_dict_proc1():
+    manager = connect_manager()
+    wstate = manager.get_worker_state()
+    print('before changing')
+    print(wstate)
+    print('after changing')
+    wstate['current_run_id'] = 'debugging'
+    print(wstate)
+    
+def test_shared_dict_proc2():
+    manager = connect_manager()
+    wstate = manager.get_worker_state()
+    print('before changing')
+    print(wstate)
+    print('after changing')
+    wstate['current_run_id'] = 'debugging_2'
+    print(wstate)
+    
+def test_shared_dict_proc_opener():
+    p1 = mp.Process(target=test_shared_dict_proc1)
+    p1.start()
+    p1.join()
+    p2 = mp.Process(target=test_shared_dict_proc2)
+    p2.start()
+    p2.join()
+    
+def reset_state():
+    manager = connect_manager()
+    server = manager.get_server_context()
+    server.set_state(server=None, daemon=None, worker={'task': 'inactive', 'current_run_id': None, 'working_pid': None, 'exception': None})
+    
 
 if __name__ == '__main__':
     # process_opener()
@@ -242,4 +275,6 @@ if __name__ == '__main__':
     # daemon_stop_supervisor(t=1, hard=True)
     # try_except_finally()
     # test_create()
-    test_is_daemon_state()
+    # test_is_daemon_state()
+    # test_shared_dict_proc_opener()
+    reset_state()

@@ -138,6 +138,8 @@ This docstring describes the intended behaviour and the main public API surface.
 import traceback
 from typing import (
     # TYPE_CHECKING,
+    get_origin,
+    get_args,
     Protocol,
     Optional,
     Callable,
@@ -875,7 +877,7 @@ class Que:
         self,
         to_loc: QueLocation = TO_RUN,
         from_loc: QueLocation = CUR_RUN,
-        index: int = 0,
+        index: int = 0
     ) -> None:
         """
         Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
@@ -889,9 +891,10 @@ class Que:
         """
         with log_and_raise(self.logger, "recover"):
             run = self.peak_run(from_loc, index)
+            
+            
             run["admin"]["recover"] = True
-            if run["wandb"]["run_id"] is None:  # NOTE: run id
-                raise QueException("Run was set to recover, but no run id was provided")
+            
 
             if from_loc == FAIL_RUNS:
                 # remove error
@@ -905,7 +908,9 @@ class Que:
                     early_stopping=run["early_stopping"],
                     wandb=run["wandb"],
                 )
-
+            elif run["wandb"]["run_id"] is None:  # NOTE: run id is currently required for recovery
+                raise QueException("Run was set to recover, but no run id was provided")
+            
             _ = self._pop_run(from_loc, index)
             self._set_run(to_loc, 0, run)
 
@@ -1039,6 +1044,7 @@ class Que:
                 for run in tomv:
                     new_location.insert(0, run)
 
+
     def edit_run(
         self,
         loc: QueLocation,
@@ -1046,13 +1052,20 @@ class Que:
         key1: str,
         value: Any,
         key2: Optional[str] = None,
+        do_eval: bool = False
     ) -> None:
         with log_and_raise(self.logger, "edit"):
             run = self._pop_run(loc, idx)
-            if key2 is not None:
-                run[key1][key2] = value
+            if do_eval:
+                val = eval(value)
             else:
-                run[key1] = value
+                val = value
+                    
+            if key2 is not None:
+                run[key1][key2] = val
+            else:
+                run[key1] = val
+                
             self._set_run(loc, idx, run)
 
     def find_runs(
@@ -1141,6 +1154,23 @@ class ServerState(TypedDict):
     worker_state: WorkerState
 
 
+def _safe_isinstance(value: Any, type_hint: Any) -> bool:
+    """isinstance-safe check that handles generic types like List[str]."""
+    origin = get_origin(type_hint)
+    
+    if origin is Literal:
+            return value in get_args(type_hint)
+        
+    # e.g. List[str] -> list, Dict[str, int] -> dict, Optional[X] -> Union
+    if origin is Union:
+        # For Optional[X] (which is Union[X, None]), check each arg
+        return any(_safe_isinstance(value, t) for t in type_hint.__args__)
+    
+    if origin is not None:
+        return isinstance(value, origin)
+    
+    return isinstance(value, type_hint)
+
 def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
     """
     Check if object is an instance of WorkerState
@@ -1156,7 +1186,7 @@ def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
     for key, type_ in WorkerState.__annotations__.items():
         if key not in obj:
             return False
-        elif not isinstance(obj[key], type_):
+        elif not _safe_isinstance(obj[key], type_):
             return False
         
     return True
@@ -1176,7 +1206,7 @@ def is_daemon_state(obj: Any) -> TypeGuard[DaemonState]:
     for key, type_ in DaemonState.__annotations__.items():
         if key not in obj:
             return False
-        elif not isinstance(obj[key], type_):
+        elif not _safe_isinstance(obj[key], type_):
             return False
         
     return True

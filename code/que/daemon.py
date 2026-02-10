@@ -1,4 +1,5 @@
 from typing import Optional, TypedDict
+import logging
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
 from logging import Logger
@@ -6,6 +7,7 @@ import os
 import time
 from .core import (
     DAEMON_NAME,
+    SERVER_LOG_PATH,
     WORKER_NAME,
     connect_manager,
     DaemonState,
@@ -17,41 +19,43 @@ from .worker import Worker
 class Daemon:
     def __init__(
         self,
-        awake: bool,
-        stop_on_fail: bool,
         worker: Worker,
         logger: Logger,
         stop_worker_event: EventClass,
         stop_daemon_event: EventClass,
+        state: DaemonState,
     ) -> None:
-        self.awake = awake
-        self.stop_on_fail = stop_on_fail
         self.worker = worker
         self.logger = logger
         self.stop_worker_event = stop_worker_event
         self.stop_daemon_event = stop_daemon_event
         self.worker_process: Optional[Process] = None
         self.supervisor_process: Optional[Process] = None
-        self.supervisor_pid: Optional[int] = None
-
-        
         self.logger.info("Daemon initialized")
-
-        if self.awake:
-            self.logger.info("Daemon state is 'awake', starting supervisor...")
-            self.start_supervisor()
-
+        
+        self.set_state(state)
+    
+    def _reattach_server_logger(self):
+        """Re-attach the server log file handler in a spawned child process."""
+        logger = logging.getLogger(WORKER_NAME)
+        if not logger.handlers:  # avoid duplicate handlers on repeated calls
+            handler = logging.FileHandler(SERVER_LOG_PATH)
+            handler.setLevel(logging.DEBUG)
+            handler.setFormatter(logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            ))
+            logger.addHandler(handler)
+            logger.setLevel(logging.DEBUG)
+        self.logger = logger
+    
     def get_state(self) -> DaemonState:
-        return DaemonState(
-            awake=self.awake,
-            stop_on_fail=self.stop_on_fail,
-            supervisor_pid=self.supervisor_pid,
-        )
+        return self.state
 
     def set_state(self, state: DaemonState) -> None:
-        self.awake = state['awake']
-        self.stop_on_fail = state['stop_on_fail']
-        self.supervisor_pid = state["supervisor_pid"]
+        self.state = state
+        if self.state['awake']:
+            self.logger.info("Daemon state is 'awake', starting supervisor...")
+            self.start_supervisor()
 
     def monitor_worker(self) -> bool:
         """
@@ -63,6 +67,8 @@ class Daemon:
         assert isinstance(self.worker_process, Process)
         self.worker_process.join()
 
+
+        self.worker.state['working_pid'] = None
         # If worker died naturally (crash or finish)
         exit_code = self.worker_process.exitcode
         if exit_code == 0:
@@ -70,7 +76,7 @@ class Daemon:
         else:
             self.logger.warning(f"Worker process ended with exit code: {exit_code}")
 
-            if self.stop_on_fail:
+            if self.state['stop_on_fail']:
                 self.logger.info("stop_on_fail is True. Not restarting.")
                 return False
 
@@ -108,7 +114,10 @@ class Daemon:
         The worker process is started and monitored here. After it completes successfully, it is restarted.
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
         """
-        
+        manager = connect_manager()
+        self.state = manager.get_daemon_state()
+        self.worker.state = manager.get_worker_state()
+        self._reattach_server_logger()
         
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
 
@@ -136,6 +145,9 @@ class Daemon:
                 time.sleep(1.0)  # Prevent tight loop on error
 
         self.logger.info("Supervisor process exiting.")
+        self.state['awake'] = False
+        self.state['supervisor_pid'] = None
+        
 
     def start_supervisor(self) -> None:
         """Start the supervisor process"""
@@ -145,12 +157,12 @@ class Daemon:
 
         self.stop_daemon_event.clear()  # Reset event in case it was set previously
         self.stop_worker_event.clear()
-        self.awake = True
+        self.state['awake'] = True
         
 
         self.supervisor_process = Process(target=self.supervise)
         self.supervisor_process.start()
-        self.supervisor_pid = self.supervisor_process.pid
+        self.state['supervisor_pid'] = self.supervisor_process.pid
         self.logger.info(
             f"Supervisor launched (Child PID: {self.supervisor_process.pid})"
         )
@@ -172,13 +184,13 @@ class Daemon:
 
             if not self.worker_process.is_alive():
                 self.worker_process = None
-                self.worker.working_pid = None
+                self.worker.state['working_pid'] = None
 
             self.logger.info("Worker stopped.")
         else:
             self.logger.warning("No worker process to stop")
             self.worker_process = None
-            self.worker.working_pid = None
+            self.worker.state['working_pid'] = None
 
     def stop_supervisor(
         self,
@@ -208,14 +220,13 @@ class Daemon:
             
             if not self.supervisor_process.is_alive():
                 self.supervisor_process = None
-                self.supervisor_pid = None
+                self.state['supervisor_pid'] = None
                 
             self.logger.info("Supervisor stopped.")
 
         else:
             self.logger.warning("No supervisor process to stop")
             self.supervisor_process = None
-            self.supervisor_pid = None
             
         
 
