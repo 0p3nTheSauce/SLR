@@ -322,7 +322,7 @@ def load_info(dirp: Path, checkname: str):
 
 def setup_data(norm_dict: NormDict, split: str, frame_size: int, num_frames: int, shuffle: bool) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
 	test_info = get_wlasl_info(split, set_name="test")
-	test_dataset, num_classes, perm, shanon_entropy = get_data_set(
+	test_dataset, perm, shanon_entropy = get_data_set(
 		set_info=test_info,
 		norm_dict=norm_dict,
 		frame_size=frame_size,
@@ -337,7 +337,7 @@ def setup_data(norm_dict: NormDict, split: str, frame_size: int, num_frames: int
 		pin_memory=True,
 		drop_last=False,
 	)
-	return test_loader, num_classes, perm, shanon_entropy
+	return test_loader, test_dataset.num_classes, perm, shanon_entropy
 
 
 def test_run(

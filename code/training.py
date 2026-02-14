@@ -3,7 +3,7 @@ import torch  # type: ignore
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import LRScheduler
+from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
 from pathlib import Path
 import wandb
 from wandb.sdk.wandb_run import Run
@@ -451,8 +451,11 @@ def train_loop(
                         "Epoch": epoch,
                     }
                 )
-
-                scheduler.step()
+                if isinstance(scheduler, ReduceLROnPlateau):
+                    assert epoch_loss is not None, 'Should be defined by now'
+                    scheduler.step(epoch_loss)
+                else:
+                    scheduler.step()
 
         # Save checkpoint
         if (

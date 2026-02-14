@@ -173,6 +173,7 @@ class Worker:
             self.state['task'] = 'inactive'
             
     def _test(self) -> None:
+        """Tests the run in cur_runs and moves to old_runs"""
         if not gpu_manager.wait_for_completion(
             check_interval=10,
             logger=self.server_logger,
