@@ -75,11 +75,23 @@ class WarmRestartInfo(SchedBase):
 	tmult: int
 	eta_min: float
  
-SchedInfo : TypeAlias = Union[CosAnealInfo, WarmRestartInfo, WarmOnly]
+class ReduceLROnPlateau(SchedBase):
+	type: Literal['ReduceLROnPlateau']
+	mode: Literal['min', 'max']
+	factor: float
+	patience: int
+	threshold: float
+	threshold_mode: Literal['rel', 'abs'] 
+	cooldown: int
+	min_lr: Union[List[float], float]
+	eps: float
+ 
+SchedInfo : TypeAlias = Union[CosAnealInfo, WarmRestartInfo, WarmOnly, ReduceLROnPlateau]
 
 class DataInfo(TypedDict):
 	num_frames: int
 	frame_size: int
+
 
 class WandbInfo(TypedDict):
 	entity: str
@@ -141,6 +153,8 @@ class ExpInfo(RunInfo):
 class CompExpInfo(ExpInfo):
 	"""Inherits from ExpInfo, adds results"""
 	results: CompRes
+
+
 
  
 class Sumarised(TypedDict):

@@ -55,7 +55,7 @@ Important methods (summary)
                 move it into old_runs and remove it from cur_run. Raises QueEmpty if cur_run is empty.
 - stash_failed_run(error: str) -> None
                 Move the current run from cur_run to fail_runs and annotate with error.
-- recover_run(move_to: QueLocation = TO_RUN) -> None
+- recover_run(to_loc: QueLocation = TO_RUN) -> None
                 Mark the current run for recovery (admin.recover = True) and move it to the
                 specified location.
 - clear_runs(loc: QueLocation) -> None
@@ -135,9 +135,11 @@ Example usage
                 q.save_state()
 This docstring describes the intended behaviour and the main public API surface.
 """
-
+import traceback
 from typing import (
-    TYPE_CHECKING,
+    # TYPE_CHECKING,
+    get_origin,
+    get_args,
     Protocol,
     Optional,
     Callable,
@@ -156,8 +158,10 @@ from pathlib import Path
 import json
 from logging import Logger
 import logging
-from multiprocessing.managers import BaseManager
+from multiprocessing.managers import BaseManager, DictProxy
 import time
+from datetime import datetime
+import os
 # locals
 from run_types import (
     ExpInfo,
@@ -169,26 +173,28 @@ from run_types import (
 )
 from testing import full_test, load_comp_res
 from configs import print_config, load_config
-from contextlib import contextmanager
 
+from contextlib import contextmanager
+from multiprocessing.synchronize import Event as EventClass
 # constants
 # MR_NAME = "monitor"
 QUE_DIR = Path(__file__).parent
 
 QUE_NAME = "Que"
-DN_NAME = "Daemon"
+DAEMON_NAME = "Daemon"
 WORKER_NAME = "Worker"
 SERVER_NAME = "Server"
+TRAINING_NAME = "Training"
+
 RUN_PATH = QUE_DIR / "Runs.json"
-DAEMON_STATE_PATH = QUE_DIR / "Daemon.json"
-WR_LOG_PATH = QUE_DIR / "Worker.log"
-DN_LOG_PATH = QUE_DIR / "Daemon.log"
+SERVER_STATE_PATH = QUE_DIR / "Server.json"
 
+TRAINING_LOG_PATH = QUE_DIR / "Training.log"
+SERVER_LOG_PATH = QUE_DIR / "Server.log"
 
-SR_LOG_PATH = QUE_DIR / "Server.log"
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
-
+SERVER_MODULE_PATH = f"{QUE_DIR.name}.server"
 
 TO_RUN = "to_run"  # havent run yet
 CUR_RUN = "cur_run"  # busy running
@@ -196,6 +202,7 @@ OLD_RUNS = "old_runs"  # run already
 FAIL_RUNS = "fail_runs"  # runs that crashed
 # List for argparse choices
 QUE_LOCATIONS = [TO_RUN, CUR_RUN, OLD_RUNS]
+PROCESS_NAMES = [SERVER_NAME, DAEMON_NAME, WORKER_NAME]
 SYNONYMS = {
     "new": "to_run",
     "tr": "to_run",
@@ -207,8 +214,8 @@ SYNONYMS = {
     "fr": "fail_runs",
 }
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
-
-#tmux
+ProcessNames: TypeAlias = Literal["Server", "Daemon", "Worker"]
+# tmux
 SESH_NAME = "train"
 
 
@@ -312,21 +319,29 @@ class QueBusy(QueException):
     def __reduce__(self):
         return (self.__class__, (self.message,))
 
+
 @contextmanager
 def log_and_raise(logger: Logger, task: str = "Operation"):
     """
     Context manager that logs success or logs error and re-raises exception
-
-    Args:
-            success_msg: Message to log on success
-            error_msg: Message to log on error (before re-raising)
+    
+    :param logger: To log transaction
+    :type logger: Logger
+    :param task: The current task attempting to perform
+    :type task: str
     """
     try:
         yield
         logger.info(f"{task} completed successfully")
     except Exception as e:
         logger.error(f"{task} failed: {e}")
+        logger.error(traceback.format_exc())
         raise e
+
+
+def timestamp_path(path: Union[str, Path]) -> str:
+    formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    return str(path).replace(".json", f"_{formatted}.json")
 
 
 class Que:
@@ -378,7 +393,7 @@ class Que:
         return to_get.pop(idx)
 
     def _set_run(self, loc: QueLocation, idx: int, run: GenExp) -> None:
-        """Set a run at a specified location and index
+        """Set a run at a specified location and index. Uses insert under the hood
 
         Args:
                 loc (QueLocation): to_run, cur_run or old_runs
@@ -504,64 +519,51 @@ class Que:
 
         return stats
 
-    def _get_val(self, run: GenExp, keys: List[str]) -> Any:
-        """Unpack the value in a run using a list of keys
 
-        Args:
-                                        run (GenExp): Provided general run
-                                        keys (List[str]): Keys to unpack dictionary
-
-        Returns:
-                                        Any: The value
+    def load_state(self, in_path: Optional[Union[str, Path]] = None):
         """
-        unpack = cast(Dict[str, Any], run)
-        for k in keys:
-            unpack = unpack[k]
-        return unpack
+        Load Que from file. Default load from RUN_PATH, unless in_path is provided
 
-    def _find_runs(
-        self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
-    ) -> Tuple[List[int], List[GenExp]]:
-        """Find runs with matching keys, if any
-
-        Args:
-                                        to_search (List[GenExp]): A run list
-                                        keys (List[str]): Run keys
-                                        value (Any): The desired value
-
-        Returns:
-                                        List[Tuple[int, GenExp]]: A List of runs
+        :param in_path: Overide default load path.
+        :type in_path: Optional[Union[str, Path]]
         """
-        idxs = []
-        runs = []
-        for i, run in enumerate(to_search):
-            if criterion(self._get_val(run, keys)):
-                idxs.append(i)
-                runs.append(run)
-        return idxs, runs
+        if in_path is None:
+            in_path = self.runs_path
+        elif not Path(in_path).exists():
+            self.logger.warning(
+                f"No existing state found at {in_path}. Load unsuccessful."
+            )
+            return
 
-    def load_state(self):
-        """Read que from file"""
         try:
-            with open(self.runs_path, "r") as f:
+            with open(in_path, "r") as f:
                 data = json.load(f)
             self.to_run = data.get(TO_RUN, [])
             self.cur_run = data.get(CUR_RUN, [])
             self.old_runs = data.get(OLD_RUNS, [])
             self.fail_runs = data.get(FAIL_RUNS, [])
-            self.logger.info(f"Loaded que state from {self.runs_path}")
+            self.logger.info(f"Loaded que state from {in_path}")
         except FileNotFoundError:
             self.logger.warning(
-                f"No existing state found at {self.runs_path}. Starting fresh."
+                f"No existing state found at {in_path}. Starting fresh."
             )
             self.to_run = []
             self.cur_run = []
             self.old_runs = []
             self.fail_runs = []
 
-    def save_state(self):
-        """Write que to file"""
-        with open(self.runs_path, "w") as f:
+    def save_state(
+        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+    ):
+        if out_path is None:
+            out_path = self.runs_path
+        elif Path(out_path).exists() and not timestamp:
+            self.logger.warning(f"Overwriting existing state file: {out_path}")
+
+        if timestamp:
+            out_path = timestamp_path(out_path)
+
+        with open(out_path, "w") as f:
             all_runs = {
                 TO_RUN: self.to_run,
                 CUR_RUN: self.cur_run,
@@ -569,7 +571,7 @@ class Que:
                 FAIL_RUNS: self.fail_runs,
             }
             json.dump(all_runs, f, indent=4)
-        self.logger.info(f"Saved que to {self.runs_path}")
+        self.logger.info(f"Saved que to {out_path}")
 
     # for worker
 
@@ -592,15 +594,16 @@ class Que:
             raise QueEmpty(loc)
         elif abs(idx) >= len(to_get):
             raise QueIdxOOR(loc, idx, len(to_get))
+        
         return to_get[idx]
-    
+
     def peak_cur_run(self) -> ExpInfo:
         """Peaks the current run
-        
+
         Returns:
             ExpInfo: Dictionary of experiment info"""
         return self.peak_run(CUR_RUN, 0)
-    
+
     def pop_cur_run(self) -> ExpInfo:
         """Pops the current run
 
@@ -616,7 +619,7 @@ class Que:
                 run (ExpInfo): Dictionary of experiment info
         """
         self._set_run(CUR_RUN, 0, run)
-    
+
     def stash_next_run(self) -> str:
         """Moves next run from to_run to cur_run. Saves state with lock over both read and write"""
         next_run = self._pop_run(TO_RUN, 0)
@@ -637,22 +640,8 @@ class Que:
         Raises:
                 QueEmpty: If cur_run is empty
         """
-        # fin_run = self._pop_run(CUR_RUN, 0)
-        fin_run = self.peak_run(CUR_RUN, 0)  # safer incase crash during test
-        results = full_test(admin=fin_run["admin"], data=fin_run["data"])
-        comp_run = CompExpInfo(
-            admin=fin_run["admin"],
-            training=fin_run["training"],
-            optimizer=fin_run["optimizer"],
-            model_params=fin_run["model_params"],
-            data=fin_run["data"],
-            scheduler=fin_run["scheduler"],
-            early_stopping=fin_run["early_stopping"],
-            wandb=fin_run["wandb"],
-            results=results,
-        )
-        self._set_run(OLD_RUNS, 0, comp_run)
-        _ = self._pop_run(CUR_RUN, 0)  # still remove from cur
+
+        self._set_run(OLD_RUNS, 0, self.pop_cur_run())        
         self.logger.info("Stored finished run")
 
     def stash_failed_run(self, error: str) -> None:
@@ -672,16 +661,37 @@ class Que:
         """Method to"""
         return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
 
-    def list_runs(self, loc: QueLocation) -> List[Sumarised]:
+    def _get_val(self, run: GenExp, keys: List[str]) -> Any:
+        """Unpack the value in a run using a list of keys
+
+        Args:
+            run (GenExp): Provided general run
+            keys (List[str]): Keys to unpack dictionary
+
+        Returns:
+            Any: The value
+        """
+        unpack = cast(Dict[str, Any], run)
+        for k in keys:
+            unpack = unpack[k]
+        return unpack
+
+    def list_runs(self, loc: QueLocation, key_set: Optional[List[str]] = None, reverse: bool = False) -> List[Sumarised]:
         """List runs at a given location in summarised format
 
         Args:
-                                        loc (QueLocation): to_run, cur_run or old_runs
+            loc (QueLocation): Literal of: to_run, cur_run, old_runs or fail_runs
+            key_set (Optional[List[str]]): List of keys to unpack value in Dictionary
 
         Returns:
-                                        List[List[str]]: Summarised runs
+            List[List[str]]: Summarised runs
         """
-        return [self._run_sum(run) for run in self._fetch_state(loc)]
+        loc_runs = self._fetch_state(loc)
+        if key_set is None:
+            return [self._run_sum(run) for run in loc_runs]
+        else:
+            runs = sorted(loc_runs, key=lambda x: self._get_val(x, key_set), reverse=reverse)
+            return [self._run_sum(run) for run in runs]    
 
     def disp_runs(self, loc: QueLocation, exc: Optional[List[str]] = None) -> None:
         print(f"{loc} runs".title())
@@ -764,7 +774,6 @@ class Que:
     def print_runs(cls, runs: List[Sumarised], exc: Optional[List[str]] = None) -> None:
         """If you are working through the proxy and have already got the runs list"""
 
-
         if len(runs) == 0:
             print("  No runs available")
             return
@@ -779,7 +788,9 @@ class Que:
         ]
 
         if "best_val_acc" in runs[0]:
-            header_parts.append("Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2))
+            header_parts.append(
+                "Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2)
+            )
             header_parts.append(
                 "Best Val Loss".ljust(stats.get("max_best_val_loss_len", 4) + 2)
             )
@@ -849,15 +860,59 @@ class Que:
 
     # for QueShell interface
 
-    def recover_run(self, move_to: QueLocation = TO_RUN) -> None:
-        """Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present"""
+    def recover_run(
+        self,
+        to_loc: QueLocation = TO_RUN,
+        from_loc: QueLocation = CUR_RUN,
+        index: int = 0,
+        clean_slate: bool = False
+    ) -> None:
+        """
+        Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
+
+        :param to_loc: Location to move recovered run to
+        :type to_loc: QueLocation
+        :param from_loc: Location to recover run from
+        :type from_loc: QueLocation
+        :param index: Index of run to recover
+        :type index: int
+        :param clean_slate: Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.  
+        :type clean_state: bool
+        """
+        self.logger.debug(f"clean slate is set to: {clean_slate}")
         with log_and_raise(self.logger, "recover"):
-            run = self.peak_cur_run()
-            run["admin"]["recover"] = True
-            if run["wandb"]["run_id"] is None: #NOTE: run id could become optional if required
+            run = self.peak_run(from_loc, index)
+            
+            if not clean_slate:
+                self.logger.debug("setting recover to True")
+                run["admin"]["recover"] = True
+            else:
+                #ensure recover is false (e.g. run was set to recover then failed)
+                self.logger.debug("Ensuring recover is False")
+                run["admin"]["recover"] = False
+
+            if from_loc == FAIL_RUNS:
+                # remove error
+                run = ExpInfo(
+                    admin=run["admin"],
+                    training=run["training"],
+                    optimizer=run["optimizer"],
+                    model_params=run["model_params"],
+                    data=run["data"],
+                    scheduler=run["scheduler"],
+                    early_stopping=run["early_stopping"],
+                    wandb=run["wandb"],
+                )
+            elif run["wandb"]["run_id"] is None and not clean_slate:  # NOTE: run id is currently required for recovery
                 raise QueException("Run was set to recover, but no run id was provided")
-            _ = self.pop_cur_run()
-            self._set_run(move_to, 0, run)
+            
+            _ = self._pop_run(from_loc, index)
+            self._set_run(to_loc, 0, run)
+
+        self.logger.info(
+            f"Recovered Run: {self.run_str(to_loc, 0)} with index: {index} from {from_loc} to {to_loc}"
+        )
+        self.logger.info("\n")
 
     def clear_runs(self, loc: QueLocation) -> None:
         """reset the runs queue"""
@@ -881,8 +936,8 @@ class Que:
                                         ask (bool, optional): Pre-check run before creation. Defaults to True.
         """
         with log_and_raise(self.logger, "create"):
+            
             config = load_config(arg_dict)
-
             if self._is_dup_exp(config):
                 raise QueDupExp
 
@@ -984,6 +1039,7 @@ class Que:
                 for run in tomv:
                     new_location.insert(0, run)
 
+
     def edit_run(
         self,
         loc: QueLocation,
@@ -991,14 +1047,60 @@ class Que:
         key1: str,
         value: Any,
         key2: Optional[str] = None,
+        do_eval: bool = False
     ) -> None:
+        """
+        Edit a run in the Que
+        
+        :param self: Que
+        :param loc: Location to edit
+        :type loc: QueLocation
+        :param idx: Index of run in location
+        :type idx: int
+        :param key1: First level key of run config dictionary
+        :type key1: str
+        :param value: Value to use as replacement for original value
+        :type value: Any
+        :param key2: Optionally provide second level key
+        :type key2: Optional[str]
+        :param do_eval: Evaluate the provided value to a type (other wise defaults to string)
+        :type do_eval: bool
+        """
+        
         with log_and_raise(self.logger, "edit"):
             run = self._pop_run(loc, idx)
-            if key2 is not None:
-                run[key1][key2] = value
+            if do_eval:
+                val = eval(value)
             else:
-                run[key1] = value
+                val = value
+                    
+            if key2 is not None:
+                run[key1][key2] = val
+            else:
+                run[key1] = val
+                
             self._set_run(loc, idx, run)
+
+    def _find_runs(
+        self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
+    ) -> Tuple[List[int], List[GenExp]]:
+        """Find runs with matching keys, if any
+
+        Args:
+            to_search (List[GenExp]): A run list
+            keys (List[str]): Run keys
+            value (Any): The desired value
+
+        Returns:
+            List[Tuple[int, GenExp]]: A List of runs
+        """
+        idxs = []
+        runs = []
+        for i, run in enumerate(to_search):
+            if criterion(self._get_val(run, keys)):
+                idxs.append(i)
+                runs.append(run)
+        return idxs, runs
 
     def find_runs(
         self,
@@ -1009,12 +1111,12 @@ class Que:
         """Find the set of runs which match all of the key list value pairs
 
         Args:
-                                        loc (QueLocation): Location to search
-                                        key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
-                                        values (List[Any]): The corresponding values for each set of keys
+            loc (QueLocation): Location to search
+            key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
+            values (List[Any]): The corresponding values for each set of keys
 
         Returns:
-                                        Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
+            Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
         """
 
         assert len(key_set) == len(criterions), (
@@ -1026,211 +1128,253 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
-# --- Daemon State Management --- #
+    def update_runs(self, key1: str, key_value: Tuple[str, Any]) -> None:
+        """Update fields in the que. Useful if mass alterations are needed to runs
+
+        Args:
+            key1 (str): Top level key, e.g. data
+            key_value (Tuple[str, Any]): Key value pair, of secondary key, e.g. num_frames 16
+
+        Raises:
+            ValueError: If the top level key is faulty
+        """
+        with log_and_raise(self.logger, "que.update_runs"):
+            all_runs = {
+                TO_RUN: self.to_run,
+                CUR_RUN: self.cur_run,
+                FAIL_RUNS: self.fail_runs,
+                OLD_RUNS: self.old_runs
+            }
+            
+            for location_name, run_list in all_runs.items():
+                for idx, run in enumerate(run_list):
+                    if key1 not in run:
+                        raise ValueError(f"Top level key: {key1} not found in available keys: {run.keys()} for run: {idx} in: {location_name}")
+                    subdict = run[key1]
+                    key2, value = key_value
+                    # if key2 not in subdict:
+                    #     raise ValueError(f"Second level key: {key2} not found in available keys: {subdict.keys()} for run: {idx} in: {location_name}, with top level key: {key1}")
+                    subdict[key2] = value
+                    run[key1] = subdict
+                    all_runs[location_name][idx] = run
+                
+            self.to_run = all_runs[TO_RUN]
+            self.cur_run = all_runs[CUR_RUN]
+            self.fail_runs = all_runs[FAIL_RUNS]
+            self.old_runs = all_runs[OLD_RUNS]
+                
+
+
+# # ------- Basmanager connections -------#
+Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
+
+
+class WorkerState(TypedDict):
+    task: Worker_tasks
+    current_run_id: Optional[str]
+    working_pid: Optional[int]
+    exception: Optional[str]
+
 
 class DaemonState(TypedDict):
-    pid: Optional[int]
-    worker_pid: Optional[int]
-    stop_on_fail: bool
     awake: bool
+    stop_on_fail: bool
+    supervisor_pid: Optional[int]
 
 
-def is_daemon_state(val: Any) -> TypeGuard[DaemonState]:
+class ServerState(TypedDict):
+    server_pid: Optional[int]
+    daemon_state: DaemonState
+    worker_state: WorkerState
+
+
+def _safe_isinstance(value: Any, type_hint: Any) -> bool:
+    """isinstance-safe check that handles generic types like List[str]."""
+    origin = get_origin(type_hint)
+    
+    if origin is Literal:
+            return value in get_args(type_hint)
+        
+    # e.g. List[str] -> list, Dict[str, int] -> dict, Optional[X] -> Union
+    if origin is Union:
+        # For Optional[X] (which is Union[X, None]), check each arg
+        return any(_safe_isinstance(value, t) for t in type_hint.__args__)
+    
+    if origin is not None:
+        return isinstance(value, origin)
+    
+    return isinstance(value, type_hint)
+
+def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
     """
-    Type guard to check if an arbitrary value is structurally
-    compatible with the DaemonState TypedDict.
+    Check if object is an instance of WorkerState
+    
+    :param obj: Object to check
+    :type obj: Any
+    :return: Boolean based on whether object is worker state
+    :rtype: TypeGuard[WorkerState]
     """
-    # 1. Check if the value is a dictionary
-    if not isinstance(val, dict):
+    if not isinstance(obj, dict):
         return False
-
-    # 2. Check for the presence of all required keys
-    # Since all keys are technically *optional* in the Python dictionary sense
-    # but *required* by TypedDict (unless explicitly marked NotRequired),
-    # we check for all keys listed in the TypedDict.
-    required_keys = DaemonState.__annotations__.keys()
-    if not all(key in val for key in required_keys):
-        return False
-
-    # 3. Check the type of each value
-    # We use .get() here defensively, although the previous check makes it safe
-    # to use val[key].
-
-    # Check 'pid' and 'worker_pid' (Optional[int])
-    if not (val.get("pid") is None or isinstance(val["pid"], int)):
-        return False
-
-    if not (val.get("worker_pid") is None or isinstance(val["worker_pid"], int)):
-        return False
-
-    # Check 'stop_on_fail' and 'awake' (bool)
-    if not isinstance(val.get("stop_on_fail"), bool):
-        return False
-
-    if not isinstance(val.get("awake"), bool):
-        return False
-
-    # If all checks pass, it is a DaemonState
+    
+    for key, type_ in WorkerState.__annotations__.items():
+        if key not in obj:
+            return False
+        elif not _safe_isinstance(obj[key], type_):
+            return False
+        
     return True
 
+def is_daemon_state(obj: Any) -> TypeGuard[DaemonState]:
+    """
+    Check if object is an instance of DaemonState
+    
+    :param obj: Object to check
+    :type obj: Any
+    :return: Description
+    :rtype: TypeGuard[DaemonState]
+    """
+    if not isinstance(obj, dict):
+        return False
+    
+    for key, type_ in DaemonState.__annotations__.items():
+        if key not in obj:
+            return False
+        elif not _safe_isinstance(obj[key], type_):
+            return False
+        
+    return True
+    
 
-def read_daemon_state(state_path: Union[Path, str] = DAEMON_STATE_PATH) -> DaemonState:
+def is_server_state(obj: Any) -> TypeGuard[ServerState]:
+    """
+    Type guard to check if an arbitrary object is structurally
+    compatible with the ServerState TypedDict.
+    """
+    
+    if not isinstance(obj, dict):
+        return False
+
+    required_keys = ServerState.__annotations__.keys()
+    if not all(key in obj for key in required_keys):
+        return False
+
+    sp = obj.get('server_pid')
+    if not (sp is None or isinstance(sp, int)):
+        return False
+    
+    if not is_daemon_state(obj.get('daemon_state')):
+        return False
+    
+    if not is_worker_state(obj.get('worker_state')):
+        return False
+    
+    return True
+
+def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
     with open(state_path, "r") as f:
         data = json.load(f)
-    if is_daemon_state(data):
+    if is_server_state(data):
         return data
     else:
         raise ValueError(
-            f"Data read from: {state_path} is not compatible with DaemonState"
+            f"Data read from: {state_path} is not compatible with ServerState"
         )
 
-default_state: DaemonState = {
-    "pid": None,
-    "worker_pid": None,
-    "stop_on_fail": False,
-    "awake": False,
-}
+Process_states: TypeAlias = Union[WorkerState, DaemonState, ServerState]
+# if TYPE_CHECKING:
 
-class DaemonStateHandler:
-    def __init__(
+
+class DaemonProtocol(Protocol):
+    # only making certain methods visible
+    def start_supervisor(self) -> None: ...
+    def stop_worker(
+        self, timeout: Optional[float] = None, hard: bool = False
+    ) -> None: ...
+    def stop_supervisor(
         self,
-        logger: Logger,
-        pid: Optional[int] = None,
-        worker_pid: Optional[int] = None,
-        stop_on_fail: bool = True,
-        awake: bool = False,
-        state_path: Union[Path, str] = DAEMON_STATE_PATH,
-    ) -> None:
-        self.logger = logger
-        self.pid: Optional[int] = pid
-        self.worker_pid: Optional[int] = worker_pid
-        self.stop_on_fail: bool = stop_on_fail
-        self.awake: bool = awake
-        self.state_path: Path = Path(state_path)
-        self.from_disk()
+        timeout: Optional[float] = None,
+        hard: bool = False,
+        stop_worker: bool = False,
+    ) -> None: ...
 
-    def from_disk(self) -> None:
-        try:
-            state = read_daemon_state(self.state_path)
-            self.pid = state["pid"]
-            self.worker_pid = state["worker_pid"]
-            self.stop_on_fail = state["stop_on_fail"]
-            self.awake = state["awake"]
-            self.logger.info(f"Loaded state from: {self.state_path}")
-        except Exception as e:
-            self.logger.warning(
-                f"Ran into an error when loading state: {e}\nloading from scratch"
-            )
-            self.pid = None
-            self.worker_pid = None
-            self.stop_on_fail = False
-            self.awake = False
+class WorkerProtocol(Protocol):
+    # only making certain methods visible
+    def cleanup(self) -> None: ...
+    def start(self) -> None: ...
 
-    def to_disk(self) -> None:
-        state: DaemonState = {
-            "pid": self.pid,
-            "worker_pid": self.worker_pid,
-            "stop_on_fail": self.stop_on_fail,
-            "awake": self.awake,
-        }
-        with open(self.state_path, "w") as f:
-            json.dump(state, f)
-        self.logger.info(f"Saved state to: {self.state_path}")
+class ServerContextProtocol(Protocol):
+    def save_state(self) -> None: ...
+    def load_state(self) -> None: ...
+    def get_state(self) -> ServerState: ...
+    def set_state(
+        self,
+        server: Optional[ServerState],
+        daemon: Optional[DaemonState],
+        worker: Optional[WorkerState],
+    ) -> None: ...
 
-    def get_state(self) -> DaemonState:
-        return {
-            "pid": self.pid,
-            "worker_pid": self.worker_pid,
-            "stop_on_fail": self.stop_on_fail,
-            "awake": self.awake,
-        }
 
-    def set_state(self, state: DaemonState) -> None:
-        self.pid = state["pid"]
-        self.worker_pid = state["worker_pid"]
-        self.stop_on_fail = state["stop_on_fail"]
-        self.awake = state["awake"]
+class QueManagerProtocol(Protocol):
+    def get_que(self) -> Que: ...
+    # Testing
+    def get_daemon(self) -> DaemonProtocol: ...
+    def get_daemon_state(self) -> DaemonState: ...
+    def get_worker(self) -> WorkerProtocol: ...
+    def get_worker_state(self) -> WorkerState: ...
+    def get_server_context(self) -> ServerContextProtocol: ...
 
-    def get_pid(self) -> Optional[int]:
-        return self.pid
 
-    def set_pid(self, pid: Optional[int]) -> None:
-        self.pid = pid
-
-    def get_worker_pid(self) -> Optional[int]:
-        return self.worker_pid
-
-    def set_worker_pid(self, worker_pid: Optional[int]) -> None:
-        self.worker_pid = worker_pid
-
-    def get_stop_on_fail(self) -> bool:
-        return self.stop_on_fail
-
-    def set_stop_on_fail(self, stop_on_fail: bool) -> None:
-        self.stop_on_fail = stop_on_fail
-
-    def get_awake(self) -> bool:
-        return self.awake
-
-    def set_awake(self, awake: bool) -> None:
-        self.awake = awake
-
-#------- Basmanager connections -------#
-
-if TYPE_CHECKING:
-    class DaemonControllerProtocol(Protocol):
-        def save_state(self) -> None: ...
-        def load_state(self) -> None: ...
-        def start(self) -> None: ...
-        def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None: ...
-        def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False) -> None: ...
-        def get_state(self) -> DaemonState: ...
-        def set_stop_on_fail(self, value: bool) -> None: ...
-        def set_awake(self, value: bool) -> None: ...
-
-    class QueManagerProtocol(Protocol):
-        def get_que(self) -> Que: ...
-        def get_daemon_state(self) -> DaemonStateHandler: ...
-        def DaemonController(self) -> DaemonControllerProtocol: ...
-
-class QueManager(BaseManager): 
+class QueManager(BaseManager):
     pass
+
 
 def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     """
     Useful helper for clients to connect to the QueManager server.
-    
+
     :param max_retries: Maximum number of connection attempts
     :param retry_delay: Delay between retries in seconds
     :return: Connected QueManager instance
     :rtype: QueManagerProtocol
     """
-    QueManager.register('DaemonController')
-    QueManager.register('get_que')
-    QueManager.register('get_daemon_state')
+    QueManager.register("get_que")
+    # Testing
+    QueManager.register("get_worker")
+    QueManager.register("get_worker_state", proxytype=DictProxy)
+    QueManager.register("get_daemon")
+    QueManager.register("get_daemon_state", proxytype=DictProxy)
+    QueManager.register("get_server_context")
 
     for _ in range(max_retries):
         try:
-            m = QueManager(address=('localhost', 50000), authkey=b'abracadabra')
+            m = QueManager(address=("localhost", 50000), authkey=b"abracadabra")
             m.connect()
-            return m # type: ignore
+            return m  # type: ignore
         except ConnectionRefusedError:
             print(f"Queue server not ready, retrying in {retry_delay}s...")
             time.sleep(retry_delay)
-            
+
     raise RuntimeError("Cannot connect to Queue server.")
 
-def main():
+
+def _get_basic_logger() -> Logger:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        filename=SR_LOG_PATH,  # Optional: log to file
+        filename=SERVER_LOG_PATH,  # Optional: log to file
     )
 
     logger = logging.getLogger(__name__)
+    return logger
+
+
+def main():
+    logger = _get_basic_logger()
 
     q = Que(logger)
     q.disp_runs(OLD_RUNS)
+
 
 if __name__ == "__main__":
     main()

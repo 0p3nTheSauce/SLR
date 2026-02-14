@@ -16,17 +16,6 @@ sns.set_palette("husl")
 
 #eda and demos
 
-# def display_topk(frames: np.ndarray,  output: Optional[Union[str, Path]] = None):
-#     cv2.putText(
-#     frame,                          # Image to draw on
-#     'Hello, OpenCV!',               # Text to write
-#     (50, 100),                      # Position (x, y) - bottom-left corner of text
-#     cv2.FONT_HERSHEY_SIMPLEX,       # Font
-#     1.5,                            # Font scale (size)
-#     (255, 255, 255),                # Color in BGR (white)
-#     2,                              # Thickness
-#     cv2.LINE_AA                     # Line type (anti-aliased)
-# )
 
 
 

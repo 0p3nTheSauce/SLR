@@ -1,19 +1,37 @@
 from multiprocessing import Event
+from multiprocessing.managers import DictProxy
+# from multiprocessing.managers import BaseManager
+import multiprocessing as mp
 import logging
-from typing import Optional
+from logging import Logger
+import json
+import os
+import signal
+import sys
+from typing import Optional, Union, Tuple, Any, TypeGuard
+from pathlib import Path
 
 from .core import (
+    timestamp_path,
     Que,
     QueManager,
-    SR_LOG_PATH,
+    # ProcessNames,
+    SERVER_LOG_PATH,
+    SERVER_STATE_PATH,
     QUE_NAME,
-    DN_NAME,
-    WR_LOG_PATH,
+    SERVER_NAME,
+    DAEMON_NAME,
+    TRAINING_NAME,
+    TRAINING_LOG_PATH,
     WORKER_NAME,
+    ServerState,
+    WorkerState,
     DaemonState,
+    read_server_state,
+    # Process_states
 )
-from .daemon import Daemon, DaemonStateHandler
-from .worker import Worker
+from .daemon import Daemon, DaemonState
+from .worker import Worker, WorkerState
 
 
 class ServerContext:
@@ -22,84 +40,163 @@ class ServerContext:
     This prevents relying on loose global variables.
     """
 
-    def __init__(self):
-        # Setup Logging
-        # logging.basicConfig(level=logging.INFO)
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=SR_LOG_PATH,
+    def __init__(
+        self,
+        save_on_shutdown: bool = True,
+        cleanup_timeout: float = 10.0,
+        stop_on_fail: bool = True,
+        awake: bool = False,
+        server_state_path: Union[str, Path] = SERVER_STATE_PATH,
+    ):
+        # context attributes
+        self.save_on_shutdown: bool = save_on_shutdown
+        self.cleanup_timeout: float = cleanup_timeout
+        self.state_path: Union[str, Path] = server_state_path
+
+        # # Pids
+        self.server_pid: Optional[int] = os.getpid()
+
+        # spawn for CUDA context
+        mp.set_start_method("spawn", force=True)
+
+        # signal handlers for systemd
+        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT, self._handle_shutdown)
+
+        # logging
+        que_logger, daemon_logger, server_logger, worker_logger = (
+            self._setup_logging()
         )
+        self.server_logger = server_logger
 
-        que_logger = logging.getLogger(QUE_NAME)
-        dn_logger = logging.getLogger(DN_NAME)
-        dn_state_logger = logging.getLogger(f"{DN_NAME} State")
-        wr_logger = logging.getLogger(WORKER_NAME)
-
-        # Create a separate file handler for the worker logger
-        worker_file_handler = logging.FileHandler(WR_LOG_PATH)
-        worker_file_handler.setLevel(logging.INFO)
-        worker_formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        worker_file_handler.setFormatter(worker_formatter)
-
-        # Add the handler to the worker logger
-        wr_logger.addHandler(worker_file_handler)
-
-        # IMPORTANT: Prevent the worker logger from propagating to the root logger
-        # This stops it from also writing to server.log
-        wr_logger.propagate = False
-
-        # Initialize Logic
-        self.que = Que(logger=que_logger)
-        self.worker = Worker(server_logger=wr_logger, training_logger=wr_logger)
+        # Events for controlling Daemon and Worker
         self.stop_worker_event = Event()
         self.stop_daemon_event = Event()
 
-        # State and Daemon
-        self.daemon_state = DaemonStateHandler(logger=dn_state_logger)
+
+        # Classes
+        self.que = Que(logger=que_logger)
+        self.worker = Worker(
+            server_logger=worker_logger, que=self.que, stop_event=self.stop_worker_event,
+            state=WorkerState(
+            task='inactive',
+            current_run_id=None,
+            working_pid=None,
+            exception=None
+        )
+        )
         self.daemon = Daemon(
             worker=self.worker,
-            logger=dn_logger,
-            local_state=self.daemon_state,
+            logger=daemon_logger,
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
+            state=DaemonState(
+            awake=awake,
+            stop_on_fail=stop_on_fail,
+            supervisor_pid=None
+        )
+        )
+        self.load_state()
+
+    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger]:
+        """Sets up loggers for the server components."""
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            filename=SERVER_LOG_PATH,
         )
 
+        que_logger = logging.getLogger(QUE_NAME)
+        dn_logger = logging.getLogger(DAEMON_NAME)
+        server_logger = logging.getLogger(SERVER_NAME)
+        worker_logger = logging.getLogger(WORKER_NAME)
 
-class DaemonController:
-    """
-    The Object Server wrapper.
-    Instead of registering functions, we register this class.
-    """
+        return que_logger, dn_logger, server_logger, worker_logger
 
-    def __init__(self, context: ServerContext):
-        self.ctx = context
+    def _handle_shutdown(self, signum, frame):
+        """Handle SIGTERM/SIGINT for graceful shutdown"""
+        signal_name = "SIGTERM" if signum == signal.SIGTERM else "SIGINT"
+        self.server_logger.info(
+            f"Received {signal_name}, initiating graceful shutdown..."
+        )
 
-    def save_state(self):
-        self.ctx.daemon_state.to_disk()
+        try:
+            self.server_pid = None
+            self.server_logger.info("Stopping daemon and worker...")
+            self.daemon.stop_supervisor(
+                timeout=self.cleanup_timeout, hard=False, stop_worker=True
+            )
 
-    def load_state(self):
-        self.ctx.daemon_state.from_disk()
+            if self.save_on_shutdown:
+                self.server_logger.info("Saving server state...")
+                self.daemon.state["awake"] = False #if being stopped by signal, probably don't want to be awake when restarted
+                self.server_pid = None #similarly, we have no need to save an old pid
+                self.save_state()
+            
+            self.server_logger.info("Graceful shutdown complete")
+        except Exception as e:
+            self.server_logger.error(f"Error during shutdown: {e}", exc_info=True)
+        finally:
+            sys.exit(0)
 
-    def start(self):
-        self.ctx.daemon.start_supervisor()
+    def get_state(self) -> ServerState:
+        return ServerState(
+            server_pid=self.server_pid,
+            daemon_state=self.daemon.get_state(),
+            worker_state=self.worker.get_state(),
+        )
 
-    def stop_worker(self, timeout: Optional[float] = None, hard: bool = False):
-        self.ctx.daemon.stop_worker(timeout=timeout, hard=hard)
+    def set_state(
+        self,
+        server: Optional[ServerState] = None,
+        daemon: Optional[DaemonState] = None,
+        worker: Optional[WorkerState] = None,
+    ) -> None:
+        if server is not None:
+            self.server_pid = server["server_pid"]
+            self.daemon.set_state(server["daemon_state"])
+            self.worker.set_state(server["worker_state"])
+        if daemon is not None:
+            self.daemon.set_state(daemon)
+        if worker is not None:
+            self.worker.set_state(worker)
 
-    def stop_supervisor(self, timeout: Optional[float] = None, hard: bool = False, and_worker: bool = False):
-        self.ctx.daemon.stop_supervisor(timeout=timeout, hard=hard, and_worker=and_worker)
+    def save_state(
+        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+    ):
+        if out_path is None:
+            out_path = self.state_path
+        elif Path(out_path).exists() and not timestamp:
+            self.server_logger.warning(f"Overwriting existing state file: {out_path}")
 
-    def get_state(self) -> DaemonState:
-        return self.ctx.daemon_state.get_state()
+        if timestamp:
+            out_path = timestamp_path(out_path)
 
-    def set_stop_on_fail(self, value: bool) -> None:
-        self.ctx.daemon_state.set_stop_on_fail(value)
+        with open(out_path, "w") as f:
+            json.dump(self.get_state(), f)
 
-    def set_awake(self, value: bool) -> None:
-        self.ctx.daemon_state.set_awake(value)
+        self.server_logger.info(f"Saved state to: {out_path}")
+
+    def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
+        if in_path is None:
+            in_path = self.state_path
+        elif not Path(in_path).exists():
+            self.server_logger.warning(
+                f"No existing state found at {in_path}. Load unsuccessful."
+            )
+            return
+
+        try:
+            # self.set_state(read_server_state(self.state_path))
+            state = read_server_state(self.state_path)
+            state["server_pid"] = self.server_pid #do not reset server_pid after loading
+            self.set_state(state)
+            self.server_logger.info(f"Loaded state from: {self.state_path}")
+        except Exception as e:
+            self.server_logger.warning(
+                f"Ran into an error when loading state: {e}\nloading abandoned",
+                exc_info=True
+            )
 
 
 # --- Registration Logic ---
@@ -108,24 +205,43 @@ class DaemonController:
 def setup_manager():
     """
     Configures the QueManager with the ServerContext.
+
     """
-    # Initialize the context once (Singleton pattern)
+
+    # NOTE: Additions to this function must be mirrored in connect_manager() in core.py
+
     context = ServerContext()
 
-    # 2. Register DaemonController (Object Server)
-    # Allows client to call: manager.DaemonController().start()
-    QueManager.register("DaemonController", callable=lambda: DaemonController(context))
-
-    # 3. Register Shared Que Proxy
     QueManager.register(
         "get_que",
         callable=lambda: context.que,
     )
 
-    # 4. Register shared Daemon State Proxy
+    QueManager.register(
+        "get_server_context",
+        callable=lambda: context,
+    )
+
+    QueManager.register(
+        "get_daemon",
+        callable=lambda: context.daemon,
+    )
+
     QueManager.register(
         "get_daemon_state",
-        callable=lambda: context.daemon_state,
+        callable=lambda: context.daemon.state,
+        proxytype=DictProxy,
+    )
+
+    QueManager.register(
+        "get_worker",
+        callable=lambda: context.worker,
+    )
+    
+    QueManager.register(
+        "get_worker_state",
+        callable=lambda: context.worker.state,
+        proxytype=DictProxy,
     )
 
 
@@ -140,7 +256,6 @@ def start_server():
     s = m.get_server()
 
     print("Object Server started on localhost:50000")
-    print("Exposed Objects: DaemonStateHandler, DaemonController")
 
     try:
         s.serve_forever()

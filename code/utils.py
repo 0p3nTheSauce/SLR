@@ -1,7 +1,7 @@
 from typing import List, Union, Tuple
 import torch
 import cv2
-
+from logging import Logger
 import numpy as np
 import matplotlib.pyplot as plt
 import json
@@ -13,20 +13,27 @@ import wandb
 import time
 import subprocess
 from typing import Callable, Optional, Dict, Any
-
+from multiprocessing.synchronize import Event as EventClass
 
 
 ################ GPU ###################
 
-
-
-
-
-
 class gpu_manager:
 	@classmethod
-	def get_gpu_memory_usage(cls, gpu_id=0):
-		"""Get GPU memory usage across all processes"""
+	def get_gpu_memory_usage(cls, gpu_id: int=0) -> Tuple[float, float]:
+		"""Get GPU usage across all processes
+
+		Args:
+			gpu_id (int, optional): ID of GPU. Defaults to 0.
+
+		Raises:
+			RuntimeError: nvidia-smi failed with subprocess
+			ValueError: Unexpected nvidia-smi output
+			ValueError: Failed to parse GPU memory usage:
+
+		Returns:
+			Tuple[float, float]: used, total in GiB
+		"""
 
 		result = subprocess.run(
 			[
@@ -51,16 +58,25 @@ class gpu_manager:
 
 		return used / 1024, total / 1024  # In GB
 
+
+	@classmethod
+	def output(cls, logger: Optional[Logger], message: str) -> None:
+		if logger is None:
+			print(message)
+		else:
+			logger.info(message)
+
 	@classmethod
 	def wait_for_completion(
 		cls,
 		check_interval: int = 3600,  # 1 hour
 		confirm_interval: int = 60,  # 1 minute
 		num_checks: int = 5,  # confirm consistency over 5 minutes
-		verbose: bool = False,
 		gpu_id: int = 0,
 		max_util_gb: float = 1.0,  # Maximum memory usage in GB
-	) -> bool:
+		logger: Optional[Logger] = None,
+		event: Optional[EventClass] = None
+	) -> bool: 
 		"""Wait for GPU memory to be free before proceeding
 
 		Args:
@@ -69,9 +85,10 @@ class gpu_manager:
 				num_checks: (int, optional): Confirm consistency over how many checks. Defaults to 5 (5 minutes).
 				gpu_id (int, optional): CUDA GPU. Defaults to 0.
 				max_util_gb (float, optional): Threshold GPU usage to trigger waiting. Defaults to 1.0 (GB).
-
+				logger: (Logger, optional): Optionally supply a logger
+				event: (Optional[EventClass], optional): Optionally supply a multiprocessing stopping event.
 		Returns:
-				bool: Whether monitoring was killed by the user.
+				bool: Whether monitoring was killed by the user, either through CTRL+C or stop event.
 		"""
 		assert torch.cuda.is_available(), "CUDA is not available"
 
@@ -80,30 +97,32 @@ class gpu_manager:
 		proceed = used > max_util_gb
 
 		while proceed:
-			if verbose:
-				print()
-				print(
-					f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
-				)
-				print(f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+			cls.output(logger, "")
+			cls.output(logger,
+				f"Monitoring GPU: {gpu_id}, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
+			)
+			cls.output(logger,f"Last checked at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 			try:
 				time.sleep(check_interval)
 				used, _ = cls.get_gpu_memory_usage(gpu_id)
 			except KeyboardInterrupt:
-				print()
-				print("Monitoring interrupted by user")
+				cls.output(logger,"")
+				cls.output(logger,"Monitoring interrupted by user")
 				return False
 
 			if used <= max_util_gb and cls._confirm_usage(
 				confirm_interval, num_checks, gpu_id, max_util_gb
 			):
 				break
+			elif event is not None and event.is_set():
+				cls.output(logger, "")
+				cls.output(logger, "Stop event detected")
+				return False
 
-		if verbose:
-			print()
-			print(
-				f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
-			)
+		cls.output(logger,"")
+		cls.output(logger,
+			f"GPU: {gpu_id} is available, current memory usage: {used:.2f}/{total:.2f} GB ({used / total * 100:.1f}%)"
+		)
 
 		return True
 
@@ -121,8 +140,6 @@ class gpu_manager:
 				return False
 			time.sleep(confirm_interval)
 		return True
-
-
 
 ############## wandb ##################
 class wandb_manager:
@@ -191,6 +208,22 @@ class wandb_manager:
 	def validate_runId(cls, run_id: str, entity: str, project: str) -> bool:
 		return cls.run_present(run_id, cls.list_runs(entity, project))
 
+	@classmethod
+	def open_wandb(cls, entity: str, project: str, run_id: Optional[str],) -> None:
+		"""Open wandb page in default browser.
+		Args:
+			entity (str): wandb entity
+			project (str): wandb project
+			run_id (Optional[str]): wandb run id. If None, opens project page.
+		"""
+  
+  
+		if run_id is None:
+			url = f"https://wandb.ai/{entity}/{project}/"
+		else:
+			url = f"https://wandb.ai/{entity}/{project}/runs/{run_id}"
+		subprocess.run(["xdg-open", url])
+
 ############### Input ##################
 
 def ask_nicely(message: str,
@@ -242,9 +275,6 @@ def str_dict(dic: Dict[str, Any], disp: bool = False) -> str:
 	if disp:
 		print(st)
 	return st
-
-
-
 
 def print_dict(diction):
 	print(json.dumps(diction, indent=4))
@@ -357,8 +387,6 @@ def show_bbox(frames, bbox):
 		cv2.waitKey(0)  # Display each frame for 100 ms
 	cv2.destroyAllWindows()
 
-
-
 def cv_display(frames: np.ndarray,  output: Optional[Union[str, Path]] = None):
 	for i, frame in enumerate(frames):
 		cv2.imshow('Cropped Frames', frame)  # Display the first frame
@@ -372,6 +400,8 @@ def cv_save(frames: np.ndarray, output: Union[str, Path]):
 	for i, img in enumerate(frames):
 		cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
 	print(f"Cropped frames saved to {output}.")
+
+	################# Plot based #########################
 
 def plt_display(frames: torch.Tensor, num: int, size: Tuple[float, float]=(5.0,5.0), adapt: bool=False, output: Optional[Union[str, Path]]=None):
 	"""
@@ -637,11 +667,6 @@ def clean_runs(path, ask=False, rem_empty=False, rem_files=[]):
 	for p in sub_paths:
 		clean_experiments(p, ask, rem_empty, rem_files)
 	
-def crop_frames(frames, bbox):
-	#frames hase shape (num_frames, channels, height, width)
-	#bbox is a list of [x1, y1, x2, y2]
-	x1, y1, x2, y2 = bbox
-	return frames[:, :, y1:y2, x1:x2]  # Crop the frames using the bounding box
 
 def enum_dir(path:str|Path, make:bool=False, decimals:int=3):
 	'''Enumerate filenames'''

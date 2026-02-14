@@ -1,0 +1,6 @@
+- investigate r2+1d
+- investigate different angles
+- investigate resize
+  - add resize to configfiles
+- switch from str to Literal for model names
+- downscaling instead of cropping
