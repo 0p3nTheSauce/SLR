@@ -1,0 +1,9 @@
+name: wlasl_cpu
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - scikit-learn
+  - matplotlib
+  - seaborn
+prefix: /home/luke/miniconda3/envs/wlasl_cpu
