@@ -1,7 +1,7 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List, Optional, Union, Tuple
+from typing import Dict, Any, List, Optional, Union, Tuple, Literal
 from utils import enum_dir, ask_nicely, print_dict
 from stopping import EarlyStopper, StopperOn
 from pathlib import Path
@@ -24,7 +24,7 @@ from run_types import (
 	SchedInfo,
 	WarmUpSched,
 )
-
+import json
 # TODO: make configs the sole source of these constants
 
 # constants
@@ -42,10 +42,6 @@ SPLIT_DIR = "splits"
 # - training/testing
 RUNS_PATH = "./runs"
 SEED = 42
-
-
-
-
 
 def _exp_to_run_info(expInfo: ExpInfo) -> RunInfo:
 	"""
@@ -125,6 +121,21 @@ def print_config(config_dict):
 			print(section_data)
 		print()
 
+def get_class_list(classes_path: Union[str, Path] = CLASSES_PATH) -> List[str]:
+	"""
+	Retrieve the classes list from file (still under development for other datasets)
+	
+	:param classes_path: Path to classes file
+	:type classes_path: Union[str, Path]
+	:return: List of classes ordered by label num. For example, 'book' is label 0.
+	:rtype: List[str]
+	"""
+	with open(classes_path, 'r') as f:
+		class_list = json.load(f)
+		
+	return class_list
+	
+
 ###################### Config generation ###############################
 
 def _schedular_precheck(sched_info: Optional[SchedInfo]) -> None:
@@ -144,24 +155,23 @@ def _schedular_precheck(sched_info: Optional[SchedInfo]) -> None:
 		return
  
 	#these have already been implemented
-	# valid_types = [
-	# 	'WarmOnly', #warm up only
-	# 	'CosineAnnealingLR',
-	# 	'CosineAnnealingWarmRestarts',
-	# ]
+	valid_types = [
+		'WarmOnly', #warm up only
+		'ReduceLROnPlateau',
+		'CosineAnnealingLR',
+		'CosineAnnealingWarmRestarts',
+	]
 	
-	# if sched_info["type"] not in valid_types:
-	# 	raise ValueError(
-	# 		f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
-	# 	)
+	if sched_info["type"] not in valid_types:
+		raise ValueError(
+			f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
+		)
 		
 	if 'warmup_epochs' in sched_info:
 		if sched_info["warmup_epochs"] < 0:
 			raise ValueError("warmup_epochs must be non-negative")
 		if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
 			raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
-
-
 
 def _stopper_precheck(config: Optional[StopperOn]) -> None:
 	"""Fail early if stopper is invalid

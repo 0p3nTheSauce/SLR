@@ -1,9 +1,9 @@
-from que.core import Que, QueEmpty
-from que.server import connect_manager
+from que.core import Que, QueEmpty, connect_manager
 import json
 import subprocess
 import sys
 import logging
+import torch
 
 logging.basicConfig(
 		level=logging.INFO,
@@ -66,6 +66,9 @@ def test_clear2():
         q.clear_runs('cur_run')
     except Exception as e:
         print(e)
+        
+def lrsched():
+    reduce_on_platue = torch.optim.lr_scheduler.ReduceLROnPlateau()
 
 if __name__ == '__main__':
     # test_dump_peak()

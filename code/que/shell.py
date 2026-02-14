@@ -1,9 +1,25 @@
-from .core import QUE_LOCATIONS, SYNONYMS, connect_manager, DaemonState
-
+import webbrowser
+from .core import (
+    TO_RUN,
+    GenExp,
+    ExpQue,
+    CUR_RUN,
+    QUE_LOCATIONS,
+    SYNONYMS,
+    connect_manager,
+    ServerState,
+    # WorkerState,
+    # DaemonState,
+    TRAINING_LOG_PATH,
+    SERVER_LOG_PATH,
+    RUN_PATH,
+    QueManagerProtocol,
+)
+from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
 import cmd as cmdLib
 import shlex
-from typing import Optional
+from typing import Optional, List, Any, Dict, cast
 import argparse
 import configs
 import time
@@ -20,29 +36,117 @@ import io
 import sys
 import json
 
+import subprocess
+from utils import gpu_manager
+import traceback
 
 
 class QueShell(cmdLib.Cmd):
+    avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
+    # recover_locs = [FAIL_RUNS, CUR_RUN] maybe make this if you feel like it
+
     def __init__(
         self,
+        server: QueManagerProtocol,
         auto_save: bool = True,
+
     ) -> None:
         super().__init__()
+        # Pretty stuff
         self.console = Console()
+        self._show_banner()
+        self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
+        self.intro = ""
+        # Core Objects
         self.tmux_man = tmux_manager()
         self.auto_save = auto_save
-        self.server = connect_manager()
-        self.que = self.server.get_que() #proxy object
-        self.daemon_controller = self.server.DaemonController() #object server (hold processes)
-        # Display welcome banner
-        self._show_banner()
+        # - proxy objects
+        self.que = server.get_que()
+        self.daemon = server.get_daemon()
+        self.worker = server.get_worker()
+        self.server_context = server.get_server_context()
 
-       
+        # - parsing
+        self._parser_factories = {
+            "create": lambda: configs.get_train_parser(
+                prog="create", desc="Create a new training run"
+            ),
+            "add": lambda: configs.get_train_parser(
+                prog="add", desc="Add a completed training run to old_runs"
+            ),
+            "remove": self._get_remove_parser,
+            "clear": self._get_clear_parser,
+            "list": self._get_list_parser,
+            "quit": self._get_quit_parser,
+            "shuffle": self._get_shuffle_parser,
+            "move": self._get_move_parser,
+            "edit": self._get_edit_parser,
+            "display": self._get_display_parser,
+            "daemon": self._get_daemon_parser,
+            "server": self._get_server_parser,
+            "worker": self._get_worker_parser,
+            "logs": self._get_log_parser,
+            "load": self._get_load_parser,
+            "save": self._get_save_parser,
+            "recover": self._get_recover_parser,
+            "wandb": self._get_wandb_parser,
+        }
 
-        # Override prompt with rich styling
-        # self.prompt = "(que)$"  # We'll handle this with rich
-        self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
-        self.intro = ""  # We'll handle this with rich
+    # Exception handling
+
+    @contextmanager
+    def unwrap_exception(self, message: str, error: str = ""):
+        try:
+            yield
+            self.console.print(f"[bold green]✓ {message} [/bold green]")
+        except Exception as e:
+            if error:
+                self.console.print(
+                    f"[bold red]✗ {error} : {e} [/bold red]", style="red"
+                )
+            else:
+                self.console.print(f"[bold red]✗ {e} [/bold red]", style="red")
+            
+            # Print full traceback for debugging
+            self.console.print("[dim]" + traceback.format_exc() + "[/dim]")
+
+    def _reconnect_proxies(self) -> None:
+        """Reconnect the server controller and que proxies"""
+        self.server_context._close()#type: ignore
+        self.que._close()#type: ignore
+        self.daemon._close()#type: ignore
+        self.worker._close()#type: ignore
+        server = connect_manager()
+        self.server_context = server.get_server_context()
+        self.que = server.get_que()
+        self.daemon = server.get_daemon()
+        self.worker = server.get_worker()
+
+    # Cmd overrides
+
+    def onecmd(self, line):
+        """Override to handle connection errors gracefully"""
+        try:
+            return super().onecmd(line)
+        except (EOFError, ConnectionError, BrokenPipeError, OSError) as e:
+            self.console.print(f"\n[bold yellow][WARNING][/bold yellow] Connection lost: {e}")
+            print("Attempting to reconnect...")
+            try:
+                self._reconnect_proxies()
+                self.console.print("[bold green][OK][/bold green] Reconnected!\n")
+            except Exception as reconnect_error:
+                self.console.print(f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}")
+                return False
+
+            # Retry is now outside the inner try/except, so if it fails
+            # it loops back to the top-level handler on the next onecmd call
+            # instead of being misreported as a reconnection failure.
+            try:
+                return super().onecmd(line)
+            except (EOFError, ConnectionError, BrokenPipeError, OSError):
+                self.console.print("[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again.[/bold yellow]")
+                return False
+
 
     def _show_banner(self):
         """Display a fancy welcome banner"""
@@ -60,8 +164,6 @@ class QueShell(cmdLib.Cmd):
         self.console.print(
             "\nType [bold cyan]help[/bold cyan] or [bold cyan]?[/bold cyan] to list commands.\n"
         )
-
-    
 
     def do_help(self, arg):
         """Override help to provide Rich formatted help"""
@@ -94,60 +196,29 @@ class QueShell(cmdLib.Cmd):
         table.add_column("Command", style="bold yellow", width=12)
         table.add_column("Description", style="white")
 
-        commands = [
-            ("help", "Show this help message or detailed help for a command"),
-            ("list", "Display runs in a given location"),
-            ("create", "Create a new run and add to queue"),
-            ("add", "Add a completed run to old runs"),
-            ("remove", "Remove a run from the queue"),
-            ("display", "Show detailed config for a run"),
-            ("edit", "Edit a run's configuration"),
-            ("move", "Move a run between locations"),
-            ("shuffle", "Reposition a run within a location"),
-            ("clear", "Clear all runs from a location"),
-            ("daemon", "Start/manage the daemon process"),
-            ("worker", "Start/manage the worker process"),
-            ("attach", "Attach to tmux session"),
-            ("save", "Save queue state to file"),
-            ("load", "Load queue state from file"),
-            ("recover", "Recover from a failed run"),
-            ("quit/exit", "Exit queShell"),
-        ]
-
-        for cmd, desc in commands:
-            table.add_row(cmd, desc)
+        for key, value in self._parser_factories.items():
+            cmd_parser = value()
+            desc = (
+                cmd_parser.description if cmd_parser.description else "No description"
+            )
+            table.add_row(key, desc)
 
         self.console.print(table)
         self.console.print(
             "\n[dim]Tip: Use 'help <command>' for detailed information about a specific command[/dim]\n"
         )
 
-    @contextmanager
-    def unwrap_exception(self, message: str, error: str = ""):
-        try:
-            yield
-            self.console.print(f"[bold green]✓ {message} [/bold green]")
-        except Exception as e:
-            if error:
-                self.console.print(
-                    f"[bold red]✗ {error} : {e} [/bold red]", style="red"
-                )
-            else:
-                self.console.print(f"[bold red]✗ {e} [/bold red]", style="red")
-
     def do_quit(self, arg):
         """Exit the shell with style"""
-        args = shlex.split(arg) if arg else []
-        parser = self._get_quit_parser()
-        try:
-            parsed_args = parser.parse_args(args)
-        except SystemExit:
-            self.console.print("[yellow]Quit cancelled[/yellow]")
+
+        parsed_args = self._parse_args_or_cancel("quit", arg)
+        if parsed_args is None:
             return
 
         if not parsed_args.no_save:
             with self.console.status("[bold green]Saving state...", spinner="dots"):
-                self.do_save(arg)
+                self.do_save("que")
+                self.do_save("server")
                 time.sleep(0.5)  # Brief pause for visual feedback
         else:
             self.console.print("[yellow]Exiting without saving[/yellow]")
@@ -167,33 +238,70 @@ class QueShell(cmdLib.Cmd):
     def do_EOF(self, arg):
         """Exit on Ctrl+D"""
         self.console.print()
-        return self.do_quit(arg)    
+        return self.do_quit(arg)
 
-    #Que based
+    # Que based
 
     def do_save(self, arg):
         """Save state with visual feedback"""
-        with self.unwrap_exception("Queue state saved to file"):
-            self.que.save_state()
-        with self.unwrap_exception("Daemon state saved to file"):
-            self.daemon_controller.save_state()
+        parsed_args = self._parse_args_or_cancel("save", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == "que":
+            with self.unwrap_exception(
+                "Queue state saved to file", "Failed to save que state"
+            ):
+                self.que.save_state(
+                    out_path=parsed_args.Output_Path, timestamp=parsed_args.Timestamp
+                )
+        elif parsed_args.command == "server":
+            with self.unwrap_exception(
+                "Server state saved to file", "Failed to save server state"
+            ):
+                self.server_context.save_state()
+        else:
+            raise ValueError(
+                "neither Que nor Server specified, this should not be possible"
+            )
         # self.console.print("[bold green]✓[/bold green] Queue state saved to file")
 
     def do_load(self, arg):
         """Load state with visual feedback"""
-        with self.console.status("[bold cyan]Loading state...", spinner="dots"):
-            with self.unwrap_exception("Que state loaded from file"):
-                    self.que.load_state()
-            with self.unwrap_exception("Daemon state loaded from file"):
-                    self.daemon_controller.load_state()        
-                
+        parsed_args = self._parse_args_or_cancel("load", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == "que":
+            with self.unwrap_exception(
+                "Que state loaded from file", "Failed to load Que state from file"
+            ):
+                self.que.load_state(parsed_args.Input_Path)
+        elif parsed_args.command == "server":
+            with self.unwrap_exception(
+                "Server state loaded from file", "Failed to load server state from file"
+            ):
+                self.server_context.load_state()
+        else:
+            raise ValueError(
+                "neither Que nor Server specified, this should not be possible"
+            )
+
         # self.console.print("[bold green]✓[/bold green] Queue state loaded from file")
 
     def do_recover(self, arg):
         """Recover a run with status indication"""
+        parsed_args = self._parse_args_or_cancel("recover", arg)
+        if parsed_args is None:
+            return
         with self.unwrap_exception("Run recovered successfully"):
             with self.console.status("[bold yellow]Recovering run...", spinner="dots"):
-                self.que.recover_run()
+                self.que.recover_run(
+                    from_loc=parsed_args.o_location,
+                    to_loc=parsed_args.n_location,
+                    index=parsed_args.index,
+                    clean_slate=parsed_args.clean_slate
+                )
 
     def do_clear(self, arg):
         """Clear runs with confirmation"""
@@ -211,13 +319,16 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("[yellow]Clear cancelled[/yellow]")
 
+        
     def do_list(self, arg):
         """Display runs in a beautiful table"""
         parsed_args = self._parse_args_or_cancel("list", arg)
         if parsed_args is None:
             return
 
-        runs = self.que.list_runs(parsed_args.location)
+        runs = None
+        with self.unwrap_exception('list'):
+            runs = self.que.list_runs(parsed_args.location, parsed_args.key_set, parsed_args.reverse)
 
         if not runs:
             self.console.print(
@@ -243,7 +354,6 @@ class QueShell(cmdLib.Cmd):
 
         # runs are a list of Summarised dicts
 
-        # TODO: there is probably a list comprehension way to do thi
         for idx, row in enumerate(runs):
             row_values = []
             for value in row.values():
@@ -270,31 +380,41 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("[yellow]Remove cancelled[/yellow]")
 
+    def _unpack_keys(self, run: GenExp,  key_set: List[str]) -> Any:
+        unpack = cast(Dict[str, Any], run)
+        unpack = run
+        for k in key_set:
+            unpack = unpack[k]
+        return unpack
+                
     def do_display(self, arg):
         """Display run details in a styled panel"""
         parsed_args = self._parse_args_or_cancel("display", arg)
         if parsed_args is None:
             return
-        try:
-            run = self.que.peak_run(parsed_args.location, parsed_args.index)
         
-            # Format as JSON-like syntax
+        
+        with self.unwrap_exception('Display passed', 'Display failed'):
+            run = self.que.peak_run(parsed_args.location, parsed_args.index)
+            title = f"Run {parsed_args.index} in {parsed_args.location}"
+            if parsed_args.key_set is not None:
+                run = self._unpack_keys(run, parsed_args.key_set)
+                title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.key_set)}"
+                
+        # Format as JSON-like syntax
 
-            run_json = json.dumps(run, indent=2)
-            syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+        run_json = json.dumps(run, indent=2)
+        syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
-            self.console.print(
-                Panel(
-                    syntax,
-                    title=f"Run {parsed_args.index} in {parsed_args.location}",
-                    border_style="cyan",
-                    padding=(1, 2),
-                )
+        self.console.print(
+            Panel(
+                syntax,
+                title=title,
+                border_style="cyan",
+                padding=(1, 2),
             )
-        except Exception as e:
-            self.console.print(
-                f"[red]Display failed : {e}[/red]"
-            )
+        )
+        
 
     def do_shuffle(self, arg):
         """Reposition with visual confirmation"""
@@ -305,7 +425,9 @@ class QueShell(cmdLib.Cmd):
         with self.unwrap_exception(
             f"Moved run from position {parsed_args.o_index} to {parsed_args.n_index} in {parsed_args.location}"
         ):
-            self.que.shuffle(parsed_args.location, parsed_args.o_index, parsed_args.n_index)
+            self.que.shuffle(
+                parsed_args.location, parsed_args.o_index, parsed_args.n_index
+            )
 
     def do_move(self, arg):
         """Move run with visual feedback"""
@@ -340,7 +462,9 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.console.status("[bold cyan]Creating run...", spinner="dots"):
-            with self.unwrap_exception("Run created successfully", "Failed to create new run"):
+            with self.unwrap_exception(
+                "Run created successfully", "Failed to create new run"
+            ):
                 self.que.create_run(admin_info, wandb_info)
         # self.console.print("[bold green]✓[/bold green] Run created successfully")
 
@@ -370,86 +494,208 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        self.que.edit_run(
-            parsed_args.location,
-            parsed_args.index,
-            parsed_args.key1,
-            parsed_args.value,
-            parsed_args.key2,
-        )
-        self.console.print(
-            f"[bold green]✓[/bold green] Edited run {parsed_args.index} in {parsed_args.location}"
-        )
+        with self.unwrap_exception("Edit successful", "Edit failed"): 
+            self.que.edit_run(
+                parsed_args.location,
+                parsed_args.index,
+                parsed_args.key1,
+                parsed_args.value,
+                parsed_args.key2,
+                parsed_args.do_eval
+            )
 
-    #Tmux
-    def do_attach(self, arg):
-        """Attach to the que_training tmux session"""
-        with self.unwrap_exception("Attached to tmux session", "Failed to attach to tmux session"):
-            self.tmux_man.join_session_pane()
-
-    #Daemon based
     
-    def _pretty_status(self, status: DaemonState):
-        if status["awake"]:
-            self.console.print("Daemon is currently: [bold green]Awake[/bold green]")
-        else:
-            self.console.print("Daemon is currently: [bold yellow]Asleep[/bold yellow]")
-        if status["stop_on_fail"]:
-            self.console.print("Stop on fail is: [bold red]Enabled[/bold red]")
-        else:
-            self.console.print("Stop on fail is: [bold green]Disabled[/bold green]")
-        if status["pid"]:
-            self.console.print(f"Daemon PID: [bold cyan]{status['pid']}[/bold cyan]")
-        else:
-            self.console.print("Daemon PID: [bold yellow]N/A[/bold yellow]")
-        if status["worker_pid"]:
-            self.console.print(f"Worker PID: [bold cyan]{status['worker_pid']}[/bold cyan]")
-        else:
-            self.console.print("Worker PID: [bold yellow]N/A[/bold yellow]")
             
+
+    def do_wandb(self, arg):
+        """Open the wandb page for a run"""
+        parsed_args = self._parse_args_or_cancel("wandb", arg)
+        if parsed_args is None:
+            return
+        
+        url = "https://wandb.ai/"
+        
+        if parsed_args.location is not None and parsed_args.index is not None:
+            run = self.que.peak_run(loc=parsed_args.location, idx=parsed_args.index)
+            wandb_info = run['wandb']
+            url = url + f"{wandb_info['entity']}/{wandb_info['project']}/{wandb_info['run_id']}"
+        else:
+            url = url + f"{parsed_args.entity}/{parsed_args.project}"
+        
+        with self.unwrap_exception("Wandb opened successfully", "Opening wandb failed"):
+            webbrowser.open(url)
+        
+        
+        
+    #   Worker
+
+    def do_worker(self, arg):
+        parsed_args = self._parse_args_or_cancel("worker", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == "clear_mem":
+                self.worker.cleanup()
+                self.console.print("[bold green]Cleared CUDA memory[/bold green]")
+                used, total = gpu_manager.get_gpu_memory_usage()
+                self.console.print(f"CUDA memory: {used}/{total} GiB")
+        else:
+            self.console.print(
+                f"[bold red]Command not recognised: {parsed_args.command}[/bold red]"
+            )
+
+    # Daemon
+        
     def do_daemon(self, arg):
         """Interact with the worker"""
         parsed_args = self._parse_args_or_cancel("daemon", arg)
         if parsed_args is None:
             return
-        
-        if parsed_args.command == 'save':
-            with self.unwrap_exception("Daemon state saved", "Failed to save daemon state"):
-                self.daemon_controller.save_state()
-        elif parsed_args.command == 'load':
-            with self.unwrap_exception("Daemon state loaded", "Failed to load daemon state"):
-                self.daemon_controller.load_state()
-        elif parsed_args.command == 'start':
-            with self.unwrap_exception("Worker process started", "Failed to start worker"):
-                self.daemon_controller.start()
-        elif parsed_args.command == 'stop':
+        elif parsed_args.command == "start":
+            with self.unwrap_exception(
+                "Worker process started", "Failed to start worker"
+            ):
+                self.daemon.start_supervisor()
+        elif parsed_args.command == "stop":
             if parsed_args.supervisor:
-                with self.unwrap_exception("Supervisor process stopped", "Failed to stop supervisor"):
-                    self.daemon_controller.stop_supervisor(timeout=parsed_args.timeout, hard=parsed_args.hard, and_worker=parsed_args.worker)
+                with self.unwrap_exception(
+                    "Supervisor process stopped", "Failed to stop supervisor"
+                ):
+                    self.daemon.stop_supervisor(
+                        timeout=parsed_args.timeout,
+                        hard=parsed_args.hard,
+                        stop_worker=parsed_args.worker,
+                    )
             else:
-                with self.unwrap_exception("Worker process stopped", "Failed to stop worker"):
-                    self.daemon_controller.stop_worker(timeout=parsed_args.timeout, hard=parsed_args.hard)
-        elif parsed_args.command == 'status':
-            self._pretty_status(self.daemon_controller.get_state())
-        elif parsed_args.command == 'stop-on-fail':
-            if parsed_args.value == 'on':
-                parsed_args.value = True
-            else:
-                parsed_args.value = False
-            self.daemon_controller.set_stop_on_fail(parsed_args.value)
-            self.console.print(f"[bold green]✓[/bold green] Set stop on fail to {parsed_args.value}")
-        elif parsed_args.command == 'awake':
-            if parsed_args.value == 'on':
-                parsed_args.value = True
-            self.daemon_controller.set_awake(parsed_args.value)
-            self.console.print(f"[bold green]✓[/bold green] Set awake to {parsed_args.value}")
-        else:
-            self.console.print(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")            
-    
-            
-    #Helper function
+                with self.unwrap_exception(
+                    "Worker process stopped", "Failed to stop worker"
+                ):
+                    self.daemon.stop_worker(
+                        timeout=parsed_args.timeout, hard=parsed_args.hard
+                    )
 
-    avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
+    # Server
+    
+    def _pretty_status(self, status: ServerState):
+        
+        # Main status table
+        table = Table(title="Server Status", show_header=False, box=None, padding=(0, 2))
+        table.add_column("Section", style="bold cyan", width=20)
+        table.add_column("Details")
+        
+        # Server section
+        server_pid = status['server_pid']
+        server_status = Text()
+        if server_pid:
+            server_status.append("Running ", style="bold green")
+            server_status.append(f"(PID: {server_pid})", style="dim")
+        else:
+            server_status.append("Not Running", style="bold red")
+        table.add_row("Server", server_status)
+        
+        # Daemon section
+        daemon_state = status['daemon_state']
+        daemon_table = Table(show_header=False, box=None, padding=(0, 1))
+        daemon_table.add_column(style="yellow", width=15)
+        daemon_table.add_column()
+        
+        awake_icon = "✓" if daemon_state['awake'] else "✗"
+        awake_style = "green" if daemon_state['awake'] else "red"
+        daemon_table.add_row("Awake:", Text(awake_icon, style=awake_style))
+        
+        stop_icon = "✓" if daemon_state['stop_on_fail'] else "✗"
+        daemon_table.add_row("Stop on Fail:", Text(stop_icon, style="yellow" if daemon_state['stop_on_fail'] else "dim"))
+        
+        if daemon_state['supervisor_pid']:
+            daemon_table.add_row("Supervisor PID:", str(daemon_state['supervisor_pid']))
+        
+        table.add_row("Daemon", daemon_table)
+        
+        # Worker section
+        worker_state = status['worker_state']
+        worker_table = Table(show_header=False, box=None, padding=(0, 1))
+        worker_table.add_column(style="magenta", width=15)
+        worker_table.add_column()
+        
+        task_style = "bold green" if worker_state['task'] == 'training' else "dim"
+        worker_table.add_row("Task:", Text(worker_state['task'], style=task_style))
+        
+        if worker_state['current_run_id']:
+            worker_table.add_row("Run ID:", worker_state['current_run_id'])
+        
+        if worker_state['working_pid']:
+            worker_table.add_row("Worker PID:", str(worker_state['working_pid']))
+        
+        if worker_state['exception']:
+            error_text = Text(worker_state['exception'], style="bold red")
+            worker_table.add_row("Exception:", error_text)
+        
+        table.add_row("Worker", worker_table)
+        
+        self.console.print(table)
+
+    def do_server(self, arg):
+        parsed_args = self._parse_args_or_cancel("server", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.command == "save":
+            with self.unwrap_exception(
+                "Server state saved", "Failed to save server state"
+            ):
+                self.server_context.save_state()
+        elif parsed_args.command == "load":
+            with self.unwrap_exception(
+                "Server state loaded", "Failed to load server state"
+            ):
+                self.server_context.load_state()
+        elif parsed_args.command == "status":
+            self._pretty_status(self.server_context.get_state())
+
+    # Subprocess
+
+    def do_attach(self, arg):
+        """Attach to the que_training tmux session"""
+        with self.unwrap_exception(
+            "Attached to tmux session", "Failed to attach to tmux session"
+        ):
+            self.tmux_man.join_session()  
+
+    def do_logs(self, arg):
+        """Tail the worker or daemon logs"""
+        parsed_args = self._parse_args_or_cancel("logs", arg)
+        if parsed_args is None:
+            return
+
+        if parsed_args.worker:
+            log_file = str(TRAINING_LOG_PATH)  # your constant
+        elif parsed_args.server:
+            log_file = str(SERVER_LOG_PATH)  # your constant
+        else:
+            raise ValueError("Please specify --worker or --server")
+
+        if parsed_args.clear:
+            if Confirm.ask(f"[bold red]Clear all logs in {log_file}?[/bold red]"):
+                with self.unwrap_exception(
+                    f"Cleared {log_file}", f"Failed to clear log file: {log_file}"
+                ):
+                    with open(log_file, "w") as f:
+                        f.truncate(0)
+                return
+            else:
+                self.console.print("[yellow]Action cancelled[/yellow].")
+                return
+
+        try:
+            subprocess.run(["tail", "-f", log_file])
+        except KeyboardInterrupt:
+            self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
+        except FileNotFoundError:
+            self.console.print(f"[red]Error: Log file not found at {log_file}[/red]")
+        except Exception as e:
+            self.console.print(f"[red]Error reading log file: {e}[/red]")
+
+    # Helper functions for parsing
 
     def _apply_synonyms(self, parsed_args):
         """Apply synonyms to location arguments"""
@@ -461,7 +707,7 @@ class QueShell(cmdLib.Cmd):
             parsed_args.n_location = SYNONYMS.get(
                 parsed_args.n_location.lower(), parsed_args.n_location
             )
-        if hasattr(parsed_args, "location"):
+        if hasattr(parsed_args, "location") and parsed_args.location is not None:
             parsed_args.location = SYNONYMS.get(
                 parsed_args.location.lower(), parsed_args.location
             )
@@ -470,7 +716,7 @@ class QueShell(cmdLib.Cmd):
     def _parse_args_or_cancel(self, cmd: str, arg: str) -> Optional[argparse.Namespace]:
         """
         Parse generic arguments
-        
+
         :param self: QueShell instance
         :param cmd: The name of the command, i.e. x in do_x function name
         :type cmd: str
@@ -492,28 +738,98 @@ class QueShell(cmdLib.Cmd):
 
     def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
         """Get argument parser for a given command"""
-        parsers = {
-            "create": lambda: configs.get_train_parser(
-                prog="create", desc="Create a new training run"
-            ),
-            "add": lambda: configs.get_train_parser(
-                prog="add", desc="Add a completed training run to old_runs"
-            ),
-            "remove": self._get_remove_parser,
-            "clear": self._get_clear_parser,
-            "list": self._get_list_parser,
-            "quit": self._get_quit_parser,
-            "shuffle": self._get_shuffle_parser,
-            "move": self._get_move_parser,
-            "edit": self._get_edit_parser,
-            "display": self._get_display_parser,
-            "daemon": self._get_daemon_parser
-        }
-        if cmd in parsers:
-            return parsers[cmd]()
-        return None
+        factory = self._parser_factories.get(cmd)
+        return factory() if factory else None
 
-    #Que
+    # Que
+
+    def _get_recover_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Recover a failed run", prog="recover"
+        )
+
+        parser.add_argument(
+            "--o_location",
+            "-ol",
+            type=str,
+            choices=self.avail_locs,
+            help="Location to recover from (default: cur_run)",
+            default=CUR_RUN,
+        )
+        parser.add_argument(
+            "--n_location",
+            "-nl",
+            type=str,
+            choices=self.avail_locs,
+            help="Location to move recovered run to (default: to_run)",
+            default=TO_RUN,
+        )
+        parser.add_argument(
+            "--index",
+            "-i",
+            type=int,
+            default=0,
+            help="Index of run to recover (default: 0)",
+        )
+        parser.add_argument(
+            "--clean_slate",
+            "-cs",
+            action='store_true',
+            help="Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work."
+        )
+
+
+        return parser
+
+    def _get_save_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Save the state of the Que or Daemon", prog="save"
+        )
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Target to save"
+        )
+
+        # Que Subparser
+        que_parser = subparsers.add_parser("que", help="Save Que state")
+        que_parser.add_argument(
+            "--Timestamp", "-t", action="store_true", help="Timestamp the output file"
+        )
+        que_parser.add_argument(
+            "--Output_Path",
+            "-op",
+            type=str,
+            default=RUN_PATH,
+            help=f"Output path (default: {RUN_PATH})",
+        )
+
+        # Daemon Subparser
+        subparsers.add_parser("server", help="Save Server state")
+    
+        return parser
+
+    def _get_load_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Load the state of the Que or Daemon", prog="load"
+        )
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Target to load"
+        )
+
+        # Que Subparser
+        que_load = subparsers.add_parser("que", help="Load Que state")
+        que_load.add_argument(
+            "--Input_Path",
+            "-ip",
+            type=str,
+            default=RUN_PATH,
+            help=f"Input path (default: {RUN_PATH})",
+        )
+
+        # Daemon Subparser
+        subparsers.add_parser("server", help="Load Server state")
+        # TODO: Maybe add this if desired
+
+        return parser
 
     def _get_move_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -544,6 +860,7 @@ class QueShell(cmdLib.Cmd):
         )
         parser.add_argument("location", choices=self.avail_locs)
         parser.add_argument("index", type=int)
+        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to display within the run")
         return parser
 
     def _get_clear_parser(self) -> argparse.ArgumentParser:
@@ -554,6 +871,9 @@ class QueShell(cmdLib.Cmd):
     def _get_list_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="List runs", prog="list")
         parser.add_argument("location", choices=self.avail_locs)
+        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to sort the list by")
+        parser.add_argument('--reverse', "-r", action='store_true', help='Sort in descending order')
+        
         return parser
 
     def _get_quit_parser(self) -> argparse.ArgumentParser:
@@ -569,59 +889,142 @@ class QueShell(cmdLib.Cmd):
         # parser.add_argument("key1", type=str, choices=opts_keys)
         parser.add_argument("key1", type=str)
         parser.add_argument("value", type=str)
-        parser.add_argument("-k2", "--key2", type=str, default=None)
+        parser.add_argument("--key2", "-k2", type=str, default=None)
+        parser.add_argument("--do_eval", "-de", action='store_true', help='Evaluate the provided value to a type.')
         return parser
 
-    
-    #Daemon
-    
+    # Other
+
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
-            description="Interact with the worker process", 
-            prog="daemon"
+            description="Interact with the worker process", prog="daemon"
+        )
+
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Daemon commands"
+        )
+
+
+        # Start
+        subparsers.add_parser("start", help="Start the supervisor")
+
+        # Stop with timeout
+        stop_parser = subparsers.add_parser(
+            "stop", help="Stop the worker gracefully, force kill if necessary"
+        )
+        stop_parser.add_argument(
+            "--worker", "-w", action="store_true", help="Stop the worker process"
+        )
+        stop_parser.add_argument(
+            "--supervisor",
+            "-s",
+            action="store_true",
+            help="Stop the supervisor process. Include -w to stop worker as well, otherwise wait for trainloop to complete",
+        )
+        stop_parser.add_argument(
+            "--timeout",
+            "-to",
+            type=int,
+            default=10,
+            help="Timeout in seconds (default: 10)",
+        )
+        stop_parser.add_argument(
+            "--hard",
+            "-hd",
+            action="store_true",
+            help="Force kill the worker after timeout",
+        )
+
+
+        return parser
+
+    def _get_server_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Interact with the server context", prog="server"
         )
         
-        subparsers = parser.add_subparsers(dest='command', required=True, help='Daemon commands')
-        
-        #Save state
-        subparsers.add_parser('save', help='Save daemon state to disk')
-        #Load state
-        subparsers.add_parser('load', help='Load daemon state from disk')
-        
-        # Start
-        subparsers.add_parser('start', help='Start the worker process')
-        
-        # Stop with timeout
-        stop_parser = subparsers.add_parser('stop', help='Stop the worker gracefully, force kill if necessary')
-        stop_parser.add_argument('--worker', '-w', action='store_true', help='Stop the worker process')
-        stop_parser.add_argument('--supervisor', '-s', action='store_true', help='Stop the supervisor process. Include -w to stop worker as well, otherwise wait for trainloop to complete')
-        stop_parser.add_argument('--timeout', '-to', type=int, default=10, help='Timeout in seconds (default: 10)')
-        stop_parser.add_argument('--hard', '-hd', action='store_true', help='Force kill the worker after timeout')
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Server commands"
+        )
+
+        # Save state
+        subparsers.add_parser("save", help="Save Server state to disk")
+        # Load state
+        subparsers.add_parser("load", help="Load Server state from disk")
         
         # Status
-        subparsers.add_parser('status', help='Get worker status information')
-        
-        #Set stop on fail
-        set_stop_on_fail_parser = subparsers.add_parser('stop-on-fail', help='Set stop on fail option')
-        set_stop_on_fail_parser.add_argument('value', choices=['on', 'off'], help='Boolean value to set')
-        
-        #Set awake
-        set_awake_parser = subparsers.add_parser('set-awake', help='Set awake option')
-        set_awake_parser.add_argument('value', choices=['on', 'off'], help='Boolean value to set')
-        
+        subparsers.add_parser("status", help="Get worker status information")
         
         return parser
 
-    #Tmux
-    
+    def _get_worker_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Interact with the worker", prog="worker"
+        )
+        
+        subparsers = parser.add_subparsers(
+            dest="command", required=True, help="Server commands"
+        )
+
+        # Clear memory
+        subparsers.add_parser("cleanup", help="Clear CUDA memory")
+
+        
+        return parser
 
 
-"""To dos:
-- There are some functions which do not have exception handling - add those
+    def _get_log_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Interact with Que log files", prog="logs"
+        )
 
-"""
-    
-    
+        group = parser.add_mutually_exclusive_group(required=True)
+        group.add_argument(
+            "--worker", "-w", action="store_true", help="Tail the Worker.log file"
+        )
+        group.add_argument(
+            "--server", "-s", action="store_true", help="Tail the Server.log file"
+        )
+
+        parser.add_argument(
+            "--clear",
+            "-c",
+            action="store_true",
+            help="Clear the log file instead of tailing",
+        )
+
+        return parser
+
+    def _get_wandb_parser(self) -> argparse.ArgumentParser:
+        likely_projects = [
+            f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()
+        ]
+        parser = argparse.ArgumentParser(
+            description="Open the wandb page for a run, or project", prog="wandb"
+        )
+        parser.add_argument("--location", "-l", choices=self.avail_locs)
+        parser.add_argument("--index", "-i", type=int)
+        parser.add_argument(
+            "--project",
+            "-p",
+            type=str,
+            help="Wandb project name. Probably one of: " + ", ".join(likely_projects),
+            default='projects'
+        )
+        parser.add_argument(
+            "--entity",
+            "-e",
+            type=str,
+            help=f"Wandb entity name. Default: {ENTITY}",
+            default=ENTITY,
+        )
+        return parser
+
 if __name__ == "__main__":
-    que_shell = QueShell()
-    que_shell.cmdloop()
+    server = connect_manager()
+    que_shell = QueShell(server)
+
+    try:
+        que_shell.cmdloop()
+    except KeyboardInterrupt:
+        print("\n[INFO] Exiting queShell due to keyboard interrupt.")
