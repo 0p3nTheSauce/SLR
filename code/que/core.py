@@ -519,41 +519,6 @@ class Que:
 
         return stats
 
-    def _get_val(self, run: GenExp, keys: List[str]) -> Any:
-        """Unpack the value in a run using a list of keys
-
-        Args:
-                                        run (GenExp): Provided general run
-                                        keys (List[str]): Keys to unpack dictionary
-
-        Returns:
-                                        Any: The value
-        """
-        unpack = cast(Dict[str, Any], run)
-        for k in keys:
-            unpack = unpack[k]
-        return unpack
-
-    def _find_runs(
-        self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
-    ) -> Tuple[List[int], List[GenExp]]:
-        """Find runs with matching keys, if any
-
-        Args:
-                                        to_search (List[GenExp]): A run list
-                                        keys (List[str]): Run keys
-                                        value (Any): The desired value
-
-        Returns:
-                                        List[Tuple[int, GenExp]]: A List of runs
-        """
-        idxs = []
-        runs = []
-        for i, run in enumerate(to_search):
-            if criterion(self._get_val(run, keys)):
-                idxs.append(i)
-                runs.append(run)
-        return idxs, runs
 
     def load_state(self, in_path: Optional[Union[str, Path]] = None):
         """
@@ -629,6 +594,7 @@ class Que:
             raise QueEmpty(loc)
         elif abs(idx) >= len(to_get):
             raise QueIdxOOR(loc, idx, len(to_get))
+        
         return to_get[idx]
 
     def peak_cur_run(self) -> ExpInfo:
@@ -695,16 +661,37 @@ class Que:
         """Method to"""
         return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
 
-    def list_runs(self, loc: QueLocation) -> List[Sumarised]:
+    def _get_val(self, run: GenExp, keys: List[str]) -> Any:
+        """Unpack the value in a run using a list of keys
+
+        Args:
+            run (GenExp): Provided general run
+            keys (List[str]): Keys to unpack dictionary
+
+        Returns:
+            Any: The value
+        """
+        unpack = cast(Dict[str, Any], run)
+        for k in keys:
+            unpack = unpack[k]
+        return unpack
+
+    def list_runs(self, loc: QueLocation, key_set: Optional[List[str]] = None, reverse: bool = False) -> List[Sumarised]:
         """List runs at a given location in summarised format
 
         Args:
-                                        loc (QueLocation): to_run, cur_run or old_runs
+            loc (QueLocation): Literal of: to_run, cur_run, old_runs or fail_runs
+            key_set (Optional[List[str]]): List of keys to unpack value in Dictionary
 
         Returns:
-                                        List[List[str]]: Summarised runs
+            List[List[str]]: Summarised runs
         """
-        return [self._run_sum(run) for run in self._fetch_state(loc)]
+        loc_runs = self._fetch_state(loc)
+        if key_set is None:
+            return [self._run_sum(run) for run in loc_runs]
+        else:
+            runs = sorted(loc_runs, key=lambda x: self._get_val(x, key_set), reverse=reverse)
+            return [self._run_sum(run) for run in runs]    
 
     def disp_runs(self, loc: QueLocation, exc: Optional[List[str]] = None) -> None:
         print(f"{loc} runs".title())
@@ -1094,6 +1081,27 @@ class Que:
                 
             self._set_run(loc, idx, run)
 
+    def _find_runs(
+        self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
+    ) -> Tuple[List[int], List[GenExp]]:
+        """Find runs with matching keys, if any
+
+        Args:
+            to_search (List[GenExp]): A run list
+            keys (List[str]): Run keys
+            value (Any): The desired value
+
+        Returns:
+            List[Tuple[int, GenExp]]: A List of runs
+        """
+        idxs = []
+        runs = []
+        for i, run in enumerate(to_search):
+            if criterion(self._get_val(run, keys)):
+                idxs.append(i)
+                runs.append(run)
+        return idxs, runs
+
     def find_runs(
         self,
         loc: QueLocation,
@@ -1103,12 +1111,12 @@ class Que:
         """Find the set of runs which match all of the key list value pairs
 
         Args:
-                                        loc (QueLocation): Location to search
-                                        key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
-                                        values (List[Any]): The corresponding values for each set of keys
+            loc (QueLocation): Location to search
+            key_set (List[List[str]]): A list of keys to unpack a dictionary to get to a particular value. Multiple values can be searched with a list of these sets of keys
+            values (List[Any]): The corresponding values for each set of keys
 
         Returns:
-                                        Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
+            Tuple[List[int], List[GenExp]]: Indexes, and runs, if found
         """
 
         assert len(key_set) == len(criterions), (

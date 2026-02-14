@@ -1,6 +1,8 @@
 import webbrowser
 from .core import (
     TO_RUN,
+    GenExp,
+    ExpQue,
     CUR_RUN,
     QUE_LOCATIONS,
     SYNONYMS,
@@ -11,14 +13,13 @@ from .core import (
     TRAINING_LOG_PATH,
     SERVER_LOG_PATH,
     RUN_PATH,
-
     QueManagerProtocol,
 )
 from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
 import cmd as cmdLib
 import shlex
-from typing import Optional
+from typing import Optional, List, Any, Dict, cast
 import argparse
 import configs
 import time
@@ -318,13 +319,16 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("[yellow]Clear cancelled[/yellow]")
 
+        
     def do_list(self, arg):
         """Display runs in a beautiful table"""
         parsed_args = self._parse_args_or_cancel("list", arg)
         if parsed_args is None:
             return
 
-        runs = self.que.list_runs(parsed_args.location)
+        runs = None
+        with self.unwrap_exception('list'):
+            runs = self.que.list_runs(parsed_args.location, parsed_args.key_set, parsed_args.reverse)
 
         if not runs:
             self.console.print(
@@ -376,29 +380,41 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("[yellow]Remove cancelled[/yellow]")
 
+    def _unpack_keys(self, run: GenExp,  key_set: List[str]) -> Any:
+        unpack = cast(Dict[str, Any], run)
+        unpack = run
+        for k in key_set:
+            unpack = unpack[k]
+        return unpack
+                
     def do_display(self, arg):
         """Display run details in a styled panel"""
         parsed_args = self._parse_args_or_cancel("display", arg)
         if parsed_args is None:
             return
-        try:
+        
+        
+        with self.unwrap_exception('Display passed', 'Display failed'):
             run = self.que.peak_run(parsed_args.location, parsed_args.index)
+            title = f"Run {parsed_args.index} in {parsed_args.location}"
+            if parsed_args.key_set is not None:
+                run = self._unpack_keys(run, parsed_args.key_set)
+                title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.key_set)}"
+                
+        # Format as JSON-like syntax
 
-            # Format as JSON-like syntax
+        run_json = json.dumps(run, indent=2)
+        syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
-            run_json = json.dumps(run, indent=2)
-            syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
-
-            self.console.print(
-                Panel(
-                    syntax,
-                    title=f"Run {parsed_args.index} in {parsed_args.location}",
-                    border_style="cyan",
-                    padding=(1, 2),
-                )
+        self.console.print(
+            Panel(
+                syntax,
+                title=title,
+                border_style="cyan",
+                padding=(1, 2),
             )
-        except Exception as e:
-            self.console.print(f"[red]Display failed : {e}[/red]")
+        )
+        
 
     def do_shuffle(self, arg):
         """Reposition with visual confirmation"""
@@ -487,6 +503,9 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.key2,
                 parsed_args.do_eval
             )
+
+    
+            
 
     def do_wandb(self, arg):
         """Open the wandb page for a run"""
@@ -841,6 +860,7 @@ class QueShell(cmdLib.Cmd):
         )
         parser.add_argument("location", choices=self.avail_locs)
         parser.add_argument("index", type=int)
+        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to display within the run")
         return parser
 
     def _get_clear_parser(self) -> argparse.ArgumentParser:
@@ -851,6 +871,9 @@ class QueShell(cmdLib.Cmd):
     def _get_list_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="List runs", prog="list")
         parser.add_argument("location", choices=self.avail_locs)
+        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to sort the list by")
+        parser.add_argument('--reverse', "-r", action='store_true', help='Sort in descending order')
+        
         return parser
 
     def _get_quit_parser(self) -> argparse.ArgumentParser:
