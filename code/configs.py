@@ -302,13 +302,13 @@ def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> 
 		"model",
 		type=str,
 		choices=models_available,
-		help=f"Model name from one of the implemented models: {models_available}",
+		help="Model name from one of the implemented models",
 	)
 	parser.add_argument(
 		"split",
 		type=str,
 		choices=splits_available,
-		help=f"The class split, one of:  {', '.join(splits_available)}",
+		help="The class split, one of",
 	)
 	parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	parser.add_argument(

@@ -1,4 +1,4 @@
-# WLASL
+# SLR
 
 Work in progress repo focussing on training video classification architectures on the WLASL Dataset
 
@@ -13,11 +13,11 @@ Work in progress repo focussing on training video classification architectures o
 ## Installation
 
 ```bash
-git clone https://github.com/0p3nTheSauce/WLASL.git
-cd WLASL
+git clone https://github.com/0p3nTheSauce/SLR.git
+cd SLR
 
 #recommend using mini-conda
-conda env create -f wlasl_conda.yml
+conda env create -f wlasl_gpu.yml
 conda activate wlasl
 
 #download data
@@ -35,11 +35,18 @@ python preprocess.py -as asl100 -ve
 
 ## Usage
 
+
 ### Training
-Train a model by and specifying the experiment number, dataset, model and config file:
+
+
+
+
+
 
 ```bash
-train.py -ex 4 -sp asl100 -m S3D -c './configfiles/generic/hframe_hwd.ini'
+#for help python train.py -h
+
+python train.py S3D asl100 -c './configfiles/generic/hframe_hwd.ini'
 ```
 
 If config file paths follow the nameing convention...
@@ -57,7 +64,7 @@ example:
 ... then the config path can be determined automatically:
 
 ```bash
-train.py -ex 4 -sp asl100 -m S3D
+python training.py S3D asl100 4
 ```
 
 ### Testing
