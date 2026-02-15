@@ -544,7 +544,7 @@ def full_test(
 
 	# output
 	out_dir = save_path.parent / "results"
-	res_path = out_dir / "best_val_loss.json"
+	res_path = out_dir / "best_val_loss.json" #TODO: hard coding the file path, not very good
 
 	#dont retest if exists
 	if res_path.exists() and not re_test:
