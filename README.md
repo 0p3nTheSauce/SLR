@@ -38,7 +38,7 @@ python preprocess.py -as asl100 -ve
 Training and testing have the following **positional arguments** in common:
 
 - **MODEL_NAME**: 
-    One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S,Swin3D_B, MViTv2_S, MViTv1_B as shown in ./info/implemented_info.json.
+    One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S,Swin3D_B, MViTv2_S, MViTv1_B 
 - **SPLIT**: 
     The ASL split, one of: asl100, asl300, asl1000, asl2000
 - **EXP_NO**: 

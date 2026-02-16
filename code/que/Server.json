@@ -1,1 +1,1 @@
-{"server_pid": 896548, "daemon_state": {"awake": true, "stop_on_fail": true, "supervisor_pid": 897075}, "worker_state": {"task": "training", "current_run_id": "fkv6kpik", "working_pid": 3722524, "exception": null}}
+{"server_pid": null, "daemon_state": {"awake": false, "stop_on_fail": true, "supervisor_pid": null}, "worker_state": {"task": "training", "current_run_id": "fkv6kpik", "working_pid": null, "exception": "CUDA is not available"}}
