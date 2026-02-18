@@ -1,10 +1,11 @@
 import json
 import torch
 import tqdm
-from ultralytics import YOLO  # type: ignore 
-#NOTE: Running this script will mess up the environment you are using, becuase of this stupid YOLO thing
-#it will give a '3D conv not implemented yada yada' error message
-#The solution is to delete and recreate the environment
+from ultralytics import YOLO  # type: ignore
+
+# NOTE: Running this script will mess up the environment you are using, becuase of this stupid YOLO thing
+# it will give a '3D conv not implemented yada yada' error message
+# The solution is to delete and recreate the environment
 import cv2
 from argparse import ArgumentParser
 from pathlib import Path
@@ -13,7 +14,20 @@ from pathlib import Path
 from utils import load_rgb_frames_from_video
 from configs import WLASL_ROOT, SPLIT_DIR, RAW_DIR, LABELS_PATH
 
+
+def print_v(s: str, y: bool) -> None:
+    """Print string s if y is True. Used for verbose output during preprocessing.
+
+    Args:
+        s (str): string to print
+        y (bool): if True, print s, otherwise do not print
+    """
+    if y:
+        print(s)
+
+
 def correct_bbox(bbox, frame_shape):
+
     # bbox is a list of [x1, y1, x2, y2]
     # on a hunch, the boundign box seems shifted by:
     # 0.5 * width (of bbox) to the right
@@ -310,9 +324,59 @@ def remove_short_samples(
     return mod_instances, mod_classes
 
 
+
+def check_paths(
+    split_path: Path, raw_path: Path, output_path: Path, verbose: bool
+) -> bool:
+    """
+    Verifies that the provided paths for the split json, raw videos, and output directory exist and are of the correct
+    type (file or directory). Prints the status of each path based on the verbose flag. Returns True if all paths are
+     valid, otherwise returns False.
+
+    :param split_path: Path to the split json file (e.g. ../data/WLASL/splits/asl100.json)
+    :type split_path: Path
+    :param raw_path: Path the raw videos (e.g. ../data/WLASL/WLASL2000/)
+    :type raw_path: Path
+    :param output_path: Path to the output directory where the preprocessed labels will be saved (e.g. ../data/preprocessed/labels)
+    :type output_path: Path
+    :param verbose: Boolean flag to control verbose output during preprocessing. If True, will print detailed information about the preprocessing steps. Default is False.
+    :type verbose: bool
+    :return: True if all paths are valid, otherwise False.
+    :rtype: bool
+    """
+    if split_path.exists() and split_path.is_file():
+        print_v(f"split path: {split_path}, found", verbose)
+    else:
+        print(f"split path: {split_path}, not found")
+        return False
+    if raw_path.exists() and raw_path.is_dir():
+        print_v(f"raw path: {raw_path}, found", verbose)
+    else:
+        print(f"raw path: {raw_path}, not found")
+        return False
+    if output_path.exists() and output_path.is_dir():
+        print_v(f"output path: {output_path}, found", verbose)
+    else:
+        print(f"output path: {output_path}, not found")
+        return False
+    return True
+
+
 def preprocess_split(
     split_path: Path, raw_path: Path, output_base: Path, verbose: bool = False
 ) -> None:
+    """
+    Preprocesses a WLASL split by fixing bad frame ranges, fixing bad bounding boxes, and removing short samples. Saves the results to the output directory.
+
+    :param split_path: Path to the split json file (e.g. ../data/WLASL/splits/asl100.json)
+    :type split_path: Path
+    :param raw_path: Path the raw videos (e.g. ../data/WLASL/WLASL2000/)
+    :type raw_path: Path
+    :param output_base: Path to the output directory where the preprocessed labels will be saved (e.g. ../data/preprocessed/labels)
+    :type output_base: Path
+    :param verbose: Boolean flag to control verbose output during preprocessing. If True, will print detailed information about the preprocessing steps. Default is False.
+    :type verbose: bool
+    """
     if not check_paths(split_path, raw_path, output_base, verbose):
         return
 
@@ -373,42 +437,16 @@ def preprocess_split(
     print()
 
 
-def print_v(s: str, y: bool) -> None:
-    if y:
-        print(s)
 
 
-def check_paths(
-    split_path: Path, raw_path: Path, output_path: Path, verbose: bool
-) -> bool:
-    if split_path.exists() and split_path.is_file():
-        print_v(f"split path: {split_path}, found", verbose)
-    else:
-        print(f"split path: {split_path}, not found")
-        return False
-    if raw_path.exists() and raw_path.is_dir():
-        print_v(f"raw path: {raw_path}, found", verbose)
-    else:
-        print(f"raw path: {raw_path}, not found")
-        return False
-    if output_path.exists() and output_path.is_dir():
-        print_v(f"output path: {output_path}, found", verbose)
-    else:
-        print(f"output path: {output_path}, not found")
-        return False
-    return True
-
-#NOTE: it is slow, especially for the bigger datasets, mostly held up
+# NOTE: it is slow, especially for the bigger datasets, mostly held up
 # by fixing the bounding boxes, but this doesn't totally exhause the GPU.
 # so could potentially allocate more processes to the task
 if __name__ == "__main__":
     parser = ArgumentParser(description="preprocess.py")
     parser.add_argument(
-        "-as",
-        "--asl_split",
-        type=str,
-        required=True,
-        help="<asl100|asl300|asl1000|asl2000",
+        "asl_split",
+        choices=["asl100", "asl300", "asl1000", "asl2000"],
     )
     parser.add_argument(
         "-rt",
@@ -450,5 +488,5 @@ if __name__ == "__main__":
         split_path=split_path,
         raw_path=raw_dir,
         output_base=output_dir,
-        verbose = args.verbose
+        verbose=args.verbose,
     )

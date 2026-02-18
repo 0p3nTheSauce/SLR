@@ -30,7 +30,10 @@ cd ..
 
 #preprocess data
 cd code
-python preprocess.py -as asl100 -ve
+python preprocess.py asl100 -ve
+python preprocess.py asl300 -ve
+python preprocess.py asl1000 -ve
+python preprocess.py asl2000 -ve
 ```
 
 ## Usage
