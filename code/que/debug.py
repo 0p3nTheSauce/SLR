@@ -7,11 +7,12 @@ from .shell import QueShell
 # from que.shell import QueShell
 from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
-from typing import cast    
+from typing import Optional, cast    
 import torch
 import torch.nn as nn
 import gc
-
+import getpass
+from sshtunnel import SSHTunnelForwarder #type: ignore
 
 def client_logic1():
     manager = connect_manager()
@@ -254,6 +255,58 @@ def reset_state():
     server = manager.get_server_context()
     server.set_state(server=None, daemon=None, worker={'task': 'inactive', 'current_run_id': None, 'working_pid': None, 'exception': None})
     
+
+
+
+
+
+def connect_manager_ssh(
+    host: str,
+    ssh_user: str,
+    ssh_password: Optional[str] = None,
+    ssh_key: Optional[str] = None,
+    port: int = 50000,
+    authkey: Optional[bytes] = None,
+    max_retries=5,
+    retry_delay=2,
+):
+    if authkey is None:
+        password = getpass.getpass("Queue server password: ")
+        authkey = password.encode()
+
+    tunnel = SSHTunnelForwarder(
+        host,
+        ssh_username=ssh_user,
+        ssh_password=ssh_password,      # if using password auth
+        ssh_pkey=ssh_key,               # if using key auth (path to private key)
+        remote_bind_address=("127.0.0.1", port),
+    )
+    tunnel.start()
+
+    try:
+        manager = connect_manager(
+            host="127.0.0.1",
+            port=tunnel.local_bind_port,  # sshtunnel picks a free local port
+            authkey=authkey,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+        return manager, tunnel  # caller must close tunnel when done
+    except Exception:
+        tunnel.stop()
+        raise
+
+def ssh_connect_and_test(host, ssh_user, ssh_password=None, ssh_key=None):
+    manager, tunnel = connect_manager_ssh(host, ssh_user, ssh_password, ssh_key)
+    try:
+        print("Connected to manager via SSH tunnel!")
+        # You can add more tests here to interact with the manager
+        q = manager.get_que()
+        print(q.run_str('cur_run', 0))
+    finally:
+        tunnel.stop()
+        print("SSH tunnel closed.")
+
 
 if __name__ == '__main__':
     # process_opener()
