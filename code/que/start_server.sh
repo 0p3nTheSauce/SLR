@@ -10,8 +10,8 @@ source "${CONDA_PATH}/etc/profile.d/conda.sh"
 
 
 #for debugging purposes,
-ENV_NAME="wlasl"
-# ENV_NAME="wlasl_cpu"
+# ENV_NAME="wlasl"
+ENV_NAME="wlasl_cpu"
 
 # Activate environment
 conda activate "$ENV_NAME"

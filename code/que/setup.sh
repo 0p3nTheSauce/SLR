@@ -87,14 +87,45 @@ systemctl daemon-reload
 echo "Enabling service..."
 systemctl enable "$SERVICE_NAME"
 
-echo -e "${GREEN}✓ Service installed successfully!${NC}"
+
+# Command name to create (default 'que')
+COMMAND_NAME="${2:-que}"  # Second argument, defaults to 'que'
+
+# Path to the shell script to bind
+SHELL_SCRIPT="$SCRIPT_DIR/start_shell.sh"
+
+# Where to create the symlink
+COMMAND_PATH="/usr/local/bin/$COMMAND_NAME"
+
+# Check if start_shell.sh exists
+if [ ! -f "$SHELL_SCRIPT" ]; then
+    echo -e "${RED}Error: start_shell.sh not found at $SHELL_SCRIPT${NC}"
+    exit 1
+fi
+
+# Make sure start_shell.sh is executable
+chmod +x "$SHELL_SCRIPT"
+
+echo -e "${GREEN}Creating command '$COMMAND_NAME'...${NC}"
+echo "  Linking: $COMMAND_PATH -> $SHELL_SCRIPT"
 echo ""
-echo "Useful commands:"
+
+# Create symlink for the command
+ln -sf "$SHELL_SCRIPT" "$COMMAND_PATH"
+
+echo -e "${GREEN}✓ Command '$COMMAND_NAME' installed!${NC}"
+echo "  You can now run: $COMMAND_NAME"
+echo ""
+
+echo -e "${GREEN}✓ Service installed successfully!${NC}"
+echo -e "${GREEN}✓ Command '$COMMAND_NAME' is now available!${NC}"
+echo ""
+echo "Commands:"
+echo "  Run shell:       $COMMAND_NAME"
 echo "  Start service:   sudo systemctl start $SERVICE_NAME"
 echo "  Stop service:    sudo systemctl stop $SERVICE_NAME"
 echo "  Check status:    sudo systemctl status $SERVICE_NAME"
 echo "  View logs:       sudo journalctl -u $SERVICE_NAME -f"
-echo "  Disable service: sudo systemctl disable $SERVICE_NAME"
 echo ""
 
 # Ask if user wants to start the service now
@@ -105,3 +136,5 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo -e "${GREEN}Service started!${NC}"
     echo "Check status with: sudo systemctl status $SERVICE_NAME"
 fi
+
+

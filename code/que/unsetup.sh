@@ -57,6 +57,20 @@ echo "Reloading systemd daemon..."
 systemctl daemon-reload
 systemctl reset-failed 2>/dev/null || true
 
+# Command name to remove (must match install script)
+COMMAND_NAME="${2:-que}"
+COMMAND_PATH="/usr/local/bin/$COMMAND_NAME"
+
+# Remove the command symlink if it exists
+if [ -L "$COMMAND_PATH" ] || [ -f "$COMMAND_PATH" ]; then
+    echo "Removing command '$COMMAND_NAME'..."
+    rm -f "$COMMAND_PATH"
+    echo -e "${GREEN}✓ Command removed${NC}"
+else
+    echo "Command '$COMMAND_NAME' not found, skipping."
+fi
+echo ""
+
 echo ""
 echo -e "${GREEN}✓ Service completely removed!${NC}"
 echo ""
