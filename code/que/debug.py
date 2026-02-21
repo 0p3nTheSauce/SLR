@@ -12,8 +12,9 @@ import torch
 import torch.nn as nn
 import gc
 import getpass
-from sshtunnel import SSHTunnelForwarder #type: ignore
-
+import subprocess
+import time
+from pathlib import Path
 def client_logic1():
     manager = connect_manager()
 
@@ -260,51 +261,72 @@ def reset_state():
 
 
 
-def connect_manager_ssh(
-    host: str,
-    ssh_user: str,
-    ssh_password: Optional[str] = None,
-    ssh_key: Optional[str] = None,
+
+
+def connect_manager_ssh( 
+    host: Optional[str] = None,
+    ssh_user: Optional[str] = None,
+    ssh_key: Optional[Path] = None,
+    port: int = 50000,
+    authkey: Optional[bytes] = None,
+    max_retries=5,
+    retry_delay=2,):
+    
+    if authkey is None:
+        password = getpass.getpass("Queue server password: ")
+        authkey = password.encode()
+
+    if ssh_user is None:
+        ssh_user = Path.home().name
+
+    ssh_cmd = [
+        "ssh",
+        "-N",                          # don't execute a command, just tunnel
+        "-L", f"50000:localhost:{port}", # local port -> remote port
+        "-o", "ExitOnForwardFailure=yes",
+    ]
+    if ssh_key:
+        ssh_cmd += ["-i", ssh_key.expanduser().as_posix()]
+    ssh_cmd.append(f"{ssh_user}@{host}")
+
+    tunnel = subprocess.Popen(ssh_cmd)
+    time.sleep(2)  # give the tunnel a moment to establish
+
+    try:
+        manager = connect_manager(host="127.0.0.1", port=50000, authkey=authkey, max_retries=max_retries, retry_delay=retry_delay)
+        return manager, tunnel
+    except Exception:
+        tunnel.terminate()
+        raise
+
+def ssh_connect_and_test(
+    host: Optional[str] = None,
+    ssh_user: Optional[str] = None,
+    ssh_key: Optional[Path] = None,
     port: int = 50000,
     authkey: Optional[bytes] = None,
     max_retries=5,
     retry_delay=2,
 ):
-    if authkey is None:
-        password = getpass.getpass("Queue server password: ")
-        authkey = password.encode()
-
-    tunnel = SSHTunnelForwarder(
-        host,
-        ssh_username=ssh_user,
-        ssh_password=ssh_password,      # if using password auth
-        ssh_pkey=ssh_key,               # if using key auth (path to private key)
-        remote_bind_address=("127.0.0.1", port),
+    manager, tunnel = connect_manager_ssh(
+        host=host,
+        ssh_user=ssh_user,
+        ssh_key=ssh_key,
+        port=port,
+        authkey=authkey,
+        max_retries=max_retries,
+        retry_delay=retry_delay
     )
-    tunnel.start()
-
-    try:
-        manager = connect_manager(
-            host="127.0.0.1",
-            port=tunnel.local_bind_port,  # sshtunnel picks a free local port
-            authkey=authkey,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-        )
-        return manager, tunnel  # caller must close tunnel when done
-    except Exception:
-        tunnel.stop()
-        raise
-
-def ssh_connect_and_test(host, ssh_user, ssh_password=None, ssh_key=None):
-    manager, tunnel = connect_manager_ssh(host, ssh_user, ssh_password, ssh_key)
     try:
         print("Connected to manager via SSH tunnel!")
         # You can add more tests here to interact with the manager
-        q = manager.get_que()
-        print(q.run_str('cur_run', 0))
+        que_shell = QueShell(manager)
+        try:
+            que_shell.cmdloop()
+        except KeyboardInterrupt:
+            print("\n[INFO] Exiting queShell due to keyboard interrupt.")
     finally:
-        tunnel.stop()
+        tunnel.terminate()
         print("SSH tunnel closed.")
 
 
@@ -330,4 +352,15 @@ if __name__ == '__main__':
     # test_create()
     # test_is_daemon_state()
     # test_shared_dict_proc_opener()
-    reset_state()
+    # reset_state()
+    # key_path = Path.home() / ".ssh" / "ed25519"
+    
+    # if key_path.exists():
+    #     ssh_connect_and_test(
+    #         ssh_key=str(key_path)
+    #     )
+    # else:   
+    #     print("SSH key not found, falling back to password auth")    
+    #     ssh_connect_and_test()
+        
+    ssh_connect_and_test(host='146.231.88.174', authkey=b'abracadabra')
