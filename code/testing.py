@@ -544,7 +544,7 @@ def full_test(
 
 	# output
 	out_dir = save_path.parent / "results"
-	res_path = out_dir / "best_val_loss.json"
+	res_path = out_dir / "best_val_loss.json" #TODO: hard coding the file path, not very good
 
 	#dont retest if exists
 	if res_path.exists() and not re_test:
@@ -742,7 +742,7 @@ def get_test_parser(
 		help="Display the graphs, if they have been selected",
 	)
 	partial_parser.add_argument(
-		"-ns", "--no_save", action="store_true", help="Don't save the outputs of the test"
+		"-se", "--save", action="store_true", help="Save the outputs of the test"
 	)
 
 	return parser
@@ -832,7 +832,7 @@ def main():
 			cf_matrix=args.confusion_matrix,
 			heatmap=args.heatmap,
 			disp=args.display,
-			save=not args.no_save,
+			save=args.save,
 		)
 		print_dict(results)
 

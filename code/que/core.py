@@ -162,6 +162,7 @@ from multiprocessing.managers import BaseManager, DictProxy
 import time
 from datetime import datetime
 import os
+
 # locals
 from run_types import (
     ExpInfo,
@@ -1329,7 +1330,7 @@ class QueManager(BaseManager):
     pass
 
 
-def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
+def connect_manager(host="localhost", port=50000, authkey=b"abracadabra", max_retries=5, retry_delay=2) -> "QueManagerProtocol":
     """
     Useful helper for clients to connect to the QueManager server.
 
@@ -1348,7 +1349,7 @@ def connect_manager(max_retries=5, retry_delay=2) -> "QueManagerProtocol":
 
     for _ in range(max_retries):
         try:
-            m = QueManager(address=("localhost", 50000), authkey=b"abracadabra")
+            m = QueManager(address=(host, port), authkey=authkey)
             m.connect()
             return m  # type: ignore
         except ConnectionRefusedError:

@@ -8,11 +8,16 @@ echo "$(date): Starting ML training service"
 CONDA_PATH="/home/luke/miniconda3"
 source "${CONDA_PATH}/etc/profile.d/conda.sh"
 
+
+#for debugging purposes,
+ENV_NAME="wlasl"
+# ENV_NAME="wlasl_cpu"
+
 # Activate environment
-conda activate wlasl
+conda activate "$ENV_NAME"
 
 # Verify environment is activated
-if [ "$CONDA_DEFAULT_ENV" != "wlasl" ]; then
+if [ "$CONDA_DEFAULT_ENV" != "$ENV_NAME" ]; then
     echo "ERROR: Failed to activate conda environment"
     exit 1
 fi
