@@ -1,0 +1,31 @@
+# This is a systemd service file for running the ML training process using
+# BaseManager. It ensures that the training process starts on boot,
+# restarts on failure, and logs output to the system journal.
+
+[Unit]
+Description=ML Training with BaseManager
+After=network.target
+
+[Service]
+Type=simple
+User=luke
+Group=luke
+WorkingDirectory=/home/luke/Code/SLR/code
+
+# Run the wrapper script
+ExecStart=/bin/bash /home/luke/Code/SLR/code/que/start_server.sh
+
+# Only restart on actual failures, not manual stops
+Restart=on-failure
+RestartSec=10
+
+# Prevent restart spam if it keeps failing
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=que-training
+
+[Install]
+WantedBy=multi-user.target
