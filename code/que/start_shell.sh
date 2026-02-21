@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ENV_NAME="wlasl"
-ENV_NAME="wlasl_cpu"
+ENV_NAME="wlasl"
+# ENV_NAME="wlasl_cpu"
 
 # Source conda
 CONDA_PATH="/home/luke/miniconda3"
