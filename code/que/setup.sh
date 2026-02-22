@@ -6,6 +6,7 @@ set -e  # Exit on any error
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Get the directory where this script is located
@@ -14,30 +15,72 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Get the current user and group
 CURRENT_USER="${SUDO_USER:-$USER}"
 CURRENT_GROUP=$(id -gn "$CURRENT_USER")
+CURRENT_HOME=$(eval echo "~$CURRENT_USER")
 
-SERVICE_NAME="${1:-que-training}"  # Allow custom service name as first argument
-
-# Path to the start script (relative to this install script)
-START_SCRIPT="$SCRIPT_DIR/start_server.sh"
-
-# Check if start_server.sh exists
-if [ ! -f "$START_SCRIPT" ]; then
-    echo -e "${RED}Error: start_server.sh not found at $START_SCRIPT${NC}"
+# Check if running with sudo
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${YELLOW}This script needs sudo privileges to install system-wide commands/services.${NC}"
+    echo "Please run with: sudo $0"
     exit 1
 fi
 
-# Make sure start_server.sh is executable
-chmod +x "$START_SCRIPT"
-
-echo -e "${GREEN}Generating systemd service file...${NC}"
-echo "  User: $CURRENT_USER"
-echo "  Group: $CURRENT_GROUP"
-echo "  Working Directory: $SCRIPT_DIR"
-echo "  Start Script: $START_SCRIPT"
+# ---------------------------------------------------------------------------
+# Ask: client or server?
+# ---------------------------------------------------------------------------
+echo ""
+echo -e "${CYAN}========================================${NC}"
+echo -e "${CYAN}  queShell Setup${NC}"
+echo -e "${CYAN}========================================${NC}"
+echo ""
+echo "Are you setting up a client or server?"
+echo "  1) client  - installs the 'que' command only"
+echo "  2) server  - installs the 'que' command + systemd service"
+echo ""
+read -p "Enter 1 or 2: " -n 1 -r SETUP_MODE
 echo ""
 
-# Generate the service file content
-SERVICE_CONTENT="[Unit]
+if [[ "$SETUP_MODE" == "1" ]]; then
+    MODE="client"
+elif [[ "$SETUP_MODE" == "2" ]]; then
+    MODE="server"
+else
+    echo -e "${RED}Invalid choice. Exiting.${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}Setting up as: $MODE${NC}"
+echo ""
+
+# ---------------------------------------------------------------------------
+# Shared config
+# ---------------------------------------------------------------------------
+CONDA_PATH="/home/$CURRENT_USER/miniconda3"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# ---------------------------------------------------------------------------
+# SERVER: systemd service setup
+# ---------------------------------------------------------------------------
+if [[ "$MODE" == "server" ]]; then
+    ENV_NAME="wlasl"
+    SERVICE_NAME="${1:-que-training}"
+    START_SCRIPT="$SCRIPT_DIR/start_server.sh"
+
+    if [ ! -f "$START_SCRIPT" ]; then
+        echo -e "${RED}Error: start_server.sh not found at $START_SCRIPT${NC}"
+        exit 1
+    fi
+
+    chmod +x "$START_SCRIPT"
+
+    echo -e "${GREEN}Generating systemd service file...${NC}"
+    echo "  User:              $CURRENT_USER"
+    echo "  Group:             $CURRENT_GROUP"
+    echo "  Working Directory: $SCRIPT_DIR"
+    echo "  Start Script:      $START_SCRIPT"
+    echo ""
+
+    SERVICE_CONTENT="[Unit]
 Description=ML Training with BaseManager
 After=network.target
 
@@ -65,76 +108,162 @@ SyslogIdentifier=$SERVICE_NAME
 [Install]
 WantedBy=multi-user.target"
 
-# Check if running with sudo
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${YELLOW}This script needs sudo privileges to install the systemd service.${NC}"
-    echo "Please run with: sudo $0"
-    exit 1
+    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    echo "$SERVICE_CONTENT" > "$SERVICE_FILE"
+
+    echo -e "${GREEN}Service file created at: $SERVICE_FILE${NC}"
+    echo ""
+
+    echo "Reloading systemd daemon..."
+    systemctl daemon-reload
+
+    echo "Enabling service..."
+    systemctl enable "$SERVICE_NAME"
+    echo ""
 fi
 
-# Write the service file
-SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-echo "$SERVICE_CONTENT" > "$SERVICE_FILE"
+# ---------------------------------------------------------------------------
+# CLIENT or SERVER: install the `que` command
+# ---------------------------------------------------------------------------
+if [[ "$MODE" == "client" ]]; then
+    ENV_NAME="wlasl_cpu"
+fi
 
-echo -e "${GREEN}Service file created at: $SERVICE_FILE${NC}"
-echo ""
-
-# Reload systemd daemon
-echo "Reloading systemd daemon..."
-systemctl daemon-reload
-
-# Enable the service
-echo "Enabling service..."
-systemctl enable "$SERVICE_NAME"
-
-
-# Command name to create (default 'que')
-COMMAND_NAME="${2:-que}"  # Second argument, defaults to 'que'
-
-# Path to the shell script to bind
-SHELL_SCRIPT="$SCRIPT_DIR/start_shell.sh"
-
-# Where to create the symlink
+COMMAND_NAME="${2:-que}"
 COMMAND_PATH="/usr/local/bin/$COMMAND_NAME"
+QUE_CONFIG_DIR="$CURRENT_HOME/.config/que"
+QUE_CONFIG_FILE="$QUE_CONFIG_DIR/config"
 
-# Check if start_shell.sh exists
-if [ ! -f "$SHELL_SCRIPT" ]; then
-    echo -e "${RED}Error: start_shell.sh not found at $SHELL_SCRIPT${NC}"
+echo -e "${GREEN}Creating '$COMMAND_NAME' command wrapper...${NC}"
+echo "  Command path:  $COMMAND_PATH"
+echo "  Config file:   $QUE_CONFIG_FILE"
+echo "  Conda env:     $ENV_NAME"
+echo ""
+
+# Generate the que wrapper script
+cat > "$COMMAND_PATH" << WRAPPER
+#!/bin/bash
+
+# ---------------------------------------------------------------------------
+# que - queShell launcher
+# Generated by setup.sh (mode: $MODE)
+# ---------------------------------------------------------------------------
+
+CONDA_PATH="$CONDA_PATH"
+ENV_NAME="$ENV_NAME"
+PROJECT_DIR="$PROJECT_DIR"
+QUE_CONFIG_FILE="$QUE_CONFIG_FILE"
+
+# Source conda
+source "\${CONDA_PATH}/etc/profile.d/conda.sh"
+conda activate "\$ENV_NAME"
+
+# ---- Resolve --host, using last-used value as default ----------------------
+
+# Load saved host if config exists
+SAVED_HOST=""
+if [ -f "\$QUE_CONFIG_FILE" ]; then
+    SAVED_HOST=\$(grep -E "^host=" "\$QUE_CONFIG_FILE" 2>/dev/null | cut -d= -f2-)
+fi
+
+# Check if --host was passed in this invocation
+EXPLICIT_HOST=""
+ARGS=("\$@")
+for i in "\${!ARGS[@]}"; do
+    if [[ "\${ARGS[i]}" == "--host" ]]; then
+        EXPLICIT_HOST="\${ARGS[i+1]}"
+        break
+    elif [[ "\${ARGS[i]}" == --host=* ]]; then
+        EXPLICIT_HOST="\${ARGS[i]#*=}"
+        break
+    fi
+done
+
+# Determine the host to use
+if [ -n "\$EXPLICIT_HOST" ]; then
+    HOST_TO_USE="\$EXPLICIT_HOST"
+elif [ -n "\$SAVED_HOST" ]; then
+    HOST_TO_USE="\$SAVED_HOST"
+else
+    # No host known — remind the user and exit
+    echo ""
+    echo "  No host configured. Please specify a server to connect to:"
+    echo ""
+    echo "    que --host <server_ip> [options]"
+    echo ""
+    echo "  Available options:"
+    echo "    --host          Host IP or hostname to connect to"
+    echo "    --ssh_user      SSH username (default: current user)"
+    echo "    --ssh_key       Path to SSH private key"
+    echo "    --port_client   Local port for SSH tunnel (default: 50000)"
+    echo "    --port_server   Remote port on server (default: 50000)"
+    echo "    --authkey       Authentication key for the manager"
+    echo "    --max_retries   Max connection retries (default: 5)"
+    echo "    --retry_delay   Seconds between retries (default: 2)"
+    echo ""
     exit 1
 fi
 
-# Make sure start_shell.sh is executable
-chmod +x "$SHELL_SCRIPT"
+# If no --host was passed explicitly, inject the saved one
+if [ -z "\$EXPLICIT_HOST" ]; then
+    ARGS=("--host" "\$HOST_TO_USE" "\${ARGS[@]}")
+    echo -e "  \033[0;36mConnecting to last-used host: \$HOST_TO_USE\033[0m"
+    echo -e "  \033[1;33m(Use --host <ip> to connect to a different server)\033[0m"
+    echo ""
+fi
 
-echo -e "${GREEN}Creating command '$COMMAND_NAME'...${NC}"
-echo "  Linking: $COMMAND_PATH -> $SHELL_SCRIPT"
+# Save the resolved host for next time
+mkdir -p "\$(dirname "\$QUE_CONFIG_FILE")"
+if grep -q "^host=" "\$QUE_CONFIG_FILE" 2>/dev/null; then
+    sed -i "s/^host=.*/host=\$HOST_TO_USE/" "\$QUE_CONFIG_FILE"
+else
+    echo "host=\$HOST_TO_USE" >> "\$QUE_CONFIG_FILE"
+fi
+# Make sure config is owned by the real user, not root
+chown $CURRENT_USER:$CURRENT_GROUP "\$QUE_CONFIG_FILE" 2>/dev/null || true
+
+# ---- Launch shell.py -------------------------------------------------------
+cd "\$PROJECT_DIR"
+
+exec python -W ignore::UserWarning -m que.shell "\${ARGS[@]}"
+WRAPPER
+
+chmod +x "$COMMAND_PATH"
+
+echo -e "${GREEN}✓ Command '$COMMAND_NAME' installed at $COMMAND_PATH${NC}"
 echo ""
 
-# Create symlink for the command
-ln -sf "$SHELL_SCRIPT" "$COMMAND_PATH"
-
-echo -e "${GREEN}✓ Command '$COMMAND_NAME' installed!${NC}"
-echo "  You can now run: $COMMAND_NAME"
-echo ""
-
-echo -e "${GREEN}✓ Service installed successfully!${NC}"
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+echo -e "${GREEN}========================================${NC}"
+if [[ "$MODE" == "server" ]]; then
+    echo -e "${GREEN}✓ Service '$SERVICE_NAME' installed!${NC}"
+fi
 echo -e "${GREEN}✓ Command '$COMMAND_NAME' is now available!${NC}"
+echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "Commands:"
-echo "  Run shell:       $COMMAND_NAME"
-echo "  Start service:   sudo systemctl start $SERVICE_NAME"
-echo "  Stop service:    sudo systemctl stop $SERVICE_NAME"
-echo "  Check status:    sudo systemctl status $SERVICE_NAME"
-echo "  View logs:       sudo journalctl -u $SERVICE_NAME -f"
+echo "  Run shell:       $COMMAND_NAME --host <server_ip>"
+echo "  (subsequent)     $COMMAND_NAME   # uses last-used host"
+if [[ "$MODE" == "server" ]]; then
+    echo ""
+    echo "  Start service:   sudo systemctl start $SERVICE_NAME"
+    echo "  Stop service:    sudo systemctl stop $SERVICE_NAME"
+    echo "  Check status:    sudo systemctl status $SERVICE_NAME"
+    echo "  View logs:       sudo journalctl -u $SERVICE_NAME -f"
+fi
 echo ""
 
-# Ask if user wants to start the service now
-read -p "Do you want to start the service now? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    systemctl start "$SERVICE_NAME"
-    echo -e "${GREEN}Service started!${NC}"
-    echo "Check status with: sudo systemctl status $SERVICE_NAME"
+# ---------------------------------------------------------------------------
+# Optionally start the service (server only)
+# ---------------------------------------------------------------------------
+if [[ "$MODE" == "server" ]]; then
+    read -p "Do you want to start the service now? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        systemctl start "$SERVICE_NAME"
+        echo -e "${GREEN}Service started!${NC}"
+        echo "Check status with: sudo systemctl status $SERVICE_NAME"
+    fi
 fi
-
-
