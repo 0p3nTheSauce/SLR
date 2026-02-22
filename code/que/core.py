@@ -204,13 +204,13 @@ CUR_RUN = "cur_run"  # busy running
 OLD_RUNS = "old_runs"  # run already
 FAIL_RUNS = "fail_runs"  # runs that crashed
 # List for argparse choices
-QUE_LOCATIONS = [TO_RUN, CUR_RUN, OLD_RUNS]
+QUE_LOCATIONS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
 PROCESS_NAMES = [SERVER_NAME, DAEMON_NAME, WORKER_NAME]
 SYNONYMS = {
     "new": "to_run",
     "tr": "to_run",
     "cur": "cur_run",
-    "busy": "cur_run",
+    "cr": "cur_run",
     "old": "old_runs",
     "or": "old_runs",
     "fail": "fail_runs",

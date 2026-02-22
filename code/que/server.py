@@ -1,3 +1,5 @@
+import argparse
+import getpass
 from multiprocessing import Event
 from multiprocessing.managers import DictProxy
 # from multiprocessing.managers import BaseManager
@@ -202,7 +204,7 @@ class ServerContext:
 # --- Registration Logic ---
 
 
-def setup_manager():
+def setup_manager(stop_on_fail: bool = True):
     """
     Configures the QueManager with the ServerContext.
 
@@ -210,7 +212,7 @@ def setup_manager():
 
     # NOTE: Additions to this function must be mirrored in connect_manager() in core.py
 
-    context = ServerContext()
+    context = ServerContext(stop_on_fail=stop_on_fail)
 
     QueManager.register(
         "get_que",
@@ -248,14 +250,43 @@ def setup_manager():
 # --- Server Startup ---
 
 
-def start_server():
-    setup_manager()
+def get_server_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="queShell command line arguments")
+
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host IP. If localhost, then connects to local manager. If remote, will establish SSH tunnel and connect to manager through that (default: localhost)",
+    )
+    parser.add_argument(
+        "--port_server",
+        type=int,
+        default=50000,
+        help="Remote port for SSH tunnel (default: 50000)",
+    )
+    parser.add_argument(
+        "--authkey",
+        type=str,
+        default='abracadabra', #for testing, should be changed back to None for production
+        help="Authentication key for connecting to the manager (default: None, will prompt for password)",
+    )
+    parser.add_argument(
+        "--stop_on_fail",
+        action="store_true",
+        help="Whether the daemon should stop itself if a run fails (default: False)",
+    )
+
+    return parser
+
+def start_server(stop_on_fail: bool = True, address: Tuple[str, int] = ("localhost", 50000), authkey: bytes = b"abracadabra"):
+    setup_manager(stop_on_fail=stop_on_fail)
 
     # Note: We bind to localhost for security, change to 0.0.0.0 to expose externally
-    m = QueManager(address=("localhost", 50000), authkey=b"abracadabra")
+    m = QueManager(address=address, authkey=authkey)
     s = m.get_server()
 
-    print("Object Server started on localhost:50000")
+    print(f"Object Server started on {address[0]}:{address[1]} with authkey: {authkey.decode()}")
 
     try:
         s.serve_forever()
@@ -264,4 +295,8 @@ def start_server():
 
 
 if __name__ == "__main__":
-    start_server()
+    parser = get_server_parser()
+    args = parser.parse_args()
+    
+    
+    start_server(stop_on_fail=args.stop_on_fail, address=(args.host, args.port_server), authkey=args.authkey.encode())

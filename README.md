@@ -267,7 +267,8 @@ runs
 
 ## Features
 
-- See Que, shortly...
+- Run [utils.py](./code/utils.py) to automatically clean up checkpoints.
+- Use the [Que](./code/que/README.md) feature to schedule and automatically train + test runs.
 
 
 ## Contributing
