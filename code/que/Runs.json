@@ -2,63 +2,6 @@
     "to_run": [
         {
             "admin": {
-                "model": "R(2+1)D_18",
-                "dataset": "WLASL",
-                "split": "asl2000",
-                "exp_no": "000",
-                "recover": false,
-                "config_path": "./configfiles/asl2000/R(2+1)D_18_000.ini",
-                "save_path": "runs/asl2000/R(2+1)D_18_exp000/checkpoints"
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5
-            },
-            "data": {
-                "num_frames": 16,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 10,
-                "tmult": 1,
-                "eta_min": 0,
-                "warm_up": null
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 50,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-2000",
-                "tags": [
-                    "asl2000",
-                    "R(2+1)D_18",
-                    "exp-000"
-                ],
-                "run_id": null
-            }
-        },
-        {
-            "admin": {
                 "model": "R3D_18",
                 "dataset": "WLASL",
                 "split": "asl2000",
@@ -346,6 +289,65 @@
     "cur_run": [
         {
             "admin": {
+                "model": "R(2+1)D_18",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "exp_no": "000",
+                "recover": true,
+                "config_path": "./configfiles/asl2000/R(2+1)D_18_000.ini",
+                "save_path": "runs/asl2000/R(2+1)D_18_exp000/checkpoints"
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 1,
+                "eta_min": 0,
+                "warm_up": null
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "asl2000",
+                    "R(2+1)D_18",
+                    "exp-000"
+                ],
+                "run_id": "mi1aom4x"
+            }
+        }
+    ],
+    "old_runs": [
+        {
+            "admin": {
                 "model": "MViTv2_S",
                 "dataset": "WLASL",
                 "split": "asl2000",
@@ -399,10 +401,71 @@
                     "exp-000"
                 ],
                 "run_id": "fkv6kpik"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 42.036753445635526,
+                "best_val_loss": 2.829838923984428,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.355025,
+                        "top5": 0.69265,
+                        "top10": 0.7828999999999999
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.38867662382771795,
+                        "top5": 0.7162209100382078,
+                        "top10": 0.7981938172976728
+                    },
+                    "average_loss": 2.916583989946097
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.355025,
+                        "top5": 0.69265,
+                        "top10": 0.7828999999999999
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.38867662382771795,
+                        "top5": 0.7162209100382078,
+                        "top10": 0.7981938172976728
+                    },
+                    "average_loss": 2.916583989946097
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.14124166666666668,
+                        "top5": 0.351025,
+                        "top10": 0.45219166666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.15595692948940604,
+                        "top5": 0.3726988537686697,
+                        "top10": 0.47064953108718305
+                    },
+                    "average_loss": 4.951329667045698,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
             }
-        }
-    ],
-    "old_runs": [
+        },
         {
             "admin": {
                 "model": "MViTv1_B",
