@@ -1120,13 +1120,6 @@ def get_queshell_parser() -> argparse.ArgumentParser:
         help="Remote port for SSH tunnel (default: 50000)",
     )
     parser.add_argument(
-        "--authkey",
-        type=str,
-        # default=None,
-        default='abracadabra', #for testing, should be changed back to None for production
-        help="Authentication key for connecting to the manager (default: None, will prompt for password)",
-    )
-    parser.add_argument(
         "--max_retries",
         type=int,
         default=5,

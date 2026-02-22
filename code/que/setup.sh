@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 # Get the current user and group
 CURRENT_USER="${SUDO_USER:-$USER}"
 CURRENT_GROUP=$(id -gn "$CURRENT_USER")
@@ -55,43 +55,66 @@ echo ""
 # ---------------------------------------------------------------------------
 # Ask: which conda env?
 # ---------------------------------------------------------------------------
-echo "Which conda environment do you want to use for queShell?"
-echo "  1) wlasl      - with GPU support (requires CUDA setup)"
-echo "  2) wlasl_cpu  - CPU-only environment"
-echo ""
-read -p "Enter 1 or 2: " -n 1 -r ENV_CHOICE
-echo ""
+CONDA_PATH="/home/$CURRENT_USER/miniconda3"
 
-if [[ "$ENV_CHOICE" == "1" ]]; then
+if [[ "$MODE" == "server" ]]; then
     ENV_NAME="wlasl"
-elif [[ "$ENV_CHOICE" == "2" ]]; then
-    ENV_NAME="wlasl_cpu"
 else
-    echo -e "${RED}Invalid choice. Exiting.${NC}"
+    echo "Which conda environment do you want to use for queShell?"
+    echo "  1) wlasl      - with GPU support (requires CUDA setup)"
+    echo "  2) wlasl_cpu  - CPU-only environment"
+    echo ""
+    read -p "Enter 1 or 2: " -n 1 -r ENV_CHOICE
+    echo ""
+
+    if [[ "$ENV_CHOICE" == "1" ]]; then
+        ENV_NAME="wlasl"
+    elif [[ "$ENV_CHOICE" == "2" ]]; then
+        ENV_NAME="wlasl_cpu"
+    else
+        echo -e "${RED}Invalid choice. Exiting.${NC}"
+        exit 1
+    fi
+fi
+
+#confirm env exists
+source "$CONDA_PATH/etc/profile.d/conda.sh"
+if ! conda env list | grep -q "$ENV_NAME"; then
+    echo -e "${RED}Environment '$ENV_NAME' does not exist. Exiting.${NC}"
     exit 1
 fi
 
 
-
-
-
-# ---------------------------------------------------------------------------
-# Shared config
-# ---------------------------------------------------------------------------
-CONDA_PATH="/home/$CURRENT_USER/miniconda3"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # ---------------------------------------------------------------------------
 # SERVER: systemd service setup
 # ---------------------------------------------------------------------------
 
 if [[ "$MODE" == "server" ]]; then
-    SERVICE_NAME="${1:-que-training}"
+    SERVICE_NAME="que-training"
     START_SERVER_SCRIPT="/usr/local/bin/start_server"
 
     START_SERVER_CONTENT=""
 
     # Generate the start_server wrapper script
+
+    echo""
+    echo "Set stop on failure behavior for the server daemon:"
+    echo "  1) Yes - the server will automatically stop if a run fails (recommended for stability)"
+    echo "  2) No  - the server will keep running even if a run fails (use with caution)"
+    echo ""
+    read -p "Enter 1 or 2: " -n 1 -r STOP_ON_FAIL_CHOICE
+    echo "" 
+
+    if [[ "$STOP_ON_FAIL_CHOICE" == "1" ]]; then
+        EXEC_START_OPTIONS="--stop_on_fail"
+    elif [[ "$STOP_ON_FAIL_CHOICE" == "2" ]]; then
+        EXEC_START_OPTIONS=""
+    else
+        echo -e "${RED}Invalid choice. Exiting.${NC}"
+        exit 1
+    fi
+
     cat > "$START_SERVER_SCRIPT" << START_SERVER_WRAPPER
     #!/bin/bash
 
@@ -110,7 +133,7 @@ if [[ "$MODE" == "server" ]]; then
 
     cd "\$PROJECT_DIR"
 
-    exec python -m que.server "\$@"
+    exec python -m que.server "\$@" 
 START_SERVER_WRAPPER
 
 
@@ -121,7 +144,9 @@ START_SERVER_WRAPPER
 
     chmod +x "$START_SERVER_SCRIPT"
 
-    echo -e "${GREEN}Generating systemd service file...${NC}"
+    
+
+    echo -e "${GREEN}Generating systemd service file start script...${NC}"
     echo "  User:              $CURRENT_USER"
     echo "  Group:             $CURRENT_GROUP"
     echo "  Working Directory: $SCRIPT_DIR"
@@ -139,7 +164,7 @@ START_SERVER_WRAPPER
         WorkingDirectory=$SCRIPT_DIR
 
         # Run the wrapper script
-        ExecStart=/bin/bash $START_SERVER_SCRIPT
+        ExecStart=/bin/bash $START_SERVER_SCRIPT $EXEC_START_OPTIONS
 
         # Only restart on actual failures, not manual stops
         Restart=on-failure
@@ -180,7 +205,7 @@ if [[ "$MODE" == "client" ]]; then
     ENV_NAME="wlasl_cpu"
 fi
 
-COMMAND_NAME="${2:-que}"
+COMMAND_NAME="que"
 COMMAND_PATH="/usr/local/bin/$COMMAND_NAME"
 
 QUE_CONFIG_DIR="$CURRENT_HOME/.config/que"
@@ -255,7 +280,6 @@ else
     echo "    --ssh_key       Path to SSH private key"
     echo "    --port_client   Local port for SSH tunnel (default: 50000)"
     echo "    --port_server   Remote port on server (default: 50000)"
-    echo "    --authkey       Authentication key for the manager"
     echo "    --max_retries   Max connection retries (default: 5)"
     echo "    --retry_delay   Seconds between retries (default: 2)"
     echo ""
