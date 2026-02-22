@@ -1,4 +1,28 @@
 import webbrowser
+import cmd as cmdLib
+import shlex
+from typing import Optional, List, Any, Dict, Tuple, Tuple, cast
+import argparse
+import configs
+import time
+from contextlib import contextmanager
+
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.prompt import Confirm
+from rich.text import Text
+from rich.syntax import Syntax
+from rich import box
+import io
+import sys
+import json
+from pathlib import Path
+import subprocess
+import getpass
+import traceback
+#locals
+from utils import gpu_manager
 from .core import (
     TO_RUN,
     GenExp,
@@ -17,29 +41,6 @@ from .core import (
 )
 from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
-import cmd as cmdLib
-import shlex
-from typing import Optional, List, Any, Dict, cast
-import argparse
-import configs
-import time
-from contextlib import contextmanager
-
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.prompt import Confirm
-from rich.text import Text
-from rich.syntax import Syntax
-from rich import box
-import io
-import sys
-import json
-
-import subprocess
-from utils import gpu_manager
-import traceback
-
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -1020,11 +1021,173 @@ class QueShell(cmdLib.Cmd):
         )
         return parser
 
-if __name__ == "__main__":
-    server = connect_manager()
-    que_shell = QueShell(server)
+
+
+def ssh_tunnel_maker(
+    host_ip: str,
+    ssh_user: Optional[str] = None,
+    ssh_key: Optional[Path] = None,
+    port_client: int = 50000,
+    port_server: int = 50000,
+    ) -> subprocess.Popen:
+    """Open an ssh tunnel with the specified host, user, and key, forwarding
+    port_client to port_server on the remote host. Returns the subprocess.Popen
+    object for the tunnel.
+
+    Args:
+        host_ip (str): Host IP address. 
+        ssh_user (Optional[str], optional): The user profile on the server, otherwise uses the current logged in user for this session. Defaults to None.
+        ssh_key (Optional[Path], optional): Path to ssh_key. Defaults to None, will ask for password if not provided.
+        port_client (int, optional): Client side port. Defaults to 50000.
+        port_server (int, optional): Server side port. Defaults to 50000.
+
+    Returns:
+        subprocess.Popen: Opened subprocess for the ssh tunnel, which can be terminated with .terminate() when the tunnel is no longer needed.
+    """
+    
+    if ssh_user is None:
+        ssh_user = Path.home().name
+
+    ssh_cmd = [
+        "ssh",
+        "-N",                          # don't execute a command, just tunnel
+        "-L", f"{port_client}:localhost:{port_server}", # local port -> remote port
+        "-o", "ExitOnForwardFailure=yes",
+    ]
+    if ssh_key:
+        ssh_cmd += ["-i", ssh_key.expanduser().as_posix()]
+    ssh_cmd.append(f"{ssh_user}@{host_ip}")
+
+    tunnel = subprocess.Popen(ssh_cmd)
+    time.sleep(2)  # give the tunnel a moment to establish
 
     try:
-        que_shell.cmdloop()
-    except KeyboardInterrupt:
-        print("\n[INFO] Exiting queShell due to keyboard interrupt.")
+        return tunnel
+    except Exception:
+        tunnel.terminate()
+        raise
+
+
+@contextmanager
+def tunnel_handler(tunnel: Optional[subprocess.Popen]):
+    """Context manager to handle the lifecycle of an ssh tunnel subprocess. Ensures that the tunnel is properly terminated when the context is exited, even if an exception occurs.
+
+    Args:
+        tunnel (Optional[subprocess.Popen]): The subprocess.Popen object representing the ssh tunnel. Can be None if no tunnel was created.
+
+    Yields:
+        None
+    """
+    try:
+        yield
+    finally:
+        if tunnel is not None:
+            tunnel.terminate()
+            tunnel.wait()  # Wait for the subprocess to terminate to avoid zombies
+
+
+def get_queshell_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="queShell command line arguments")
+
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Host IP. If localhost, then connects to local manager. If remote, will establish SSH tunnel and connect to manager through that (default: localhost)",
+    )
+    parser.add_argument(
+        "--ssh_user",
+        type=str,
+        default=getpass.getuser(),
+        help="SSH username (default: current user)",
+    )
+    parser.add_argument(
+        "--ssh_key",
+        type=Path,
+        default=None,
+        help="Path to SSH private key (default: None, will use default SSH keys or password authentication)",
+    )
+    parser.add_argument(
+        "--port_client",
+        type=int,
+        default=50000,
+        help="Local port for SSH tunnel (default: 50000)",
+    )
+    parser.add_argument(
+        "--port_server",
+        type=int,
+        default=50000,
+        help="Remote port for SSH tunnel (default: 50000)",
+    )
+    parser.add_argument(
+        "--authkey",
+        type=str,
+        # default=None,
+        default='abracadabra', #for testing, should be changed back to None for production
+        help="Authentication key for connecting to the manager (default: None, will prompt for password)",
+    )
+    parser.add_argument(
+        "--max_retries",
+        type=int,
+        default=5,
+        help="Maximum number of connection retries (default: 5)",
+    )
+    parser.add_argument(
+        "--retry_delay",
+        type=int,   
+        default=2,
+        help="Delay in seconds between connection retries (default: 2)",
+    )
+    return parser
+
+if __name__ == "__main__":
+    
+    parser = get_queshell_parser()
+    args = parser.parse_args()
+    
+   
+    if args.host != "localhost":
+        
+        if args.ssh_key is not None:
+            args.ssh_key = args.ssh_key.expanduser()
+            if not args.ssh_key.exists():
+                print(f"SSH key not found at {args.ssh_key}")
+                raise ValueError("SSH key not found")
+        else:
+            id_rsa = Path.home() / ".ssh" / "id_rsa"  # default SSH key path
+            ed25519 = Path.home() / ".ssh" / "id_ed25519"
+            if id_rsa.exists():
+                args.ssh_key = id_rsa
+            elif ed25519.exists():
+                args.ssh_key = ed25519
+            else:
+                print("No SSH key provided and no default keys found, will attempt password authentication")     
+        
+        
+        try:
+            tunnel = ssh_tunnel_maker(
+                host_ip=args.host,
+                ssh_user=args.ssh_user,
+                ssh_key=args.ssh_key,
+                port_client=args.port_client,
+                port_server=args.port_server
+            )
+            print("SSH tunnel established successfully")
+        except Exception as e:
+            print(f"Failed to establish SSH tunnel: {e}")
+            raise
+        
+    else:
+        tunnel = None  # No tunnel needed for localhost         
+        
+    with tunnel_handler(tunnel):
+        try:
+            QueShell(connect_manager()).cmdloop()
+        except KeyboardInterrupt:
+            print("\n[INFO] Exiting queShell due to keyboard interrupt.")
+            
+    
+        
+
+
+   
