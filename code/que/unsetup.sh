@@ -45,12 +45,14 @@ echo -e "${YELLOW}Uninstalling ($MODE)...${NC}"
 echo ""
 
 # ---------------------------------------------------------------------------
-# SERVER: stop and remove systemd service
+# SERVER: stop and remove systemd service and start script
 # ---------------------------------------------------------------------------
 if [[ "$MODE" == "server" ]]; then
     SERVICE_NAME="${1:-que-training}"
     SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+    START_SERVER_SCRIPT="/usr/local/bin/start_server"
 
+    #service removal
     if [ ! -f "$SERVICE_FILE" ]; then
         echo -e "${YELLOW}Service file not found: $SERVICE_FILE — skipping service removal.${NC}"
     else
@@ -78,6 +80,16 @@ if [[ "$MODE" == "server" ]]; then
         systemctl daemon-reload
         systemctl reset-failed 2>/dev/null || true
     fi
+
+    #start script removal
+    if [ ! -f "$START_SERVER_SCRIPT" ]; then
+        echo -e "${YELLOW}Start server script not found: $START_SERVER_SCRIPT — skipping removal.${NC}"
+    else
+        echo "Removing start server script..."
+        rm -f "$START_SERVER_SCRIPT"
+        echo -e "${GREEN}✓ Start server script removed${NC}"
+    fi
+
 fi
 
 # ---------------------------------------------------------------------------
@@ -120,8 +132,10 @@ echo ""
 echo -e "${GREEN}========================================${NC}"
 if [[ "$MODE" == "server" ]]; then
     echo -e "${GREEN}✓ Service completely removed!${NC}"
+    echo -e "${GREEN}✓ Start server script removed!${NC}"
 fi
 echo -e "${GREEN}✓ Command '$COMMAND_NAME' removed!${NC}"
+
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo "You can reinstall at any time with: sudo ./setup.sh"

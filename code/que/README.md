@@ -8,6 +8,8 @@ The que feature (pronounced queue) allows users to create training runs, and add
 
 ## Setup
 
-The recommended approach is to make a systemd service file. 
+The recommended approach is to run [setup.sh](./setup.sh). This will prompt the user whether to set up the `client` side, or `server` side shell. 
 
-substitute WorkingDirectory and ExecStart
+### Server:
+
+Selecting the server option creates a systemd 
