@@ -153,9 +153,9 @@ class QueShell(cmdLib.Cmd):
         """Display a fancy welcome banner"""
         banner = Text()
         banner.append("╔═══════════════════════════════════════╗\n", style="bold cyan")
-        banner.append("║        ", style="bold cyan")
-        banner.append("queShell v2.0", style="bold yellow")
-        banner.append("                  ║\n", style="bold cyan")
+        banner.append("║          ", style="bold cyan")
+        banner.append("QueShell", style="bold yellow")
+        banner.append("                     ║\n", style="bold cyan")
         banner.append("║   ", style="bold cyan")
         banner.append("Queue Management System", style="bold white")
         banner.append("             ║\n", style="bold cyan")
@@ -1059,7 +1059,7 @@ def ssh_tunnel_maker(
     ssh_cmd.append(f"{ssh_user}@{host_ip}")
 
     tunnel = subprocess.Popen(ssh_cmd)
-    time.sleep(2)  # give the tunnel a moment to establish
+    time.sleep(1)  # give the tunnel a moment to establish
 
     try:
         return tunnel
@@ -1182,9 +1182,11 @@ if __name__ == "__main__":
         
     with tunnel_handler(tunnel):
         try:
-            QueShell(connect_manager()).cmdloop()
+            que_shell = QueShell(connect_manager())
+            que_shell.cmdloop()
         except KeyboardInterrupt:
-            print("\n[INFO] Exiting queShell due to keyboard interrupt.")
+            print("\n[INFO] Exiting queShell without saving due to keyboard interrupt.")
+            
             
     
         
