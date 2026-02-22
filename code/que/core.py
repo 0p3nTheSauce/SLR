@@ -135,6 +135,7 @@ Example usage
                 q.save_state()
 This docstring describes the intended behaviour and the main public API surface.
 """
+
 import traceback
 from typing import (
     # TYPE_CHECKING,
@@ -177,6 +178,7 @@ from configs import print_config, load_config
 
 from contextlib import contextmanager
 from multiprocessing.synchronize import Event as EventClass
+
 # constants
 # MR_NAME = "monitor"
 QUE_DIR = Path(__file__).parent
@@ -325,7 +327,7 @@ class QueBusy(QueException):
 def log_and_raise(logger: Logger, task: str = "Operation"):
     """
     Context manager that logs success or logs error and re-raises exception
-    
+
     :param logger: To log transaction
     :type logger: Logger
     :param task: The current task attempting to perform
@@ -520,7 +522,6 @@ class Que:
 
         return stats
 
-
     def load_state(self, in_path: Optional[Union[str, Path]] = None):
         """
         Load Que from file. Default load from RUN_PATH, unless in_path is provided
@@ -595,7 +596,7 @@ class Que:
             raise QueEmpty(loc)
         elif abs(idx) >= len(to_get):
             raise QueIdxOOR(loc, idx, len(to_get))
-        
+
         return to_get[idx]
 
     def peak_cur_run(self) -> ExpInfo:
@@ -642,7 +643,7 @@ class Que:
                 QueEmpty: If cur_run is empty
         """
 
-        self._set_run(OLD_RUNS, 0, self.pop_cur_run())        
+        self._set_run(OLD_RUNS, 0, self.pop_cur_run())
         self.logger.info("Stored finished run")
 
     def stash_failed_run(self, error: str) -> None:
@@ -677,7 +678,12 @@ class Que:
             unpack = unpack[k]
         return unpack
 
-    def list_runs(self, loc: QueLocation, key_set: Optional[List[str]] = None, reverse: bool = False) -> List[Sumarised]:
+    def list_runs(
+        self,
+        loc: QueLocation,
+        key_set: Optional[List[str]] = None,
+        reverse: bool = False,
+    ) -> List[Sumarised]:
         """List runs at a given location in summarised format
 
         Args:
@@ -691,8 +697,10 @@ class Que:
         if key_set is None:
             return [self._run_sum(run) for run in loc_runs]
         else:
-            runs = sorted(loc_runs, key=lambda x: self._get_val(x, key_set), reverse=reverse)
-            return [self._run_sum(run) for run in runs]    
+            runs = sorted(
+                loc_runs, key=lambda x: self._get_val(x, key_set), reverse=reverse
+            )
+            return [self._run_sum(run) for run in runs]
 
     def disp_runs(self, loc: QueLocation, exc: Optional[List[str]] = None) -> None:
         print(f"{loc} runs".title())
@@ -866,7 +874,7 @@ class Que:
         to_loc: QueLocation = TO_RUN,
         from_loc: QueLocation = CUR_RUN,
         index: int = 0,
-        clean_slate: bool = False
+        clean_slate: bool = False,
     ) -> None:
         """
         Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
@@ -877,18 +885,18 @@ class Que:
         :type from_loc: QueLocation
         :param index: Index of run to recover
         :type index: int
-        :param clean_slate: Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.  
+        :param clean_slate: Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.
         :type clean_state: bool
         """
         self.logger.debug(f"clean slate is set to: {clean_slate}")
         with log_and_raise(self.logger, "recover"):
             run = self.peak_run(from_loc, index)
-            
+
             if not clean_slate:
                 self.logger.debug("setting recover to True")
                 run["admin"]["recover"] = True
             else:
-                #ensure recover is false (e.g. run was set to recover then failed)
+                # ensure recover is false (e.g. run was set to recover then failed)
                 self.logger.debug("Ensuring recover is False")
                 run["admin"]["recover"] = False
 
@@ -904,9 +912,11 @@ class Que:
                     early_stopping=run["early_stopping"],
                     wandb=run["wandb"],
                 )
-            elif run["wandb"]["run_id"] is None and not clean_slate:  # NOTE: run id is currently required for recovery
+            elif (
+                run["wandb"]["run_id"] is None and not clean_slate
+            ):  # NOTE: run id is currently required for recovery
                 raise QueException("Run was set to recover, but no run id was provided")
-            
+
             _ = self._pop_run(from_loc, index)
             self._set_run(to_loc, 0, run)
 
@@ -937,7 +947,6 @@ class Que:
                                         ask (bool, optional): Pre-check run before creation. Defaults to True.
         """
         with log_and_raise(self.logger, "create"):
-            
             config = load_config(arg_dict)
             if self._is_dup_exp(config):
                 raise QueDupExp
@@ -1040,7 +1049,6 @@ class Que:
                 for run in tomv:
                     new_location.insert(0, run)
 
-
     def edit_run(
         self,
         loc: QueLocation,
@@ -1048,11 +1056,11 @@ class Que:
         key1: str,
         value: Any,
         key2: Optional[str] = None,
-        do_eval: bool = False
+        do_eval: bool = False,
     ) -> None:
         """
         Edit a run in the Que
-        
+
         :param self: Que
         :param loc: Location to edit
         :type loc: QueLocation
@@ -1067,19 +1075,19 @@ class Que:
         :param do_eval: Evaluate the provided value to a type (other wise defaults to string)
         :type do_eval: bool
         """
-        
+
         with log_and_raise(self.logger, "edit"):
             run = self._pop_run(loc, idx)
             if do_eval:
                 val = eval(value)
             else:
                 val = value
-                    
+
             if key2 is not None:
                 run[key1][key2] = val
             else:
                 run[key1] = val
-                
+
             self._set_run(loc, idx, run)
 
     def _find_runs(
@@ -1144,13 +1152,15 @@ class Que:
                 TO_RUN: self.to_run,
                 CUR_RUN: self.cur_run,
                 FAIL_RUNS: self.fail_runs,
-                OLD_RUNS: self.old_runs
+                OLD_RUNS: self.old_runs,
             }
-            
+
             for location_name, run_list in all_runs.items():
                 for idx, run in enumerate(run_list):
                     if key1 not in run:
-                        raise ValueError(f"Top level key: {key1} not found in available keys: {run.keys()} for run: {idx} in: {location_name}")
+                        raise ValueError(
+                            f"Top level key: {key1} not found in available keys: {run.keys()} for run: {idx} in: {location_name}"
+                        )
                     subdict = run[key1]
                     key2, value = key_value
                     # if key2 not in subdict:
@@ -1158,12 +1168,11 @@ class Que:
                     subdict[key2] = value
                     run[key1] = subdict
                     all_runs[location_name][idx] = run
-                
+
             self.to_run = all_runs[TO_RUN]
             self.cur_run = all_runs[CUR_RUN]
             self.fail_runs = all_runs[FAIL_RUNS]
             self.old_runs = all_runs[OLD_RUNS]
-                
 
 
 # # ------- Basmanager connections -------#
@@ -1192,24 +1201,25 @@ class ServerState(TypedDict):
 def _safe_isinstance(value: Any, type_hint: Any) -> bool:
     """isinstance-safe check that handles generic types like List[str]."""
     origin = get_origin(type_hint)
-    
+
     if origin is Literal:
-            return value in get_args(type_hint)
-        
+        return value in get_args(type_hint)
+
     # e.g. List[str] -> list, Dict[str, int] -> dict, Optional[X] -> Union
     if origin is Union:
         # For Optional[X] (which is Union[X, None]), check each arg
         return any(_safe_isinstance(value, t) for t in type_hint.__args__)
-    
+
     if origin is not None:
         return isinstance(value, origin)
-    
+
     return isinstance(value, type_hint)
+
 
 def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
     """
     Check if object is an instance of WorkerState
-    
+
     :param obj: Object to check
     :type obj: Any
     :return: Boolean based on whether object is worker state
@@ -1217,19 +1227,20 @@ def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
     """
     if not isinstance(obj, dict):
         return False
-    
+
     for key, type_ in WorkerState.__annotations__.items():
         if key not in obj:
             return False
         elif not _safe_isinstance(obj[key], type_):
             return False
-        
+
     return True
+
 
 def is_daemon_state(obj: Any) -> TypeGuard[DaemonState]:
     """
     Check if object is an instance of DaemonState
-    
+
     :param obj: Object to check
     :type obj: Any
     :return: Description
@@ -1237,22 +1248,22 @@ def is_daemon_state(obj: Any) -> TypeGuard[DaemonState]:
     """
     if not isinstance(obj, dict):
         return False
-    
+
     for key, type_ in DaemonState.__annotations__.items():
         if key not in obj:
             return False
         elif not _safe_isinstance(obj[key], type_):
             return False
-        
+
     return True
-    
+
 
 def is_server_state(obj: Any) -> TypeGuard[ServerState]:
     """
     Type guard to check if an arbitrary object is structurally
     compatible with the ServerState TypedDict.
     """
-    
+
     if not isinstance(obj, dict):
         return False
 
@@ -1260,17 +1271,18 @@ def is_server_state(obj: Any) -> TypeGuard[ServerState]:
     if not all(key in obj for key in required_keys):
         return False
 
-    sp = obj.get('server_pid')
+    sp = obj.get("server_pid")
     if not (sp is None or isinstance(sp, int)):
         return False
-    
-    if not is_daemon_state(obj.get('daemon_state')):
+
+    if not is_daemon_state(obj.get("daemon_state")):
         return False
-    
-    if not is_worker_state(obj.get('worker_state')):
+
+    if not is_worker_state(obj.get("worker_state")):
         return False
-    
+
     return True
+
 
 def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
     with open(state_path, "r") as f:
@@ -1281,6 +1293,7 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
         raise ValueError(
             f"Data read from: {state_path} is not compatible with ServerState"
         )
+
 
 Process_states: TypeAlias = Union[WorkerState, DaemonState, ServerState]
 # if TYPE_CHECKING:
@@ -1299,10 +1312,12 @@ class DaemonProtocol(Protocol):
         stop_worker: bool = False,
     ) -> None: ...
 
+
 class WorkerProtocol(Protocol):
     # only making certain methods visible
     def cleanup(self) -> None: ...
     def start(self) -> None: ...
+
 
 class ServerContextProtocol(Protocol):
     def save_state(self) -> None: ...
@@ -1330,7 +1345,9 @@ class QueManager(BaseManager):
     pass
 
 
-def connect_manager(host="localhost", port=50000, authkey=b"abracadabra", max_retries=5, retry_delay=2) -> "QueManagerProtocol":
+def connect_manager(
+    host="localhost", port=50000, authkey=b"abracadabra", max_retries=5, retry_delay=2
+) -> "QueManagerProtocol":
     """
     Useful helper for clients to connect to the QueManager server.
 
