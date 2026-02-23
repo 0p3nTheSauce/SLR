@@ -255,16 +255,6 @@ runs
 ```
 
 
-
-
-
-
-
-
-
-			
-
-
 ## Features
 
 - Run [utils.py](./code/utils.py) to automatically clean up checkpoints.
@@ -277,4 +267,4 @@ Contributions are welcome! Please open issues or submit pull requests.
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+The data provided in this project is subject to the C-UDA license of the forked WLASL dataset. See [C-UDA-1.0.pdf](C-UDA-1.0.pdf)
