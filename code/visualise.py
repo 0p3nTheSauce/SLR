@@ -14,18 +14,10 @@ plt.style.use('seaborn-v0_8-darkgrid')
 sns.set_palette("husl")
 
 
-#eda and demos
-
-
-
-
 
 #results
 
-def load_results(filepath: str) -> Dict:
-	"""Load results from JSON file."""
-	with open(filepath, 'r') as f:
-		return json.load(f)
+# Simple plotting utilities for visualising testing results
 
 def plot_heatmap(
     report: Dict[str, Dict[str, float]],
@@ -240,6 +232,10 @@ def plot_confusion_matrix(
     if disp:
         plt.show()
 
+
+# WLASL-specific visualizations: used for SATNAC results. Some may be useful, but moving forward, 
+# results may be restructured to be more general and these may be removed or refactored.
+
 def extract_metrics_df(results: Dict) -> pd.DataFrame:
 	"""Extract metrics into a pandas DataFrame for easier manipulation."""
 	data = []
@@ -448,7 +444,9 @@ def run_visualizations(filepath: str,
 					   tb:bool=False):
 	"""Run all visualizations."""
 	# Load results
-	results = load_results(filepath)
+
+	with open(filepath, 'r') as f:
+		results = json.load(f)
 	
 	if formatter:
 		results = formatter(results)
@@ -482,17 +480,5 @@ def run_visualizations(filepath: str,
 if __name__ == "__main__":
 	# Assuming you have saved your JSON data to 'results.json'
 	df, results = run_visualizations('./results/wlasl_satnac_16_only_summary.json', extractor=extract_metrics_df_sumed, splits=['asl100'])
-	# with open('wlasl_100_stats_ref.json', 'r') as f:
-	# 	asl100 = json.load(f)
-	# with open('wlasl_300_stats_ref.json', 'r') as f:
-	# 	asl300 = json.load(f)
-	# table = compare_splits_latex_table(asl100, asl300)
-	# print(table)
 	
-	# with open('wlasl_flipped_summary.json', 'r') as f:
-	# 	res = json.load(f)
-	# print(generate_latex_table(res, 'asl100', metric_type='avg', caption='Flipped results', label='wlasl_results_flipped'))
-	# print(generate_latex_table(res, 'asl300', metric_type='avg', caption='Flipped results', label='wlasl_results_flipped'))
-	# print()
- 
 	
