@@ -1,0 +1,1525 @@
+{
+    "num_classes": 100,
+    "num_instances": 2038,
+    "num_signers": 97,
+    "per_set_stats": {
+        "train": {
+            "num_instances": 1442,
+            "num_signers": 91,
+            "per_class_stats": {
+                "book": {
+                    "num_instances": 30,
+                    "num_signers": 14,
+                    "num_variations": 1
+                },
+                "drink": {
+                    "num_instances": 25,
+                    "num_signers": 15,
+                    "num_variations": 1
+                },
+                "computer": {
+                    "num_instances": 20,
+                    "num_signers": 12,
+                    "num_variations": 3
+                },
+                "before": {
+                    "num_instances": 18,
+                    "num_signers": 13,
+                    "num_variations": 2
+                },
+                "chair": {
+                    "num_instances": 19,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "go": {
+                    "num_instances": 19,
+                    "num_signers": 13,
+                    "num_variations": 2
+                },
+                "clothes": {
+                    "num_instances": 18,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "who": {
+                    "num_instances": 18,
+                    "num_signers": 15,
+                    "num_variations": 1
+                },
+                "candy": {
+                    "num_instances": 17,
+                    "num_signers": 13,
+                    "num_variations": 2
+                },
+                "cousin": {
+                    "num_instances": 16,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "deaf": {
+                    "num_instances": 16,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "fine": {
+                    "num_instances": 15,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "help": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "no": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "thin": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 2
+                },
+                "walk": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "year": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "yes": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "all": {
+                    "num_instances": 14,
+                    "num_signers": 12,
+                    "num_variations": 2
+                },
+                "black": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "cool": {
+                    "num_instances": 14,
+                    "num_signers": 8,
+                    "num_variations": 3
+                },
+                "finish": {
+                    "num_instances": 14,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "hot": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "like": {
+                    "num_instances": 14,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "many": {
+                    "num_instances": 15,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "mother": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "now": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "orange": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "table": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "thanksgiving": {
+                    "num_instances": 15,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "what": {
+                    "num_instances": 14,
+                    "num_signers": 12,
+                    "num_variations": 2
+                },
+                "woman": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "bed": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "blue": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "bowling": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "can": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "dog": {
+                    "num_instances": 14,
+                    "num_signers": 13,
+                    "num_variations": 2
+                },
+                "family": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "fish": {
+                    "num_instances": 13,
+                    "num_signers": 12,
+                    "num_variations": 2
+                },
+                "graduate": {
+                    "num_instances": 15,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "hat": {
+                    "num_instances": 15,
+                    "num_signers": 14,
+                    "num_variations": 1
+                },
+                "hearing": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "kiss": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "language": {
+                    "num_instances": 13,
+                    "num_signers": 9,
+                    "num_variations": 2
+                },
+                "later": {
+                    "num_instances": 14,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "man": {
+                    "num_instances": 15,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "shirt": {
+                    "num_instances": 14,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "study": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "tall": {
+                    "num_instances": 13,
+                    "num_signers": 12,
+                    "num_variations": 2
+                },
+                "white": {
+                    "num_instances": 15,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "wrong": {
+                    "num_instances": 15,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "accident": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "apple": {
+                    "num_instances": 14,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "bird": {
+                    "num_instances": 14,
+                    "num_signers": 14,
+                    "num_variations": 1
+                },
+                "change": {
+                    "num_instances": 14,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "color": {
+                    "num_instances": 14,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "corn": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "cow": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "dance": {
+                    "num_instances": 14,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "dark": {
+                    "num_instances": 13,
+                    "num_signers": 9,
+                    "num_variations": 2
+                },
+                "doctor": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "eat": {
+                    "num_instances": 14,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "enjoy": {
+                    "num_instances": 14,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "forget": {
+                    "num_instances": 14,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "give": {
+                    "num_instances": 13,
+                    "num_signers": 9,
+                    "num_variations": 2
+                },
+                "last": {
+                    "num_instances": 13,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "meet": {
+                    "num_instances": 14,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "pink": {
+                    "num_instances": 13,
+                    "num_signers": 12,
+                    "num_variations": 2
+                },
+                "pizza": {
+                    "num_instances": 13,
+                    "num_signers": 7,
+                    "num_variations": 3
+                },
+                "play": {
+                    "num_instances": 14,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "school": {
+                    "num_instances": 14,
+                    "num_signers": 14,
+                    "num_variations": 1
+                },
+                "secretary": {
+                    "num_instances": 13,
+                    "num_signers": 7,
+                    "num_variations": 2
+                },
+                "short": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 2
+                },
+                "time": {
+                    "num_instances": 14,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "want": {
+                    "num_instances": 14,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "work": {
+                    "num_instances": 14,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "africa": {
+                    "num_instances": 12,
+                    "num_signers": 9,
+                    "num_variations": 2
+                },
+                "basketball": {
+                    "num_instances": 13,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "birthday": {
+                    "num_instances": 12,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "brown": {
+                    "num_instances": 13,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "but": {
+                    "num_instances": 12,
+                    "num_signers": 9,
+                    "num_variations": 2
+                },
+                "cheat": {
+                    "num_instances": 12,
+                    "num_signers": 8,
+                    "num_variations": 2
+                },
+                "city": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "cook": {
+                    "num_instances": 13,
+                    "num_signers": 9,
+                    "num_variations": 1
+                },
+                "decide": {
+                    "num_instances": 13,
+                    "num_signers": 10,
+                    "num_variations": 1
+                },
+                "full": {
+                    "num_instances": 12,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "how": {
+                    "num_instances": 12,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "jacket": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "letter": {
+                    "num_instances": 12,
+                    "num_signers": 9,
+                    "num_variations": 3
+                },
+                "medicine": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "need": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "paint": {
+                    "num_instances": 13,
+                    "num_signers": 9,
+                    "num_variations": 1
+                },
+                "paper": {
+                    "num_instances": 13,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "pull": {
+                    "num_instances": 13,
+                    "num_signers": 11,
+                    "num_variations": 1
+                },
+                "purple": {
+                    "num_instances": 13,
+                    "num_signers": 13,
+                    "num_variations": 1
+                },
+                "right": {
+                    "num_instances": 12,
+                    "num_signers": 10,
+                    "num_variations": 2
+                },
+                "same": {
+                    "num_instances": 12,
+                    "num_signers": 7,
+                    "num_variations": 2
+                },
+                "son": {
+                    "num_instances": 13,
+                    "num_signers": 12,
+                    "num_variations": 1
+                },
+                "tell": {
+                    "num_instances": 13,
+                    "num_signers": 7,
+                    "num_variations": 1
+                },
+                "thursday": {
+                    "num_instances": 13,
+                    "num_signers": 10,
+                    "num_variations": 1
+                }
+            }
+        },
+        "val": {
+            "num_instances": 338,
+            "num_signers": 69,
+            "per_class_stats": {
+                "book": {
+                    "num_instances": 6,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "drink": {
+                    "num_instances": 6,
+                    "num_signers": 6,
+                    "num_variations": 1
+                },
+                "computer": {
+                    "num_instances": 5,
+                    "num_signers": 4,
+                    "num_variations": 3
+                },
+                "before": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "chair": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "go": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "clothes": {
+                    "num_instances": 4,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "who": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "candy": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "cousin": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "deaf": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "fine": {
+                    "num_instances": 4,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "help": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "no": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "thin": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "walk": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "year": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "yes": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 1
+                },
+                "all": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "black": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "cool": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 3
+                },
+                "finish": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "hot": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "like": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "many": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "mother": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "now": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "orange": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "table": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "thanksgiving": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "what": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "woman": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "bed": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "blue": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "bowling": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "can": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "dog": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "family": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "fish": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "graduate": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "hat": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "hearing": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "kiss": {
+                    "num_instances": 4,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "language": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "later": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "man": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "shirt": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "study": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "tall": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "white": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "wrong": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "accident": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "apple": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "bird": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "change": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "color": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "corn": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "cow": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "dance": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "dark": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "doctor": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "eat": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "enjoy": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "forget": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "give": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "last": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "meet": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "pink": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "pizza": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 3
+                },
+                "play": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "school": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "secretary": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "short": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "time": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "want": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "work": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "africa": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "basketball": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "birthday": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "brown": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "but": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "cheat": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "city": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "cook": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "decide": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "full": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "how": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "jacket": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "letter": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 3
+                },
+                "medicine": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "need": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "paint": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "paper": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "pull": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "purple": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "right": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "same": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "son": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "tell": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "thursday": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                }
+            }
+        },
+        "test": {
+            "num_instances": 258,
+            "num_signers": 56,
+            "per_class_stats": {
+                "book": {
+                    "num_instances": 4,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "drink": {
+                    "num_instances": 4,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "computer": {
+                    "num_instances": 5,
+                    "num_signers": 4,
+                    "num_variations": 3
+                },
+                "before": {
+                    "num_instances": 4,
+                    "num_signers": 4,
+                    "num_variations": 2
+                },
+                "chair": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "go": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "clothes": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "who": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "candy": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "cousin": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "deaf": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "fine": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "help": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "no": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "thin": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "walk": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "year": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "yes": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "all": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "black": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "cool": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 3
+                },
+                "finish": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "hot": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "like": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "many": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "mother": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "now": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "orange": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "table": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "thanksgiving": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "what": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "woman": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 1
+                },
+                "bed": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "blue": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "bowling": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "can": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "dog": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "family": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "fish": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "graduate": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "hat": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "hearing": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "kiss": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "language": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "later": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "man": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "shirt": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "study": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "tall": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "white": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "wrong": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "accident": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "apple": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "bird": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "change": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "color": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "corn": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "cow": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "dance": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "dark": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "doctor": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "eat": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "enjoy": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "forget": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "give": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "last": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "meet": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "pink": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "pizza": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 3
+                },
+                "play": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "school": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "secretary": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "short": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "time": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "want": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "work": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "africa": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "basketball": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "birthday": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "brown": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "but": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "cheat": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "city": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "cook": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "decide": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "full": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "how": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 2
+                },
+                "jacket": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "letter": {
+                    "num_instances": 3,
+                    "num_signers": 3,
+                    "num_variations": 3
+                },
+                "medicine": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "need": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "paint": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "paper": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "pull": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "purple": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "right": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "same": {
+                    "num_instances": 3,
+                    "num_signers": 2,
+                    "num_variations": 2
+                },
+                "son": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "tell": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                },
+                "thursday": {
+                    "num_instances": 2,
+                    "num_signers": 2,
+                    "num_variations": 1
+                }
+            }
+        }
+    }
+}
