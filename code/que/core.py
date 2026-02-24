@@ -1013,6 +1013,24 @@ class Que:
         with log_and_raise(self.logger, "shuffle"):
             self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
 
+    def _move(
+        self,
+        o_loc: QueLocation,
+        n_loc: QueLocation,
+        oi_idx: int,
+    ) -> None:
+        """Moves a run between locations in que (at beginning)
+
+        Args:
+            o_loc (QueLocation): Old location
+            n_loc (QueLocation): New location
+            oi_idx (int): Old initial index
+        """
+         # self._set_run(n_loc, 0, self._pop_run(o_loc, oi_idx)) #NOTE: in an exception this would delete the run
+        run = self.peak_run(o_loc, oi_idx)
+        self._set_run(n_loc, 0, run)
+        _ = self._pop_run(o_loc, oi_idx)
+
     def move(
         self,
         o_loc: QueLocation,
@@ -1023,31 +1041,39 @@ class Que:
         """Moves a run between locations in que (at beginning)
 
         Args:
-                                                                                                                                        o_loc (QueLocation): Old location
-                                                                                                                                        n_loc (QueLocation): New location
-                                                                                                                                        oi_idx (int): Old initial index
-                                                                                                                                        of_idx (int): Old final index, if specifying a range.
+            o_loc (QueLocation): Old location
+            n_loc (QueLocation): New location
+            oi_idx (int): Old initial index
+            of_idx (int): Old final index, if specifying a range.
         """
         with log_and_raise(self.logger, "move"):
             if of_idx is None:
-                self._set_run(n_loc, 0, self._pop_run(o_loc, oi_idx))
+                self._move(o_loc, n_loc, oi_idx)
             else:
                 # Range move
                 old_location = self._fetch_state(o_loc)
-                new_location = self._fetch_state(n_loc)
+                # new_location = self._fetch_state(n_loc)
+
+                if oi_idx > of_idx:
+                    #swap so of_idx is larger
+                    t = of_idx
+                    of_idx = oi_idx
+                    oi_idx = t
 
                 # Validate range
                 if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
                     raise QueIdxOORR(o_loc, oi_idx, of_idx, len(old_location))
 
                 # Extract the runs to move
-                tomv = []
+                # tomv = []
+                
                 for _ in range(oi_idx, of_idx + 1):
-                    tomv.append(old_location.pop(oi_idx))
+                    # tomv.append(old_location.pop(oi_idx))
+                    self._move(o_loc, n_loc, oi_idx)
 
                 # Insert into new location (in reverse to maintain order when inserting at 0)
-                for run in tomv:
-                    new_location.insert(0, run)
+                # for run in tomv:
+                #     new_location.insert(0, run)
 
     def edit_run(
         self,
