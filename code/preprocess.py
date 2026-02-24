@@ -138,7 +138,7 @@ def fix_bad_frame_range(
         instance["frame_end"] = end
         fixed_instances.append(instance)
 
-    log_path = log_dir / file_extension
+    log_path = log_dir / f"{remove_policy}_{file_extension}"
     if bad_frames:
         with open(log_path, "a") as log_file:
             log_file.write(
@@ -247,7 +247,7 @@ def fix_bad_bboxes(
             instance | {"bbox": largest_bbox}
         )  # update with fresh bbox
 
-    log_path = log_dir / file_extension
+    log_path = log_dir / f"{remove_policy}_{file_extension}"
 
     if bad_bboxes:
         with open(log_path, "a") as log_file:
@@ -292,7 +292,7 @@ def remove_short_samples(
                 f"bad number of frames {num_frame} for video {inst['video_id']}, removing."
             )
 
-    log_path = log_dir / file_extension
+    log_path = log_dir / f"cutoff_{cutoff}_{file_extension}"
 
     if short_samples:
         with open(log_path, "a") as log_file:
