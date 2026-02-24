@@ -179,6 +179,7 @@ class EarlyStopper:
             "best_epoch": self.best_epoch,
             "counter": self.counter,
             "stop": self.stop,
+            "stopped_by_event" : self.stopped_by_event
         }
 
     def load_state_dict(self, state_dict: StopperState) -> None:
