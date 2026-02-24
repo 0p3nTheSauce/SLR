@@ -1,4 +1,6 @@
-
+Stats TODOS:
+- instances per individual video (help to determine whether to remove certain instances
+  or just fix the frame rannge)
 
 Augmentation TODOs:
   general:

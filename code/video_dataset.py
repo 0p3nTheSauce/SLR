@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import (
     Callable,
     Optional,
+    Any,
     Tuple,
     Literal,
     TypedDict,
@@ -24,7 +25,7 @@ from video_transforms import correct_num_frames, resize_by_diag, crop_frames
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from models import NormDict
-from preprocess2 import InstanceDict, AVAIL_SETS, AVAIL_SPLITS
+from preprocess import InstanceDict, AVAIL_SETS
 ############################# Dictionaries and Types #############################
 
 
@@ -37,7 +38,7 @@ class DataSetInfo(TypedDict):
     set_name: AVAIL_SETS
 
 
-def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
+def is_instance_dict(obj: Any) -> TypeGuard[InstanceDict]:
     """Type guard to check if a dict is an InstanceDict
 
     Args:
@@ -45,11 +46,24 @@ def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
     Returns:
         TypeGuard[InstanceDict]: True if obj is an InstanceDict, False otherwise
     """
-    required_keys = InstanceDict.__annotations__.keys()
-    return required_keys.issubset(obj.keys())
-
-
-############################ Helper Functions ############################
+    try:
+        _ = InstanceDict(
+            bbox=obj['bbox'],
+            frame_end=obj['frame_end'],
+            frame_start=obj['frame_start'],
+            instance_id=obj['instance_id'],
+            signer_id=obj['signer_id'],
+            source=obj['source'],
+            split=obj['split'],
+            url=obj['url'],
+            variation_id=obj['variation_id'],
+            video_id=obj['video_id'],
+            label_name=obj['label_name'],
+            label_num=obj['label_num']
+        )
+        return True
+    except Exception:
+        return False
 
 
 def load_data_from_json(json_path: Union[str, Path]) -> List[InstanceDict]:
@@ -66,9 +80,8 @@ def load_data_from_json(json_path: Union[str, Path]) -> List[InstanceDict]:
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    #NOTE: if this is a performance bottleneck, we can consider only checking the first few items, or a random sample of items, rather than the whole list
-    for item in data:
-        if not is_instance_dict(item):
+    for item in data: #NOTE: Overhead is actually mininmal on strict ~0.019 s for WLASL2000 train.
+        if not is_instance_dict(item): 
             raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
 
     return data
@@ -150,14 +163,10 @@ class VideoDataset(Dataset):
             set_info["labels"]
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
-        classes_path = (
-            set_info["labels"]
-            / f"{set_info['set_name']}_classes_{set_info['label_suff']}"
-        )
+
         self.data = load_data_from_json(instances_path)
-        with open(classes_path, "r") as f:
-            self.classes = json.load(f)
-        self.num_classes = len(set(self.classes))
+        self.classes = set([inst['label_name'] for inst in self.data])
+        self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
         video_path = self.root / (item["video_id"] + ".mp4")

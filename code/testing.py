@@ -37,7 +37,6 @@ from run_types import (
 	ShuffRes,
 	TopKRes,
     )
-from utils import print_dict
 
 # constants
 
@@ -818,7 +817,7 @@ def main():
 		# Run complete test suite
 		print("Running full test suite...")
 		results = full_test(admin, data=data, save=args.save)
-		print_dict(results)
+		print(json.dumps(results, indent=4))
 	elif args.command == "partial":
 		# Run partial test with specified parameters
 		print(f"Running partial test on {args.set_name} set...")
@@ -834,7 +833,7 @@ def main():
 			disp=args.display,
 			save=args.save,
 		)
-		print_dict(results)
+		print(json.dumps(results, indent=4))
 
 
 if __name__ == "__main__":
