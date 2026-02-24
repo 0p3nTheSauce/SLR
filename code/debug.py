@@ -4,6 +4,8 @@ import subprocess
 import sys
 import logging
 import torch
+import video_dataset
+import preprocess2
 
 logging.basicConfig(
 		level=logging.INFO,
@@ -70,11 +72,32 @@ def test_clear2():
 def lrsched():
     reduce_on_platue = torch.optim.lr_scheduler.ReduceLROnPlateau()
 
+def test_instance_typegaurd():
+    valid_dict = preprocess2.InstanceDict(
+        video_id='video1',
+        frame_start=0,
+        frame_end=10,
+        label_name='label1',
+        label_num=0,
+        bbox=[0, 0, 100, 100]
+    )
+    invalid_dict = {
+        'video_id': 'video1',
+        'frame_start': 0,
+        'frame_end': 10,
+        'label_name': 'label1',
+        'label_num': 0,
+        # 'bbox' key is missing
+    }
+    print(video_dataset.is_instance_dict(valid_dict))  # Should print True
+    print(video_dataset.is_instance_dict(invalid_dict))  # Should print False
+
 if __name__ == '__main__':
     # test_dump_peak()
     # test_dump_peak_server()
     # test_subprocess()
     # test_subrocess2()
     # test_ex()
-    test_clear()
-    pass
+    # test_clear()
+    test_instance_typegaurd()
+    

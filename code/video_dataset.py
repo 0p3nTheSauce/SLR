@@ -24,17 +24,8 @@ from video_transforms import correct_num_frames, resize_by_diag, crop_frames
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from models import NormDict
-
+from preprocess2 import InstanceDict, AVAIL_SETS, AVAIL_SPLITS
 ############################# Dictionaries and Types #############################
-
-
-class InstanceDict(TypedDict):
-    video_id: str
-    frame_start: int
-    frame_end: int
-    label_name: str
-    label_num: int
-    bbox: list[int]  # [x1, y1, x2, y2]
 
 
 class DataSetInfo(TypedDict):
@@ -43,7 +34,7 @@ class DataSetInfo(TypedDict):
     root: Path
     labels: Path
     label_suff: str
-    set_name: Literal["train", "test", "val"]
+    set_name: AVAIL_SETS
 
 
 def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
@@ -54,14 +45,7 @@ def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
     Returns:
         TypeGuard[InstanceDict]: True if obj is an InstanceDict, False otherwise
     """
-    required_keys = {
-        "video_id",
-        "frame_start",
-        "frame_end",
-        "label_name",
-        "label_num",
-        "bbox",
-    }
+    required_keys = InstanceDict.__annotations__.keys()
     return required_keys.issubset(obj.keys())
 
 
@@ -82,10 +66,10 @@ def load_data_from_json(json_path: Union[str, Path]) -> List[InstanceDict]:
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    # NOTE: Commenting out type guard check for performance reasons
-    # for item in data:
-    #     if not is_instance_dict(item):
-    #         raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
+    #NOTE: if this is a performance bottleneck, we can consider only checking the first few items, or a random sample of items, rather than the whole list
+    for item in data:
+        if not is_instance_dict(item):
+            raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
 
     return data
 
