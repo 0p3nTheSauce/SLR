@@ -1,0 +1,11 @@
+
+ New bad frames: Policy: strict Total removed videos: 9
+ Invalid start frame 4638 for video 70234 with length 109. Removing instance.
+Invalid start frame 4948 for video 70271 with length 148. Removing instance.
+Invalid start frame 7669 for video 70361 with length 118. Removing instance.
+Invalid start frame 3522 for video 70030 with length 92. Removing instance.
+Invalid start frame 4053 for video 70119 with length 106. Removing instance.
+Invalid start frame 3367 for video 70029 with length 112. Removing instance.
+Invalid start frame 5137 for video 70325 with length 105. Removing instance.
+Invalid start frame 5549 for video 70237 with length 118. Removing instance.
+Invalid start frame 1402 for video 70026 with length 92. Removing instance.

@@ -1,0 +1,3 @@
+
+ New short samples Total removed: 1 
+ bad number of frames 9 for video 59958, removing.

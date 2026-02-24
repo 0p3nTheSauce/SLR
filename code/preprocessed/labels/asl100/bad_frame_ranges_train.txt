@@ -1,0 +1,36 @@
+
+ New bad frames: Policy: strict Total removed videos: 34
+ Invalid start frame 3732 for video 70266 with length 121. Removing instance.
+Invalid start frame 4778 for video 70348 with length 96. Removing instance.
+Invalid start frame 2101 for video 70230 with length 131. Removing instance.
+Invalid start frame 3092 for video 70263 with length 118. Removing instance.
+Invalid start frame 5286 for video 70326 with length 126. Removing instance.
+Invalid start frame 1161 for video 70332 with length 102. Removing instance.
+Invalid start frame 4420 for video 70015 with length 92. Removing instance.
+Invalid start frame 80 for video 68586 with length 58. Removing instance.
+Invalid start frame 860 for video 70306 with length 130. Removing instance.
+Invalid start frame 1146 for video 70244 with length 96. Removing instance.
+Invalid start frame 5546 for video 70299 with length 122. Removing instance.
+Invalid start frame 4000 for video 70345 with length 108. Removing instance.
+Invalid start frame 1858 for video 70249 with length 114. Removing instance.
+Invalid start frame 1285 for video 70245 with length 100. Removing instance.
+Invalid start frame 4359 for video 70296 with length 112. Removing instance.
+Invalid start frame 1683 for video 70132 with length 132. Removing instance.
+Invalid start frame 1682 for video 70309 with length 109. Removing instance.
+Invalid start frame 830 for video 70107 with length 104. Removing instance.
+Invalid start frame 7250 for video 70152 with length 112. Removing instance.
+Invalid start frame 7390 for video 70049 with length 86. Removing instance.
+Invalid start frame 7902 for video 70051 with length 117. Removing instance.
+Invalid start frame 4255 for video 70376 with length 97. Removing instance.
+Invalid start frame 1429 for video 70246 with length 109. Removing instance.
+Invalid start frame 1068 for video 70207 with length 112. Removing instance.
+Invalid start frame 6591 for video 70355 with length 107. Removing instance.
+Invalid start frame 6741 for video 70356 with length 96. Removing instance.
+Invalid start frame 6881 for video 70357 with length 136. Removing instance.
+Invalid start frame 7225 for video 70359 with length 100. Removing instance.
+Invalid start frame 869 for video 70242 with length 96. Removing instance.
+Invalid start frame 4221 for video 70295 with length 94. Removing instance.
+Invalid start frame 2006 for video 70211 with length 101. Removing instance.
+Invalid start frame 5233 for video 70378 with length 112. Removing instance.
+Invalid start frame 1581 for video 70247 with length 101. Removing instance.
+Invalid start frame 1749 for video 70335 with length 121. Removing instance.
