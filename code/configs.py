@@ -25,7 +25,6 @@ from run_types import (
 	WarmUpSched,
 )
 import json
-# TODO: make configs the sole source of these constants
 
 # constants
 # - wandb
