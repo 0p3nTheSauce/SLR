@@ -14,4 +14,6 @@ code/media/
 code/weights/
 code/wandb/
 code/preprocessed/
+code/que/Server.json
+code/que/Runs.json
 .vscode/
