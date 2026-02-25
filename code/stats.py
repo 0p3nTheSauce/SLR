@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import List, Dict, TypedDict, TypeAlias, Literal, Optional
 import matplotlib.pyplot as plt
 
-
 # =============================================================================
 #                       TYPE DEFINITIONS
 # =============================================================================
