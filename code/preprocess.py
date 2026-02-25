@@ -204,6 +204,7 @@ def fix_bad_bboxes(
     """
 
     # TODO: could be a bit faster
+    #NOTE: This function can sometimes bork your conda env, blame ultralytics. If it does remake the env. 
     model = YOLO("yolov8n.pt")  # Load a pre-trained YOLO model
     device = "cuda" if torch.cuda.is_available() else "cpu"
 

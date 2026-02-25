@@ -16,9 +16,13 @@ Work in progress repo focussing on training video classification architectures o
 git clone https://github.com/0p3nTheSauce/SLR.git
 cd SLR
 
-#recommend using mini-conda
-conda env create -f wlasl_gpu.yml
+#recommend using mini-conda 
+conda env create -f wlasl_gpu.yml #GPU version required for training / testing
 conda activate wlasl
+
+#alternatively if no GPU available 
+# conda env create -f wlasl_cpu.yml 
+# conda activate wlasl_cpu
 
 #download data
 mkdir data && cd data
@@ -30,7 +34,10 @@ cd ..
 
 #preprocess data
 cd code
-python preprocess.py -as asl100 -ve
+python preprocess.py asl100 -ve 
+python preprocess.py asl300 -ve 
+python preprocess.py asl1000 -ve 
+python preprocess.py asl2000 -ve 
 ```
 
 ## Usage

@@ -2,8 +2,13 @@ name: wlasl_cpu
 channels:
   - defaults
 dependencies:
-  - python=3.10
-  - scikit-learn
   - matplotlib
+  - scikit-learn
   - seaborn
-prefix: /home/luke/miniconda3/envs/wlasl_cpu
+  - python=3.10
+  - cpuonly
+  - pytorch
+  - torchvision
+  - torchaudio
+  - opencv
+prefix: /home/g21g8924/miniconda3/envs/wlasl_cpu
