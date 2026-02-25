@@ -25,7 +25,7 @@ from video_transforms import correct_num_frames, resize_by_diag, crop_frames
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from models import NormDict
-from preprocess import InstanceDict, AVAIL_SETS
+from preprocess import InstanceDict, AVAIL_SETS, is_instance_dict
 ############################# Dictionaries and Types #############################
 
 
@@ -38,32 +38,6 @@ class DataSetInfo(TypedDict):
     set_name: AVAIL_SETS
 
 
-def is_instance_dict(obj: Any) -> TypeGuard[InstanceDict]:
-    """Type guard to check if a dict is an InstanceDict
-
-    Args:
-        obj (dict): Object to check
-    Returns:
-        TypeGuard[InstanceDict]: True if obj is an InstanceDict, False otherwise
-    """
-    try:
-        _ = InstanceDict(
-            bbox=obj['bbox'],
-            frame_end=obj['frame_end'],
-            frame_start=obj['frame_start'],
-            instance_id=obj['instance_id'],
-            signer_id=obj['signer_id'],
-            source=obj['source'],
-            split=obj['split'],
-            url=obj['url'],
-            variation_id=obj['variation_id'],
-            video_id=obj['video_id'],
-            label_name=obj['label_name'],
-            label_num=obj['label_num']
-        )
-        return True
-    except Exception:
-        return False
 
 LOAD_DATA_POLICY : TypeAlias = Literal['strict', 'accepting']
 

@@ -1,3 +1,7 @@
+DATA TODO:
+- fix urls for downloading from google drive / find better way to host
+
+
 Stats TODOS:
 - instances per individual video (help to determine whether to remove certain instances
   or just fix the frame rannge)
