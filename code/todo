@@ -1,6 +1,22 @@
-- investigate r2+1d
+Stats TODOS:
+- instances per individual video (help to determine whether to remove certain instances
+  or just fix the frame rannge)
+
+Augmentation TODOs:
+  general:
+  - investigate different augmentations (color jitter, noise, etc.)
+  - add to config
+  spatial:
+  - investigate resize
+  - investigate cropping
+  - investigate padding
+  - investigate different interpolation methods
+  - investigate different angles
+  - downscaling instead of cropping
+  temporal:
+  - jitter, sample, reverse, shuffle, etc.
+
+Misc TODOs:
 - investigate different angles
-- investigate resize
-  - add resize to configfiles
+- investigate r2+1d
 - switch from str to Literal for model names
-- downscaling instead of cropping

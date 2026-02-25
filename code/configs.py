@@ -1,8 +1,8 @@
 import configparser
 import argparse
 import ast
-from typing import Dict, Any, List, Optional, Union, Tuple, Literal
-from utils import enum_dir, ask_nicely, print_dict
+from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
+from utils import enum_dir
 from stopping import EarlyStopper, StopperOn
 from pathlib import Path
 import torch
@@ -25,7 +25,6 @@ from run_types import (
 	WarmUpSched,
 )
 import json
-# TODO: make configs the sole source of these constants
 
 # constants
 # - wandb
@@ -42,6 +41,27 @@ SPLIT_DIR = "splits"
 # - training/testing
 RUNS_PATH = "./runs"
 SEED = 42
+
+def ask_nicely(message: str, requirment: Optional[Callable] = None, error: Optional[str] = None) -> str:
+	"""Ask user for input, with optional requirement and error message
+
+	Args:
+		message (str): The message to display when asking for input
+		requirment (Optional[callable], optional): A function that takes the input and
+			returns True if it meets the requirement, False otherwise. Defaults to None.
+		error (Optional[str], optional): The error message to display if the requirement is not met. Defaults to None.
+
+	Returns:
+		str: The user input that meets the requirement (if provided)
+	"""
+	while True:
+		ans = input(message)
+		if requirment is None or requirment(ans):
+			return ans
+		else:
+			print(error if error else "Invalid input, please try again.")
+
+
 
 def _exp_to_run_info(expInfo: ExpInfo) -> RunInfo:
 	"""
@@ -112,7 +132,7 @@ def print_config(config_dict):
 			for key, value in section_data.items():
 				if isinstance(value, dict):
 					print(f"{key} :")
-					print_dict(value) #TODO: could be better
+					print(json.dumps(value, indent=4)) #TODO: could be better
 					
 				else:
 					print(f"    {key:<{max_key_len}} : {value}")

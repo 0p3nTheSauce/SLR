@@ -22,6 +22,7 @@ class StopperState(TypedDict):
 	best_epoch: int
 	counter: int
 	stop: bool
+	stopped_by_event: bool
 
 
 ####################### Typed Dictionaries #############################

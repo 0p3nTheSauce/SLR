@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import (
     Callable,
     Optional,
+    Any,
     Tuple,
     Literal,
     TypedDict,
@@ -24,17 +25,8 @@ from video_transforms import correct_num_frames, resize_by_diag, crop_frames
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from models import NormDict
-
+from preprocess import InstanceDict, AVAIL_SETS
 ############################# Dictionaries and Types #############################
-
-
-class InstanceDict(TypedDict):
-    video_id: str
-    frame_start: int
-    frame_end: int
-    label_name: str
-    label_num: int
-    bbox: list[int]  # [x1, y1, x2, y2]
 
 
 class DataSetInfo(TypedDict):
@@ -43,10 +35,10 @@ class DataSetInfo(TypedDict):
     root: Path
     labels: Path
     label_suff: str
-    set_name: Literal["train", "test", "val"]
+    set_name: AVAIL_SETS
 
 
-def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
+def is_instance_dict(obj: Any) -> TypeGuard[InstanceDict]:
     """Type guard to check if a dict is an InstanceDict
 
     Args:
@@ -54,21 +46,28 @@ def is_instance_dict(obj: dict) -> TypeGuard[InstanceDict]:
     Returns:
         TypeGuard[InstanceDict]: True if obj is an InstanceDict, False otherwise
     """
-    required_keys = {
-        "video_id",
-        "frame_start",
-        "frame_end",
-        "label_name",
-        "label_num",
-        "bbox",
-    }
-    return required_keys.issubset(obj.keys())
+    try:
+        _ = InstanceDict(
+            bbox=obj['bbox'],
+            frame_end=obj['frame_end'],
+            frame_start=obj['frame_start'],
+            instance_id=obj['instance_id'],
+            signer_id=obj['signer_id'],
+            source=obj['source'],
+            split=obj['split'],
+            url=obj['url'],
+            variation_id=obj['variation_id'],
+            video_id=obj['video_id'],
+            label_name=obj['label_name'],
+            label_num=obj['label_num']
+        )
+        return True
+    except Exception:
+        return False
 
+LOAD_DATA_POLICY : TypeAlias = Literal['strict', 'accepting']
 
-############################ Helper Functions ############################
-
-
-def load_data_from_json(json_path: Union[str, Path]) -> List[InstanceDict]:
+def load_data_from_json(json_path: Union[str, Path], policy: LOAD_DATA_POLICY) -> List[InstanceDict]:
     """Load list of InstanceDict from a json file
 
     Args:
@@ -82,10 +81,9 @@ def load_data_from_json(json_path: Union[str, Path]) -> List[InstanceDict]:
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    # NOTE: Commenting out type guard check for performance reasons
-    # for item in data:
-    #     if not is_instance_dict(item):
-    #         raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
+    for item in data: #NOTE: Overhead is actually mininmal on strict ~0.019 s for WLASL2000 train.
+        if not is_instance_dict(item) and policy == 'strict': 
+            raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
 
     return data
 
@@ -132,28 +130,22 @@ class VideoDataset(Dataset):
             Callable[[torch.Tensor, InstanceDict], torch.Tensor]
         ] = None,
         include_meta: bool = False,
+        load_policy: LOAD_DATA_POLICY = 'accepting'
     ) -> None:
         """
         Custom video dataset, based on the structure of the WLASL dataset
 
-        :param root: Path to the root directory where the video files are located.
-        :type root: Path
-        :param instances_path: Path to the json file with data points inside
-        :type instances_path: Path
-        :param classes_path: Path to the json file with class names ordered by label
-        :type classes_path: Path
-        :param crop: Switch to turn pre-cropping on. The crop is based on YOLO predictions for where people are.
-        :type crop: bool
+        :param set_info: Dictionary containing information for the location of the dataset.
         :param num_frames: The desired number of frames.
         :type num_frames: int
         :param transforms: A Transform function to apply to raw videos.
         :type transforms: Optional[Callable[[torch.Tensor], torch.Tensor]]
+        :param item_transforms: A Transform function to apply to raw videos.
+        :type item_transforms: Optional[Callable[[torch.Tensor, InstanceDict], torch.Tensor]]
         :param include_meta: Boolean flag to include extra meta information
         :type include_meta: bool
-        :param resize: Boolean flag to resize by the diagonal (wlasl strategy)
-        :type resize: bool
-        :param all_frames: Boolean flag to instead keep all the flags
-        :type all_frames: bool
+        :param load_policy: Load data that does not match List[InstanceDict] exactly. For backwards compatibility with older preprocessing strategies.
+        :type load_policy: LOAD_DATA_POLICY
         """
         self.root = set_info["root"]
         if not self.root.exists():
@@ -166,14 +158,9 @@ class VideoDataset(Dataset):
             set_info["labels"]
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
-        classes_path = (
-            set_info["labels"]
-            / f"{set_info['set_name']}_classes_{set_info['label_suff']}"
-        )
-        self.data = load_data_from_json(instances_path)
-        with open(classes_path, "r") as f:
-            self.classes = json.load(f)
-        self.num_classes = len(set(self.classes))
+        self.data = load_data_from_json(instances_path, load_policy)
+        self.classes = set([inst['label_num'] for inst in self.data])
+        self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
         video_path = self.root / (item["video_id"] + ".mp4")

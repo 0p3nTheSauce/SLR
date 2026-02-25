@@ -1,10 +1,5 @@
-- make better state handling for worker, eg dedicated class such as que
 
 Shell:
-- improved exception handling
-- add logging for server main logger
-- add restart, or start command for the server
-- Add probe to check server is running/start server
 - add flag to check if changes were made before saving 
 - make a persistent shell history file/ ability to drop in and out of shell like tmux
 - Add more options to logs
@@ -13,12 +8,7 @@ Daemon
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
     that the process started successfully)
 
-Worker:
-- fix logging issue for server logger
-- pass testing to worker, and make it appear in status
-
 Server:
-- make the shell work remotely
 - redirect wandb output to log file
 - add auto experiment num
 - redirect testing output to log file
