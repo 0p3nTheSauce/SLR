@@ -14,3 +14,5 @@ code/media/
 code/weights/
 code/wandb
 .vscode/
+./.vscode/
+
