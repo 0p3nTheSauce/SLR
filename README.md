@@ -25,12 +25,12 @@ conda activate wlasl
 # conda activate wlasl_cpu
 
 #download data
-mkdir data && cd data
-curl -L "https://drive.google.com/uc?export=download&id=1kq0Vzt13226mODCEhhC3mpwhsSawaojS" -o splits.zip
-curl -L "https://drive.google.com/uc?export=download&id=1Rv_8ZE6VDQDaY8tbJUucx1E8mcdUp-xX" -o WLASL2000.zip
+mkdir data/WLASL && cd data/WLASL
+wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/splits.zip"
+wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/WLASL2000.zip"
 unzip splits.zip
 unzip WLASL2000.zip
-cd ..
+cd ../..
 
 #preprocess data
 cd code
@@ -274,4 +274,4 @@ Contributions are welcome! Please open issues or submit pull requests.
 
 ## License
 
-The data provided in this project is subject to the C-UDA license of the forked WLASL dataset. See [C-UDA-1.0.pdf](C-UDA-1.0.pdf)
+The data provided in this project is subject to the C-UDA license of the forked WLASL dataset. By downloading or using this data, you agree to the terms of the C-UDA and any downstream redistribution must also comply with these terms. See [C-UDA-1.0.pdf](C-UDA-1.0.pdf)
