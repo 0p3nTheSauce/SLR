@@ -70,6 +70,8 @@ class ServerContext:
             self._setup_logging()
         )
         self.server_logger = server_logger
+        self.server_logger.info(self.seperator("Server starting up"))
+        
 
         # Events for controlling Daemon and Worker
         self.stop_worker_event = Event()
@@ -99,6 +101,17 @@ class ServerContext:
         )
         )
         self.load_state()
+
+    def seperator(self, r_str: str) -> str:
+        sep = ""
+
+        if r_str:
+            sep += ("\n" * 2) + ("-" * 10) + ("\n")
+            sep += f"{r_str:^10}"
+            sep += ("\n" * 2) + ("-" * 10) + ("\n")
+        else:
+            sep += "\n"
+        return sep.title()
 
     def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger]:
         """Sets up loggers for the server components."""
