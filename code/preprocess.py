@@ -25,7 +25,23 @@ AVAIL_SPLITS: TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
 
 
 class instance_dict(TypedDict):
-    """Represents a single instance of a gloss in the dataset. This is the format that the data is currently in, and will be modified by the preprocessing functions."""
+    """Represents a single instance of a gloss in the dataset.
+    This is the format that the data is currently in, and will be modified by the 
+    preprocessing functions.
+    
+    Keys:
+    --------
+    - bbox: List[int]
+    - frame_end: int
+    - frame_start: int
+    - instance_id: int
+    - signer_id: int
+    - source: str
+    - split: str
+    - url: str
+    - variation_id: int
+    - video_id: str
+    """
 
     bbox: List[int]
     frame_end: int
