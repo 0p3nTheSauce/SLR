@@ -96,13 +96,9 @@ class InstanceDict(instance_dict):
 	- video_id: str
 	- label_num: int
 	- label_name: str
-	- frame_height: int
-	- frame_width: int
 	"""
 	label_num: int
 	label_name: str
-	frame_height: int
-	frame_width: int
 	
 
 
@@ -134,40 +130,16 @@ def is_instance_dict(obj: Any) -> TypeGuard[InstanceDict]:
 			video_id=obj["video_id"],
 			label_name=obj["label_name"],
 			label_num=obj["label_num"],
-			frame_height=obj["frame_height"],
-			frame_width=obj["frame_width"],
-			
 		)
 		return True
 	except Exception:
 		return False
 
 
-def _retrieve_frame_shape(instance: instance_dict, raw_path: Path = Path(WLASL_ROOT) / RAW_DIR) -> Tuple[int, int]:
-	"""Get the frame shape of a video.
-
-	Args:
-			raw_path (Path): Path to raw videos directory
-			instance (instance_dict): Dictionary containing key: video_id
-
-	Raises:
-		FileNotFoundError: If the video file does not exist
-		ValueError: If no frames were loaded for the video file
-
-	Returns:
-			Tuple[int, int]: Height, Width
-	"""
-	vid_path = raw_path / (instance["video_id"] + ".mp4")
-	frames = cv_load(vid_path, 0, 1)
-	return frames.shape[1], frames.shape[2]
-
-
 def instance_to_Instance(
 	d: instance_dict,
 	label_num: int,
 	label_name: str,
-	frame_width: int,
-	frame_height: int,
 ) -> InstanceDict:
 	"""Add attributes to convert an instance_dict to and InstanceDict
 
@@ -183,8 +155,6 @@ def instance_to_Instance(
 		**d,
 		"label_num": label_num,
 		"label_name": label_name,
-		"frame_width": frame_width,
-		"frame_height": frame_height,
 	}
 
 
@@ -219,11 +189,7 @@ def get_set(
 	for i, gloss_d in enumerate(lst_wlasl_class_dicts):
 		for inst in gloss_d["instances"]:
 			if inst["split"] == set_name:
-				try:
-					height, width = _retrieve_frame_shape(inst)
-				except ValueError:
-					height, width = 0, 0 #will be filtered at a later stage
-				mod_instances.append(instance_to_Instance(inst, i, gloss_d["gloss"], frame_height=height, frame_width=width))
+				mod_instances.append(instance_to_Instance(inst, i, gloss_d["gloss"]))
 	return mod_instances
 
 
