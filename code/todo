@@ -24,3 +24,5 @@ Misc TODOs:
 - investigate different angles
 - investigate r2+1d
 - switch from str to Literal for model names
+- reorganise runs folder
+- reorganise preprocessed folder

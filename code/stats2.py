@@ -23,7 +23,7 @@ from typing import List, Dict, TypedDict, TypeAlias, Literal, Optional, Union, A
 import matplotlib.pyplot as plt
 #locals
 from configs import WLASL_ROOT, SPLIT_DIR, CLASSES_PATH
-from preprocess import instance_dict, gloss_dict
+from preprocess import instance_dict, wlasl_class_dict, InstanceDict
 
 # =============================================================================
 #                       TYPE DEFINITIONS
@@ -102,8 +102,10 @@ class split_stats(TypedDict):
 
 
 # =============================================================================
-#                       SET REFORMATION
+#                       SET MANIPULATION
 # =============================================================================
+
+
 
 def get_set(
     instances: List[instance_dict], set_name: AVAIL_SETS
@@ -115,10 +117,10 @@ def get_set(
             filtered_instances.append(instance)
     return filtered_instances
 
-def seperate_by_set(glosses: List[gloss_dict]) -> Dict[AVAIL_SETS, List[gloss_dict]]:
+def seperate_by_set(glosses: List[wlasl_class_dict]) -> Dict[AVAIL_SETS, List[wlasl_class_dict]]:
     """Separates glosses by their set (train/val/test)."""
     set_names: List[AVAIL_SETS] = ["train", "val", "test"]
-    sets: Dict[AVAIL_SETS, List[gloss_dict]] = {name: [] for name in set_names}
+    sets: Dict[AVAIL_SETS, List[wlasl_class_dict]] = {name: [] for name in set_names}
     for gloss in glosses:
         instances = gloss["instances"]
         for set_name in sets.keys():
@@ -128,6 +130,9 @@ def seperate_by_set(glosses: List[gloss_dict]) -> Dict[AVAIL_SETS, List[gloss_di
                 {"gloss": gloss["gloss"], "instances": filtered_instances}
             )
     return sets
+
+
+
 
 # =============================================================================
 #                       STATISTICS CALCULATION
@@ -171,8 +176,8 @@ def collect_class_stats(instances: List[instance_dict]) -> class_stats:
     )
 
 
-def get_per_class_stats(glosses: List[gloss_dict]) -> Dict[str, class_stats]:
-    """Collects statistics for all classes in a list of gloss_dicts (recommend seperating into test/val/train first)"""
+def get_per_class_stats(glosses: List[wlasl_class_dict]) -> Dict[str, class_stats]:
+    """Collects statistics for all classes in a list of wlasl_class_dicts (recommend seperating into test/val/train first)"""
     per_class_stats = {}
     for gloss in glosses:
         class_name = gloss["gloss"]
@@ -180,8 +185,8 @@ def get_per_class_stats(glosses: List[gloss_dict]) -> Dict[str, class_stats]:
         per_class_stats[class_name] = collect_class_stats(instances)
     return per_class_stats
 
-# def collect_all_class_stats(glosses: List[gloss_dict]) -> Dict[str, class_stats]:
-#     """Collects statistics for all classes in a list of gloss_dicts (recommend seperating into test/val/train first)"""
+# def collect_all_class_stats(glosses: List[wlasl_class_dict]) -> Dict[str, class_stats]:
+#     """Collects statistics for all classes in a list of wlasl_class_dicts (recommend seperating into test/val/train first)"""
 #     all_class_stats = {}
 #     for gloss_d in glosses:
 #         class_name = gloss_d["gloss"]
@@ -190,8 +195,8 @@ def get_per_class_stats(glosses: List[gloss_dict]) -> Dict[str, class_stats]:
 #     return per_class_stats
 
 
-def get_unique_signers(dataset: List[gloss_dict]) -> set[int]:
-    """Get set of unique sighners in a list of gloss_dicts"""
+def get_unique_signers(dataset: List[wlasl_class_dict]) -> set[int]:
+    """Get set of unique sighners in a list of wlasl_class_dicts"""
     signers = set()
     for gloss_d in dataset:
         for instance_dict in gloss_d["instances"]:
@@ -199,7 +204,7 @@ def get_unique_signers(dataset: List[gloss_dict]) -> set[int]:
     return signers
 
 
-def get_num_instances(dataset: List[gloss_dict]) -> int:
+def get_num_instances(dataset: List[wlasl_class_dict]) -> int:
     """Get the number of instances in a dataset"""
 
     num_instances = 0
@@ -208,7 +213,7 @@ def get_num_instances(dataset: List[gloss_dict]) -> int:
     return num_instances
 
 
-def get_set_stats(subset: List[gloss_dict]) -> set_stats:
+def get_set_stats(subset: List[wlasl_class_dict]) -> set_stats:
     """Get stats for a particular set (one of test/val.train, seperate first)"""
     return set_stats(
         num_instances=get_num_instances(subset),
@@ -217,7 +222,7 @@ def get_set_stats(subset: List[gloss_dict]) -> set_stats:
     )
 
 
-def get_per_set_stats(glosses: List[gloss_dict]) -> Dict[AVAIL_SETS, set_stats]:
+def get_per_set_stats(glosses: List[wlasl_class_dict]) -> Dict[AVAIL_SETS, set_stats]:
     """Seperates into sets, then returns stats per set"""
     sets = seperate_by_set(glosses)
     per_set_stats = {}
@@ -226,7 +231,7 @@ def get_per_set_stats(glosses: List[gloss_dict]) -> Dict[AVAIL_SETS, set_stats]:
     return per_set_stats
 
 
-def get_split_stats(split: List[gloss_dict]) -> split_stats:
+def get_split_stats(split: List[wlasl_class_dict]) -> split_stats:
     return split_stats(
         num_classes=len(split),
         num_instances=get_num_instances(split),
