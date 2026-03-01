@@ -107,6 +107,19 @@ class BadInstance(InstanceDict):
 
 	reason: str
 
+class ErrDict(TypedDict):
+	"""Format for storing bad instances
+	
+	Keys
+	-------
+	- policy: str
+	- num_offenders: int
+	- instances: List[BadInstance]
+	"""
+	policy: str
+	num_offenders: int
+	instances: List[BadInstance]
+
 
 def is_instance_dict(obj: Any) -> TypeGuard[InstanceDict]:
 	"""Type guard to check if a dict is an InstanceDict
@@ -211,11 +224,11 @@ def output_bad(
 	"""
 
 	if len(bad_instances) != 0:
-		err_dict = {
+		err_dict = ErrDict({
 			"policy": remove_policy,
 			"num_offenders": len(bad_instances),
 			"instances": bad_instances,
-		}
+		})
 		with open(log_path, "w") as log_file:
 			json.dump(err_dict, log_file, indent=4)
 		print(f"Bad {fixing_description} logged to {log_path}.")
