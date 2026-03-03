@@ -260,11 +260,13 @@ def extract_metrics_df(results: Dict) -> pd.DataFrame:
 					data.append(row)
 	return pd.DataFrame(data)
 
-def extract_metrics_df_sumed(results: Dict, split: str='as1100') -> pd.DataFrame:
+def extract_metrics_df_sumed(results: Dict, split: str='asl100') -> pd.DataFrame:
 	"""Extract metrics into a pandas DataFrame for easier manipulation."""
 	data = []
-	split_dict = results[split]
+	
 	print(results.keys())
+	split_dict = results[split]
+	
 	for arch in split_dict:
 		top_k_scores = split_dict[arch]['top_k_average_per_class_acc']
 		row = {
@@ -455,7 +457,7 @@ def run_visualizations(filepath: str,
 	
 	# Extract to DataFrame
 	if extractor:
-		df = extractor(results)
+		df = extractor(results, splits[0])
 	else:
 		df = extract_metrics_df(results)
 	

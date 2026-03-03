@@ -29,9 +29,11 @@ from typing import (
 	Union,
 	Any,
 	Iterable,
-	Tuple
+	Tuple,
+	Callable
 )
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import numpy as np
 # locals
 from configs import WLASL_ROOT, SPLIT_DIR, CLASSES_PATH
@@ -39,7 +41,9 @@ from preprocess import instance_dict, wlasl_class_dict, InstanceDict
 
 AVAIL_SETS: TypeAlias = Literal["train", "val", "test"]
 AVAIL_SPLITS: TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
-
+INSTANCE_KEYS: TypeAlias = Literal['bbox', 'frame_end', 'frame_start', 'instance_id', 'signer_id', 'source', 'split', 'url', 'variation_id', 'video_id', 'label_num', 'label_name']
+FRAME_WIDTH: int = 256
+FRAME_HEIGHT: int = 256
 
 class HistoGram(Dict[Any, int]):
 	"""Represents a histogram with value : count"""
@@ -58,8 +62,9 @@ def make_histogram(values: Iterable) -> HistoGram:
 	return hist
 
 
-class class_stats(TypedDict):
-	"""Represents statistics for a single gloss.
+class instance_stats(TypedDict):
+	"""Represents statistics for instances in a list of InstanceDicts. 
+	This can be stats per-class in a set, or, stats for the whole set.
 	Keys
 	---------
 	- num_instances: int
@@ -78,12 +83,13 @@ class class_stats(TypedDict):
 	variation_distribution: HistoGram
 
 
+
 class set_stats(TypedDict):
 	"""Represents statistics for a data subset (train/val/test)."""
 
 	num_instances: int
 	num_signers: int
-	per_class_stats: Dict[str, class_stats]  # key is the class name
+	per_instance_stats: Dict[str, instance_stats]  # key is the class name
 
 
 class split_stats(TypedDict):
@@ -174,16 +180,16 @@ def retrieve_split_data(
 # STATISTICS CALCULATION
 
 
-def collect_class_stats(
+def collect_instance_stats(
 	instances: Union[List[InstanceDict], List[instance_dict]],
-) -> class_stats:
+) -> instance_stats:
 	"""Collects statistics for a single class based on its instances.
 
 	Args:
 			instances (List[instance_dict]): A list of instances of the same class
 
 	Returns:
-			class_stats: Statistics for the specific class, collected from all its instances
+			instance_stats: Statistics for the specific class, collected from all its instances
 	"""
 	num_instances = 0
 	histograms = {
@@ -206,7 +212,7 @@ def collect_class_stats(
 			else:
 				hist[value] = 1  # create entry if it doesnt exist
 
-	return class_stats(
+	return instance_stats(
 		num_instances=num_instances,
 		length_distribution=histograms["length"],
 		signers_distribution=histograms["signer_id"],
@@ -216,24 +222,24 @@ def collect_class_stats(
 	)
 
 
-def get_per_class_stats(glosses: List[wlasl_class_dict]) -> Dict[str, class_stats]:
+def get_per_instance_stats(glosses: List[wlasl_class_dict]) -> Dict[str, instance_stats]:
 	"""Collects statistics for all classes in a list of wlasl_class_dicts (recommend seperating into test/val/train first)"""
-	per_class_stats = {}
+	per_instance_stats = {}
 	for gloss in glosses:
 		class_name = gloss["gloss"]
 		instances = gloss["instances"]
-		per_class_stats[class_name] = collect_class_stats(instances)
-	return per_class_stats
+		per_instance_stats[class_name] = collect_instance_stats(instances)
+	return per_instance_stats
 
 
-# def collect_all_class_stats(glosses: List[wlasl_class_dict]) -> Dict[str, class_stats]:
+# def collect_all_instance_stats(glosses: List[wlasl_class_dict]) -> Dict[str, instance_stats]:
 #     """Collects statistics for all classes in a list of wlasl_class_dicts (recommend seperating into test/val/train first)"""
-#     all_class_stats = {}
+#     all_instance_stats = {}
 #     for gloss_d in glosses:
 #         class_name = gloss_d["gloss"]
 #         instances = gloss_d["instances"]
-#         per_class_stats[class_name] = collect_class_stats(instances)
-#     return per_class_stats
+#         per_instance_stats[class_name] = collect_instance_stats(instances)
+#     return per_instance_stats
 
 
 def get_unique_signers(dataset: List[wlasl_class_dict]) -> set[int]:
@@ -259,7 +265,7 @@ def get_set_stats(subset: List[wlasl_class_dict]) -> set_stats:
 	return set_stats(
 		num_instances=get_num_instances(subset),
 		num_signers=len(get_unique_signers(subset)),
-		per_class_stats=get_per_class_stats(subset),
+		per_instance_stats=get_per_instance_stats(subset),
 	)
 
 
@@ -308,7 +314,7 @@ def latex_split_summary_table(split_name: AVAIL_SPLITS, stats: split_stats) -> s
 	for set_name, s in stats["per_set_stats"].items():
 		rows.append(
 			f"{set_name} & {s['num_instances']} & {s['num_signers']} & "
-			f"{len(s['per_class_stats'])} \\\\"
+			f"{len(s['per_instance_stats'])} \\\\"
 		)
 
 	table = (
@@ -334,7 +340,7 @@ def latex_split_summary_table(split_name: AVAIL_SPLITS, stats: split_stats) -> s
 
 
 # copilot
-def latex_class_stats_table(
+def latex_instance_stats_table(
 	split_name: AVAIL_SPLITS,
 	set_name: AVAIL_SETS,
 	set_stats_obj: set_stats,
@@ -357,7 +363,7 @@ def latex_class_stats_table(
 			A LaTeX table environment as a string.
 	"""
 	rows = []
-	for gloss, cstats in set_stats_obj["per_class_stats"].items():
+	for gloss, cstats in set_stats_obj["per_instance_stats"].items():
 		rows.append(
 			f"{gloss} & {cstats['num_instances']} & "
 			f"{len(cstats['signers_distribution'])} & {len(cstats['variation_distribution'])} \\\\"
@@ -391,80 +397,24 @@ def latex_class_stats_table(
 
 
 # 1/2 cluade, 1/2 me
-def plot_distribution_o(
-	histogram: HistoGram,
-	gloss: str,
-	set_name: AVAIL_SETS,
-	split_name: AVAIL_SPLITS,
-	metric: str,
-	unit: str = "",
-	categorical: bool = False,
-) -> None:
-
-	sorted_items = sorted(
-		histogram.items(), key=lambda x: str(x[0]) if categorical else x[0]
-	)
-	# sorted_items = sorted(histogram.items(), key=lambda x: x[0]) #sort by keys
-	values, counts = zip(*sorted_items)  # seperate tuples
-	expanded_values = [
-		value for value, count in sorted_items for _ in range(count)
-	]  # un-do binning
-
-	plt.figure(figsize=(12, 4))
-
-	if categorical:
-		x_pos = range(len(values))
-		plt.bar(
-			x_pos, counts, width=0.8
-		)  # gapless for quantitative, gaps for categorical
-		plt.xticks(x_pos, values, rotation=45, ha="right")
-	else:
-		plt.bar(values, counts, width=2)
-		# plt.hist(expanded_values, bins=30)
-
-		statsy_listy = [
-			("mean", lambda x: np.mean(x), "red"),
-			("median", lambda x: np.median(x), "blue"),
-			("lower quartile", lambda x: np.percentile(x, 25), "brown"),
-			("upper quartile", lambda x: np.percentile(x, 75), "brown"),
-		]
-		for metric_name, stat_func, colour in statsy_listy:
-			metric_val = stat_func(expanded_values)
-			plt.axvline(
-				metric_val,
-				color=colour,
-				linestyle="--",
-				label=f"{metric_name}: {metric_val:.1f}{' ' + unit if unit else ''}",
-			)
-
-		plt.legend()
-
-	xlabel = f"{metric}{' (' + unit + ')' if unit else ''}"
-	plt.xlabel(xlabel)
-	plt.ylabel("Count")
-	plt.title(
-		f'{metric.capitalize()} Distribution: {split_name} / {set_name} / "{gloss}"'
-	)
-	plt.tight_layout()
-	plt.show()
-
 def plot_distribution(
 	histogram: HistoGram,
-	gloss: str,
 	set_name: AVAIL_SETS,
 	split_name: AVAIL_SPLITS,
 	metric: str,
+	gloss: str = "",
 	unit: str = "",
 	categorical: bool = False,
 	hist_or_bar: Literal['hist', 'bar'] = 'hist',
 	bins: Optional[int] = None,
-	figsize: Tuple[int, int] = (12, 4)
+	figsize: Tuple[int, int] = (12, 4),
+	show_nums_on_bars:bool=True
 ) -> None:
 
-	sorted_items = sorted(
-		histogram.items(), key=lambda x: str(x[0]) if categorical else x[0]
-	)
-	# sorted_items = sorted(histogram.items(), key=lambda x: x[0]) #sort by keys
+	# sorted_items = sorted(
+	# 	histogram.items(), key=lambda x: str(x[0]) if categorical else x[0]
+	# )
+	sorted_items = sorted(histogram.items(), key=lambda x: x[0]) #sort by keys
 	values, counts = zip(*sorted_items)  # seperate tuples
 	expanded_values = [
 		value for value, count in sorted_items for _ in range(count)
@@ -477,12 +427,25 @@ def plot_distribution(
 		plt.bar(
 			x_pos, counts, width=0.8
 		)  # gapless for quantitative, gaps for categorical
+		if show_nums_on_bars:
+			for x, y in zip(x_pos, counts):
+				plt.text(x, y, str(y), ha='center', va='bottom')
 		plt.xticks(x_pos, values, rotation=45, ha="right")
+	elif hist_or_bar == 'hist':
+		# plt.hist(expanded_values, bins = bins)
+		n, bins_out, patches = plt.hist(expanded_values, bins=bins)
+		if show_nums_on_bars:
+			for patch, count in zip(patches, n): #type: ignore 	
+				x = patch.get_x() + patch.get_width() / 2
+				if count == 0:
+					plt.text(x, count, '', ha='center', va='bottom')
+				else:
+					plt.text(x, count, str(int(count)), ha='center', va='bottom')
 	else:
-		if hist_or_bar == 'hist':
-			plt.hist(expanded_values, bins = bins)
-		else:
-			plt.bar(values, counts, width=2)
+		plt.bar(values, counts, width=2)
+		if show_nums_on_bars:
+			for x, y in zip(values, counts):
+				plt.text(x, y, str(y), ha='center', va='bottom')
 
 		statsy_listy = [
 			("mean", lambda x: np.mean(x), "red"),
@@ -499,20 +462,98 @@ def plot_distribution(
 				label=f"{metric_name}: {metric_val:.1f}{' ' + unit if unit else ''}",
 			)
 
-		plt.legend()
+	plt.legend()
 
 	xlabel = f"{metric}{' (' + unit + ')' if unit else ''}"
 	plt.xlabel(xlabel)
 	plt.ylabel("Count")
+
+	title = f'{metric.capitalize()} Distribution: {split_name} / {set_name}'
+	if gloss:
+		title += f' / "{gloss}"'
+
 	plt.title(
-		f'{metric.capitalize()} Distribution: {split_name} / {set_name} / "{gloss}"'
+		title
 	)
 	plt.tight_layout()
 	plt.show()
 
+
+
+
+
+
+#claude
+def plot_bboxes_on_canvas(instances: List[InstanceDict], figsize: Tuple[int, int] = (6,6)) -> None:
+    """Draw bounding boxes for each class on a blank 256x256 canvas, coloured by class."""
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(0, FRAME_WIDTH)
+    ax.set_ylim(0, FRAME_HEIGHT)
+    ax.invert_yaxis()  # image coordinates: y increases downward
+    ax.set_facecolor("#1a1a1a")
+    fig.patch.set_facecolor("#1a1a1a")
+
+    unique_labels = list(set(inst["label_name"] for inst in instances))
+    cmap = plt.cm.get_cmap("tab20", len(unique_labels))
+    colour_map = {label: cmap(i) for i, label in enumerate(unique_labels)}
+
+    for inst in instances:
+        x1, y1, x2, y2 = inst["bbox"]
+        w, h = x2 - x1, y2 - y1
+        colour = colour_map[inst["label_name"]]
+        rect = patches.Rectangle(
+            (x1, y1), w, h,
+            linewidth=1, edgecolor=colour, facecolor=(*colour[:3], 0.05)
+        )
+        ax.add_patch(rect)
+
+    ax.set_title("Bounding Boxes by Class", color="white")
+    ax.tick_params(colors="white")
+    plt.tight_layout()
+    plt.show()
+
+
+#claude/me
+def plot_dimension_distributions(
+		instances: List[InstanceDict],
+		figsize: Tuple[int, int] = (12, 4),
+		) -> None:
+	"""Histograms of bbox width and height across all instances."""
+	widths  = [inst["bbox"][2] - inst["bbox"][0] for inst in instances]
+	heights = [inst["bbox"][3] - inst["bbox"][1] for inst in instances]
+
+	fig, axes = plt.subplots(1, 2, figsize=figsize)
+	for ax, data, label in zip(axes, [widths, heights], ["Width (px)", "Height (px)"]):
+		ax.hist(data, bins=30, color="steelblue", edgecolor="white")
+		statsy_listy = [
+			("mean", lambda x: np.mean(x), "red"),
+			("median", lambda x: np.median(x), "blue"),
+			("lower quartile", lambda x: np.percentile(x, 25), "brown"),
+			("upper quartile", lambda x: np.percentile(x, 75), "brown"),
+		]
+		for metric_name, stat_func, colour in statsy_listy:
+			metric_val = stat_func(data)
+			ax.axvline(
+				metric_val,
+				color=colour,
+				linestyle="--",
+				label=f"{metric_name}: {metric_val:.1f} (px)",
+			)
+		ax.set_xlabel(label)
+		ax.set_ylabel("Count")
+		ax.legend()
+
+	plt.suptitle("BBox Dimension Distributions")
+	plt.tight_layout()
+	plt.show()
+
+
+
+
+
 # copilot
 def barplot_metric(
-	per_class: Dict[str, class_stats],
+	per_class: Dict[str, instance_stats],
 	metric: str,
 	top_n: Optional[int] = None,
 	title: Optional[str] = None,
@@ -524,7 +565,7 @@ def barplot_metric(
 	Parameters
 	----------
 	per_class : dict
-			Mapping gloss → class_stats.
+			Mapping gloss → instance_stats.
 	metric : str
 			One of {"num_instances", "num_signers", "num_variations"}.
 	top_n : int, optional
@@ -558,7 +599,7 @@ def barplot_metric(
 
 # copilot
 def histogram_metric(
-	per_class: Dict[str, class_stats],
+	per_class: Dict[str, instance_stats],
 	metric: str,
 	bins: int = 20,
 	title: Optional[str] = None,
@@ -570,7 +611,7 @@ def histogram_metric(
 	Parameters
 	----------
 	per_class : dict
-			Mapping gloss → class_stats.
+			Mapping gloss → instance_stats.
 	metric : str
 			One of {"num_instances", "num_signers", "num_variations"}.
 	bins : int
@@ -597,7 +638,7 @@ def histogram_metric(
 
 # copilot
 def scatter_instances_vs_signers(
-	per_class: Dict[str, class_stats],
+	per_class: Dict[str, instance_stats],
 	figsize: tuple = (6, 5),
 	title: Optional[str] = None,
 ) -> None:
@@ -607,7 +648,7 @@ def scatter_instances_vs_signers(
 	Parameters
 	----------
 	per_class : dict
-			Mapping gloss → class_stats.
+			Mapping gloss → instance_stats.
 	figsize : tuple
 			Figure size.
 	title : str, optional

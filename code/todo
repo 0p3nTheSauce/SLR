@@ -1,10 +1,12 @@
-DATA TODO:
-- fix urls for downloading from google drive / find better way to host
-
+Testing TODOS:
+- rate models on recognition per class 
 
 Stats TODOS:
-- instances per individual video (help to determine whether to remove certain instances
-  or just fix the frame rannge)
+- compare bounding boxes / plot bounding boxes
+- investigate set level stats
+- investigate how to represent a distribution of distributions
+- compare model recognition per class to instance stats
+- correct removed instances labels?
 
 Augmentation TODOs:
   general:
