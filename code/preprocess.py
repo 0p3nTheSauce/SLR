@@ -42,7 +42,7 @@ class instance_dict(TypedDict):
 
 	Keys:
 	--------
-	- bbox: List[int]
+	- bbox: List[int] # [x_min, y_min, x_max, y_max]
 	- frame_end: int
 	- frame_start: int
 	- instance_id: int
@@ -54,7 +54,7 @@ class instance_dict(TypedDict):
 	- video_id: str
 	"""
 
-	bbox: List[int]
+	bbox: List[int] #[x_min, y_min, x_max, y_max]
 	frame_end: int
 	frame_start: int
 	instance_id: int
@@ -64,20 +64,6 @@ class instance_dict(TypedDict):
 	url: str
 	variation_id: int
 	video_id: str
-
-
-class wlasl_class_dict(TypedDict):
-	"""Represents a single gloss and its associated instances.
-
-	Keys
-	--------
-	- gloss: str
-	- instances: List[instance_dict]
-	"""
-
-	gloss: str
-	instances: List[instance_dict]
-
 
 class InstanceDict(instance_dict):
 	"""Represents a single instance of a gloss in the dataset, with the label_num and label_name added. This is the format that the data will be in after preprocessing.
@@ -90,7 +76,7 @@ class InstanceDict(instance_dict):
 	- instance_id: int
 	- signer_id: int
 	- source: str
-	- split: str
+	- split: str (one of available sets, not splits. Uses wlasl name convention)
 	- url: str
 	- variation_id: int
 	- video_id: str
@@ -100,6 +86,18 @@ class InstanceDict(instance_dict):
 	label_num: int
 	label_name: str
 	
+class wlasl_class_dict(TypedDict):
+	"""Represents a single gloss and its associated instances.
+
+	Keys
+	--------
+	- gloss: str
+	- instances: List[instance_dict]
+	"""
+
+	gloss: str
+	instances: List[instance_dict]
+
 
 
 class BadInstance(InstanceDict):

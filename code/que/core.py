@@ -439,10 +439,10 @@ class Que:
         """Extract key details from a run configuration.
 
         Args:
-                                        run: Dictionary containing run configuration with admin details
-                                        exc: Optional list of keys to exclude from the summary
+            run: Dictionary containing run configuration with admin details
+            exc: Optional list of keys to exclude from the summary
         Returns:
-                                        Sumarised: Dictionary with model, exp_no, split, and config_path
+            Sumarised: Dictionary with model, exp_no, split, and config_path
         """
         return Sumarised(
             model=run["admin"]["model"],
