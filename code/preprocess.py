@@ -501,6 +501,7 @@ def preprocess_split(
 	verbose: bool = False,
 	file_extension: str = "_fixed_frange_bboxes_len.json",
 	strictness: Tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
+	do_bboxes: bool = True,
 	length_cuttoff: int = 9
 ) -> None:
 	"""Preprocesses a split of the WLASL dataset by fixing bad frame ranges, fixing bad bounding boxes, and removing short samples.
@@ -552,19 +553,21 @@ def preprocess_split(
 			file_extension=f"bad_frame_ranges_{subset}.json",
 		)
 
-		# fix badly labeled bounding boxes
-		print_v("Fixing bounding boxes", verbose)
-		instances = fix_bad_bboxes(
-			raw_path=raw_path,
-			instances=instances,
-			log_dir=output_dir,
-			remove_policy=strictness[1],
-			file_extension=f"bad_bboxes_{subset}.json",
-		)
+		
+
+		if do_bboxes:
+			# fix badly labeled bounding boxes
+			print_v("Fixing bounding boxes", verbose)
+			instances = fix_bad_bboxes(
+				raw_path=raw_path,
+				instances=instances,
+				log_dir=output_dir,
+				remove_policy=strictness[1],
+				file_extension=f"bad_bboxes_{subset}.json",
+			)
 
 		# finally, remove short samples
 		print_v("Removing small samples", verbose)
-
 		instances = remove_short_samples(
 			instances=instances,
 			log_dir=output_dir,
@@ -588,11 +591,12 @@ def preprocess_split(
 # so could potentially allocate more processes to the task
 if __name__ == "__main__":
 	avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
+
 	parser = ArgumentParser(description="preprocess.py")
 	parser.add_argument(
 		"asl_split",
 		type=str,
-		choices=avail_splits.append('all'),
+		choices=avail_splits + ['all'],
 		help="Which WLASL split to preprocess",
 	)
 	parser.add_argument(
@@ -625,7 +629,7 @@ if __name__ == "__main__":
 	)
 	parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
 	parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['strict', 'strict'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
-
+	parser.add_argument('-nb', '--no_bbox', action='store_true', help='Skip intense bbox step')
 	args = parser.parse_args()
 
 	root = Path(args.root)
@@ -645,9 +649,10 @@ if __name__ == "__main__":
 			raw_path=raw_dir, 
 			output_base=output_dir,
 			verbose=args.verbose,
-			strictness=tuple(args.strictness)
+			strictness=tuple(args.strictness),
+			do_bboxes=(not args.no_bbox)
 		)
-	
+
 
 	
 
