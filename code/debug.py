@@ -1,4 +1,4 @@
-from que.core import Que, QueEmpty, connect_manager
+from que.core import Que, QueEmpty, connect_manager, _get_basic_logger
 import json
 import subprocess
 import sys
@@ -104,12 +104,63 @@ def time_instance_typegaurd():
 
     #time how long it takes to load the json and check each dict with the type guard
     start_time = time.time()
-    data = video_dataset.load_data_from_json(json_path)
+    data = video_dataset.load_data_from_json(json_path, policy='strict')
     end_time = time.time()
     print(f"Time taken to load and check all items: {end_time - start_time} seconds")
     # Time taken to load and check all items: 0.019509077072143555 seconds
 
     #Conclusion: The type guard check is very fast, and does not add significant overhead to loading the data. 
+
+
+def test_find_runs():
+    logger = _get_basic_logger()
+    
+    
+    q = Que(logger)
+    key_set = [
+        ['admin', 'exp_no'],
+        ['admin', 'model'],
+        ['training', "batch_size_equivalent"],
+        ["optimizer", "eps"],
+        ["optimizer", "backbone_init_lr"],
+        ["optimizer", "backbone_weight_decay"],
+        ["optimizer", "classifier_init_lr"],
+        ["optimizer", "classifier_weight_decay"],
+        ["model_params", "drop_p"],
+        ["data", "num_frames"],
+        ["data", "frame_size"],
+        ["scheduler", "type"],
+        ["scheduler", "t0"],
+        ["scheduler", "tmult"],
+        ["scheduler", "eta_min"],
+    ]
+    criterions = [
+        lambda x: x != '007',
+        lambda x: x == 'S3D' or x == 'MViTv2_S',
+        lambda x: x == 8,
+        lambda x: x == 1e-05,
+        lambda x: x == 0.0001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.5,
+        lambda x: x == 16,
+        lambda x: x == 224,
+        lambda x: x == "CosineAnnealingWarmRestarts",
+        lambda x: x == 10,
+        lambda x: x == 1,
+        lambda x: x == 0,
+    ]
+    _, runs = q.find_runs('old_runs', key_set, criterions)
+    print(len(runs))
+    all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
+    for run in runs:
+        all_exps[run['admin']['split']][run['admin']['model']] = [run['admin']['exp_no']]
+    
+    
+    with open('./results/wlasl_saicist.json', 'w') as f:
+        json.dump(all_exps,f,indent=2)
+        
 
 if __name__ == '__main__':
     # test_dump_peak()
@@ -119,5 +170,6 @@ if __name__ == '__main__':
     # test_ex()
     # test_clear()
     # test_instance_typegaurd()
-    time_instance_typegaurd()
+    # time_instance_typegaurd()
+    test_find_runs()
     
