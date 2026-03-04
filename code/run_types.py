@@ -156,7 +156,13 @@ class CompExpInfo(ExpInfo):
 	results: CompRes
 
 
-
+class SumarisedNew(TypedDict):
+	run_id: Optional[str]
+	model: str
+	exp_no: str
+	dataset: str
+	split: str
+	config_path: str
  
 class Sumarised(TypedDict):
 	run_id: Optional[str]
@@ -164,8 +170,10 @@ class Sumarised(TypedDict):
 	exp_no: str
 	dataset: str
 	split: str
+	config_path: str
 	best_val_acc: Optional[float]
 	best_val_loss: Optional[float]
-	config_path: str
-	error: Optional[str]
+
  
+class SummarisedError(Sumarised):
+	error: str
