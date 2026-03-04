@@ -172,6 +172,7 @@ from run_types import (
     WandbInfo,
     RunInfo,
     Sumarised,
+    SummarisedError
 )
 from testing import full_test, load_comp_res
 from configs import print_config, load_config
@@ -444,8 +445,12 @@ class Que:
         Returns:
             Sumarised: Dictionary with model, exp_no, split, and config_path
         """
-        return Sumarised(
-            model=run["admin"]["model"],
+        
+        err = run.get("error") if self._is_failed_exp(run) else None
+        
+        if err:
+            return SummarisedError(
+                model=run["admin"]["model"],
             exp_no=run["admin"]["exp_no"],
             dataset=run["admin"]["dataset"],
             split=run["admin"]["split"],
@@ -455,8 +460,23 @@ class Que:
             best_val_loss=(
                 run["results"]["best_val_loss"] if "results" in run else None
             ),
-            error=run.get("error") if self._is_failed_exp(run) else None,
-        )
+            error=err
+            )
+        else:
+            return Sumarised(
+                model=run["admin"]["model"],
+                exp_no=run["admin"]["exp_no"],
+                dataset=run["admin"]["dataset"],
+                split=run["admin"]["split"],
+                config_path=run["admin"]["config_path"],
+                run_id=run.get("wandb", {}).get("run_id") if "wandb" in run else None,
+                best_val_acc=(run["results"]["best_val_acc"] if "results" in run else None),
+                best_val_loss=(
+                    run["results"]["best_val_loss"] if "results" in run else None
+                ),
+            )
+
+        
 
     def _run_to_str(self, run_sum: Sumarised) -> str:
         """Convert a summarised run to a string for display

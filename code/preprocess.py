@@ -238,7 +238,7 @@ def fix_bad_frame_range(
 	raw_path: Path,
 	instances: List[InstanceDict],
 	log_dir: Path,
-	remove_policy: Literal["strict", "reset_frames"] = "strict",
+	remove_policy: Literal["strict", "reset"] = "strict",
 	file_extension: str = "bad_frame_ranges.json",
 ) -> List[InstanceDict]:
 	"""Remove videos where the file cannot be read, or the start or end frame are impossible.
@@ -248,7 +248,7 @@ def fix_bad_frame_range(
 			raw_path (Path): Path to root directory of videos
 			instances (List[instance]): Instance dictionaries
 			log_dir (Path): Directory to place logged errors
-			remove_policy (Literal["strict", "reset_frames"], optional): If the remove policy is strict,
+			remove_policy (Literal["strict", "reset"], optional): If the remove policy is strict,
 					then the instance is removed, otherwise an attempt is made to fix the index. In the case of
 					start: the start frame is set to 0
 					end: the end frame is set to start + numframes
@@ -344,7 +344,7 @@ def fix_bad_bboxes(
 	raw_path: Path,
 	instances: List[InstanceDict],
 	log_dir: Path,
-	remove_policy: Literal["strict", "reset_bbox"] = "strict",
+	remove_policy: Literal["strict", "reset"] = "strict",
 	file_extension: str = "bad_bboxes.json",
 ) -> List[InstanceDict]:
 	"""Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video,
@@ -356,7 +356,7 @@ def fix_bad_bboxes(
 			raw_path (Path): Path to root directory of videos
 			instances (List[instance]): Instance dictionaries
 			log_dir (Path): Directory to place logged errors
-			remove_policy (Literal["strict", "reset_bbox"], optional): Policy for handling bad bounding boxes. Defaults to "strict".
+			remove_policy (Literal["strict", "reset"], optional): Policy for handling bad bounding boxes. Defaults to "strict".
 			file_extension (str, optional): File extension for the log file. Defaults to "bad_bboxes.json".
 
 	Raises:
@@ -500,6 +500,8 @@ def preprocess_split(
 	output_base: Path,
 	verbose: bool = False,
 	file_extension: str = "_fixed_frange_bboxes_len.json",
+	strictness: Tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
+	length_cuttoff: int = 9
 ) -> None:
 	"""Preprocesses a split of the WLASL dataset by fixing bad frame ranges, fixing bad bounding boxes, and removing short samples.
 	The processed data is saved to the output directory, and any issues found during preprocessing are
@@ -546,7 +548,7 @@ def preprocess_split(
 			raw_path=raw_path,
 			instances=instances,
 			log_dir=output_dir,
-			remove_policy="strict",
+			remove_policy=strictness[0],
 			file_extension=f"bad_frame_ranges_{subset}.json",
 		)
 
@@ -556,7 +558,7 @@ def preprocess_split(
 			raw_path=raw_path,
 			instances=instances,
 			log_dir=output_dir,
-			remove_policy="reset_bbox",
+			remove_policy=strictness[1],
 			file_extension=f"bad_bboxes_{subset}.json",
 		)
 
@@ -566,7 +568,7 @@ def preprocess_split(
 		instances = remove_short_samples(
 			instances=instances,
 			log_dir=output_dir,
-			cutoff=9,
+			cutoff=length_cuttoff,
 			file_extension=f"removed_short_samples_{subset}.json",
 		)
 
@@ -585,11 +587,12 @@ def preprocess_split(
 # by fixing the bounding boxes, but this doesn't totally exhause the GPU.
 # so could potentially allocate more processes to the task
 if __name__ == "__main__":
+	avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
 	parser = ArgumentParser(description="preprocess.py")
 	parser.add_argument(
 		"asl_split",
 		type=str,
-		choices=["asl100", "asl300", "asl1000", "asl2000"],
+		choices=avail_splits.append('all'),
 		help="Which WLASL split to preprocess",
 	)
 	parser.add_argument(
@@ -621,18 +624,32 @@ if __name__ == "__main__":
 		default=LABELS_PATH,
 	)
 	parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
+	parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['strict', 'strict'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
+
 	args = parser.parse_args()
 
 	root = Path(args.root)
-	split_path = root / args.split_dir / f"{args.asl_split}.json"
 	raw_dir = root / args.raw_dir
 	output_dir = Path(args.output_dir)
-
 	output_dir.mkdir(parents=True, exist_ok=True)
 
-	preprocess_split(
-		split_path=split_path,
-		raw_path=raw_dir,
-		output_base=output_dir,
-		verbose=args.verbose,
-	)
+	if args.asl_split == 'all':
+		todo_splits = avail_splits
+	else:
+		todo_splits = [args.asl_split]
+
+	for split in todo_splits:
+		split_path = root / args.split_dir / f"{split}.json"
+		preprocess_split(
+			split_path=split_path,
+			raw_path=raw_dir, 
+			output_base=output_dir,
+			verbose=args.verbose,
+			strictness=tuple(args.strictness)
+		)
+	
+
+	
+
+	
+		

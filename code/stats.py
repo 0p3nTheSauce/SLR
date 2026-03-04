@@ -119,16 +119,22 @@ class preproc_class_dict(TypedDict):
 
 
 def reverse_preproc_format(
-	preproc_instances: List[InstanceDict],
+	preproc_instances: List[InstanceDict], classes:Optional[List[str]] = None,
 ) -> List[preproc_class_dict]:
-	num_classes = len(set([inst["label_name"] for inst in preproc_instances]))
+	num_classes = len(set([inst["label_num"] for inst in preproc_instances]))
 	lst_ppcd = [preproc_class_dict(gloss="empty", instances=[])] * num_classes
 	for pp_inst in preproc_instances:
 		label_num = pp_inst["label_num"]
 		entry = lst_ppcd[label_num]
 		if entry["gloss"] == "empty":
+			if "label_name" in pp_inst:
+				gloss = pp_inst['label_name']
+			elif classes is not None:
+				gloss = classes[pp_inst['label_num']]
+			else:
+				raise ValueError('instance does not contain the key: label_name')
 			lst_ppcd[label_num] = preproc_class_dict(
-				gloss=pp_inst["label_name"], instances=[pp_inst]
+				gloss=gloss, instances=[pp_inst]
 			)
 		else:
 			lst_ppcd[label_num]["instances"].append(pp_inst)
@@ -246,8 +252,8 @@ def get_unique_signers(dataset: List[wlasl_class_dict]) -> set[int]:
 	"""Get set of unique sighners in a list of wlasl_class_dicts"""
 	signers = set()
 	for gloss_d in dataset:
-		for instance_dict in gloss_d["instances"]:
-			signers.add(instance_dict["signer_id"])
+		for instance_d in gloss_d["instances"]:
+			signers.add(instance_d["signer_id"])
 	return signers
 
 
