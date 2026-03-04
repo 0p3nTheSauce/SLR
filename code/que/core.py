@@ -695,7 +695,12 @@ class Que:
         """
         unpack = cast(Dict[str, Any], run)
         for k in keys:
-            unpack = unpack[k]
+            try:
+                unpack = unpack[k]
+            except Exception:
+                print(f'Could not unpack: {json.dumps(unpack)}')
+                print(f'... with key: {k}')
+                break
         return unpack
 
     def list_runs(
