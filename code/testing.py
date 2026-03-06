@@ -178,14 +178,14 @@ def test_topk_clsrep(
 	"""Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
 	Args:
-									model (torch.nn.Module): Initialised model to test.
-									test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
-									seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
-									verbose (bool, optional): Verbose output. Defaults to False.
-									save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
+		model (torch.nn.Module): Initialised model to test.
+		test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
+		seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
+		verbose (bool, optional): Verbose output. Defaults to False.
+		save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
 
 	Returns:
-									Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
+		Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
 	"""
 
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

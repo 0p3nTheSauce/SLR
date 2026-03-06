@@ -187,7 +187,7 @@ class Worker:
             
         fin_run = self.que.peak_cur_run()
         with redirect_stdout(self.log_adapter):
-            results = full_test(admin=fin_run['admin'], data=fin_run['data'])
+            results = full_test(admin=fin_run['admin'], data=fin_run['data'], re_test=True)
         comp_run = CompExpInfo(
             admin=fin_run["admin"],
             training=fin_run["training"],
