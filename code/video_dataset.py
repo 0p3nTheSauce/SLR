@@ -6,6 +6,7 @@ import torch
 from pathlib import Path
 from typing import (
     Callable,
+    cast,
     Optional,
     Any,
     Tuple,
@@ -21,11 +22,17 @@ from video_transforms import Shuffle
 
 # local imports
 from utils import load_rgb_frames_from_video
-from video_transforms import correct_num_frames, resize_by_diag, crop_frames
+from video_transforms import (
+    correct_num_frames,
+    resize_by_diag,
+    crop_frames,
+    get_transform,
+)
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from models import NormDict
 from preprocess import InstanceDict, AVAIL_SETS, is_instance_dict
+
 ############################# Dictionaries and Types #############################
 
 
@@ -38,10 +45,12 @@ class DataSetInfo(TypedDict):
     set_name: AVAIL_SETS
 
 
+LOAD_DATA_POLICY: TypeAlias = Literal["strict", "accepting"]
 
-LOAD_DATA_POLICY : TypeAlias = Literal['strict', 'accepting']
 
-def load_data_from_json(json_path: Union[str, Path], policy: LOAD_DATA_POLICY) -> List[InstanceDict]:
+def load_data_from_json(
+    json_path: Union[str, Path], policy: LOAD_DATA_POLICY
+) -> List[InstanceDict]:
     """Load list of InstanceDict from a json file
 
     Args:
@@ -55,8 +64,10 @@ def load_data_from_json(json_path: Union[str, Path], policy: LOAD_DATA_POLICY) -
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    for item in data: #NOTE: Overhead is actually mininmal on strict ~0.019 s for WLASL2000 train.
-        if not is_instance_dict(item) and policy == 'strict': 
+    for item in (
+        data
+    ):  # NOTE: Overhead is actually mininmal on strict ~0.019 s for WLASL2000 train.
+        if not is_instance_dict(item) and policy == "strict":
             raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
 
     return data
@@ -104,7 +115,7 @@ class VideoDataset(Dataset):
             Callable[[torch.Tensor, InstanceDict], torch.Tensor]
         ] = None,
         include_meta: bool = False,
-        load_policy: LOAD_DATA_POLICY = 'accepting'
+        load_policy: LOAD_DATA_POLICY = "accepting",
     ) -> None:
         """
         Custom video dataset, based on the structure of the WLASL dataset
@@ -132,8 +143,8 @@ class VideoDataset(Dataset):
             set_info["labels"]
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
-        self.data = load_data_from_json(instances_path, load_policy)
-        self.classes = set([inst['label_num'] for inst in self.data])
+        self.data: List[InstanceDict] = load_data_from_json(instances_path, load_policy)
+        self.classes = set([inst["label_num"] for inst in self.data])
         self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
@@ -154,7 +165,7 @@ class VideoDataset(Dataset):
         return sampled_frames.to(torch.uint8)
 
     def __getitem__(self, idx):
-        item = self.data[idx]
+        item = cast(InstanceDict, self.data[idx])
         frames = self.__manual_load__(item)
 
         if self.item_transforms is not None:
@@ -163,9 +174,13 @@ class VideoDataset(Dataset):
         if self.transforms is not None:
             frames = self.transforms(frames)
 
-        result = {"frames": frames, "label_num": item["label_num"]}
         if self.include_meta:
-            result.update(item)
+            result = {"frames": frames} | item
+        else:
+            result = result = {"frames": frames, "label_num": item["label_num"]}
+            
+            
+            
         return result
 
     def __len__(self):
@@ -173,21 +188,6 @@ class VideoDataset(Dataset):
 
 
 ################################## Helper functions #######################################
-
-
-def _identity_transform(x):
-    """Identity transform - returns input unchanged"""
-    return x
-
-
-def _normalize_to_float(x):
-    """Convert tensor to float and normalize to [0, 1]"""
-    return x.float() / 255.0
-
-
-def _permute_time_channel(x):
-    """Permute tensor from (C, T, H, W) to (T, C, H, W)"""
-    return x.permute(1, 0, 2, 3)
 
 
 def _resize_by_diagonal(frames, item):
@@ -199,65 +199,6 @@ def _crop_frames(frames, item):
     """Crop out the bounding box from the frames"""
     return crop_frames(frames, item["bbox"])
 
-
-Cropping_Strategy: TypeAlias = Literal["Centre", "Random"]
-
-def get_transform(
-    norm_dict: Optional[NormDict] = None,
-    frame_size: Optional[int] = None,
-    shuffle: bool = False,
-    num_frames: Optional[int] = None,
-    crop: Optional[Cropping_Strategy] = None
-    ) -> Tuple[Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]]:
-    
-    
-    
-    # transform(frames) -> frames
-    if shuffle:
-        assert num_frames is not None, "num_frames must be specified if shuffle is True"
-        maybe_shuffle_t = Shuffle(num_frames)
-        perm = maybe_shuffle_t.permutation
-        sh_e = Shuffle.shannon_entropy(perm)
-        perm = list(map(int, perm.numpy()))
-    else:
-        maybe_shuffle_t = v2.Lambda(_identity_transform)
-        perm = None
-        sh_e = None
-
-    if norm_dict is not None:
-        final_transform = v2.Compose(
-            [
-                maybe_shuffle_t,
-                v2.Lambda(_normalize_to_float),
-                v2.Normalize(mean=norm_dict["mean"], std=norm_dict["std"]),
-                v2.Lambda(_permute_time_channel),
-            ]
-        )
-    else:
-        final_transform = v2.Compose(
-            [
-                maybe_shuffle_t,
-                v2.Lambda(_normalize_to_float),
-                v2.Lambda(_permute_time_channel),
-            ]
-        )
-    transform = final_transform
-
-    if frame_size is not None:
-        assert crop is not None, f'Specify crop, one of {Cropping_Strategy}'
-        
-        if crop == "Random":
-            transform = v2.Compose(
-                [
-                    v2.RandomCrop(frame_size),
-                    v2.RandomHorizontalFlip(),
-                    final_transform,
-                ]
-            )
-        elif crop == "Centre":
-            transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
-            
-    return transform, perm, sh_e
 
 def get_data_set(
     set_info: DataSetInfo,
@@ -299,20 +240,16 @@ def get_data_set(
     elif cropping == "Bbox":
         item_transforms = _crop_frames
 
-    if cropping == 'Default':
-        crop = 'Random' if set_info['set_name'] == 'train' else 'Centre'
-    elif cropping == 'Bbox':
+    if cropping == "Default":
+        crop = "Random" if set_info["set_name"] == "train" else "Centre"
+    elif cropping == "Bbox":
         crop = None
     else:
         crop = cropping
 
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
-        norm_dict,
-        frame_size,
-        shuffle,
-        num_frames,
-        crop=crop
+        norm_dict, frame_size, shuffle, num_frames, crop=crop
     )
 
     dataset = VideoDataset(

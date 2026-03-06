@@ -14,9 +14,7 @@ import time
 import subprocess
 from typing import Callable, Optional, Dict, Any
 from multiprocessing.synchronize import Event as EventClass
-
-
-
+import math
 
 
 ################ GPU ###################
@@ -460,6 +458,69 @@ def plt_display(
 			plt.savefig(output / f"frame{i}.png", bbox_inches="tight", pad_inches=0)
 		plt.show()
 
+def plt_display_grid(
+	frames: torch.Tensor,
+	num: int,
+	size: Tuple[float, float] = (5.0, 5.0),
+	adapt: bool = False,
+	output: Optional[Union[str, Path]] = None,
+	cols: int = 8,
+):
+	"""
+	Visualise a subset of frames in a grid layout using matplotlib.
+
+	Args:
+			frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
+			num (int): Number of frames to display (evenly sampled). Must be >= 1.
+			size (tuple, optional): Size (width, height) in inches per cell. Defaults to (5, 5).
+			adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
+			output (str | Path, optional): If provided, saves the grid figure as 'grid.png'.
+			cols (int, optional): Maximum number of frames per row. Defaults to 8.
+
+	Returns:
+			None
+
+	Raises:
+			ValueError: If num < 1 or frames has incompatible shape.
+	"""
+	if num < 1:
+		raise ValueError("num must be >= 1")
+
+	if adapt:
+		factor = 5 / 256
+		w, h = frames.shape[2], frames.shape[3]
+		size = (w * factor, h * factor)
+
+	num_frames = len(frames)
+	step = 1 if num_frames <= num else num_frames // num
+	sampled = frames[::step][:num]
+
+	rows = math.ceil(len(sampled) / cols)
+	fig, axes = plt.subplots(
+		rows, cols,
+		figsize=(size[0] * cols, size[1] * rows),
+		squeeze=False,
+	)
+
+	for i, frame in enumerate(sampled):
+		np_frame = frame.permute(1, 2, 0).cpu().numpy()
+		np_frame = (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
+		ax = axes[i // cols][i % cols]
+		ax.imshow(np_frame)
+		ax.axis("off")
+
+	# Hide any unused cells in the last row
+	for j in range(len(sampled), rows * cols):
+		axes[j // cols][j % cols].set_visible(False)
+
+	plt.subplots_adjust(wspace=0.02, hspace=0.02)
+
+	if output:
+		output = Path(output)
+		output.mkdir(parents=True, exist_ok=True)
+		plt.savefig(output / "grid.png", bbox_inches="tight", pad_inches=0)
+
+	plt.show()
 
 ################### Conversions #####################
 
