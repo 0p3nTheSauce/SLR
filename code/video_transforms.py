@@ -1,5 +1,12 @@
 import torch
-from typing import Callable, List
+from typing import (
+    Callable,
+    List,
+    TypeAlias,
+    Literal,
+    Tuple
+    
+)
 import random
 import utils
 import time
@@ -7,9 +14,11 @@ import gc
 from typing import Optional
 import statistics
 from torchvision.transforms.v2 import Transform
-import torchvision.transforms.v2 as ts
-import torchvision.transforms.v2 as transforms_v2
+import torchvision.transforms.v2 as v2
 import numpy as np
+
+#locals
+from models import NormDict
 
 def bench_mark_enhanced(
 	data,
@@ -224,7 +233,7 @@ def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
 	new_width = int(frames.shape[2] * scale_factor)
 	new_height = int(frames.shape[3] * scale_factor)
 
-	transform = transforms_v2.Resize((new_height, new_width))
+	transform = v2.Resize((new_height, new_width))
 
 	return transform(frames)
 
@@ -288,6 +297,87 @@ class Shuffle(Transform):
 
 
 
+
+def _identity_transform(x):
+    """Identity transform - returns input unchanged"""
+    return x
+
+
+def _normalize_to_float(x):
+    """Convert tensor to float and normalize to [0, 1]"""
+    return x.float() / 255.0
+
+
+def _permute_time_channel(x):
+    """Permute tensor from (C, T, H, W) to (T, C, H, W)"""
+    return x.permute(1, 0, 2, 3)
+
+
+
+
+Cropping_Strategy: TypeAlias = Literal["Centre", "Random"]
+
+def get_transform(
+    norm_dict: Optional[NormDict] = None,
+    frame_size: Optional[int] = None,
+    shuffle: bool = False,
+    num_frames: Optional[int] = None,
+    crop: Optional[Cropping_Strategy] = None
+    ) -> Tuple[Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]]:
+    
+    
+    
+    # transform(frames) -> frames
+    if shuffle:
+        assert num_frames is not None, "num_frames must be specified if shuffle is True"
+        maybe_shuffle_t = Shuffle(num_frames)
+        perm = maybe_shuffle_t.permutation
+        sh_e = Shuffle.shannon_entropy(perm)
+        perm = list(map(int, perm.numpy()))
+    else:
+        maybe_shuffle_t = v2.Lambda(_identity_transform)
+        perm = None
+        sh_e = None
+
+    if norm_dict is not None:
+        final_transform = v2.Compose(
+            [
+                maybe_shuffle_t,
+                v2.Lambda(_normalize_to_float),
+                v2.Normalize(mean=norm_dict["mean"], std=norm_dict["std"]),
+                v2.Lambda(_permute_time_channel),
+            ]
+        )
+    else:
+        final_transform = v2.Compose(
+            [
+                maybe_shuffle_t,
+                v2.Lambda(_normalize_to_float),
+                v2.Lambda(_permute_time_channel),
+            ]
+        )
+    transform = final_transform
+
+    if frame_size is not None:
+        assert crop is not None, f'Specify crop, one of {Cropping_Strategy}'
+        
+        if crop == "Random":
+            transform = v2.Compose(
+                [
+                    v2.RandomCrop(frame_size),
+                    v2.RandomHorizontalFlip(),
+                    final_transform,
+                ]
+            )
+        elif crop == "Centre":
+            transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
+            
+    return transform, perm, sh_e
+
+
+
+
+
 if __name__ == "__main__":
 	vid = "./media/00333.mp4"
 	frames = utils.load_rgb_frames_from_video(vid, 0, 0, all=True)
@@ -296,9 +386,9 @@ if __name__ == "__main__":
 
 	# shuffled_indices = torch.randperm(frames.size(0))
 	
-	t = ts.Compose(
+	t = v2.Compose(
 		[
-			ts.Lambda(lambda x: x.permute(0, 2, 1, 3, 4)),  # T C H W -> C T H W
+			v2.Lambda(lambda x: x.permute(0, 2, 1, 3, 4)),  # T C H W -> C T H W
 			Shuffle(frames.size(0)),
 		]
 	)
