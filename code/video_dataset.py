@@ -24,9 +24,10 @@ from video_transforms import Shuffle
 from utils import load_rgb_frames_from_video
 from video_transforms import (
     correct_num_frames,
-    resize_by_diag,
-    crop_frames,
+    _resize_by_diagonal,
+    _crop_frames,
     get_transform,
+    
 )
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
@@ -179,8 +180,6 @@ class VideoDataset(Dataset):
         else:
             result = result = {"frames": frames, "label_num": item["label_num"]}
             
-            
-            
         return result
 
     def __len__(self):
@@ -188,17 +187,6 @@ class VideoDataset(Dataset):
 
 
 ################################## Helper functions #######################################
-
-
-def _resize_by_diagonal(frames, item):
-    """Resize the target diagonal to 256 before random cropping as per wlasl"""
-    return resize_by_diag(frames, item["bbox"], target_diag=256)
-
-
-def _crop_frames(frames, item):
-    """Crop out the bounding box from the frames"""
-    return crop_frames(frames, item["bbox"])
-
 
 def get_data_set(
     set_info: DataSetInfo,
