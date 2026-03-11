@@ -1,0 +1,186 @@
+{
+    "overachievers": [
+        {
+            "Gloss": "beginning",
+            "Instances": 5,
+            "Signers": 3,
+            "F1_Score": 1.0
+        },
+        {
+            "Gloss": "swimsuit",
+            "Instances": 5,
+            "Signers": 3,
+            "F1_Score": 1.0
+        }
+    ],
+    "underachievers": [
+        {
+            "Gloss": "before",
+            "Instances": 18,
+            "Signers": 13,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "thin",
+            "Instances": 15,
+            "Signers": 13,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "eat",
+            "Instances": 14,
+            "Signers": 13,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "yellow",
+            "Instances": 13,
+            "Signers": 13,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "hot",
+            "Instances": 15,
+            "Signers": 12,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "what",
+            "Instances": 14,
+            "Signers": 12,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "blue",
+            "Instances": 15,
+            "Signers": 12,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "hearing",
+            "Instances": 15,
+            "Signers": 12,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "time",
+            "Instances": 14,
+            "Signers": 12,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "wrong",
+            "Instances": 15,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "corn",
+            "Instances": 13,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "short",
+            "Instances": 13,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "need",
+            "Instances": 13,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "different",
+            "Instances": 12,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "red",
+            "Instances": 12,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "bathroom",
+            "Instances": 11,
+            "Signers": 11,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "help",
+            "Instances": 15,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "bowling",
+            "Instances": 15,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "right",
+            "Instances": 12,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "check",
+            "Instances": 11,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "sick",
+            "Instances": 12,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "blanket",
+            "Instances": 11,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "call",
+            "Instances": 11,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "copy",
+            "Instances": 11,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "first",
+            "Instances": 11,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "approve",
+            "Instances": 10,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "new",
+            "Instances": 10,
+            "Signers": 10,
+            "F1_Score": 0.0
+        },
+        {
+            "Gloss": "east",
+            "Instances": 10,
+            "Signers": 10,
+            "F1_Score": 0.0
+        }
+    ]
+}

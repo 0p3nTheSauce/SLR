@@ -319,8 +319,8 @@ def load_info(dirp: Path, checkname: str):
 			resd[fn.name.replace(".json", "")] = json.load(f)
 	return resd
 
-def setup_data(norm_dict: NormDict, split: str, frame_size: int, num_frames: int, shuffle: bool) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
-	test_info = get_wlasl_info(split, set_name="test")
+def setup_data(set_name: Literal['train', 'test', 'val'], norm_dict: NormDict, split: str, frame_size: int, num_frames: int, shuffle: bool) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
+	test_info = get_wlasl_info(split, set_name=set_name)
 	test_dataset, perm, shanon_entropy = get_data_set(
 		set_info=test_info,
 		norm_dict=norm_dict,
@@ -390,6 +390,7 @@ def test_run(
 		output.mkdir(exist_ok=True)
 
 	dloader, num_classes, m_permt, m_sh_et = setup_data(
+		set_name = set_name,
 		norm_dict=norm_vals(model_name),
 		split=admin["split"],
 		frame_size=data["frame_size"],

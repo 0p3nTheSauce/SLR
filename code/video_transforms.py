@@ -19,6 +19,8 @@ import numpy as np
 
 #locals
 from models import NormDict
+from preprocess import InstanceDict
+
 
 def bench_mark_enhanced(
 	data,
@@ -312,6 +314,17 @@ def _permute_time_channel(x):
     """Permute tensor from (C, T, H, W) to (T, C, H, W)"""
     return x.permute(1, 0, 2, 3)
 
+
+
+
+def _resize_by_diagonal(frames, item):
+    """Resize the target diagonal to 256 before random cropping as per wlasl"""
+    return resize_by_diag(frames, item["bbox"], target_diag=256)
+
+
+def _crop_frames(frames: torch.Tensor, item: InstanceDict):
+    """Crop out the bounding box from the frames"""
+    return crop_frames(frames, item["bbox"])
 
 
 
