@@ -280,7 +280,7 @@ if __name__ == '__main__':
     # test_clear()
     # test_instance_typegaurd()
     # time_instance_typegaurd()
-    # test_find_runs()
-    test_find_S3D_runs()
+    test_find_runs()
+    # test_find_S3D_runs()
     # test_set_nested()
     
