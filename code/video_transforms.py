@@ -412,21 +412,6 @@ def get_transform(
         )
     
     transform = final_transform
-    
-    if shuffle:
-        assert num_frames is not None, "num_frames must be specified if shuffle is True"
-        shuffle_t = Shuffle(num_frames)
-        perm =	shuffle_t.permutation
-        transform = v2.Compose([
-			shuffle_t, #shuffle must come first
-			final_transform
-		])
-        
-        sh_e = Shuffle.shannon_entropy(perm)
-        perm = list(map(int, perm.numpy()))
-    else:
-        perm = None
-        sh_e = None
         
 
     if frame_size is not None:
@@ -444,6 +429,22 @@ def get_transform(
             transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
         else:
             raise ValueError(f"Unexpected crop: {crop}")
+        
+        
+    if shuffle:
+        assert num_frames is not None, "num_frames must be specified if shuffle is True"
+        shuffle_t = Shuffle(num_frames)
+        perm =	shuffle_t.permutation
+        transform = v2.Compose([
+			shuffle_t, #shuffle must come first
+			transform
+		])
+        
+        sh_e = Shuffle.shannon_entropy(perm)
+        perm = list(map(int, perm.numpy()))
+    else:
+        perm = None
+        sh_e = None
             
     return transform, perm, sh_e
 
