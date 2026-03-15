@@ -30,13 +30,13 @@ from configs import (
 	RUNS_PATH,
 )
 from run_types import (
-    CompRes,
-    DataInfo,
-    MinInfo,
+	CompRes,
+	DataInfo,
+	MinInfo,
 	BaseRes,
 	ShuffRes,
 	TopKRes,
-    )
+	)
 
 # constants
 
@@ -332,7 +332,7 @@ def setup_data(set_name: Literal['train', 'test', 'val'], norm_dict: NormDict, s
 		test_dataset,
 		batch_size=1,
 		shuffle=False,
-		num_workers=2,
+		num_workers=0,
 		pin_memory=True,
 		drop_last=False,
 	)
@@ -663,6 +663,9 @@ def get_test_parser(
 	full_parser.add_argument(
 		"-se", "--save", action="store_true", help="Save the outputs of the test"
 	)
+	full_parser.add_argument(
+		"-rt", "--re_test", action="store_true", help="Retest if results exist"
+	)
 
 	# ============ PARTIAL TEST SUBPARSER ============
 	partial_parser = subparsers.add_parser(
@@ -744,7 +747,7 @@ def get_test_parser(
 	partial_parser.add_argument(
 		"-se", "--save", action="store_true", help="Save the outputs of the test"
 	)
-
+	
 	return parser
 
 
@@ -817,7 +820,7 @@ def main():
 	if args.command == "full":
 		# Run complete test suite
 		print("Running full test suite...")
-		results = full_test(admin, data=data, save=args.save)
+		results = full_test(admin, data=data, save=args.save, re_test=args.re_test)
 		print(json.dumps(results, indent=4))
 	elif args.command == "partial":
 		# Run partial test with specified parameters

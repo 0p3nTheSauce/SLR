@@ -57,12 +57,14 @@ class MViTv2S_basic(nn.Module):
 						self._initialize_classifier()  # mvitspecific initialization
 
 		def _initialize_classifier(self):
-				"""Initialize only the classifier weights, leaving backbone untouched"""
-				for m in self.classifier.modules():
-						if isinstance(m, nn.Linear):
-								nn.init.trunc_normal_(m.weight, std=0.02)
-								if m.bias is not None:
-										nn.init.constant_(m.bias, 0.0)
+			"""Initialize only the classifier weights, leaving backbone untouched"""
+			for m in self.classifier.modules():
+				if isinstance(m, nn.Linear):
+						nn.init.trunc_normal_(m.weight, std=0.02)
+						if m.bias is not None:
+							nn.init.constant_(m.bias, 0.0)
+
+
 
 		def forward(self, x: torch.Tensor) -> torch.Tensor:
 				# Convert if necessary (B, C, H, W) -> (B, C, 1, H, W)

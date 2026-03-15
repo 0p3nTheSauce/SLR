@@ -1,3 +1,4 @@
+from typing import Dict, List, Any
 from que.core import Que, QueEmpty, connect_manager, _get_basic_logger
 import json
 import subprocess
@@ -198,7 +199,7 @@ def test_find_S3D_runs():
         lambda x: x == 0.001,
         lambda x: x == 0.001,
         lambda x: x == 0.5,
-        lambda x: x == 16,
+        lambda x: x == 32,
         lambda x: x == 224,
         lambda x: x == "CosineAnnealingWarmRestarts",
         lambda x: x == 10,
@@ -212,10 +213,63 @@ def test_find_S3D_runs():
         all_exps[run['admin']['split']][run['admin']['model']] = [run['admin']['exp_no']]
     
     
-    # with open('./debug.json', 'w') as f:
-    #     json.dump(all_exps,f,indent=2)
-        
+    with open('./results/S3D_32_SAICIST.json', 'w') as f:
+        json.dump(all_exps,f,indent=2)
+    print(json.dumps(all_exps, indent=4))
     print(idxs)
+
+class CleverDict(Dict):
+    def __init__(self, dict: Dict[Any, Any]):
+        self.dict = dict
+        
+    def __getitem__(self, keys: List[Any]) -> Any:
+        d = self.dict.copy()
+        for key in keys:
+            d = d[key]
+        return d
+    
+    def __setitem__(self, keys: List[Any], val: Any):
+        self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
+
+    def _set_inplace(self, d:Dict[Any, Any], k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
+        if len(ks) == 0:
+            d[k] = val
+            return d
+        else:
+            next_key = ks.pop(0)
+            d[k] = self._set_inplace(d[k],next_key, ks, val)
+            return d          
+        
+    def to_dict(self) -> Dict[Any, Any]:
+        return self.dict.copy()
+    
+    
+    def __str__(self) -> str:
+        return str(self.dict)
+    
+    def __delitem__(self, key):
+        raise NotImplementedError
+        
+
+def test_set_nested():
+    a = {a:b for a, b in zip('abcdef', range(5))}
+    b = a.copy()
+    c = a.copy()
+    d = {
+        'z':a,
+        'y':b,
+        'x':c
+    }
+    print(json.dumps(d, indent=4))    
+    cd = CleverDict(d)
+    ks = ['z', 'a']
+    v = 200
+    cd[ks] = v
+    ks = ['x', 'e']
+    v = 300
+    ks = ['x', 'e']
+    print(json.dumps(cd.to_dict(), indent=4)) 
+    print(cd) 
 
 if __name__ == '__main__':
     # test_dump_peak()
@@ -226,6 +280,7 @@ if __name__ == '__main__':
     # test_clear()
     # test_instance_typegaurd()
     # time_instance_typegaurd()
-    test_find_runs()
-    # test_find_S3D_runs()
+    # test_find_runs()
+    test_find_S3D_runs()
+    # test_set_nested()
     

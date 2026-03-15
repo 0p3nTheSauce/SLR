@@ -1,6 +1,6 @@
 from typing import  Tuple, TypedDict
 import torch
-
+import torch.nn as nn
 # locals
 from .pytorch_mvit import MViTv2S_basic, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
@@ -104,8 +104,29 @@ def norm_vals(model_name: str) -> NormDict:
     return norm_dict[model_name]
 
 
+def extend_classifier(model: nn.Module, additional_classes: int):
+    """Extend the classifier by additional_classes"""
+    old_linear = model.classifier[1]  # index 1 because of the Dropout at [0]
+    
+    old_out = old_linear.out_features
+    in_features = old_linear.in_features
+    new_out = old_out + additional_classes
+
+    new_linear = nn.Linear(in_features, new_out)
+
+    # Copy old weights and biases into the first `old_out` rows
+    with torch.no_grad():
+        new_linear.weight[:old_out] = old_linear.weight
+        new_linear.bias[:old_out]   = old_linear.bias
+        # Rows beyond old_out are left as default kaiming/random init
+
+    model.classifier[1] = new_linear
+    return model
+
+
 __all__ = [
     "get_model",
+    "extend_classifier",
     "S3D_basic",
     "Resnet3D_18_basic",
     "Resnet2_plus1D_18_basic",

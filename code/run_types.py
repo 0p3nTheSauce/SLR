@@ -37,6 +37,7 @@ class AdminInfo(MinInfo):
 	exp_no: str
 	recover: bool
 	config_path: str
+	weight_path: Optional[str]
 
 class TrainingInfo(TypedDict):
 	batch_size: int
