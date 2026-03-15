@@ -1,3 +1,4 @@
+from typing import Optional, cast    , Dict, List, Any
 import shlex
 import configs
 # from .server import connect_manager
@@ -7,7 +8,6 @@ from .shell import QueShell
 # from que.shell import QueShell
 from .core import Que, connect_manager, _get_basic_logger
 from .tmux import tmux_manager
-from typing import Optional, cast    
 import torch
 import torch.nn as nn
 import gc
@@ -15,6 +15,8 @@ import getpass
 import subprocess
 import time
 from pathlib import Path
+import json
+
 
 
 def client_logic1():
@@ -332,6 +334,8 @@ def ssh_connect_and_test(
         print("SSH tunnel closed.")
 
 
+
+    
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -365,4 +369,6 @@ if __name__ == '__main__':
     #     print("SSH key not found, falling back to password auth")    
     #     ssh_connect_and_test()
         
-    ssh_connect_and_test(host='146.231.88.174', authkey=b'abracadabra')
+    # ssh_connect_and_test(host='146.231.88.174', authkey=b'abracadabra')
+    # test_set_nested()
+    pass

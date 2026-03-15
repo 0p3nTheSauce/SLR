@@ -499,9 +499,8 @@ class QueShell(cmdLib.Cmd):
             self.que.edit_run(
                 parsed_args.location,
                 parsed_args.index,
-                parsed_args.key1,
+                parsed_args.key_set,
                 parsed_args.value,
-                parsed_args.key2,
                 parsed_args.do_eval
             )
 
@@ -883,14 +882,11 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_edit_parser(self) -> argparse.ArgumentParser:
-        # opts_keys = list(map(str, self.que.old_runs[0].keys()))
         parser = argparse.ArgumentParser(description="Edit run", prog="edit")
         parser.add_argument("location", choices=self.avail_locs)
         parser.add_argument("index", type=int)
-        # parser.add_argument("key1", type=str, choices=opts_keys)
-        parser.add_argument("key1", type=str)
+        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to unpack the nested run by")
         parser.add_argument("value", type=str)
-        parser.add_argument("--key2", "-k2", type=str, default=None)
         parser.add_argument("--do_eval", "-de", action='store_true', help='Evaluate the provided value to a type.')
         return parser
 

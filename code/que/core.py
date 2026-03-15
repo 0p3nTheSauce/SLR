@@ -1100,13 +1100,26 @@ class Que:
                 # for run in tomv:
                 #     new_location.insert(0, run)
 
+    @classmethod
+    def _set_inplace(cls, d:Dict[Any, Any], k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
+        if len(ks) == 0:
+            d[k] = val
+            return d
+        else:
+            next_key = ks.pop(0)
+            d[k] = cls._set_inplace(d[k],next_key, ks, val)
+            return d  
+    
+    @classmethod
+    def set_nested(cls, d:Dict[Any, Any],ks:List[Any], val:Any) ->Dict[Any, Any]:
+        return cls._set_inplace(d, ks[0], ks[1:], val)
+
     def edit_run(
         self,
         loc: QueLocation,
         idx: int,
-        key1: str,
+        keys: List[str],
         value: Any,
-        key2: Optional[str] = None,
         do_eval: bool = False,
     ) -> None:
         """
@@ -1128,18 +1141,18 @@ class Que:
         """
 
         with log_and_raise(self.logger, "edit"):
-            run = self._pop_run(loc, idx)
+            run = self.peak_run(loc, idx) #safety first
+            
             if do_eval:
                 val = eval(value)
             else:
                 val = value
 
-            if key2 is not None:
-                run[key1][key2] = val
-            else:
-                run[key1] = val
+            run = self.set_nested(cast(Dict[str, Any], run), keys, val)
+            _ = self._pop_run(loc, idx)
+            self._set_run(loc, idx, cast(GenExp, run))
 
-            self._set_run(loc, idx, run)
+
 
     def _find_runs(
         self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]

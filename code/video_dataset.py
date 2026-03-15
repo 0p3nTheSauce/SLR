@@ -27,7 +27,6 @@ from video_transforms import (
     _resize_by_diagonal,
     _crop_frames,
     get_transform,
-    
 )
 
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
@@ -179,7 +178,7 @@ class VideoDataset(Dataset):
             result = {"frames": frames} | item
         else:
             result = result = {"frames": frames, "label_num": item["label_num"]}
-            
+
         return result
 
     def __len__(self):
@@ -187,6 +186,7 @@ class VideoDataset(Dataset):
 
 
 ################################## Helper functions #######################################
+
 
 def get_data_set(
     set_info: DataSetInfo,
@@ -229,7 +229,10 @@ def get_data_set(
         item_transforms = _crop_frames
 
     if cropping == "Default":
-        crop = "Random" if set_info["set_name"] == "train" else "Centre"
+        if set_info["set_name"] == "train":
+            crop = "Random"  
+        else:
+            crop = "Centre"
     elif cropping == "Bbox":
         crop = None
     else:

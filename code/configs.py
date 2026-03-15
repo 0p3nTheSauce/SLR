@@ -32,7 +32,8 @@ ENTITY = "ljgoodall2001-rhodes-university"
 # PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
 # - data
-LABELS_PATH = "preprocessed/labels"
+# LABELS_PATH = "preprocessed/labels"
+LABELS_PATH = "preprocessed/labels_old"
 LABEL_SUFFIX = "fixed_frange_bboxes_len.json"
 CLASSES_PATH = "./info/wlasl_class_list.json"
 WLASL_ROOT = "../data/WLASL"
@@ -41,6 +42,7 @@ SPLIT_DIR = "splits"
 # - training/testing
 RUNS_PATH = "./runs"
 SEED = 42
+
 
 def ask_nicely(message: str, requirment: Optional[Callable] = None, error: Optional[str] = None) -> str:
 	"""Ask user for input, with optional requirement and error message
@@ -385,6 +387,7 @@ def get_train_parser(prog: Optional[str] = None,desc: str = "Train a model") -> 
 		"-t", "--tags", nargs="+", type=str, help="Additional wandb tags"
 	)
 	parser.add_argument("-c", "--config_path", help="path to config .ini file")
+	parser.add_argument('-w', "--weights_path", type=str, help="Path to model pretrained weights")
 	parser.add_argument("-na", "--no_ask", action='store_true', help="Don't ask for confirmation")
  
  
@@ -525,6 +528,18 @@ def take_args(
 		tags.append("Recovered")
 	if args.tags is not None:
 		tags.extend(args.tags)
+  
+	#get weight path
+	if args.weights_path:
+		weights_path = Path(args.weights_path)  
+		if not weights_path.exists():
+			raise FileNotFoundError(f'File {weights_path} could not be found')
+		else:
+			weights_path = str(weights_path)
+	else:
+		weights_path = None
+
+	
 
 	wandb_info = WandbInfo(entity=args.entity, project=args.project, tags=tags, run_id=args.run_id)
 	admin_info = AdminInfo(
@@ -534,7 +549,8 @@ def take_args(
 		exp_no=args.exp_no,
 		recover=args.recover,
 		config_path=args.config_path,
-		save_path=args.save_path
+		save_path=args.save_path,
+		weight_path=weights_path
 	)
 
 	return admin_info, wandb_info

@@ -263,7 +263,7 @@ class Worker:
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
     def start(self):
-        """this is likely started in a seperate process, so que requirs connecting"""
+        """this is likely started in a seperate process, so que requires connecting"""
         
         manager = connect_manager()
         self.que = manager.get_que()
