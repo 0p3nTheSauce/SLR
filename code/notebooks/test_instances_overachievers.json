@@ -1,0 +1,40 @@
+[
+    {
+        "bbox": [
+            41,
+            36,
+            209,
+            220
+        ],
+        "frame_end": 33,
+        "frame_start": 1,
+        "instance_id": 2,
+        "signer_id": 4,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20Beginning-00_DNPsIIj0.mp4",
+        "variation_id": 0,
+        "video_id": "05778",
+        "label_num": 1318,
+        "label_name": "beginning"
+    },
+    {
+        "bbox": [
+            49,
+            40,
+            209,
+            224
+        ],
+        "frame_end": 45,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 20,
+        "source": "handspeak",
+        "split": "test",
+        "url": "https://www.handspeak.com/word/s/swimsuit-bottom.mp4",
+        "variation_id": 0,
+        "video_id": "56368",
+        "label_num": 1561,
+        "label_name": "swimsuit"
+    }
+]

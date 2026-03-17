@@ -185,10 +185,10 @@ def test_find_S3D_runs():
         ["model_params", "drop_p"],
         ["data", "num_frames"],
         ["data", "frame_size"],
-        ["scheduler", "type"],
-        ["scheduler", "t0"],
-        ["scheduler", "tmult"],
-        ["scheduler", "eta_min"],
+    #     ["scheduler", "type"],
+    #     ["scheduler", "t0"],
+    #     ["scheduler", "tmult"],
+    #     ["scheduler", "eta_min"],
     ]
     criterions = [
         lambda x: x == 'S3D',
@@ -201,10 +201,10 @@ def test_find_S3D_runs():
         lambda x: x == 0.5,
         lambda x: x == 32,
         lambda x: x == 224,
-        lambda x: x == "CosineAnnealingWarmRestarts",
-        lambda x: x == 10,
-        lambda x: x == 1,
-        lambda x: x == 0,
+        # lambda x: x == "CosineAnnealingWarmRestarts",
+        # lambda x: x == 10,
+        # lambda x: x == 1,
+        # lambda x: x == 0,
     ]
     idxs, runs = q.find_runs('old_runs', key_set, criterions)
     print(len(runs))
@@ -213,7 +213,7 @@ def test_find_S3D_runs():
         all_exps[run['admin']['split']][run['admin']['model']] = [run['admin']['exp_no']]
     
     
-    with open('./results/S3D_32_SAICIST.json', 'w') as f:
+    with open('./S3D_32_SAICIST.json', 'w') as f:
         json.dump(all_exps,f,indent=2)
     print(json.dumps(all_exps, indent=4))
     print(idxs)
@@ -271,6 +271,17 @@ def test_set_nested():
     print(json.dumps(cd.to_dict(), indent=4)) 
     print(cd) 
 
+def test_extend_classifier():
+    from models import extend_classifier, get_model
+
+    model = get_model('MViTv2_S', 100, 0.5)
+    print(model.classifier)
+    checkpoint = torch.load('runs/asl100/MViTv2_S_exp011/checkpoints/best.pth')
+    model.load_state_dict(checkpoint)
+    model = extend_classifier(model, 300)
+    print(model.classifier)
+    
+
 if __name__ == '__main__':
     # test_dump_peak()
     # test_dump_peak_server()
@@ -280,7 +291,8 @@ if __name__ == '__main__':
     # test_clear()
     # test_instance_typegaurd()
     # time_instance_typegaurd()
-    test_find_runs()
-    # test_find_S3D_runs()
+    # test_find_runs()
+    test_find_S3D_runs()
     # test_set_nested()
+    # test_extend_classifier()
     

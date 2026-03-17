@@ -127,9 +127,12 @@ def print_config(config_dict):
 		section_data = config_dict[section]
 
 		# Calculate max key length for alignment
-		max_key_len = (
-			max(len(str(k)) for k in section_data.keys()) if section_data else 0
-		)
+		if isinstance(section_data, Dict):
+			max_key_len = (
+				max(len(str(k)) for k in section_data.keys()) if section_data else 0
+			)
+		else:
+			max_key_len = len(section_data)
 		if isinstance(section_data, dict):
 			for key, value in section_data.items():
 				if isinstance(value, dict):
