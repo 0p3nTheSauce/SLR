@@ -474,7 +474,7 @@ def plt_display_grid(
 			num (int): Number of frames to display (evenly sampled). Must be >= 1.
 			size (tuple, optional): Size (width, height) in inches per cell. Defaults to (5, 5).
 			adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
-			output (str | Path, optional): If provided, saves the grid figure as 'grid.png'.
+			output (str | Path, optional): If provided, saves the grid figure as output.
 			cols (int, optional): Maximum number of frames per row. Defaults to 8.
 
 	Returns:
@@ -516,9 +516,7 @@ def plt_display_grid(
 	plt.subplots_adjust(wspace=0.02, hspace=0.02)
 
 	if output:
-		output = Path(output)
-		output.mkdir(parents=True, exist_ok=True)
-		plt.savefig(output / "grid.png", bbox_inches="tight", pad_inches=0)
+		plt.savefig(output, bbox_inches="tight", pad_inches=0)
 
 	plt.show()
 

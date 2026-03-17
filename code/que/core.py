@@ -476,8 +476,6 @@ class Que:
                 ),
             )
 
-        
-
     def _run_to_str(self, run_sum: Sumarised) -> str:
         """Convert a summarised run to a string for display
 
@@ -508,6 +506,21 @@ class Que:
             ):
                 return True
         return False
+
+    @classmethod
+    def _clean_slate(cls, run:GenExp) -> ExpInfo:
+        run["admin"]["recover"] = False
+        run['wandb']['run_id'] = None
+        return  ExpInfo(
+                    admin=run["admin"],
+                    training=run["training"],
+                    optimizer=run["optimizer"],
+                    model_params=run["model_params"],
+                    data=run["data"],
+                    scheduler=run["scheduler"],
+                    early_stopping=run["early_stopping"],
+                    wandb=run["wandb"],
+                )
 
     @classmethod
     def _get_print_stats(cls, runs: List[Sumarised]) -> Dict[str, int]:
@@ -917,26 +930,18 @@ class Que:
         with log_and_raise(self.logger, "recover"):
             run = self.peak_run(from_loc, index)
 
-            if not clean_slate:
+            if clean_slate:
+                self.logger.debug("running _clean_slate: set recover to False, and run_id to None")
+                run = self._clean_slate(run)
+            else:
                 self.logger.debug("setting recover to True")
                 run["admin"]["recover"] = True
-            else:
-                # ensure recover is false (e.g. run was set to recover then failed)
-                self.logger.debug("Ensuring recover is False")
-                run["admin"]["recover"] = False
 
             if from_loc == FAIL_RUNS:
                 # remove error
-                run = ExpInfo(
-                    admin=run["admin"],
-                    training=run["training"],
-                    optimizer=run["optimizer"],
-                    model_params=run["model_params"],
-                    data=run["data"],
-                    scheduler=run["scheduler"],
-                    early_stopping=run["early_stopping"],
-                    wandb=run["wandb"],
-                )
+                if "error" in run:
+                    del run['error']
+                run = ExpInfo(run)
             elif (
                 run["wandb"]["run_id"] is None and not clean_slate
             ):  # NOTE: run id is currently required for recovery
@@ -1152,8 +1157,6 @@ class Que:
             _ = self._pop_run(loc, idx)
             self._set_run(loc, idx, cast(GenExp, run))
 
-
-
     def _find_runs(
         self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
     ) -> Tuple[List[int], List[GenExp]]:
@@ -1238,7 +1241,30 @@ class Que:
             self.fail_runs = all_runs[FAIL_RUNS]
             self.old_runs = all_runs[OLD_RUNS]
 
+    def copy_run(
+        self,
+        o_loc: QueLocation,
+        o_idx: int,
+        n_loc: QueLocation,
+        n_idx: int = 0,
+        clean_slate: bool = False
+    ) -> None:
+        """Copies a run from one original location to a new location
 
+        Args:
+            o_loc (QueLocation): Original location
+            o_idx (int): Original index
+            n_loc (QueLocation): New location
+            n_idx (int, optional): New index. Defaults to 0.
+            clean_slate (bool, optional): Flag to remove error, set wandb_id to None, and recover to False. Defaults to False.
+        """
+        with log_and_raise(self.logger, "copy"):
+            run = self.peak_run(o_loc,o_idx)
+            if clean_slate:
+                run = self._clean_slate(run)
+            self._set_run(n_loc, n_idx, run)
+            
+            
 # # ------- Basmanager connections -------#
 Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 

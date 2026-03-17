@@ -259,13 +259,6 @@ def reset_state():
     manager = connect_manager()
     server = manager.get_server_context()
     server.set_state(server=None, daemon=None, worker={'task': 'inactive', 'current_run_id': None, 'working_pid': None, 'exception': None})
-    
-
-
-
-
-
-
 
 def connect_manager_ssh( 
     host: Optional[str] = None,
@@ -333,9 +326,19 @@ def ssh_connect_and_test(
         tunnel.terminate()
         print("SSH tunnel closed.")
 
+def test_new_recover():
+    q = Que(_get_basic_logger())
+    q.disp_run('fail_runs', 0)
+    q.recover_run(from_loc='fail_runs', clean_slate=True)
+    q.disp_run('to_run', 0)
+
+def test_copy():
+    q = Que(_get_basic_logger())
+    q.disp_run('fail_runs', 0)
+    q.copy_run('fail_runs', 0, 'to_run')
+    q.disp_run('to_run', 0)
 
 
-    
 if __name__ == '__main__':
     # process_opener()
     # idle_daemon()
@@ -371,4 +374,5 @@ if __name__ == '__main__':
         
     # ssh_connect_and_test(host='146.231.88.174', authkey=b'abracadabra')
     # test_set_nested()
-    pass
+    # test_new_recover()
+    test_copy()

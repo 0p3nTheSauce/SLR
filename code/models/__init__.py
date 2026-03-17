@@ -104,23 +104,43 @@ def norm_vals(model_name: str) -> NormDict:
     return norm_dict[model_name]
 
 
-def extend_classifier(model: nn.Module, additional_classes: int):
-    """Extend the classifier by additional_classes"""
-    old_linear = model.classifier[1]  # index 1 because of the Dropout at [0]
-    
-    old_out = old_linear.out_features
-    in_features = old_linear.in_features
-    new_out = old_out + additional_classes
+def extend_classifier(model: nn.Module, final_classes: int):
+    """Extend the classifier to final_classes outputs, preserving existing weights."""
+    old_layer = model.classifier[1]  # index 1 because of the Dropout at [0]
 
-    new_linear = nn.Linear(in_features, new_out)
+    if isinstance(old_layer, nn.Linear):
+        old_out = old_layer.out_features
+        in_features = old_layer.in_features
+        old_weight = old_layer.weight  # [old_out, in_features]
+        new_layer = nn.Linear(in_features, final_classes, bias=True)
 
-    # Copy old weights and biases into the first `old_out` rows
+    elif isinstance(old_layer, nn.Conv3d):
+        old_out = old_layer.out_channels
+        in_features = old_layer.in_channels
+        old_weight = old_layer.weight  # [old_out, in_features, *kernel_size]
+        new_layer = nn.Conv3d(
+            in_features, final_classes,
+            kernel_size=old_layer.kernel_size, #type: ignore
+            stride=old_layer.stride, #type: ignore
+            padding=old_layer.padding, #type: ignore
+            bias=True,
+        )
+
+    else:
+        raise TypeError(f"Unexpected layer type: {type(old_layer)}")
+
+    if old_layer.bias is None:
+        raise ValueError("Expected old layer to have a bias, but bias is None")
+
+    assert final_classes > old_out, \
+        f"final_classes ({final_classes}) must be greater than current classes ({old_out})"
+
     with torch.no_grad():
-        new_linear.weight[:old_out] = old_linear.weight
-        new_linear.bias[:old_out]   = old_linear.bias
+        new_layer.weight[:old_out] = old_weight
+        new_layer.bias[:old_out]   = old_layer.bias #type: ignore
         # Rows beyond old_out are left as default kaiming/random init
 
-    model.classifier[1] = new_linear
+    model.classifier[1] = new_layer
     return model
 
 
