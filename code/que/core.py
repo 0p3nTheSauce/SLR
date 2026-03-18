@@ -939,9 +939,16 @@ class Que:
 
             if from_loc == FAIL_RUNS:
                 # remove error
-                if "error" in run:
-                    del run['error']
-                run = ExpInfo(run)
+                run = ExpInfo(
+                    admin=run["admin"],
+                    training=run["training"],
+                    optimizer=run["optimizer"],
+                    model_params=run["model_params"],
+                    data=run["data"],
+                    scheduler=run["scheduler"],
+                    early_stopping=run["early_stopping"],
+                    wandb=run["wandb"],
+                )
             elif (
                 run["wandb"]["run_id"] is None and not clean_slate
             ):  # NOTE: run id is currently required for recovery
@@ -1118,6 +1125,12 @@ class Que:
     @classmethod
     def set_nested(cls, d:Dict[Any, Any],ks:List[Any], val:Any) ->Dict[Any, Any]:
         return cls._set_inplace(d, ks[0], ks[1:], val)
+    
+    @classmethod
+    def get_nested(cls, d:Dict[Any, Any],ks:List[Any]) -> Any:
+        for k in ks:
+            d = d[k]
+        return d 
 
     def edit_run(
         self,
@@ -1204,15 +1217,12 @@ class Que:
             idxs, runs = self._find_runs(runs, k_lst, crit)
         return idxs, runs
 
-    def update_runs(self, key1: str, key_value: Tuple[str, Any]) -> None:
+    def update_runs(self, key_set: List[str], transform: Callable[[Any], Any]) -> None:
         """Update fields in the que. Useful if mass alterations are needed to runs
 
         Args:
-            key1 (str): Top level key, e.g. data
-            key_value (Tuple[str, Any]): Key value pair, of secondary key, e.g. num_frames 16
-
-        Raises:
-            ValueError: If the top level key is faulty
+            key_set (List[str]): List of keys to access nested dictionary
+            transform (Callable[[Any], Any]): Transform to apply to value.
         """
         with log_and_raise(self.logger, "que.update_runs"):
             all_runs = {
@@ -1224,17 +1234,13 @@ class Que:
 
             for location_name, run_list in all_runs.items():
                 for idx, run in enumerate(run_list):
-                    if key1 not in run:
-                        raise ValueError(
-                            f"Top level key: {key1} not found in available keys: {run.keys()} for run: {idx} in: {location_name}"
-                        )
-                    subdict = run[key1]
-                    key2, value = key_value
-                    # if key2 not in subdict:
-                    #     raise ValueError(f"Second level key: {key2} not found in available keys: {subdict.keys()} for run: {idx} in: {location_name}, with top level key: {key1}")
-                    subdict[key2] = value
-                    run[key1] = subdict
-                    all_runs[location_name][idx] = run
+                    run = self.set_nested(
+                        run,
+                        key_set,
+                        transform(self.get_nested(run, key_set))
+                    )
+                    run_list[idx] = run
+                all_runs[location_name] = run_list
 
             self.to_run = all_runs[TO_RUN]
             self.cur_run = all_runs[CUR_RUN]
