@@ -1,4 +1,4 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Union
 from que.core import Que, QueEmpty, connect_manager, _get_basic_logger
 import json
 import subprocess
@@ -8,6 +8,8 @@ import torch
 import video_dataset
 import preprocess
 import time
+from pathlib import Path
+
 logging.basicConfig(
 		level=logging.INFO,
 		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -280,7 +282,89 @@ def test_extend_classifier():
     model.load_state_dict(checkpoint)
     model = extend_classifier(model, 300)
     print(model.classifier)
+
+def test_get_next_expno():
+    from configs import get_next_expno
+    print(get_next_expno('asl2000', 'MViTv2_S'))
+
+def reformat_runs():
+    from configs import RUNS_PATH
+    runs = Path(RUNS_PATH)
+    asl_split = runs / 'asl100'
+    # for asl_split in runs.iterdir():
+    print('-'*5,f'Working on split: {asl_split}','-'*5)
+    for model_exp_dir in asl_split.iterdir():
+        parts = model_exp_dir.name.rsplit("_exp", maxsplit=1)
+        if len(parts) != 2 or not parts[1].isdigit():
+            print(model_exp_dir.name, 'doesnt match')
+            continue
+        
+        model_name, exp_num = parts
+        
+        new_path = asl_split / model_name / f"exp{exp_num}"
+
+        print(f"{model_exp_dir}  ->  {new_path}")
+        new_path.mkdir(parents=True, exist_ok=True)
+        model_exp_dir.rename(new_path) 
+
+def _reformat_config_path(model_exp_c:Union[Path, str]) -> Path:
+    model_exp_c = Path(model_exp_c)
     
+    parts = model_exp_c.name.rsplit("_", maxsplit=1)
+    
+    if len(parts) != 2 or not parts[1][-5].isdigit():
+        raise ValueError(f'Parts do not match pattern for: {model_exp_c}. Found parts: {", ".join(parts)}')
+    model_name, exp_num = parts
+    exp_num = exp_num[:-4]
+    return model_exp_c.parent / model_name / f"exp{exp_num}.ini" 
+
+def reformat_configs():
+    from configs import CONFIGS_PATH
+    confs = Path(CONFIGS_PATH)
+    asl_split = confs / 'asl100'
+    # for asl_split in confs.iterdir():
+    print('-'*5,f'Working on split: {asl_split}','-'*5)
+    for model_exp_dir in asl_split.iterdir():
+        
+        try:
+            new_path = _reformat_config_path(model_exp_dir)
+        except ValueError as v:
+            print(v)
+            continue
+
+        print(f"{model_exp_dir}  ->  {new_path}")
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        model_exp_dir.rename(new_path) 
+
+
+
+def _reformat_path(chck_dir:Union[Path, str]) -> Path:
+    chck_dir = Path(chck_dir)
+    model_exp_dir = chck_dir.parent
+    parts = model_exp_dir.name.rsplit("_exp", maxsplit=1)
+    if len(parts) != 2 or not parts[1].isdigit():
+
+        raise ValueError(f'Parts do not match pattern for: {chck_dir}. Found parts: {", ".join(parts)}')
+    model_name, exp_num = parts
+    return model_exp_dir.parent / model_name / f"exp{exp_num}" / chck_dir.name
+
+def _reformat_weight_path(wpath: Optional[str]) -> Optional[str]:
+    if wpath is None:
+        return wpath
+    wpath_p = Path(wpath)
+    return str(_reformat_path(wpath_p.parent) / wpath_p.name)
+
+def reformat_runs_json(runs:str):
+    q= Que(_get_basic_logger(), runs_path = runs)
+    ks = ['admin', 'save_path']
+    ks2 = ['admin']
+    ks3 = ['admin', 'weight_path']
+    q.disp_run('old_runs', 0)
+    q.update_runs(ks, lambda x: str(_reformat_path(x)))
+    q.update_runs(ks2, lambda x: x | {'weight_path': None} if 'weight_path' not in x else x)
+    q.update_runs(ks3, _reformat_weight_path)
+    q.disp_run('old_runs', 0)
+
 
 if __name__ == '__main__':
     # test_dump_peak()
@@ -292,7 +376,10 @@ if __name__ == '__main__':
     # test_instance_typegaurd()
     # time_instance_typegaurd()
     # test_find_runs()
-    test_find_S3D_runs()
+    # test_find_S3D_runs()
     # test_set_nested()
     # test_extend_classifier()
-    
+    # test_get_next_expno()
+    # reformat_runs()
+    # reformat_runs_json('/home/luke/Code/SLR/code/runs_c.json')
+    reformat_configs()

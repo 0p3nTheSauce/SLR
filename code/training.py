@@ -547,7 +547,7 @@ def main():
 
     args = parser.parse_args()
 
-    maybe_args = take_args(parsed_args=args, ask_bf_ovrite=not args.no_ask)
+    maybe_args = take_args(parsed_args=args)
     if isinstance(maybe_args, tuple):
         admin, wandb_info = maybe_args
     else:

@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 import tqdm
 from pathlib import Path
 import gc
-
+import re
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import norm_vals, get_model, NormDict
@@ -28,6 +28,7 @@ from models import avail_models
 from configs import (
 	get_avail_splits,
 	RUNS_PATH,
+	get_model_results_dir
 )
 from run_types import (
 	CompRes,
@@ -338,6 +339,21 @@ def setup_data(set_name: Literal['train', 'test', 'val'], norm_dict: NormDict, s
 	)
 	return test_loader, test_dataset.num_classes, perm, shanon_entropy
 
+def checkpoint_dir_to_result_dir(checkpoint_dir:Path) -> Path:
+	"""Find the corresponding results path for the provided checkpoint path
+
+	Args:
+		checkpoint_dir (Path): Model checkpoints directory
+
+	Returns:
+		Path: Results save path
+	"""
+	chck_str = str(checkpoint_dir)
+	reg_digits = re.search(r'\d+$', chck_str)
+	if reg_digits is not None:
+		reg_digits = int(reg_digits.group())
+	return get_model_results_dir(checkpoint_dir.parent, reg_digits)
+		
 
 def test_run(
 	admin: MinInfo,
@@ -355,17 +371,17 @@ def test_run(
 	"""Perform testing of a model according to the provided configuration.
 
 	Args:
-					config (Dict[str, Any]): Run config file.
-					perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
-					test_val (bool, optional): Test on the val set. Defaults to False.
-					test_test (bool, optional): Test on the test set. Defaults to True.
-					check (str, optional): Checkpoint name. Defaults to "best.pth".
-					br_graph (bool, optional): Create bar graph. Defaults to False.
-					cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
-					heatmap (bool, optional): Create heatmap. Defaults to False.
-					disp (bool, optional): Display plots. Defaults to False.
-					save (bool, optional): Save results and plots. Defaults to True.
-					re_test (bool, optional): Test even if results already saved. Defaults to False.
+		config (Dict[str, Any]): Run config file.
+		perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+		test_val (bool, optional): Test on the val set. Defaults to False.
+		test_test (bool, optional): Test on the test set. Defaults to True.
+		check (str, optional): Checkpoint name. Defaults to "best.pth".
+		br_graph (bool, optional): Create bar graph. Defaults to False.
+		cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+		heatmap (bool, optional): Create heatmap. Defaults to False.
+		disp (bool, optional): Display plots. Defaults to False.
+		save (bool, optional): Save results and plots. Defaults to True.
+		re_test (bool, optional): Test even if results already saved. Defaults to False.
 
 	Returns:
 					Optional[Dict[str, Any]]: Results if correct parameters.
@@ -384,7 +400,7 @@ def test_run(
 
 	save_path = Path(admin["save_path"])
 
-	output = save_path.parent / "results"
+	output = checkpoint_dir_to_result_dir(save_path)
 
 	if save or save_img:
 		output.mkdir(exist_ok=True)
