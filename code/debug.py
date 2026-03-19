@@ -354,16 +354,34 @@ def _reformat_weight_path(wpath: Optional[str]) -> Optional[str]:
     wpath_p = Path(wpath)
     return str(_reformat_path(wpath_p.parent) / wpath_p.name)
 
+def _safe_reformat_conf(model_exp_c:str) -> str:
+    safe_dirs = ['asl100', 'asl300', 'asl1000', 'asl2000']
+    
+    if Path(model_exp_c).parent.name in safe_dirs:    
+        try:
+            ref = str(_reformat_config_path(model_exp_c))
+            print(f'{model_exp_c} -> {ref}') 
+            return ref
+        except (ValueError, IndexError) as e:
+            print(f'skipping {model_exp_c} because of {e}')
+            return model_exp_c
+    else:
+        print(f'skipping: {Path(model_exp_c).name}')
+        return model_exp_c
+
 def reformat_runs_json(runs:str):
     q= Que(_get_basic_logger(), runs_path = runs)
     ks = ['admin', 'save_path']
     ks2 = ['admin']
     ks3 = ['admin', 'weight_path']
-    q.disp_run('old_runs', 0)
+    ks4 = ['admin', 'config_path']
+    # q.disp_run('old_runs', 0)
     q.update_runs(ks, lambda x: str(_reformat_path(x)))
     q.update_runs(ks2, lambda x: x | {'weight_path': None} if 'weight_path' not in x else x)
     q.update_runs(ks3, _reformat_weight_path)
-    q.disp_run('old_runs', 0)
+    q.update_runs(ks4, _safe_reformat_conf)
+    # q.disp_run('old_runs', 0)
+    q.save_state(out_path=runs.replace('.json', 'c.json'))
 
 
 if __name__ == '__main__':
@@ -381,5 +399,5 @@ if __name__ == '__main__':
     # test_extend_classifier()
     # test_get_next_expno()
     # reformat_runs()
-    # reformat_runs_json('/home/luke/Code/SLR/code/runs_c.json')
-    reformat_configs()
+    # reformat_configs()
+    reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')

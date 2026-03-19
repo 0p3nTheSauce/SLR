@@ -16,6 +16,8 @@ code/wandb/
 code/preprocessed/
 code/que/Server.json
 code/que/Runs.json
+code/que/old_ques/
 .vscode/
 ./.vscode/
+
 

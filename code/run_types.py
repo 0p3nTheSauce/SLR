@@ -175,6 +175,11 @@ class Sumarised(TypedDict):
 	best_val_acc: Optional[float]
 	best_val_loss: Optional[float]
 
- 
+class SummarisedRes(Sumarised):
+	test_top1_acc: Optional[float]
+	test_av_loss: Optional[float]
+
+
+
 class SummarisedError(Sumarised):
 	error: str

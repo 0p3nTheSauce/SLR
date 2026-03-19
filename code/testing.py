@@ -28,7 +28,9 @@ from models import avail_models
 from configs import (
 	get_avail_splits,
 	RUNS_PATH,
-	get_model_results_dir
+	get_model_results_dir,
+	get_model_exp_dir,
+	get_model_checkpoint_dir
 )
 from run_types import (
 	CompRes,
@@ -559,7 +561,7 @@ def full_test(
 	save_path = Path(admin["save_path"])
 
 	# output
-	out_dir = save_path.parent / "results"
+	out_dir = checkpoint_dir_to_result_dir(save_path)
 	res_path = out_dir / "best_val_loss.json" #TODO: hard coding the file path, not very good
 
 	#dont retest if exists
@@ -655,6 +657,12 @@ def get_test_parser(
 	)
 	full_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	full_parser.add_argument(
+		"-cp_d_n",
+		"--checkpoint_dir_no",
+		type=int,
+		help="Checkpoint directory number (e.g. 10). Useful if multiple checkpoint directories",
+		default=None)
+	full_parser.add_argument(
 		"-ds",
 		"--dataset",
 		type=str,
@@ -702,6 +710,12 @@ def get_test_parser(
 	)
 	partial_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
 	partial_parser.add_argument(
+		"-cp_d_n",
+		"--checkpoint_dir_no",
+		type=int,
+		help="Checkpoint directory number (e.g. 10). Useful if multiple checkpoint directories",
+		default=None)
+	partial_parser.add_argument(
 		"set_name",
 		type=str,
 		choices=['test', 'val', 'train'],
@@ -736,7 +750,7 @@ def get_test_parser(
 		help="Shuffle the frames when testing",
 	)
 	partial_parser.add_argument(
-		"-cn",
+		"-cp_n",
 		"--checkpoint_name",
 		type=str,
 		help="Checkpoint name, if not best.pth",
@@ -771,10 +785,12 @@ def main():
 	parser = get_test_parser()
 	args = parser.parse_args()
 
-	exp_no = str(int(args.exp_no)).zfill(3)
-	args.exp_no = exp_no
-	output = Path(f"{RUNS_PATH}/{args.split}/{args.model}_exp{exp_no}")
-	save_path = output / "checkpoints"
+	output = get_model_exp_dir(
+        split=args.split,
+        model=args.model,
+        exp_no=args.exp_no,
+    )
+	save_path = get_model_checkpoint_dir(output, args.checkpoint_dir_no)
 
 	if (
 		not save_path.exists()
