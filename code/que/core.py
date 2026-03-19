@@ -163,7 +163,8 @@ from multiprocessing.managers import BaseManager, DictProxy
 import time
 from datetime import datetime
 import os
-
+from contextlib import contextmanager
+from multiprocessing.synchronize import Event as EventClass
 # locals
 from run_types import (
     ExpInfo,
@@ -172,13 +173,13 @@ from run_types import (
     WandbInfo,
     RunInfo,
     Sumarised,
-    SummarisedError
+    SummarisedError,
+    SummarisedRes
 )
 from testing import full_test, load_comp_res
-from configs import print_config, load_config
+from configs import print_config, load_config, ZFILL
+from utils import enum_dir
 
-from contextlib import contextmanager
-from multiprocessing.synchronize import Event as EventClass
 
 # constants
 # MR_NAME = "monitor"
@@ -195,6 +196,8 @@ SERVER_STATE_PATH = QUE_DIR / "Server.json"
 
 TRAINING_LOG_PATH = QUE_DIR / "Training.log"
 SERVER_LOG_PATH = QUE_DIR / "Server.log"
+
+ARCHIVE_DIR = QUE_DIR / "old_ques"
 
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
@@ -432,7 +435,7 @@ class Que:
         """Check if run is a FailedExp"""
         return isinstance(run, dict) and "error" in run
 
-    def _is_comp_exp_info(self, run: GenExp) -> TypeGuard[CompExpInfo]:
+    def _is_comp_exp_info(self, run: RunInfo) -> TypeGuard[CompExpInfo]:
         """Check if run is a CompExpInfo"""
         return isinstance(run, dict) and "results" in run
 
@@ -445,25 +448,8 @@ class Que:
         Returns:
             Sumarised: Dictionary with model, exp_no, split, and config_path
         """
-        
-        err = run.get("error") if self._is_failed_exp(run) else None
-        
-        if err:
-            return SummarisedError(
-                model=run["admin"]["model"],
-            exp_no=run["admin"]["exp_no"],
-            dataset=run["admin"]["dataset"],
-            split=run["admin"]["split"],
-            config_path=run["admin"]["config_path"],
-            run_id=run.get("wandb", {}).get("run_id") if "wandb" in run else None,
-            best_val_acc=(run["results"]["best_val_acc"] if "results" in run else None),
-            best_val_loss=(
-                run["results"]["best_val_loss"] if "results" in run else None
-            ),
-            error=err
-            )
-        else:
-            return Sumarised(
+
+        sum_run = Sumarised(
                 model=run["admin"]["model"],
                 exp_no=run["admin"]["exp_no"],
                 dataset=run["admin"]["dataset"],
@@ -475,6 +461,14 @@ class Que:
                     run["results"]["best_val_loss"] if "results" in run else None
                 ),
             )
+
+        if self._is_failed_exp(run):
+            return cast(SummarisedError, sum_run | {"error": run['error']})
+        elif self._is_comp_exp_info(run):
+            results = run['results']["test"]
+            return cast(SummarisedRes, sum_run | {"test_top1_acc": results['top_k_per_instance_acc']['top1'] * 100, 'test_av_loss': results['average_loss']})
+        else:
+            return sum_run
 
     def _run_to_str(self, run_sum: Sumarised) -> str:
         """Convert a summarised run to a string for display
@@ -508,9 +502,21 @@ class Que:
         return False
 
     @classmethod
-    def _clean_slate(cls, run:GenExp) -> ExpInfo:
+    def _clean_slate(cls, run:GenExp, enum_chck:bool) -> ExpInfo:
+        """Apply clean slate to run config. Useful for reusing already defined configs
+
+        Args:
+            run (GenExp): Run config, could be new, failed or complete
+            enum_chck (bool): Enumerate the checkpoint. Recommend True when you want to repeat a run with the same config, 
+                            and False when the run failed before starting.
+
+        Returns:
+            ExpInfo: A 'new' run config. Sets recover to False, run_id to None, and removes results/errors
+        """
         run["admin"]["recover"] = False
         run['wandb']['run_id'] = None
+        if enum_chck:
+            run["admin"]["save_path"] = str(enum_dir(run['admin']['save_path'], decimals=ZFILL))
         return  ExpInfo(
                     admin=run["admin"],
                     training=run["training"],
@@ -588,12 +594,15 @@ class Que:
             self.fail_runs = []
 
     def save_state(
-        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False, archive:bool = True
     ):
         if out_path is None:
             out_path = self.runs_path
         elif Path(out_path).exists() and not timestamp:
             self.logger.warning(f"Overwriting existing state file: {out_path}")
+
+        if archive:
+            out_path = ARCHIVE_DIR / out_path
 
         if timestamp:
             out_path = timestamp_path(out_path)
@@ -913,6 +922,7 @@ class Que:
         from_loc: QueLocation = CUR_RUN,
         index: int = 0,
         clean_slate: bool = False,
+        enum_chck: bool = False #in recover more likely to be using same checkpoint dir
     ) -> None:
         """
         Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
@@ -925,6 +935,8 @@ class Que:
         :type index: int
         :param clean_slate: Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.
         :type clean_state: bool
+        :param enum_chck: Enumerate checkpoint directory. In recover more likely to be using same checkpoint dir (False).
+        type enum_chck: bool
         """
         self.logger.debug(f"clean slate is set to: {clean_slate}")
         with log_and_raise(self.logger, "recover"):
@@ -932,7 +944,7 @@ class Que:
 
             if clean_slate:
                 self.logger.debug("running _clean_slate: set recover to False, and run_id to None")
-                run = self._clean_slate(run)
+                run = self._clean_slate(run, enum_chck)
             else:
                 self.logger.debug("setting recover to True")
                 run["admin"]["recover"] = True
@@ -1253,7 +1265,8 @@ class Que:
         o_idx: int,
         n_loc: QueLocation,
         n_idx: int = 0,
-        clean_slate: bool = False
+        clean_slate: bool = False,
+        enum_chck:bool = True# in copy, more likely to want new checkpoint dir
     ) -> None:
         """Copies a run from one original location to a new location
 
@@ -1263,11 +1276,12 @@ class Que:
             n_loc (QueLocation): New location
             n_idx (int, optional): New index. Defaults to 0.
             clean_slate (bool, optional): Flag to remove error, set wandb_id to None, and recover to False. Defaults to False.
+            enum_chck (bool, optional): Flag to enumerate checkpoint. In copy, more likely to want new checkpoint dir. Defaults to True.
         """
         with log_and_raise(self.logger, "copy"):
             run = self.peak_run(o_loc,o_idx)
             if clean_slate:
-                run = self._clean_slate(run)
+                run = self._clean_slate(run, enum_chck)
             self._set_run(n_loc, n_idx, run)
             
             

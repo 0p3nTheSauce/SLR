@@ -82,6 +82,7 @@ class QueShell(cmdLib.Cmd):
             "shuffle": self._get_shuffle_parser,
             "move": self._get_move_parser,
             "edit": self._get_edit_parser,
+            "copy": self._get_copy_parser,
             "display": self._get_display_parser,
             "daemon": self._get_daemon_parser,
             "server": self._get_server_parser,
@@ -474,7 +475,7 @@ class QueShell(cmdLib.Cmd):
         args = shlex.split(arg)
 
         try:
-            maybe_args = configs.take_args(sup_args=args, ask_bf_ovrite=False)
+            maybe_args = configs.take_args(sup_args=args)
         except (SystemExit, ValueError):
             self.console.print("[red]Add cancelled (incorrect arguments)[/red]")
             return
@@ -504,7 +505,20 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.do_eval
             )
 
-    
+    def do_copy(self, arg):
+        """Copy a run"""
+        parsed_args = self._parse_args_or_cancel("copy", arg)
+        if parsed_args is None:
+            return
+        
+        with self.unwrap_exception("Copy successful", "Copy failed"):
+            self.que.copy_run(
+                parsed_args.o_location, 
+                parsed_args.o_index,
+                parsed_args.n_location,
+                parsed_args.n_index,
+                parsed_args.clean_slate
+            )
             
 
     def do_wandb(self, arg):
@@ -890,6 +904,19 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("--do_eval", "-de", action='store_true', help='Evaluate the provided value to a type.')
         return parser
 
+    def _get_copy_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description='Copy run', prog='copy')
+        parser.add_argument("o_location", choices=self.avail_locs, help='Original location')
+        parser.add_argument("o_index", type=int, help='Original index')
+        parser.add_argument("n_location", choices=self.avail_locs, help='New location')
+        parser.add_argument('-ni', "--n_index", type=int, default=0, help='New index')
+        parser.add_argument(
+            "--clean_slate",
+            "-cs",
+            action='store_true',
+            help="Preserve only the config, not results, wandb or recover status"
+        )
+        return parser
     # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
