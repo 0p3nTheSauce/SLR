@@ -162,9 +162,8 @@ import logging
 from multiprocessing.managers import BaseManager, DictProxy
 import time
 from datetime import datetime
-import os
 from contextlib import contextmanager
-from multiprocessing.synchronize import Event as EventClass
+
 # locals
 from run_types import (
     ExpInfo,
@@ -174,7 +173,7 @@ from run_types import (
     RunInfo,
     Sumarised,
     SummarisedError,
-    SummarisedRes
+    SummarisedRes,
 )
 from testing import full_test, load_comp_res
 from configs import print_config, load_config, ZFILL
@@ -239,6 +238,23 @@ class AllRuns(TypedDict):
     cur_run: List[ExpInfo]
     to_run: List[ExpInfo]
     fail_runs: List[FailedExp]
+
+
+class PositionInfo(TypedDict):
+    location: QueLocation
+    index: int
+
+
+class RangePosition(PositionInfo):
+    index2: int
+
+
+class SortInfo(TypedDict):
+    key_set: List[str]
+    reverse: bool
+
+
+NO_SORT = SortInfo({"key_set": [], "reverse": False})
 
 
 class QueException(Exception):
@@ -363,9 +379,12 @@ class Que:
         self.cur_run: List[ExpInfo] = []
         self.to_run: List[ExpInfo] = []
         self.fail_runs: List[FailedExp] = []
+        # self.selected_runs: ExpQue = []
         self.auto_save: bool = auto_save
         self.logger = logger
         self.load_state()
+
+    # General helpers
 
     def _fetch_state(self, loc: QueLocation) -> ExpQue:
         """Return reference to the specified list"""
@@ -431,15 +450,18 @@ class Que:
                 raise QueBusy()
             self.cur_run.insert(idx, run)
 
-    def _is_failed_exp(self, run: RunInfo) -> TypeGuard[FailedExp]:
+    @classmethod
+    def _is_failed_exp(cls, run: RunInfo) -> TypeGuard[FailedExp]:
         """Check if run is a FailedExp"""
         return isinstance(run, dict) and "error" in run
 
-    def _is_comp_exp_info(self, run: RunInfo) -> TypeGuard[CompExpInfo]:
+    @classmethod
+    def _is_comp_exp_info(cls, run: RunInfo) -> TypeGuard[CompExpInfo]:
         """Check if run is a CompExpInfo"""
         return isinstance(run, dict) and "results" in run
 
-    def _run_sum(self, run: RunInfo) -> Sumarised:
+    @classmethod
+    def _run_sum(cls, run: RunInfo) -> Sumarised:
         """Extract key details from a run configuration.
 
         Args:
@@ -450,23 +472,30 @@ class Que:
         """
 
         sum_run = Sumarised(
-                model=run["admin"]["model"],
-                exp_no=run["admin"]["exp_no"],
-                dataset=run["admin"]["dataset"],
-                split=run["admin"]["split"],
-                config_path=run["admin"]["config_path"],
-                run_id=run.get("wandb", {}).get("run_id") if "wandb" in run else None,
-                best_val_acc=(run["results"]["best_val_acc"] if "results" in run else None),
-                best_val_loss=(
-                    run["results"]["best_val_loss"] if "results" in run else None
-                ),
-            )
+            model=run["admin"]["model"],
+            exp_no=run["admin"]["exp_no"],
+            dataset=run["admin"]["dataset"],
+            split=run["admin"]["split"],
+            config_path=run["admin"]["config_path"],
+            run_id=run.get("wandb", {}).get("run_id") if "wandb" in run else None,
+            best_val_acc=(run["results"]["best_val_acc"] if "results" in run else None),
+            best_val_loss=(
+                run["results"]["best_val_loss"] if "results" in run else None
+            ),
+        )
 
-        if self._is_failed_exp(run):
-            return cast(SummarisedError, sum_run | {"error": run['error']})
-        elif self._is_comp_exp_info(run):
-            results = run['results']["test"]
-            return cast(SummarisedRes, sum_run | {"test_top1_acc": results['top_k_per_instance_acc']['top1'] * 100, 'test_av_loss': results['average_loss']})
+        if cls._is_failed_exp(run):
+            return cast(SummarisedError, sum_run | {"error": run["error"]})
+        elif cls._is_comp_exp_info(run):
+            results = run["results"]["test"]
+            return cast(
+                SummarisedRes,
+                sum_run
+                | {
+                    "test_top1_acc": results["top_k_per_instance_acc"]["top1"] * 100,
+                    "test_av_loss": results["average_loss"],
+                },
+            )
         else:
             return sum_run
 
@@ -502,31 +531,33 @@ class Que:
         return False
 
     @classmethod
-    def _clean_slate(cls, run:GenExp, enum_chck:bool) -> ExpInfo:
+    def _clean_slate(cls, run: GenExp, enum_chck: bool) -> ExpInfo:
         """Apply clean slate to run config. Useful for reusing already defined configs
 
         Args:
             run (GenExp): Run config, could be new, failed or complete
-            enum_chck (bool): Enumerate the checkpoint. Recommend True when you want to repeat a run with the same config, 
+            enum_chck (bool): Enumerate the checkpoint. Recommend True when you want to repeat a run with the same config,
                             and False when the run failed before starting.
 
         Returns:
             ExpInfo: A 'new' run config. Sets recover to False, run_id to None, and removes results/errors
         """
         run["admin"]["recover"] = False
-        run['wandb']['run_id'] = None
+        run["wandb"]["run_id"] = None
         if enum_chck:
-            run["admin"]["save_path"] = str(enum_dir(run['admin']['save_path'], decimals=ZFILL))
-        return  ExpInfo(
-                    admin=run["admin"],
-                    training=run["training"],
-                    optimizer=run["optimizer"],
-                    model_params=run["model_params"],
-                    data=run["data"],
-                    scheduler=run["scheduler"],
-                    early_stopping=run["early_stopping"],
-                    wandb=run["wandb"],
-                )
+            run["admin"]["save_path"] = str(
+                enum_dir(run["admin"]["save_path"], decimals=ZFILL)
+            )
+        return ExpInfo(
+            admin=run["admin"],
+            training=run["training"],
+            optimizer=run["optimizer"],
+            model_params=run["model_params"],
+            data=run["data"],
+            scheduler=run["scheduler"],
+            early_stopping=run["early_stopping"],
+            wandb=run["wandb"],
+        )
 
     @classmethod
     def _get_print_stats(cls, runs: List[Sumarised]) -> Dict[str, int]:
@@ -594,7 +625,10 @@ class Que:
             self.fail_runs = []
 
     def save_state(
-        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False, archive:bool = True
+        self,
+        out_path: Optional[Union[str, Path]] = None,
+        timestamp: bool = False,
+        archive: bool = True,
     ):
         if out_path is None:
             out_path = self.runs_path
@@ -617,8 +651,6 @@ class Que:
             json.dump(all_runs, f, indent=4)
         self.logger.info(f"Saved que to {out_path}")
 
-    # for worker
-
     def peak_run(self, loc: QueLocation, idx: int) -> GenExp:
         """Get the run at the given location with the provided index, but don't remove
 
@@ -640,6 +672,8 @@ class Que:
             raise QueIdxOOR(loc, idx, len(to_get))
 
         return to_get[idx]
+
+    # Worker helpers
 
     def peak_cur_run(self) -> ExpInfo:
         """Peaks the current run
@@ -694,18 +728,38 @@ class Que:
         failed = cast(FailedExp, run | {"error": error})
         self._set_run(FAIL_RUNS, 0, failed)
 
-    # summarisation
+    # Que Display and modification
+
+    # - helpers
+
+    @classmethod
+    def _set_inplace(
+        cls, d: Dict[Any, Any], k: Any, ks: List[Any], val: Any
+    ) -> Dict[Any, Any]:
+        if len(ks) == 0:
+            d[k] = val
+            return d
+        else:
+            next_key = ks.pop(0)
+            d[k] = cls._set_inplace(d[k], next_key, ks, val)
+            return d
+
+    @classmethod
+    def set_nested(cls, d: Dict[Any, Any], ks: List[Any], val: Any) -> Dict[Any, Any]:
+        return cls._set_inplace(d, ks[0], ks[1:], val)
+
+    @classmethod
+    def get_nested(cls, d: Dict[Any, Any], ks: List[Any]) -> Any:
+        for k in ks:
+            d = d[k]
+        return d
 
     @classmethod
     def get_config(cls, next_run: RunInfo) -> str:
         admin = next_run["admin"]
         return admin["config_path"]
 
-    def run_str(self, loc: QueLocation, idx: int) -> str:
-        """Method to"""
-        return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
-
-    def _get_val(self, run: GenExp, keys: List[str]) -> Any:
+    def get_val(self, run: GenExp, keys: List[str]) -> Any:
         """Unpack the value in a run using a list of keys
 
         Args:
@@ -716,42 +770,88 @@ class Que:
             Any: The value
         """
         unpack = cast(Dict[str, Any], run)
-        for k in keys:
-            try:
-                unpack = unpack[k]
-            except Exception:
-                print(f'Could not unpack: {json.dumps(unpack)}')
-                print(f'... with key: {k}')
-                break
-        return unpack
+        with log_and_raise(self.logger, "get_nested"):
+            return self.get_nested(unpack, keys)
+
+    # - features
+
+    def run_str(self, loc: QueLocation, idx: int) -> str:
+        """Method to"""
+        return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
 
     def list_runs(
+        self, loc: QueLocation, keys: List[str] = [], reverse: bool = False
+    ) -> ExpQue:
+        """get the runs list at a given location
+
+        Args:
+            loc (QueLocation): Que location
+            keys (List[str], optional): Sort runs by nested dictionary. Defaults to [].
+            reverse (bool, optional): Reverse when sorting. Defaults to False.
+
+        Returns:
+            ExpQue: One of the que locations in list format
+        """
+        loc_runs = self._fetch_state(loc)
+
+        if keys:
+            return sorted(
+                loc_runs, key=lambda x: self.get_val(x, keys), reverse=reverse
+            )
+        else:
+            return loc_runs
+
+    def select_runs(
         self,
         loc: QueLocation,
-        key_set: Optional[List[str]] = None,
+        indexes: List[int],
+        keys: List[str] = [],
         reverse: bool = False,
+    ) -> ExpQue:
+        """Select one or runs from an optionally sorted location.
+
+        Args:
+            loc (QueLocation): Location to select from
+            indexes (List[int]): Indexes to select
+            keys (List[str], optional): Sort runs by nested dictionary. Defaults to [].
+            reverse (bool, optional): Reverse when sorting. Defaults to False.
+
+        Returns:
+            ExpQue: Sub-que from loc
+        """
+        runs = self.list_runs(loc, keys, reverse)
+        return [runs[i] for i in indexes]
+
+    @classmethod
+    def summarise(cls, runs: ExpQue) -> List[Sumarised]:
+        """Summarise list of runs
+
+        Args:
+            runs (ExpQue): Subset from one of the locations
+
+        Returns:
+            List[Sumarised]: Summarised version of supplied runs
+        """
+        return [cls._run_sum(run) for run in runs]
+
+    def summarise_runs(
+        self, loc: QueLocation, keys: List[str] = [], reverse: bool = False
     ) -> List[Sumarised]:
         """List runs at a given location in summarised format
 
         Args:
             loc (QueLocation): Literal of: to_run, cur_run, old_runs or fail_runs
-            key_set (Optional[List[str]]): List of keys to unpack value in Dictionary
+            keys (List[str], optional): Sort runs by nested dictionary. Defaults to [].
+            reverse (bool, optional): Reverse when sorting. Defaults to False.
 
         Returns:
             List[List[str]]: Summarised runs
         """
-        loc_runs = self._fetch_state(loc)
-        if key_set is None:
-            return [self._run_sum(run) for run in loc_runs]
-        else:
-            runs = sorted(
-                loc_runs, key=lambda x: self._get_val(x, key_set), reverse=reverse
-            )
-            return [self._run_sum(run) for run in runs]
+        return self.summarise(self.list_runs(loc, keys, reverse))
 
     def disp_runs(self, loc: QueLocation, exc: Optional[List[str]] = None) -> None:
         print(f"{loc} runs".title())
-        runs = self.list_runs(loc)
+        runs = self.summarise_runs(loc)
 
         if len(runs) == 0:
             print("  No runs available")
@@ -914,15 +1014,13 @@ class Que:
         """
         print_config(self.peak_run(loc, idx))
 
-    # for QueShell interface
-
     def recover_run(
         self,
         to_loc: QueLocation = TO_RUN,
         from_loc: QueLocation = CUR_RUN,
         index: int = 0,
         clean_slate: bool = False,
-        enum_chck: bool = False #in recover more likely to be using same checkpoint dir
+        enum_chck: bool = False,  # in recover more likely to be using same checkpoint dir
     ) -> None:
         """
         Set the run in cur_run to recover and move to to_run or cur_run. Raises a value error if run_id is not present
@@ -943,7 +1041,9 @@ class Que:
             run = self.peak_run(from_loc, index)
 
             if clean_slate:
-                self.logger.debug("running _clean_slate: set recover to False, and run_id to None")
+                self.logger.debug(
+                    "running _clean_slate: set recover to False, and run_id to None"
+                )
                 run = self._clean_slate(run, enum_chck)
             else:
                 self.logger.debug("setting recover to True")
@@ -1075,7 +1175,7 @@ class Que:
             n_loc (QueLocation): New location
             oi_idx (int): Old initial index
         """
-         # self._set_run(n_loc, 0, self._pop_run(o_loc, oi_idx)) #NOTE: in an exception this would delete the run
+        # self._set_run(n_loc, 0, self._pop_run(o_loc, oi_idx)) #NOTE: in an exception this would delete the run
         run = self.peak_run(o_loc, oi_idx)
         self._set_run(n_loc, 0, run)
         _ = self._pop_run(o_loc, oi_idx)
@@ -1104,7 +1204,7 @@ class Que:
                 # new_location = self._fetch_state(n_loc)
 
                 if oi_idx > of_idx:
-                    #swap so of_idx is larger
+                    # swap so of_idx is larger
                     t = of_idx
                     of_idx = oi_idx
                     oi_idx = t
@@ -1115,7 +1215,7 @@ class Que:
 
                 # Extract the runs to move
                 # tomv = []
-                
+
                 for _ in range(oi_idx, of_idx + 1):
                     # tomv.append(old_location.pop(oi_idx))
                     self._move(o_loc, n_loc, oi_idx)
@@ -1123,26 +1223,6 @@ class Que:
                 # Insert into new location (in reverse to maintain order when inserting at 0)
                 # for run in tomv:
                 #     new_location.insert(0, run)
-
-    @classmethod
-    def _set_inplace(cls, d:Dict[Any, Any], k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
-        if len(ks) == 0:
-            d[k] = val
-            return d
-        else:
-            next_key = ks.pop(0)
-            d[k] = cls._set_inplace(d[k],next_key, ks, val)
-            return d  
-    
-    @classmethod
-    def set_nested(cls, d:Dict[Any, Any],ks:List[Any], val:Any) ->Dict[Any, Any]:
-        return cls._set_inplace(d, ks[0], ks[1:], val)
-    
-    @classmethod
-    def get_nested(cls, d:Dict[Any, Any],ks:List[Any]) -> Any:
-        for k in ks:
-            d = d[k]
-        return d 
 
     def edit_run(
         self,
@@ -1171,8 +1251,8 @@ class Que:
         """
 
         with log_and_raise(self.logger, "edit"):
-            run = self.peak_run(loc, idx) #safety first
-            
+            run = self.peak_run(loc, idx)  # safety first
+
             if do_eval:
                 val = eval(value)
             else:
@@ -1198,7 +1278,7 @@ class Que:
         idxs = []
         runs = []
         for i, run in enumerate(to_search):
-            if criterion(self._get_val(run, keys)):
+            if criterion(self.get_val(run, keys)):
                 idxs.append(i)
                 runs.append(run)
         return idxs, runs
@@ -1247,9 +1327,7 @@ class Que:
             for location_name, run_list in all_runs.items():
                 for idx, run in enumerate(run_list):
                     run = self.set_nested(
-                        run,
-                        key_set,
-                        transform(self.get_nested(run, key_set))
+                        run, key_set, transform(self.get_nested(run, key_set))
                     )
                     run_list[idx] = run
                 all_runs[location_name] = run_list
@@ -1259,32 +1337,39 @@ class Que:
             self.fail_runs = all_runs[FAIL_RUNS]
             self.old_runs = all_runs[OLD_RUNS]
 
-    def copy_run(
+    def copy_runs(
         self,
         o_loc: QueLocation,
-        o_idx: int,
+        o_indexes: List[int],
         n_loc: QueLocation,
         n_idx: int = 0,
         clean_slate: bool = False,
-        enum_chck:bool = True# in copy, more likely to want new checkpoint dir
+        enum_chck: bool = True,
+        keys: List[str] = [],
+        reverse: bool = False,
     ) -> None:
         """Copies a run from one original location to a new location
 
         Args:
             o_loc (QueLocation): Original location
-            o_idx (int): Original index
+            o_indexes (List[int]): Original indexes to select
             n_loc (QueLocation): New location
             n_idx (int, optional): New index. Defaults to 0.
             clean_slate (bool, optional): Flag to remove error, set wandb_id to None, and recover to False. Defaults to False.
             enum_chck (bool, optional): Flag to enumerate checkpoint. In copy, more likely to want new checkpoint dir. Defaults to True.
+            keys (List[str], optional): Sort runs by nested dictionary. Defaults to [].
+            reverse (bool, optional): Reverse when sorting. Defaults to False.
+
         """
+        # in copy, more likely to want new checkpoint dir
         with log_and_raise(self.logger, "copy"):
-            run = self.peak_run(o_loc,o_idx)
-            if clean_slate:
-                run = self._clean_slate(run, enum_chck)
-            self._set_run(n_loc, n_idx, run)
+            runs = self.select_runs(o_loc, o_indexes, keys, reverse)
+            for run in runs[::-1]:
+                run = self._clean_slate(run, enum_chck) if clean_slate else run
+                self._set_run(n_loc, n_idx, run)
             
-            
+
+
 # # ------- Basmanager connections -------#
 Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 

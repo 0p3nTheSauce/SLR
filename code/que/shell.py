@@ -1,7 +1,7 @@
 import webbrowser
 import cmd as cmdLib
 import shlex
-from typing import Optional, List, Any, Dict, Tuple, Tuple, cast
+from typing import Optional, List, Any, Dict,cast
 import argparse
 import configs
 import time
@@ -21,12 +21,12 @@ from pathlib import Path
 import subprocess
 import getpass
 import traceback
-#locals
+
+# locals
 from utils import gpu_manager
 from .core import (
     TO_RUN,
     GenExp,
-    ExpQue,
     CUR_RUN,
     QUE_LOCATIONS,
     SYNONYMS,
@@ -38,9 +38,11 @@ from .core import (
     SERVER_LOG_PATH,
     RUN_PATH,
     QueManagerProtocol,
+    ExpQue
 )
 from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
+
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -50,7 +52,6 @@ class QueShell(cmdLib.Cmd):
         self,
         server: QueManagerProtocol,
         auto_save: bool = True,
-
     ) -> None:
         super().__init__()
         # Pretty stuff
@@ -97,10 +98,11 @@ class QueShell(cmdLib.Cmd):
     # Exception handling
 
     @contextmanager
-    def unwrap_exception(self, message: str, error: str = ""):
+    def unwrap_exception(self, message: str = "", error: str = ""):
         try:
             yield
-            self.console.print(f"[bold green]✓ {message} [/bold green]")
+            if message:
+                self.console.print(f"[bold green]✓ {message} [/bold green]")
         except Exception as e:
             if error:
                 self.console.print(
@@ -108,16 +110,17 @@ class QueShell(cmdLib.Cmd):
                 )
             else:
                 self.console.print(f"[bold red]✗ {e} [/bold red]", style="red")
-            
+
+            # NOTE: cool idea to make this optional
             # Print full traceback for debugging
             self.console.print("[dim]" + traceback.format_exc() + "[/dim]")
 
     def _reconnect_proxies(self) -> None:
         """Reconnect the server controller and que proxies"""
-        self.server_context._close()#type: ignore
-        self.que._close()#type: ignore
-        self.daemon._close()#type: ignore
-        self.worker._close()#type: ignore
+        self.server_context._close()  # type: ignore
+        self.que._close()  # type: ignore
+        self.daemon._close()  # type: ignore
+        self.worker._close()  # type: ignore
         server = connect_manager()
         self.server_context = server.get_server_context()
         self.que = server.get_que()
@@ -131,13 +134,17 @@ class QueShell(cmdLib.Cmd):
         try:
             return super().onecmd(line)
         except (EOFError, ConnectionError, BrokenPipeError, OSError) as e:
-            self.console.print(f"\n[bold yellow][WARNING][/bold yellow] Connection lost: {e}")
+            self.console.print(
+                f"\n[bold yellow][WARNING][/bold yellow] Connection lost: {e}"
+            )
             print("Attempting to reconnect...")
             try:
                 self._reconnect_proxies()
                 self.console.print("[bold green][OK][/bold green] Reconnected!\n")
             except Exception as reconnect_error:
-                self.console.print(f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}")
+                self.console.print(
+                    f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}"
+                )
                 return False
 
             # Retry is now outside the inner try/except, so if it fails
@@ -146,9 +153,10 @@ class QueShell(cmdLib.Cmd):
             try:
                 return super().onecmd(line)
             except (EOFError, ConnectionError, BrokenPipeError, OSError):
-                self.console.print("[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again.[/bold yellow]")
+                self.console.print(
+                    "[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again.[/bold yellow]"
+                )
                 return False
-
 
     def _show_banner(self):
         """Display a fancy welcome banner"""
@@ -302,7 +310,7 @@ class QueShell(cmdLib.Cmd):
                     from_loc=parsed_args.o_location,
                     to_loc=parsed_args.n_location,
                     index=parsed_args.index,
-                    clean_slate=parsed_args.clean_slate
+                    clean_slate=parsed_args.clean_slate,
                 )
 
     def do_clear(self, arg):
@@ -321,7 +329,6 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("[yellow]Clear cancelled[/yellow]")
 
-        
     def do_list(self, arg):
         """Display runs in a beautiful table"""
         parsed_args = self._parse_args_or_cancel("list", arg)
@@ -329,9 +336,10 @@ class QueShell(cmdLib.Cmd):
             return
 
         runs = None
-        with self.unwrap_exception('list'):
-            runs = self.que.list_runs(parsed_args.location, parsed_args.key_set, parsed_args.reverse)
-
+        with self.unwrap_exception("", ""):
+            runs = self.que.summarise_runs(
+                parsed_args.location, parsed_args.key_set, parsed_args.reverse
+            )
         if not runs:
             self.console.print(
                 Panel(
@@ -382,41 +390,45 @@ class QueShell(cmdLib.Cmd):
         else:
             self.console.print("[yellow]Remove cancelled[/yellow]")
 
-    def _unpack_keys(self, run: GenExp,  key_set: List[str]) -> Any:
+    def _unpack_keys(self, run: GenExp, key_set: List[str]) -> Any:
         unpack = cast(Dict[str, Any], run)
         unpack = run
         for k in key_set:
             unpack = unpack[k]
         return unpack
-                
+
     def do_display(self, arg):
         """Display run details in a styled panel"""
         parsed_args = self._parse_args_or_cancel("display", arg)
         if parsed_args is None:
             return
-        
-        
-        with self.unwrap_exception('Display passed', 'Display failed'):
-            run = self.que.peak_run(parsed_args.location, parsed_args.index)
+
+        with self.unwrap_exception("", "Display failed"):
+            if parsed_args.list_key_set:
+                run = self.que.list_runs(
+                    parsed_args.location,parsed_args.list_key_set, parsed_args.reverse
+                )[parsed_args.index]
+
+            else:
+                run = self.que.peak_run(parsed_args.location, parsed_args.index)
             title = f"Run {parsed_args.index} in {parsed_args.location}"
             if parsed_args.key_set is not None:
                 run = self._unpack_keys(run, parsed_args.key_set)
                 title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.key_set)}"
-                
-        # Format as JSON-like syntax
 
-        run_json = json.dumps(run, indent=2)
-        syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+            # Format as JSON-like syntax
 
-        self.console.print(
-            Panel(
-                syntax,
-                title=title,
-                border_style="cyan",
-                padding=(1, 2),
+            run_json = json.dumps(run, indent=2)
+            syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+
+            self.console.print(
+                Panel(
+                    syntax,
+                    title=title,
+                    border_style="cyan",
+                    padding=(1, 2),
+                )
             )
-        )
-        
 
     def do_shuffle(self, arg):
         """Reposition with visual confirmation"""
@@ -496,13 +508,13 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        with self.unwrap_exception("Edit successful", "Edit failed"): 
+        with self.unwrap_exception("Edit successful", "Edit failed"):
             self.que.edit_run(
                 parsed_args.location,
                 parsed_args.index,
                 parsed_args.key_set,
                 parsed_args.value,
-                parsed_args.do_eval
+                parsed_args.do_eval,
             )
 
     def do_copy(self, arg):
@@ -510,37 +522,37 @@ class QueShell(cmdLib.Cmd):
         parsed_args = self._parse_args_or_cancel("copy", arg)
         if parsed_args is None:
             return
-        
+
         with self.unwrap_exception("Copy successful", "Copy failed"):
-            self.que.copy_run(
-                parsed_args.o_location, 
-                parsed_args.o_index,
+            self.que.copy_runs(
+                parsed_args.o_location,
+                parsed_args.o_indexes,
                 parsed_args.n_location,
                 parsed_args.n_index,
-                parsed_args.clean_slate
+                parsed_args.clean_slate,
             )
-            
-
+        
     def do_wandb(self, arg):
         """Open the wandb page for a run"""
         parsed_args = self._parse_args_or_cancel("wandb", arg)
         if parsed_args is None:
             return
-        
+
         url = "https://wandb.ai/"
-        
+
         if parsed_args.location is not None and parsed_args.index is not None:
             run = self.que.peak_run(loc=parsed_args.location, idx=parsed_args.index)
-            wandb_info = run['wandb']
-            url = url + f"{wandb_info['entity']}/{wandb_info['project']}/{wandb_info['run_id']}"
+            wandb_info = run["wandb"]
+            url = (
+                url
+                + f"{wandb_info['entity']}/{wandb_info['project']}/{wandb_info['run_id']}"
+            )
         else:
             url = url + f"{parsed_args.entity}/{parsed_args.project}"
-        
+
         with self.unwrap_exception("Wandb opened successfully", "Opening wandb failed"):
             webbrowser.open(url)
-        
-        
-        
+
     #   Worker
 
     def do_worker(self, arg):
@@ -549,17 +561,17 @@ class QueShell(cmdLib.Cmd):
             return
 
         if parsed_args.command == "clear_mem":
-                self.worker.cleanup()
-                self.console.print("[bold green]Cleared CUDA memory[/bold green]")
-                used, total = gpu_manager.get_gpu_memory_usage()
-                self.console.print(f"CUDA memory: {used}/{total} GiB")
+            self.worker.cleanup()
+            self.console.print("[bold green]Cleared CUDA memory[/bold green]")
+            used, total = gpu_manager.get_gpu_memory_usage()
+            self.console.print(f"CUDA memory: {used}/{total} GiB")
         else:
             self.console.print(
                 f"[bold red]Command not recognised: {parsed_args.command}[/bold red]"
             )
 
     # Daemon
-        
+
     def do_daemon(self, arg):
         """Interact with the worker"""
         parsed_args = self._parse_args_or_cancel("daemon", arg)
@@ -589,16 +601,18 @@ class QueShell(cmdLib.Cmd):
                     )
 
     # Server
-    
+
     def _pretty_status(self, status: ServerState):
-        
+
         # Main status table
-        table = Table(title="Server Status", show_header=False, box=None, padding=(0, 2))
+        table = Table(
+            title="Server Status", show_header=False, box=None, padding=(0, 2)
+        )
         table.add_column("Section", style="bold cyan", width=20)
         table.add_column("Details")
-        
+
         # Server section
-        server_pid = status['server_pid']
+        server_pid = status["server_pid"]
         server_status = Text()
         if server_pid:
             server_status.append("Running ", style="bold green")
@@ -606,46 +620,49 @@ class QueShell(cmdLib.Cmd):
         else:
             server_status.append("Not Running", style="bold red")
         table.add_row("Server", server_status)
-        
+
         # Daemon section
-        daemon_state = status['daemon_state']
+        daemon_state = status["daemon_state"]
         daemon_table = Table(show_header=False, box=None, padding=(0, 1))
         daemon_table.add_column(style="yellow", width=15)
         daemon_table.add_column()
-        
-        awake_icon = "✓" if daemon_state['awake'] else "✗"
-        awake_style = "green" if daemon_state['awake'] else "red"
+
+        awake_icon = "✓" if daemon_state["awake"] else "✗"
+        awake_style = "green" if daemon_state["awake"] else "red"
         daemon_table.add_row("Awake:", Text(awake_icon, style=awake_style))
-        
-        stop_icon = "✓" if daemon_state['stop_on_fail'] else "✗"
-        daemon_table.add_row("Stop on Fail:", Text(stop_icon, style="yellow" if daemon_state['stop_on_fail'] else "dim"))
-        
-        if daemon_state['supervisor_pid']:
-            daemon_table.add_row("Supervisor PID:", str(daemon_state['supervisor_pid']))
-        
+
+        stop_icon = "✓" if daemon_state["stop_on_fail"] else "✗"
+        daemon_table.add_row(
+            "Stop on Fail:",
+            Text(stop_icon, style="yellow" if daemon_state["stop_on_fail"] else "dim"),
+        )
+
+        if daemon_state["supervisor_pid"]:
+            daemon_table.add_row("Supervisor PID:", str(daemon_state["supervisor_pid"]))
+
         table.add_row("Daemon", daemon_table)
-        
+
         # Worker section
-        worker_state = status['worker_state']
+        worker_state = status["worker_state"]
         worker_table = Table(show_header=False, box=None, padding=(0, 1))
         worker_table.add_column(style="magenta", width=15)
         worker_table.add_column()
-        
-        task_style = "bold green" if worker_state['task'] == 'training' else "dim"
-        worker_table.add_row("Task:", Text(worker_state['task'], style=task_style))
-        
-        if worker_state['current_run_id']:
-            worker_table.add_row("Run ID:", worker_state['current_run_id'])
-        
-        if worker_state['working_pid']:
-            worker_table.add_row("Worker PID:", str(worker_state['working_pid']))
-        
-        if worker_state['exception']:
-            error_text = Text(worker_state['exception'], style="bold red")
+
+        task_style = "bold green" if worker_state["task"] == "training" else "dim"
+        worker_table.add_row("Task:", Text(worker_state["task"], style=task_style))
+
+        if worker_state["current_run_id"]:
+            worker_table.add_row("Run ID:", worker_state["current_run_id"])
+
+        if worker_state["working_pid"]:
+            worker_table.add_row("Worker PID:", str(worker_state["working_pid"]))
+
+        if worker_state["exception"]:
+            error_text = Text(worker_state["exception"], style="bold red")
             worker_table.add_row("Exception:", error_text)
-        
+
         table.add_row("Worker", worker_table)
-        
+
         self.console.print(table)
 
     def do_server(self, arg):
@@ -673,7 +690,7 @@ class QueShell(cmdLib.Cmd):
         with self.unwrap_exception(
             "Attached to tmux session", "Failed to attach to tmux session"
         ):
-            self.tmux_man.join_session()  
+            self.tmux_man.join_session()
 
     def do_logs(self, arg):
         """Tail the worker or daemon logs"""
@@ -788,10 +805,9 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument(
             "--clean_slate",
             "-cs",
-            action='store_true',
-            help="Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work."
+            action="store_true",
+            help="Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.",
         )
-
 
         return parser
 
@@ -818,7 +834,7 @@ class QueShell(cmdLib.Cmd):
 
         # Daemon Subparser
         subparsers.add_parser("server", help="Save Server state")
-    
+
         return parser
 
     def _get_load_parser(self) -> argparse.ArgumentParser:
@@ -852,7 +868,7 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("o_location", choices=self.avail_locs)
         parser.add_argument("n_location", choices=self.avail_locs)
         parser.add_argument("oi_index", type=int)
-        parser.add_argument("-of", "--of_index", type=int, default=None)
+        parser.add_argument("--of_index", "-of", type=int, default=None)
         return parser
 
     def _get_shuffle_parser(self) -> argparse.ArgumentParser:
@@ -874,7 +890,26 @@ class QueShell(cmdLib.Cmd):
         )
         parser.add_argument("location", choices=self.avail_locs)
         parser.add_argument("index", type=int)
-        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to display within the run")
+        parser.add_argument(
+            "--key_set",
+            "-ks",
+            nargs="+",
+            type=str,
+            help="List of keys to display within the run",
+        )
+        parser.add_argument(
+            "--list_key_set",
+            "-lks",
+            nargs="+",
+            type=str,
+            help="List of keys to search through list",
+        )
+        parser.add_argument(
+            "--reverse",
+            "-r",
+            action="store_true",
+            help="Sort in descending order",
+        )
         return parser
 
     def _get_clear_parser(self) -> argparse.ArgumentParser:
@@ -885,9 +920,17 @@ class QueShell(cmdLib.Cmd):
     def _get_list_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="List runs", prog="list")
         parser.add_argument("location", choices=self.avail_locs)
-        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to sort the list by")
-        parser.add_argument('--reverse', "-r", action='store_true', help='Sort in descending order')
-        
+        parser.add_argument(
+            "--key_set",
+            "-ks",
+            nargs="+",
+            type=str,
+            help="List of keys to sort the list by",
+        )
+        parser.add_argument(
+            "--reverse", "-r", action="store_true", help="Sort in descending order"
+        )
+
         return parser
 
     def _get_quit_parser(self) -> argparse.ArgumentParser:
@@ -899,24 +942,55 @@ class QueShell(cmdLib.Cmd):
         parser = argparse.ArgumentParser(description="Edit run", prog="edit")
         parser.add_argument("location", choices=self.avail_locs)
         parser.add_argument("index", type=int)
-        parser.add_argument("--key_set", "-ks", nargs='+', type=str, help="List of keys to unpack the nested run by")
+        parser.add_argument(
+            "--key_set",
+            "-ks",
+            nargs="+",
+            type=str,
+            help="List of keys to unpack the nested run by",
+        )
         parser.add_argument("value", type=str)
-        parser.add_argument("--do_eval", "-de", action='store_true', help='Evaluate the provided value to a type.')
+        parser.add_argument(
+            "--do_eval",
+            "-de",
+            action="store_true",
+            help="Evaluate the provided value to a type.",
+        )
         return parser
 
     def _get_copy_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description='Copy run', prog='copy')
-        parser.add_argument("o_location", choices=self.avail_locs, help='Original location')
-        parser.add_argument("o_index", type=int, help='Original index')
-        parser.add_argument("n_location", choices=self.avail_locs, help='New location')
-        parser.add_argument('-ni', "--n_index", type=int, default=0, help='New index')
+        parser = argparse.ArgumentParser(description="Copy run", prog="copy")
+        parser.add_argument(
+            "o_location", choices=self.avail_locs, help="Original location"
+        )
+        parser.add_argument(
+            "--o_indexes",
+            "-i",
+            nargs="+",
+            type=str,
+            help="List of indexes to copy",
+        )
+        parser.add_argument("n_location", choices=self.avail_locs, help="New location")
+        parser.add_argument("-ni", "--n_index", type=int, default=0, help="New index")
         parser.add_argument(
             "--clean_slate",
             "-cs",
-            action='store_true',
-            help="Preserve only the config, not results, wandb or recover status"
+            action="store_true",
+            help="Preserve only the config, not results, wandb or recover status",
+        )
+        parser.add_argument(
+            "--keys",
+            "-k",
+            nargs="+",
+            type=str,
+            help="List of keys to sort the list by",
+        )
+        parser.add_argument(
+            "--reverse", "-r", action="store_true", help="Sort in descending order"
         )
         return parser
+
+
     # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
@@ -927,7 +1001,6 @@ class QueShell(cmdLib.Cmd):
         subparsers = parser.add_subparsers(
             dest="command", required=True, help="Daemon commands"
         )
-
 
         # Start
         subparsers.add_parser("start", help="Start the supervisor")
@@ -959,14 +1032,13 @@ class QueShell(cmdLib.Cmd):
             help="Force kill the worker after timeout",
         )
 
-
         return parser
 
     def _get_server_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
             description="Interact with the server context", prog="server"
         )
-        
+
         subparsers = parser.add_subparsers(
             dest="command", required=True, help="Server commands"
         )
@@ -975,17 +1047,17 @@ class QueShell(cmdLib.Cmd):
         subparsers.add_parser("save", help="Save Server state to disk")
         # Load state
         subparsers.add_parser("load", help="Load Server state from disk")
-        
+
         # Status
         subparsers.add_parser("status", help="Get worker status information")
-        
+
         return parser
 
     def _get_worker_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
             description="Interact with the worker", prog="worker"
         )
-        
+
         subparsers = parser.add_subparsers(
             dest="command", required=True, help="Server commands"
         )
@@ -993,9 +1065,7 @@ class QueShell(cmdLib.Cmd):
         # Clear memory
         subparsers.add_parser("cleanup", help="Clear CUDA memory")
 
-        
         return parser
-
 
     def _get_log_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -1033,7 +1103,7 @@ class QueShell(cmdLib.Cmd):
             "-p",
             type=str,
             help="Wandb project name. Probably one of: " + ", ".join(likely_projects),
-            default='projects'
+            default="projects",
         )
         parser.add_argument(
             "--entity",
@@ -1045,20 +1115,19 @@ class QueShell(cmdLib.Cmd):
         return parser
 
 
-
 def ssh_tunnel_maker(
     host_ip: str,
     ssh_user: Optional[str] = None,
     ssh_key: Optional[Path] = None,
     port_client: int = 50000,
     port_server: int = 50000,
-    ) -> subprocess.Popen:
+) -> subprocess.Popen:
     """Open an ssh tunnel with the specified host, user, and key, forwarding
     port_client to port_server on the remote host. Returns the subprocess.Popen
     object for the tunnel.
 
     Args:
-        host_ip (str): Host IP address. 
+        host_ip (str): Host IP address.
         ssh_user (Optional[str], optional): The user profile on the server, otherwise uses the current logged in user for this session. Defaults to None.
         ssh_key (Optional[Path], optional): Path to ssh_key. Defaults to None, will ask for password if not provided.
         port_client (int, optional): Client side port. Defaults to 50000.
@@ -1067,15 +1136,17 @@ def ssh_tunnel_maker(
     Returns:
         subprocess.Popen: Opened subprocess for the ssh tunnel, which can be terminated with .terminate() when the tunnel is no longer needed.
     """
-    
+
     if ssh_user is None:
         ssh_user = Path.home().name
 
     ssh_cmd = [
         "ssh",
-        "-N",                          # don't execute a command, just tunnel
-        "-L", f"{port_client}:localhost:{port_server}", # local port -> remote port
-        "-o", "ExitOnForwardFailure=yes",
+        "-N",  # don't execute a command, just tunnel
+        "-L",
+        f"{port_client}:localhost:{port_server}",  # local port -> remote port
+        "-o",
+        "ExitOnForwardFailure=yes",
     ]
     if ssh_key:
         ssh_cmd += ["-i", ssh_key.expanduser().as_posix()]
@@ -1150,20 +1221,18 @@ def get_queshell_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--retry_delay",
-        type=int,   
+        type=int,
         default=2,
         help="Delay in seconds between connection retries (default: 2)",
     )
     return parser
 
+
 if __name__ == "__main__":
-    
     parser = get_queshell_parser()
     args = parser.parse_args()
-    
-   
+
     if args.host != "localhost":
-        
         if args.ssh_key is not None:
             args.ssh_key = args.ssh_key.expanduser()
             if not args.ssh_key.exists():
@@ -1177,35 +1246,29 @@ if __name__ == "__main__":
             elif ed25519.exists():
                 args.ssh_key = ed25519
             else:
-                print("No SSH key provided and no default keys found, will attempt password authentication")     
-        
-        
+                print(
+                    "No SSH key provided and no default keys found, will attempt password authentication"
+                )
+
         try:
             tunnel = ssh_tunnel_maker(
                 host_ip=args.host,
                 ssh_user=args.ssh_user,
                 ssh_key=args.ssh_key,
                 port_client=args.port_client,
-                port_server=args.port_server
+                port_server=args.port_server,
             )
             print("SSH tunnel established successfully")
         except Exception as e:
             print(f"Failed to establish SSH tunnel: {e}")
             raise
-        
+
     else:
-        tunnel = None  # No tunnel needed for localhost         
-        
+        tunnel = None  # No tunnel needed for localhost
+
     with tunnel_handler(tunnel):
         try:
             que_shell = QueShell(connect_manager())
             que_shell.cmdloop()
         except KeyboardInterrupt:
             print("\n[INFO] Exiting queShell without saving due to keyboard interrupt.")
-            
-            
-    
-        
-
-
-   

@@ -337,7 +337,6 @@ def reformat_configs():
         model_exp_dir.rename(new_path) 
 
 
-
 def _reformat_path(chck_dir:Union[Path, str]) -> Path:
     chck_dir = Path(chck_dir)
     model_exp_dir = chck_dir.parent
@@ -400,4 +399,5 @@ if __name__ == '__main__':
     # test_get_next_expno()
     # reformat_runs()
     # reformat_configs()
-    reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')
+    # reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')
+    pass

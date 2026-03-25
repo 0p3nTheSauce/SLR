@@ -20,47 +20,6 @@ from pathlib import Path
 import json
 
 
-def client_logic1():
-    manager = connect_manager()
-
-    # 1. Get the Controller Object
-    controller = manager.get_server_context()
-    daemon = manager.get_daemon()
-
-    print("Initial State:", controller.get_state())
-
-    # 3. Operate on the Controller
-    print("Starting daemon...")
-    daemon.start_supervisor()
-
-    print("Updated State:", controller.get_state())
-
-
-def client_logic2():
-    manager = connect_manager()
-
-    # 1. Get the Controller Object
-    controller = manager.get_server_context()
-    daemon = manager.get_daemon()
-
-    print("Current State:", controller.get_state())
-
-    # 3. Operate on the Controller
-    print("Stopping daemon...")
-    daemon.stop_supervisor()
-
-    print("Final State:", controller.get_state())
-
-
-def que_client():
-    manager = connect_manager()
-
-    # get the shared que
-    que = manager.get_que()
-    cast(Que, que)
-    print("Current Que State:")
-    Que.print_runs(que.list_runs("cur_run"))
-
 
 def tmuxer():
     tman = tmux_manager()
@@ -361,45 +320,10 @@ def test_new_recover():
 
 def test_copy():
     q = Que(_get_basic_logger())
-    q.disp_run("fail_runs", 0)
-    q.copy_run("fail_runs", 0, "to_run")
+    # q.disp_run("fail_runs", 0)
+    # q.copy_runs("fail_runs", [0], "to_run")
     q.disp_run("to_run", 0)
 
 
 if __name__ == "__main__":
-    # process_opener()
-    # idle_daemon()
-    # client_logic1()
-    # client_logic2()
-    # que_client()
-    # tmuxer()
-    # timestamp()
-    # sim_leak()
-    # constant()
-    # activate_conda_env("wlasl")
-    # show_help()
-    # reconnect()
-    # server_context_daemon_start()
-    # server_context_daemon_stop(t=1)
-    # server_controller_stop()
-    # daemon_start_supervisor()
-    # daemon_stop_supervisor(t=1, hard=True)
-    # try_except_finally()
-    # test_create()
-    # test_is_daemon_state()
-    # test_shared_dict_proc_opener()
-    # reset_state()
-    # key_path = Path.home() / ".ssh" / "ed25519"
-
-    # if key_path.exists():
-    #     ssh_connect_and_test(
-    #         ssh_key=str(key_path)
-    #     )
-    # else:
-    #     print("SSH key not found, falling back to password auth")
-    #     ssh_connect_and_test()
-
-    # ssh_connect_and_test(host='146.231.88.174', authkey=b'abracadabra')
-    # test_set_nested()
-    # test_new_recover()
     test_copy()
