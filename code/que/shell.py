@@ -538,7 +538,7 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-    
+
     
 
     def do_wandb(self, arg):
@@ -919,8 +919,7 @@ class QueShell(cmdLib.Cmd):
 
     def _get_exp_parser(self):
         parser = argparse.ArgumentParser(description='Define an experiment', prog='exp')
-        parser.add_argument('--keys', '-k', nargs='+',type=str,
-            help="List of keys to unpack the nested run by", )
+        
         parser.add_argument("value", type=str)
         parser.add_argument(
             "--do_eval",
@@ -1018,31 +1017,10 @@ class QueShell(cmdLib.Cmd):
         subparsers.add_parser("start", help="Start the supervisor")
 
         # Stop with timeout
-        stop_parser = subparsers.add_parser(
-            "stop", help="Stop the worker gracefully, force kill if necessary"
-        )
-        stop_parser.add_argument(
-            "--worker", "-w", action="store_true", help="Stop the worker process"
-        )
-        stop_parser.add_argument(
-            "--supervisor",
-            "-s",
-            action="store_true",
-            help="Stop the supervisor process. Include -w to stop worker as well, otherwise wait for trainloop to complete",
-        )
-        stop_parser.add_argument(
-            "--timeout",
-            "-to",
-            type=int,
-            default=10,
-            help="Timeout in seconds (default: 10)",
-        )
-        stop_parser.add_argument(
-            "--hard",
-            "-hd",
-            action="store_true",
-            help="Force kill the worker after timeout",
-        )
+        stop_parser = subparsers.add_parser("stop", help="Stop the worker gracefully, force kill if necessary")
+        stop_parser.add_argument("--worker", "-w", action="store_true", help="Stop the worker process")
+        stop_parser.add_argument("--supervisor", "-s", action="store_true", help="Stop the supervisor process")
+        self._add_graceful_stop_args(stop_parser)
 
         return parser
 
