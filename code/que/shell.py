@@ -338,7 +338,7 @@ class QueShell(cmdLib.Cmd):
         runs = None
         with self.unwrap_exception("", ""):
             runs = self.que.summarise_runs(
-                parsed_args.location, parsed_args.key_set, parsed_args.reverse
+                parsed_args.location, parsed_args.keys, parsed_args.reverse
             )
         if not runs:
             self.console.print(
@@ -412,9 +412,9 @@ class QueShell(cmdLib.Cmd):
             else:
                 run = self.que.peak_run(parsed_args.location, parsed_args.index)
             title = f"Run {parsed_args.index} in {parsed_args.location}"
-            if parsed_args.key_set is not None:
-                run = self._unpack_keys(run, parsed_args.key_set)
-                title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.key_set)}"
+            if parsed_args.keys is not None:
+                run = self._unpack_keys(run, parsed_args.keys)
+                title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.keys)}"
 
             # Format as JSON-like syntax
 
@@ -512,7 +512,7 @@ class QueShell(cmdLib.Cmd):
             self.que.edit_run(
                 parsed_args.location,
                 parsed_args.index,
-                parsed_args.key_set,
+                parsed_args.keys,
                 parsed_args.value,
                 parsed_args.do_eval,
             )
@@ -531,7 +531,16 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.n_index,
                 parsed_args.clean_slate,
             )
-        
+
+    def do_experiment(self, arg):
+        """Create an experiment config"""
+        parsed_args = self._parse_args_or_cancel("experiment", arg)
+        if parsed_args is None:
+            return
+
+    
+    
+
     def do_wandb(self, arg):
         """Open the wandb page for a run"""
         parsed_args = self._parse_args_or_cancel("wandb", arg)
@@ -772,45 +781,87 @@ class QueShell(cmdLib.Cmd):
         factory = self._parser_factories.get(cmd)
         return factory() if factory else None
 
-    # Que
+    # --- Argument factory methods ---
 
-    def _get_recover_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Recover a failed run", prog="recover"
-        )
-
+    def _add_keys_arg(self, parser: argparse.ArgumentParser, help: str = "List of keys to unpack the nested run by") -> argparse.ArgumentParser:
+        """--keys / -k: key path for nested run access"""
         parser.add_argument(
-            "--o_location",
-            "-ol",
+            "--keys", "-k",
+            nargs="+",
             type=str,
-            choices=self.avail_locs,
-            help="Location to recover from (default: cur_run)",
-            default=CUR_RUN,
+            help=help,
         )
-        parser.add_argument(
-            "--n_location",
-            "-nl",
-            type=str,
-            choices=self.avail_locs,
-            help="Location to move recovered run to (default: to_run)",
-            default=TO_RUN,
-        )
-        parser.add_argument(
-            "--index",
-            "-i",
-            type=int,
-            default=0,
-            help="Index of run to recover (default: 0)",
-        )
-        parser.add_argument(
-            "--clean_slate",
-            "-cs",
-            action="store_true",
-            help="Do not set run['admin']['recover'] to True. This flag is useful for moving runs out of cur_run or fail_runs, when they stopped before doing real work.",
-        )
-
         return parser
 
+    def _add_location_arg(self, parser: argparse.ArgumentParser, name: str = "location", positional: bool = True, help: str = "Queue location") -> argparse.ArgumentParser:
+        """Positional or optional location argument drawn from avail_locs"""
+        if positional:
+            parser.add_argument(name, choices=self.avail_locs, help=help)
+        else:
+            parser.add_argument(f"--{name}", f"-{''.join(w[0] for w in name.split('_'))}", choices=self.avail_locs, help=help)
+        return parser
+
+    def _add_index_arg(self, parser: argparse.ArgumentParser, name: str = "index", default: int = 0, required: bool = True) -> argparse.ArgumentParser:
+        """Positional or optional integer index argument"""
+        flag = f"--{name}"
+        short = f"-{''.join(w[0] for w in name.split('_'))}"
+        if required:
+            parser.add_argument(name, type=int)
+        else:
+            parser.add_argument(flag, short, type=int, default=default)
+        return parser
+
+    def _add_reverse_arg(self, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+        """--reverse / -r: sort in descending order"""
+        parser.add_argument(
+            "--reverse", "-r",
+            action="store_true",
+            help="Sort in descending order",
+        )
+        return parser
+
+    def _add_clean_slate_arg(self, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+        """--clean_slate / -cs: strip results/recover status, keep config only"""
+        parser.add_argument(
+            "--clean_slate", "-cs",
+            action="store_true",
+            help="Preserve only the config, not results, wandb or recover status",
+        )
+        return parser
+
+    def _add_graceful_stop_args(self, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+        """--timeout / -to and --hard / -hd: used wherever a process is being stopped"""
+        parser.add_argument(
+            "--timeout", "-to",
+            type=int,
+            default=10,
+            help="Timeout in seconds before force kill (default: 10)",
+        )
+        parser.add_argument(
+            "--hard", "-hd",
+            action="store_true",
+            help="Force kill the process after timeout",
+        )
+        return parser
+
+    def _add_o_location_arg(self, parser: argparse.ArgumentParser, default=None) -> argparse.ArgumentParser:
+        """--o_location / -ol: origin location"""
+        kwargs = dict(type=str, choices=self.avail_locs, help="Origin location")
+        if default is not None:
+            kwargs["default"] = default
+        parser.add_argument("--o_location", "-ol", **kwargs) #type: ignore
+        return parser
+
+    def _add_n_location_arg(self, parser: argparse.ArgumentParser, default=None) -> argparse.ArgumentParser:
+        """--n_location / -nl: destination location"""
+        kwargs = dict(type=str, choices=self.avail_locs, help="Destination location")
+        if default is not None:
+            kwargs["default"] = default
+        parser.add_argument("--n_location", "-nl", **kwargs) #type: ignore
+        return parser
+
+    # Que
+    
     def _get_save_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
             description="Save the state of the Que or Daemon", prog="save"
@@ -861,94 +912,15 @@ class QueShell(cmdLib.Cmd):
 
         return parser
 
-    def _get_move_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Move run between locations", prog="move"
-        )
-        parser.add_argument("o_location", choices=self.avail_locs)
-        parser.add_argument("n_location", choices=self.avail_locs)
-        parser.add_argument("oi_index", type=int)
-        parser.add_argument("--of_index", "-of", type=int, default=None)
-        return parser
-
-    def _get_shuffle_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Reposition a run", prog="shuffle")
-        parser.add_argument("location", choices=self.avail_locs)
-        parser.add_argument("o_index", type=int)
-        parser.add_argument("n_index", type=int)
-        return parser
-
-    def _get_remove_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Remove a run", prog="remove")
-        parser.add_argument("location", choices=self.avail_locs)
-        parser.add_argument("index", type=int)
-        return parser
-
-    def _get_display_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Display run config", prog="display"
-        )
-        parser.add_argument("location", choices=self.avail_locs)
-        parser.add_argument("index", type=int)
-        parser.add_argument(
-            "--key_set",
-            "-ks",
-            nargs="+",
-            type=str,
-            help="List of keys to display within the run",
-        )
-        parser.add_argument(
-            "--list_key_set",
-            "-lks",
-            nargs="+",
-            type=str,
-            help="List of keys to search through list",
-        )
-        parser.add_argument(
-            "--reverse",
-            "-r",
-            action="store_true",
-            help="Sort in descending order",
-        )
-        return parser
-
-    def _get_clear_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Clear runs", prog="clear")
-        parser.add_argument("location", choices=self.avail_locs)
-        return parser
-
-    def _get_list_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="List runs", prog="list")
-        parser.add_argument("location", choices=self.avail_locs)
-        parser.add_argument(
-            "--key_set",
-            "-ks",
-            nargs="+",
-            type=str,
-            help="List of keys to sort the list by",
-        )
-        parser.add_argument(
-            "--reverse", "-r", action="store_true", help="Sort in descending order"
-        )
-
-        return parser
-
     def _get_quit_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="Exit queShell", prog="quit")
         parser.add_argument("-ns", "--no_save", action="store_true")
         return parser
 
-    def _get_edit_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Edit run", prog="edit")
-        parser.add_argument("location", choices=self.avail_locs)
-        parser.add_argument("index", type=int)
-        parser.add_argument(
-            "--key_set",
-            "-ks",
-            nargs="+",
-            type=str,
-            help="List of keys to unpack the nested run by",
-        )
+    def _get_exp_parser(self):
+        parser = argparse.ArgumentParser(description='Define an experiment', prog='exp')
+        parser.add_argument('--keys', '-k', nargs='+',type=str,
+            help="List of keys to unpack the nested run by", )
         parser.add_argument("value", type=str)
         parser.add_argument(
             "--do_eval",
@@ -956,40 +928,80 @@ class QueShell(cmdLib.Cmd):
             action="store_true",
             help="Evaluate the provided value to a type.",
         )
+
+    def _get_list_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="List runs", prog="list")
+        self._add_location_arg(parser)
+        self._add_keys_arg(parser, help="List of keys to sort the list by")
+        self._add_reverse_arg(parser)
+        return parser
+
+    def _get_clear_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Clear runs", prog="clear")
+        self._add_location_arg(parser)
+        return parser
+
+    def _get_remove_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Remove a run", prog="remove")
+        self._add_location_arg(parser)
+        self._add_index_arg(parser)
+        return parser
+
+    def _get_shuffle_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Reposition a run", prog="shuffle")
+        self._add_location_arg(parser)
+        parser.add_argument("o_index", type=int)
+        parser.add_argument("n_index", type=int)
+        return parser
+
+    def _get_display_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Display run config", prog="display")
+        self._add_location_arg(parser)
+        self._add_index_arg(parser)
+        self._add_keys_arg(parser, help="List of keys to display within the run")
+        self._add_reverse_arg(parser)
+        parser.add_argument(
+            "--list_key_set", "-lks",
+            nargs="+", type=str,
+            help="List of keys to search through list",
+        )
+        return parser
+
+    def _get_edit_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Edit run", prog="edit")
+        self._add_location_arg(parser)
+        self._add_index_arg(parser)
+        self._add_keys_arg(parser)
+        parser.add_argument("value", type=str)
+        parser.add_argument("--do_eval", "-de", action="store_true", help="Evaluate the provided value to a type.")
         return parser
 
     def _get_copy_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="Copy run", prog="copy")
-        parser.add_argument(
-            "o_location", choices=self.avail_locs, help="Original location"
-        )
-        parser.add_argument(
-            "--o_indexes",
-            "-i",
-            nargs="+",
-            type=str,
-            help="List of indexes to copy",
-        )
-        parser.add_argument("n_location", choices=self.avail_locs, help="New location")
+        self._add_location_arg(parser, name="o_location", positional=True, help="Origin location")
+        self._add_location_arg(parser, name="n_location", positional=True, help="Destination location")
+        self._add_clean_slate_arg(parser)
+        self._add_reverse_arg(parser)
+        self._add_keys_arg(parser, help="List of keys to sort the list by")
+        parser.add_argument("--o_indexes", "-i", nargs="+", type=str, help="List of indexes to copy")
         parser.add_argument("-ni", "--n_index", type=int, default=0, help="New index")
-        parser.add_argument(
-            "--clean_slate",
-            "-cs",
-            action="store_true",
-            help="Preserve only the config, not results, wandb or recover status",
-        )
-        parser.add_argument(
-            "--keys",
-            "-k",
-            nargs="+",
-            type=str,
-            help="List of keys to sort the list by",
-        )
-        parser.add_argument(
-            "--reverse", "-r", action="store_true", help="Sort in descending order"
-        )
         return parser
 
+    def _get_recover_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Recover a failed run", prog="recover")
+        self._add_o_location_arg(parser, default=CUR_RUN)
+        self._add_n_location_arg(parser, default=TO_RUN)
+        self._add_index_arg(parser, required=False, default=0)
+        self._add_clean_slate_arg(parser)
+        return parser
+
+    def _get_move_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Move run between locations", prog="move")
+        self._add_location_arg(parser, name="o_location", positional=True, help="Origin location")
+        self._add_location_arg(parser, name="n_location", positional=True, help="Destination location")
+        parser.add_argument("oi_index", type=int)
+        parser.add_argument("--of_index", "-of", type=int, default=None)
+        return parser
 
     # Other
 
