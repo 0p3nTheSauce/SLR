@@ -42,7 +42,7 @@ from .core import (
 )
 from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
-
+from run_types import CleverDict
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -532,13 +532,24 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.clean_slate,
             )
 
-    def do_experiment(self, arg):
-        """Create an experiment config"""
-        parsed_args = self._parse_args_or_cancel("experiment", arg)
-        if parsed_args is None:
-            return
+    # def do_experiment(self, arg):
+    #     """Create an experiment config"""
+    #     parsed_args = self._parse_args_or_cancel("experiment", arg)
+    #     if parsed_args is None:
+    #         return
 
-
+    #     exp_dict = CleverDict({})
+        
+    #     exp_parser = self._get_exp_parser()
+    #     with self.unwrap_exception("", "experiemt failed"):
+    #         self.console.print("Enter keys and values: ")
+    #         self.console.print(f"{exp_parser.print_help()}")
+    #         entry = exp_parser.parse_args(input())
+    #         while not entry.done:
+    #             val = eval(entry.value) if entry.do_eval else entry.value
+    #             exp_dict[entry.keys] = val
+                
+            
     
 
     def do_wandb(self, arg):
@@ -860,6 +871,17 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("--n_location", "-nl", **kwargs) #type: ignore
         return parser
 
+    def _add_value_args(self, parser: argparse.ArgumentParser, help: str = "Value to assign") -> argparse.ArgumentParser:
+        """Positional `value` and its companion `--do_eval / -de` flag.
+        Used wherever a run field is being assigned a new value."""
+        parser.add_argument("value", type=str, help=help)
+        parser.add_argument(
+            "--do_eval", "-de",
+            action="store_true",
+            help="Evaluate the provided value to a Python type rather than treating it as a raw string.",
+        )
+        return parser
+
     # Que
     
     def _get_save_parser(self) -> argparse.ArgumentParser:
@@ -917,17 +939,6 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("-ns", "--no_save", action="store_true")
         return parser
 
-    def _get_exp_parser(self):
-        parser = argparse.ArgumentParser(description='Define an experiment', prog='exp')
-        
-        parser.add_argument("value", type=str)
-        parser.add_argument(
-            "--do_eval",
-            "-de",
-            action="store_true",
-            help="Evaluate the provided value to a type.",
-        )
-
     def _get_list_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="List runs", prog="list")
         self._add_location_arg(parser)
@@ -971,9 +982,16 @@ class QueShell(cmdLib.Cmd):
         self._add_location_arg(parser)
         self._add_index_arg(parser)
         self._add_keys_arg(parser)
-        parser.add_argument("value", type=str)
-        parser.add_argument("--do_eval", "-de", action="store_true", help="Evaluate the provided value to a type.")
+        self._add_value_args(parser)
         return parser
+
+    # def _get_exp_parser(self) -> argparse.ArgumentParser:
+    #     parser = argparse.ArgumentParser(description="Define an experiment", prog="exp")
+    #     self._add_keys_arg(parser)
+    #     self._add_value_args(parser)
+    #     parser.add_argument('--done', '-d', help='Stop inputting values', action='store_true')
+    #     return parser
+
 
     def _get_copy_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="Copy run", prog="copy")

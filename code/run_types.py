@@ -1,4 +1,4 @@
-from typing import TypedDict, Literal, Optional, TypeAlias, Union, List, Tuple
+from typing import TypedDict, Literal, Optional, TypeAlias, Union, List, Tuple, Dict, Any
 
 ########################## EArly stopping #############################
 
@@ -183,3 +183,56 @@ class SummarisedRes(Sumarised):
 
 class SummarisedError(Sumarised):
 	error: str
+ 
+class CleverDict(Dict):
+    def __init__(self, dict: Dict[Any, Any]):
+        self.dict = dict
+        
+    def __getitem__(self, keys: List[Any]) -> Any:
+        d = self.dict.copy()
+        for key in keys:
+            d = d[key]
+        return d
+    
+    def __setitem__(self, keys: List[Any], val: Any):
+        self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
+
+    def _set_inplace(self, d:Dict[Any, Any], k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
+        
+        if hasattr(d, '__setitem__'):
+            if len(ks) == 0:
+                d[k] = val    
+            else:
+                next_key = ks.pop(0)
+                d[k] = self._set_inplace(d[k],next_key, ks, val)
+        else:
+            if len(ks) == 0:
+                d = {k:val} 
+            else:
+                next_key = ks.pop(0)
+                d = {k: self._set_inplace({},next_key, ks, val)}
+
+        return d          
+        
+    
+    def _create_inplace(self, d:Dict[Any, Any] | Any, k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
+        if len(ks) == 0:
+            if hasattr(d, '__setitem__'):
+                d[k] = val
+            else:
+                d = {k:val}
+            return d
+        else:
+            next_key = ks.pop(0)
+            d[k] = self._set_inplace(d[k],next_key, ks, val)
+            return d   
+    
+    def to_dict(self) -> Dict[Any, Any]:
+        return self.dict.copy()
+    
+    
+    def __str__(self) -> str:
+        return str(self.dict)
+    
+    def __delitem__(self, key):
+        raise NotImplementedError

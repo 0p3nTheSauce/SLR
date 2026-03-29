@@ -234,14 +234,35 @@ class CleverDict(Dict):
         self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
 
     def _set_inplace(self, d:Dict[Any, Any], k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
+        
+        if hasattr(d, '__setitem__'):
+            if len(ks) == 0:
+                d[k] = val    
+            else:
+                next_key = ks.pop(0)
+                d[k] = self._set_inplace(d[k],next_key, ks, val)
+        else:
+            if len(ks) == 0:
+                d = {k:val} 
+            else:
+                next_key = ks.pop(0)
+                d = {k: self._set_inplace({},next_key, ks, val)}
+
+        return d          
+        
+    
+    def _create_inplace(self, d:Dict[Any, Any] | Any, k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
         if len(ks) == 0:
-            d[k] = val
+            if hasattr(d, '__setitem__'):
+                d[k] = val
+            else:
+                d = {k:val}
             return d
         else:
             next_key = ks.pop(0)
             d[k] = self._set_inplace(d[k],next_key, ks, val)
-            return d          
-        
+            return d   
+    
     def to_dict(self) -> Dict[Any, Any]:
         return self.dict.copy()
     
@@ -383,6 +404,27 @@ def reformat_runs_json(runs:str):
     q.save_state(out_path=runs.replace('.json', 'c.json'))
 
 
+def test_set_nested2():
+    a = {a:b for a, b in zip('abcdef', range(5))}
+    b = a.copy()
+    c = a.copy()
+    d = {
+        'z':a,
+        'y':b,
+        'x':c
+    }
+    # print(json.dumps(d, indent=4))    
+    cd = CleverDict(d)
+    ks = ['z', 'a']
+    v = 200
+    cd[ks] = v
+    ks = ['x', 'e']
+    v = 300
+    ks = ['x', 'e']
+    cd[ks] = v
+    print(json.dumps(cd.to_dict(), indent=4)) 
+    # print(cd) 
+
 if __name__ == '__main__':
     # test_dump_peak()
     # test_dump_peak_server()
@@ -394,10 +436,10 @@ if __name__ == '__main__':
     # time_instance_typegaurd()
     # test_find_runs()
     # test_find_S3D_runs()
-    # test_set_nested()
+    
     # test_extend_classifier()
     # test_get_next_expno()
     # reformat_runs()
     # reformat_configs()
     # reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')
-    pass
+    test_set_nested2()

@@ -2,7 +2,7 @@ from typing import  Tuple, TypedDict
 import torch
 import torch.nn as nn
 # locals
-from .pytorch_mvit import MViTv2S_basic, MViTv1B_basic
+from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
 from .pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from .pytorch_s3d import S3D_basic
@@ -12,9 +12,9 @@ def get_model(model_name: str, num_classes: int, drop_p: float) -> torch.nn.Modu
     """Get model by name.
 
     Args:
-            model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'
-            num_classes (int): Number of output classes.
-            drop_p (float): Dropout in final classification layer.
+        model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'
+        num_classes (int): Number of output classes.
+        drop_p (float): Dropout in final classification layer.
 
     Raises:
             ValueError: If model_name is not recognized.
@@ -30,6 +30,7 @@ def get_model(model_name: str, num_classes: int, drop_p: float) -> torch.nn.Modu
         "Swin3D_S": Swin3DSmall_basic,
         "Swin3D_B": Swin3DBig_basic,
         "MViTv2_S": MViTv2S_basic,
+        "MViTv2_S_e": MViTv2S_extended,
         "MViTv1_B": MViTv1B_basic,
     }
 
@@ -55,6 +56,7 @@ def avail_models() -> list[str]:
         "Swin3D_S",
         "Swin3D_B",
         "MViTv2_S",
+        "MViTv2_S_e",
         "MViTv1_B",
     ]
 
@@ -93,6 +95,7 @@ def norm_vals(model_name: str) -> NormDict:
         "Swin3D_S": NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         "Swin3D_B": NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         "MViTv2_S": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        "MViTv2_S_e": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         "MViTv1_B": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
     }
 
@@ -154,5 +157,6 @@ __all__ = [
     "Swin3DSmall_basic",
     "Swin3DBig_basic",
     "MViTv2S_basic",
+    "MViTv2S_extended",
     "MViTv1B_basic",
 ]

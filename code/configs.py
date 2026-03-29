@@ -423,14 +423,14 @@ def get_train_parser(
 
 
 def get_next_expno(split: str, model: str, runs_path: str = RUNS_PATH):
-    split_dir = Path(runs_path) / split
-    assert split_dir.exists() and split_dir.is_dir(), (
-        f"{split_dir} must exist and be a directory"
-    )
-    model_exps = sorted(split_dir.glob(f"{model}_exp*"))
-    # exp_nos = map(lambda x: int(x.name[-3:]), model_exps)
-    print(int(model_exps[-1].name[-3:]))
-
+    model_dir = Path(runs_path) / split / model
+    # assert model_dir.exists() and model_dir.is_dir(), (
+    #     f"{model_dir} must exist and be a directory"
+    # )
+    if not (model_dir.exists() and model_dir.is_dir()):
+        return 0
+    model_exps = sorted(model_dir.glob("exp*"))
+    return int(model_exps[-1].name[-3:])
 
 def get_model_exp_dir(
     split: str,
@@ -549,7 +549,9 @@ def take_args(
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
     # - enumerate experiment number
     if args.exp_no is None:
-        exp_no = 0
+        
+        exp_no = get_next_expno(args.split, args.model)
+        
         enum_exp = True
     else:
         exp_no = args.exp_no
@@ -567,7 +569,9 @@ def take_args(
 
     if enum_exp:  # working with a gerneric config
         output = enum_dir(output, decimals=ZFILL)
-
+        #update exp_no 
+        exp_no = int(output.name[-3:])
+    
     # saving
     save_path = get_model_checkpoint_dir(output)
 
@@ -623,7 +627,7 @@ def take_args(
         model=args.model,
         dataset=args.dataset,
         split=args.split,
-        exp_no=args.exp_no,
+        exp_no=str(exp_no).zfill(ZFILL),
         recover=args.recover,
         config_path=args.config_path,
         save_path=args.save_path,
@@ -634,14 +638,16 @@ def take_args(
 
 
 def main():
-    try:
-        # maybe_args = take_args(available_splits,available_model,
-        #                  sup_args=['-x', '5', '-m', 'S3D', '-sp', 'asl100'])
-        # maybe_args = take_args(sup_args=["-h"])
-        maybe_args = take_args()
-    except Exception as e:
-        maybe_args = None
-        print(f"Parsing failed with error: {e}")
+    # try:
+    #     # maybe_args = take_args(available_splits,available_model,
+    #     #                  sup_args=['-x', '5', '-m', 'S3D', '-sp', 'asl100'])
+    #     # maybe_args = take_args(sup_args=["-h"])
+    #     maybe_args = take_args()
+    # except Exception as e:
+    #     maybe_args = None
+    #     print(f"Parsing failed with error: {e}")
+
+    maybe_args = take_args()
 
     if isinstance(maybe_args, tuple):
         admin_info, wandb_info = maybe_args

@@ -736,13 +736,24 @@ class Que:
     def _set_inplace(
         cls, d: Dict[Any, Any], k: Any, ks: List[Any], val: Any
     ) -> Dict[Any, Any]:
-        if len(ks) == 0:
-            d[k] = val
-            return d
+        """set an item in a nested dict without exceptions using a list of keys"""
+        
+        
+        if hasattr(d, '__setitem__'):
+            if len(ks) == 0:
+                d[k] = val    
+            else:
+                next_key = ks.pop(0)
+                d[k] = cls._set_inplace(d[k],next_key, ks, val)
         else:
-            next_key = ks.pop(0)
-            d[k] = cls._set_inplace(d[k], next_key, ks, val)
-            return d
+            if len(ks) == 0:
+                d = {k:val} 
+            else:
+                next_key = ks.pop(0)
+                d = {k: cls._set_inplace({},next_key, ks, val)}
+        return d          
+        
+
 
     @classmethod
     def set_nested(cls, d: Dict[Any, Any], ks: List[Any], val: Any) -> Dict[Any, Any]:
