@@ -8,20 +8,55 @@ from datetime import datetime
 
 import numpy as np
 import psutil
-import slowfast.utils.logging as logging
-import slowfast.utils.multiprocessing as mpu
+from . import logging as logging
+from . import multiprocessing as mpu
 import torch
 import torchvision.io as io
 from fvcore.nn.activation_count import activation_count
 from fvcore.nn.flop_count import flop_count
 from matplotlib import pyplot as plt
-from slowfast.datasets.utils import pack_pathway_output
-from slowfast.models.batchnorm_helper import SubBatchNorm3d
-from slowfast.utils.env import pathmgr
+# from slowfast.datasets.utils import pack_pathway_output
+from ..models.batchnorm_helper import SubBatchNorm3d
+from .env import pathmgr
 from torch import nn
 from torchvision.utils import make_grid
 
 logger = logging.get_logger(__name__)
+
+def pack_pathway_output(cfg, frames):
+    """
+    Prepare output as a list of tensors. Each tensor corresponding to a
+    unique pathway.
+    Args:
+        frames (tensor): frames of images sampled from the video. The
+            dimension is `channel` x `num frames` x `height` x `width`.
+    Returns:
+        frame_list (list): list of tensors with the dimension of
+            `channel` x `num frames` x `height` x `width`.
+    """
+    if cfg.DATA.REVERSE_INPUT_CHANNEL:
+        frames = frames[[2, 1, 0], :, :, :]
+    if cfg.MODEL.ARCH in cfg.MODEL.SINGLE_PATHWAY_ARCH:
+        frame_list = [frames]
+    elif cfg.MODEL.ARCH in cfg.MODEL.MULTI_PATHWAY_ARCH:
+        fast_pathway = frames
+        # Perform temporal sampling from the fast pathway.
+        slow_pathway = torch.index_select(
+            frames,
+            1,
+            torch.linspace(
+                0, frames.shape[1] - 1, frames.shape[1] // cfg.SLOWFAST.ALPHA
+            ).long(),
+        )
+        frame_list = [slow_pathway, fast_pathway]
+    else:
+        raise NotImplementedError(
+            "Model arch {} is not in {}".format(
+                cfg.MODEL.ARCH,
+                cfg.MODEL.SINGLE_PATHWAY_ARCH + cfg.MODEL.MULTI_PATHWAY_ARCH,
+            )
+        )
+    return frame_list
 
 
 def check_nan_losses(loss):

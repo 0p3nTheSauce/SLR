@@ -96,6 +96,7 @@ def norm_vals(model_name: str) -> NormDict:
         "Swin3D_B": NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         "MViTv2_S": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         "MViTv2_S_e": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        "MVITv2_S_16x4": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         "MViTv1_B": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
     }
 

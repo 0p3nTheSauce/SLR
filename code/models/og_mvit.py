@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 
-from .mvit.mvit_model import MViT
+from .mvit.slowfast.models.video_model_builder import MViT
 from .mvit.slowfast.utils.parser import load_model_config
 import torch.nn as nn
 
@@ -21,7 +21,7 @@ class MVITv2_S_16x4(nn.Module):
         
         if weights_path is not None:
             weights_path = Path(weights_path)
-            state_dict = torch.load(weights_path, map_location='cpu')
+            state_dict = torch.load(weights_path, map_location='cpu')['model_state']
             self.model.load_state_dict(state_dict)
             
 if __name__ == "__main__":
