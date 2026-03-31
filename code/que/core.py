@@ -430,9 +430,9 @@ class Que:
                 QueIdxOOR: The provided index is out of range: [-len(loc), len(loc)]
                 TypeError: The run type doesn't match the queue location
         """
-        to_set = self._fetch_state(loc)
-        if not (-len(to_set) <= idx <= len(to_set)):
-            raise QueIdxOOR(loc, idx, len(to_set))
+        # to_set = self._fetch_state(loc)
+        # if not (-len(to_set) <= idx <= len(to_set)):
+        #     raise QueIdxOOR(loc, idx, len(to_set))
 
         # Runtime type checking with type narrowing
         if loc == FAIL_RUNS:
@@ -1098,6 +1098,7 @@ class Que:
         self,
         arg_dict: AdminInfo,
         wandb_dict: WandbInfo,
+        add_duplicates: bool = False,
     ) -> None:
         """Create and add a new training run entry
 
@@ -1108,7 +1109,7 @@ class Que:
         """
         with log_and_raise(self.logger, "create"):
             config = load_config(arg_dict)
-            if self._is_dup_exp(config):
+            if self._is_dup_exp(config) and not add_duplicates:
                 raise QueDupExp
 
             # print_config(config)
@@ -1166,9 +1167,9 @@ class Que:
     def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
         """Repositions a run from the que
         Args:
-                                                                                                                                        loc: TO_RUN, CUR_RUN or OLD_RUNS
-                                                                                                                                        o_idx: original index of run
-                                                                                                                                        n_idx: new index of run
+            loc: TO_RUN, CUR_RUN or OLD_RUNS
+            o_idx: original index of run
+            n_idx: new index of run
         """
         with log_and_raise(self.logger, "shuffle"):
             self._set_run(loc, n_idx, self._pop_run(loc, o_idx))

@@ -6,7 +6,7 @@ from torchvision.models.video import (
 )
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 
 def _unsqueeze(
     x: torch.Tensor, target_dim: int, expand_dim: int
@@ -128,37 +128,22 @@ class MViTv2S_extended(nn.Module):
         self._adapt_pos_encoding(num_frames=32)
 
     def _adapt_pos_encoding(self, num_frames: int):
-        """Interpolate temporal positional embedding to match new frame count."""
-        pe = self.pos_encoding
-        temporal_stride = self.conv_proj.stride[0]  # typically 2
-        new_temporal_size = num_frames // temporal_stride  # 32 // 2 = 16
+        temporal_stride = self.conv_proj.stride[0]
+        new_T = num_frames // temporal_stride
+        new_len = 2 * new_T - 1
 
-        if pe.temporal_size == new_temporal_size:
-            return  # nothing to do
+        for module in self.blocks.modules():
+            if not (hasattr(module, 'rel_pos_t') and module.rel_pos_t is not None):
+                continue
+            old_rpt = module.rel_pos_t.data
+            if old_rpt.shape[0] == new_len:
+                continue
+            rpt = old_rpt.permute(1, 0).unsqueeze(0)
+            rpt = F.interpolate(rpt, size=new_len, mode='linear', align_corners=False)
+            rpt = rpt.squeeze(0).permute(1, 0)
+            module.rel_pos_t = nn.Parameter(rpt)
 
-        old_embed = pe.pos_embed.data  # [1, 1 + T*H*W, C]
-        cls_token = old_embed[:, :1, :]
-        spatial_embed = old_embed[:, 1:, :]
-
-        old_T = pe.temporal_size
-        H, W = pe.spatial_size
-        C = old_embed.shape[-1]
-
-        # Reshape to [1, C, T, H*W] and interpolate T
-        spatial_embed = spatial_embed.reshape(1, old_T, H * W, C)
-        spatial_embed = spatial_embed.permute(0, 3, 1, 2)  # [1, C, old_T, H*W]
-        spatial_embed = torch.nn.functional.interpolate(
-            spatial_embed,
-            size=(new_temporal_size, H * W),
-            mode="bilinear",
-            align_corners=False,
-        )
-        spatial_embed = spatial_embed.permute(0, 2, 3, 1).reshape(
-            1, new_temporal_size * H * W, C
-        )
-
-        pe.pos_embed = nn.Parameter(torch.cat([cls_token, spatial_embed], dim=1))
-        pe.temporal_size = new_temporal_size
+        self.pos_encoding.temporal_size = new_T  # ← fixes the thw tuple
 
     def _initialize_classifier(self):
         """Initialize only the classifier weights, leaving backbone untouched"""
@@ -168,6 +153,27 @@ class MViTv2S_extended(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0.0)
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # Convert if necessary (B, C, H, W) -> (B, C, 1, H, W)
+        x = _unsqueeze(x, 5, 2)[0]
+        # patchify and reshape: (B, C, T, H, W) -> (B, embed_channels[0], T', H', W') -> (B, THW', embed_channels[0])
+        x = self.conv_proj(x)
+        x = x.flatten(2).transpose(1, 2)
+
+        # add positional encoding
+        x = self.pos_encoding(x)
+
+        # pass patches through the encoder
+        thw = (self.pos_encoding.temporal_size,) + self.pos_encoding.spatial_size
+        for block in self.blocks:  # type: ignore
+            x, thw = block(x, thw)
+        x = self.norm(x)
+
+        # classifier "token" as used by standard language architectures
+        x = x[:, 0]
+        x = self.classifier(x)
+
+        return x
 
 class MViTv1B_basic(nn.Module):
     def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
@@ -235,3 +241,8 @@ class MViTv1B_basic(nn.Module):
         x = self.classifier(x)
 
         return x
+
+
+if __name__ == "__main__":
+    model = MViTv2S_extended(num_classes=100)
+    

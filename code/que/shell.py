@@ -38,7 +38,8 @@ from .core import (
     SERVER_LOG_PATH,
     RUN_PATH,
     QueManagerProtocol,
-    ExpQue
+    ExpQue,
+    QueDupExp,
 )
 from configs import get_avail_splits, ENTITY, PROJECT_BASE
 from .tmux import tmux_manager
@@ -475,12 +476,18 @@ class QueShell(cmdLib.Cmd):
             self.console.print("[yellow]Create cancelled (by user)[/yellow]")
             return
 
-        with self.console.status("[bold cyan]Creating run...", spinner="dots"):
-            with self.unwrap_exception(
-                "Run created successfully", "Failed to create new run"
-            ):
+        
+        with self.unwrap_exception(
+            "Run created successfully", "Failed to create new run"
+        ):
+            try:
                 self.que.create_run(admin_info, wandb_info)
-        # self.console.print("[bold green]✓[/bold green] Run created successfully")
+            except QueDupExp:
+                #ask if want to create anyway
+                if Confirm.ask(
+                    "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
+                ):
+                    self.que.create_run(admin_info, wandb_info, add_duplicates=True)
 
     def do_add(self, arg):
         """Add run with feedback"""
@@ -522,11 +529,17 @@ class QueShell(cmdLib.Cmd):
         parsed_args = self._parse_args_or_cancel("copy", arg)
         if parsed_args is None:
             return
+        if parsed_args.o_indexes is None or len(parsed_args.o_indexes) == 0:
+            o_idxs = [0]
+        else:
+            o_idxs = list(map(int, parsed_args.o_indexes))
+        
+            
 
         with self.unwrap_exception("Copy successful", "Copy failed"):
             self.que.copy_runs(
                 parsed_args.o_location,
-                parsed_args.o_indexes,
+                o_idxs,
                 parsed_args.n_location,
                 parsed_args.n_index,
                 parsed_args.clean_slate,

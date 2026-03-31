@@ -330,60 +330,7 @@ def _crop_frames(frames: torch.Tensor, item: InstanceDict):
 
 Cropping_Strategy: TypeAlias = Literal["Centre", "Random"]
 
-# def get_transform(
-#     norm_dict: Optional[NormDict] = None,
-#     frame_size: Optional[int] = None,
-#     shuffle: bool = False,
-#     num_frames: Optional[int] = None,
-#     crop: Optional[Cropping_Strategy] = None
-#     ) -> Tuple[Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]]:
-    
-#     # transform(frames) -> frames
-#     if shuffle:
-#         assert num_frames is not None, "num_frames must be specified if shuffle is True"
-#         maybe_shuffle_t = Shuffle(num_frames)
-#         perm = maybe_shuffle_t.permutation
-#         sh_e = Shuffle.shannon_entropy(perm)
-#         perm = list(map(int, perm.numpy()))
-#     else:
-#         maybe_shuffle_t = v2.Lambda(_identity_transform)
-#         perm = None
-#         sh_e = None
 
-#     if norm_dict is not None:
-#         final_transform = v2.Compose(
-#             [
-#                 maybe_shuffle_t,
-#                 v2.Lambda(_normalize_to_float),
-#                 v2.Normalize(mean=norm_dict["mean"], std=norm_dict["std"]),
-#                 v2.Lambda(_permute_time_channel),
-#             ]
-#         )
-#     else:
-#         final_transform = v2.Compose(
-#             [
-#                 maybe_shuffle_t,
-#                 v2.Lambda(_normalize_to_float),
-#                 v2.Lambda(_permute_time_channel),
-#             ]
-#         )
-#     transform = final_transform
-
-#     if frame_size is not None:
-#         assert crop is not None, f'Specify crop, one of {Cropping_Strategy}'
-        
-#         if crop == "Random":
-#             transform = v2.Compose(
-#                 [
-#                     v2.RandomCrop(frame_size),
-#                     v2.RandomHorizontalFlip(),
-#                     final_transform,
-#                 ]
-#             )
-#         elif crop == "Centre":
-#             transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
-            
-#     return transform, perm, sh_e
 
 def get_transform(
     norm_dict: Optional[NormDict] = None,

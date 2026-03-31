@@ -324,6 +324,13 @@ def test_copy():
     # q.copy_runs("fail_runs", [0], "to_run")
     q.disp_run("to_run", 0)
 
+def update_runs():
+    q = Que(_get_basic_logger())
+    # q.update_runs("to_run", [0], {"status": "updated"})
+    q.disp_run("old_runs", 0)
+    
+    # q.disp_run("to_run", 0)
 
 if __name__ == "__main__":
-    test_copy()
+    # test_copy()
+    update_runs()

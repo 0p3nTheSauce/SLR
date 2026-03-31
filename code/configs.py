@@ -33,11 +33,12 @@ ENTITY = "ljgoodall2001-rhodes-university"
 # PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
 # - data
-LABELS_PATH = "preprocessed/labels"
+
 # LABELS_PATH = "preprocessed/labels_old"
 LABEL_SUFFIX = "fixed_frange_bboxes_len.json"
 CLASSES_PATH = "./info/wlasl_class_list.json"
 WLASL_ROOT = "../data/WLASL"
+LABELS_PATH = WLASL_ROOT + "/preprocessed/labels"
 RAW_DIR = "WLASL2000"
 SPLIT_DIR = "splits"
 # - training/testing
@@ -303,19 +304,27 @@ def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:
     )
     return conf
 
-
+def _model_params_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
+    """If model params not present, add dropout = None as default"""
+    if "model_params" not in config:
+        config["model_params"] = {"drop_p": None}
+    elif "drop_p" not in config["model_params"]:
+        config["model_params"]["drop_p"] = None
+    return config
+    
+    
 def load_config(admin: AdminInfo) -> RunInfo:
     """Load config from flat file and merge with command line args
 
     Args:
-                    admin (Dict[str, Any]): Admin args from command line
+        admin (Dict[str, Any]): Admin args from command line
 
     Raises:
-                    ValueError: If config path not found, or there are issues with the config
-                    KeyError: Various issues with config file
+        ValueError: If config path not found, or there are issues with the config
+        KeyError: Various issues with config file
 
     Returns:
-                    ExperimentInfo: Dictionary containing all required information for a run
+        ExperimentInfo: Dictionary containing all required information for a run
     """
 
     conf_path = Path(admin["config_path"])
@@ -325,6 +334,7 @@ def load_config(admin: AdminInfo) -> RunInfo:
 
     config = parse_ini_config(admin["config_path"])
     config = _add_eq_bs(config)
+    config = _model_params_precheck(config)
     ndict = {"admin": admin}
     ndict.update(config)
 
@@ -601,9 +611,9 @@ def take_args(
 
     # NOTE: these tags are redundant
     tags = [
-        args.split,
-        args.model,
-        f"exp-{exp_no}",
+        # args.split,
+        # args.model,
+        # f"exp-{exp_no}",
     ]
     if args.recover:
         tags.append("Recovered")

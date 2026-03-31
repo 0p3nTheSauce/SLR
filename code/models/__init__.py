@@ -1,14 +1,44 @@
-from typing import  Tuple, TypedDict
+from typing import Tuple, TypedDict, Optional
 import torch
 import torch.nn as nn
+
 # locals
 from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
 from .pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from .pytorch_s3d import S3D_basic
 
+# new mvit
+from .og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
 
-def get_model(model_name: str, num_classes: int, drop_p: float) -> torch.nn.Module:
+S3D = "S3D"
+R3D_18 = "R3D_18"
+R2plus1D_18 = "R(2+1)D_18"
+Swin3D_T = "Swin3D_T"
+Swin3D_S = "Swin3D_S"
+Swin3D_B = "Swin3D_B"
+MViTv2_S = "MViTv2_S"
+MViTv2_S_e = "MViTv2_S_e"
+MViTv1_B = "MViTv1_B"
+MViTv2_S_16x4 = "MViTv2_S_16x4"
+MViTv2_B_32x3 = "MViTv2_B_32x3"
+
+model_names = [
+    S3D,
+    R3D_18,
+    R2plus1D_18,
+    Swin3D_T,
+    Swin3D_S,
+    Swin3D_B,
+    MViTv2_S,
+    MViTv2_S_e,
+    MViTv1_B,
+    MViTv2_S_16x4,
+    MViTv2_B_32x3,
+]
+
+
+def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> torch.nn.Module:
     """Get model by name.
 
     Args:
@@ -22,24 +52,33 @@ def get_model(model_name: str, num_classes: int, drop_p: float) -> torch.nn.Modu
     Returns:
             torch.nn.Module: Model instance
     """
-    model_constructors = {
-        "S3D": S3D_basic,
-        "R3D_18": Resnet3D_18_basic,
-        "R(2+1)D_18": Resnet2_plus1D_18_basic,
-        "Swin3D_T": Swin3DTiny_basic,
-        "Swin3D_S": Swin3DSmall_basic,
-        "Swin3D_B": Swin3DBig_basic,
-        "MViTv2_S": MViTv2S_basic,
-        "MViTv2_S_e": MViTv2S_extended,
-        "MViTv1_B": MViTv1B_basic,
+    model_constructors_dp = { #dropouthas to be float at the moment
+        S3D: S3D_basic,
+        R3D_18: Resnet3D_18_basic,
+        R2plus1D_18: Resnet2_plus1D_18_basic,
+        Swin3D_T: Swin3DTiny_basic,
+        Swin3D_S: Swin3DSmall_basic,
+        Swin3D_B: Swin3DBig_basic,
+        MViTv2_S: MViTv2S_basic,
+        MViTv2_S_e: MViTv2S_extended,
+        MViTv1_B: MViTv1B_basic,
+        
     }
 
-    if model_name not in model_constructors:
+    model_constructors_opdp = { #optional dropout, defaults to original config
+        MViTv2_S_16x4: MVITv2_S_16x4_basic,
+        MViTv2_B_32x3: MVITv2_B_32x3_basic,
+        }
+
+    if model_name not in model_constructors_dp and model_name not in model_constructors_opdp:
         raise ValueError(
-            f"Model {model_name} not recognized. Available models: {list(model_constructors.keys())}"
+            f"Model {model_name} not recognized. Available models: {list(model_constructors_dp.keys()) + list(model_constructors_opdp.keys())}"
         )
 
-    return model_constructors[model_name](num_classes=num_classes, drop_p=drop_p)
+    if model_name in model_constructors_dp:
+        return model_constructors_dp[model_name](num_classes=num_classes, drop_p=drop_p)
+    else:
+        return model_constructors_opdp[model_name](num_classes=num_classes, drop_p=drop_p)
 
 
 def avail_models() -> list[str]:
@@ -48,17 +87,7 @@ def avail_models() -> list[str]:
     Returns:
             list[str]: List of available model names.
     """
-    return [
-        "S3D",
-        "R3D_18",
-        "R(2+1)D_18",
-        "Swin3D_T",
-        "Swin3D_S",
-        "Swin3D_B",
-        "MViTv2_S",
-        "MViTv2_S_e",
-        "MViTv1_B",
-    ]
+    return model_names
 
 
 class NormDict(TypedDict):
@@ -82,22 +111,26 @@ def norm_vals(model_name: str) -> NormDict:
     """
 
     norm_dict = {
-        "S3D": NormDict(
+        S3D: NormDict(
             mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
         ),
-        "R3D_18": NormDict(
+        R3D_18: NormDict(
             mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
         ),
-        "R(2+1)D_18": NormDict(
+        R2plus1D_18: NormDict(
             mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
         ),
-        "Swin3D_T": NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        "Swin3D_S": NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        "Swin3D_B": NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        "MViTv2_S": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
-        "MViTv2_S_e": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
-        "MVITv2_S_16x4": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
-        "MViTv1_B": NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        Swin3D_T: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        Swin3D_S: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        Swin3D_B: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        
+        #All mvits use same norm values since pretrained on kinetics400
+        MViTv2_S: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        MViTv2_S_e: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        MViTv1_B: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        #new mvit
+        MViTv2_S_16x4: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        MViTv2_B_32x3: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
     }
 
     if model_name not in norm_dict:
@@ -123,10 +156,11 @@ def extend_classifier(model: nn.Module, final_classes: int):
         in_features = old_layer.in_channels
         old_weight = old_layer.weight  # [old_out, in_features, *kernel_size]
         new_layer = nn.Conv3d(
-            in_features, final_classes,
-            kernel_size=old_layer.kernel_size, #type: ignore
-            stride=old_layer.stride, #type: ignore
-            padding=old_layer.padding, #type: ignore
+            in_features,
+            final_classes,
+            kernel_size=old_layer.kernel_size,  # type: ignore
+            stride=old_layer.stride,  # type: ignore
+            padding=old_layer.padding,  # type: ignore
             bias=True,
         )
 
@@ -136,17 +170,21 @@ def extend_classifier(model: nn.Module, final_classes: int):
     if old_layer.bias is None:
         raise ValueError("Expected old layer to have a bias, but bias is None")
 
-    assert final_classes > old_out, \
+    assert final_classes > old_out, (
         f"final_classes ({final_classes}) must be greater than current classes ({old_out})"
+    )
 
     with torch.no_grad():
         new_layer.weight[:old_out] = old_weight
-        new_layer.bias[:old_out]   = old_layer.bias #type: ignore
+        new_layer.bias[:old_out] = old_layer.bias  # type: ignore
         # Rows beyond old_out are left as default kaiming/random init
 
     model.classifier[1] = new_layer
     return model
 
+def get_num_parameters(model: nn.Module) -> int:
+    """Get total number of parameters in a model."""
+    return sum(p.numel() for p in model.parameters())
 
 __all__ = [
     "get_model",
@@ -160,4 +198,6 @@ __all__ = [
     "MViTv2S_basic",
     "MViTv2S_extended",
     "MViTv1B_basic",
+    "MVITv2_S_16x4_basic",
+    "MVITv2_B_32x3_basic",
 ]
