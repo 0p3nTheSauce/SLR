@@ -31,8 +31,7 @@ from utils import wandb_manager
 from testing import save_test_sizes
 
 
-def setup_data(
-    norm_dict: NormDict, config: RunInfo
+def setup_data(config: RunInfo
 ) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
     # NOTE: update for other datasets
     train_info = get_wlasl_info(config["admin"]["split"], set_name="train")
@@ -40,15 +39,16 @@ def setup_data(
 
     train_dataset, _, _ = get_data_set(
         set_info=train_info,
-        norm_dict=norm_dict,
-        frame_size=config["data"]["frame_size"],
-        num_frames=config["data"]["num_frames"],
+        data_info=config["data"],
     )
+    val_data_info = config["data"].copy()
+    # override val data aug with test aug 
+    #TODO: add proper handlig for test augs, but for now just hardcode test aug
+    val_data_info["frame_size_strategy"] = "Centre_crop"
+    val_data_info["spatial_aug"] = None
     val_dataset, _, _ = get_data_set(
         set_info=val_info,
-        norm_dict=norm_dict,
-        frame_size=config["data"]["frame_size"],
-        num_frames=config["data"]["num_frames"],
+        data_info=val_data_info,
     )
 
     train_loader = DataLoader(
@@ -252,7 +252,7 @@ def load_checkpoint(load_path: Path, device: torch.device) -> Dict[str, Any]:
 def load_pretrained(
     check_path: Path,
     model_name: str,
-    drop_p: float,
+    drop_p: Optional[float], #uses default if None
     final_classes: int,
     extend: bool = True,
 ) -> nn.Module:
@@ -306,7 +306,7 @@ def train_loop(
     if seed is not None:
         set_seed(seed)
 
-    dataloaders, num_classes = setup_data(norm_vals(model_name), config)
+    dataloaders, num_classes = setup_data(config)
 
     # setup model
     drop_p = config["model_params"]["drop_p"]

@@ -28,7 +28,7 @@ from video_transforms import (
     _crop_frames,
     get_transform,
 )
-from run_types import DataInfo
+
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from models import NormDict
 from preprocess import InstanceDict, AVAIL_SETS, is_instance_dict
@@ -190,7 +190,12 @@ class VideoDataset(Dataset):
 
 def get_data_set(
     set_info: DataSetInfo,
-    data_info: DataInfo
+    norm_dict: Optional[NormDict] = None,
+    frame_size: Optional[int] = None,
+    num_frames: Optional[int] = None,
+    shuffle: bool = False,
+    resize_by_diagonal: bool = False,
+    cropping: Literal["Bbox", "Centre", "Random", "Default"] = "Default",
 ) -> Tuple[VideoDataset, Optional[List[int]], Optional[float]]:
     """
     Get the training, val or test set. Optionally, load frames unchanged.
@@ -217,27 +222,34 @@ def get_data_set(
     :rtype: Tuple[VideoDataset, List[int] | None, float | None]
     """
     # item_transform(frames, item) -> frames
-    # item_transforms = None
-    # if resize_by_diagonal:
-    #     item_transforms = _resize_by_diagonal
-    # elif cropping == "Bbox":
-    #     item_transforms = _crop_frames
+    item_transforms = None
+    if resize_by_diagonal:
+        item_transforms = _resize_by_diagonal
+    elif cropping == "Bbox":
+        item_transforms = _crop_frames
+
+    if cropping == "Default":
+        if set_info["set_name"] == "train":
+            crop = "Random"  
+        else:
+            crop = "Centre"
+    elif cropping == "Bbox":
+        crop = None
+    else:
+        crop = cropping
 
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
-        num_frames=data_info["num_frames"],
-        frame_size=data_info["frame_size"],
-        norm_dict=data_info["norm_dict"],
-        frame_size_strategy=data_info["frame_size_strategy"],
-        temporal_aug=data_info["temporal_aug"],
-        auto_augment=data_info["spatial_aug"]
+        norm_dict, frame_size, 
+        ("Shuffle" if shuffle else None), num_frames, 
+        crop=crop
     )
 
     dataset = VideoDataset(
         set_info,
-        num_frames=data_info["num_frames"],
+        num_frames=num_frames,
         transforms=transform,
-        item_transforms=None, # item_transforms, #TODO: add item transforms back in when we have them
+        item_transforms=item_transforms,
     )
 
     return dataset, perm, sh_e

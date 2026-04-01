@@ -10,7 +10,7 @@ import numpy as np
 import random
 
 # locals
-from models import avail_models
+from models import avail_models, norm_vals
 from run_types import (
     ExpInfo,
     WandbInfo,
@@ -312,6 +312,29 @@ def _model_params_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
         config["model_params"]["drop_p"] = None
     return config
     
+def _data_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Builds correct DataInfo structure, and checks for required keys. Also adds defaults for optional keys if not present.
+    """
+    if "data" not in config:
+        raise ValueError("Data section is required in config")
+    data_conf = config["data"]
+    #add norm dict if there is not spatial aug
+    if "spatial_aug" not in data_conf or data_conf["spatial_aug"] is None:
+        data_conf["norm_dict"] = norm_vals(config["admin"]["model"])
+    else:
+        data_conf["norm_dict"] = None
+    # add default frame size strategy
+    if "frame_size_strategy" not in data_conf:
+        data_conf["frame_size_strategy"] = None
+    # add default temporal augmentation strategy
+    if "temporal_aug" not in data_conf:
+        data_conf["temporal_aug"] = None
+    # add default spatial augmentation strategy
+    if "spatial_aug" not in data_conf:
+        data_conf["spatial_aug"] = None
+        
+    config["data"] = DataInfo(**data_conf)
+    return config
     
 def load_config(admin: AdminInfo) -> RunInfo:
     """Load config from flat file and merge with command line args
@@ -335,6 +358,7 @@ def load_config(admin: AdminInfo) -> RunInfo:
     config = parse_ini_config(admin["config_path"])
     config = _add_eq_bs(config)
     config = _model_params_precheck(config)
+    config = _data_precheck(config)
     ndict = {"admin": admin}
     ndict.update(config)
 

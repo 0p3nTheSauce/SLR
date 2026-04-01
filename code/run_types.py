@@ -1,4 +1,5 @@
 from typing import TypedDict, Literal, Optional, TypeAlias, Union, List, Tuple, Dict, Any
+from models import NormDict
 
 ########################## EArly stopping #############################
 
@@ -53,7 +54,7 @@ class OptimizerInfo(TypedDict):
 	classifier_weight_decay: float
 
 class Model_paramsInfo(TypedDict):
-	drop_p: float
+	drop_p: Optional[float]
 
 class WarmUpSched(TypedDict):
 	start_factor: float
@@ -90,10 +91,19 @@ class ReduceLROnPlateau(SchedBase):
  
 SchedInfo : TypeAlias = Union[CosAnealInfo, WarmRestartInfo, WarmOnly, ReduceLROnPlateau]
 
+
+# Define our new augmentation configuration options
+AutoAugmentStrategy: TypeAlias = Literal["IMAGENET", "CIFAR10", "SVHN"]
+TemporalStrategy: TypeAlias = Literal["Shuffle", "Reverse", "Both"]
+FrameSize_Strategy: TypeAlias = Literal["Centre_crop", "Random_crop", "Scale_and_pad"]
+
 class DataInfo(TypedDict):
 	num_frames: int
 	frame_size: int
-
+	norm_dict: Optional[NormDict]
+	frame_size_strategy: Optional[FrameSize_Strategy]
+	temporal_aug: Optional[TemporalStrategy]
+	spatial_aug: Optional[AutoAugmentStrategy]
 
 class WandbInfo(TypedDict):
 	entity: str

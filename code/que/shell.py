@@ -41,7 +41,7 @@ from .core import (
     ExpQue,
     QueDupExp,
 )
-from configs import get_avail_splits, ENTITY, PROJECT_BASE
+from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from .tmux import tmux_manager
 from run_types import CleverDict
 
@@ -74,9 +74,7 @@ class QueShell(cmdLib.Cmd):
             "create": lambda: configs.get_train_parser(
                 prog="create", desc="Create a new training run"
             ),
-            "add": lambda: configs.get_train_parser(
-                prog="add", desc="Add a completed training run to old_runs"
-            ),
+            "add": self._get_add_parser,
             "remove": self._get_remove_parser,
             "clear": self._get_clear_parser,
             "list": self._get_list_parser,
@@ -155,7 +153,7 @@ class QueShell(cmdLib.Cmd):
                 return super().onecmd(line)
             except (EOFError, ConnectionError, BrokenPipeError, OSError):
                 self.console.print(
-                    "[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again.[/bold yellow]"
+                    "[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again."
                 )
                 return False
 
@@ -492,22 +490,33 @@ class QueShell(cmdLib.Cmd):
     def do_add(self, arg):
         """Add run with feedback"""
         args = shlex.split(arg)
-
+        parser = self._get_add_parser()
+        parsed_args = parser.parse_args(args)
+        parsed_args.no_enum_chck = True #bypass enum check
+        # print(parsed_args.checkpoint_num)
         try:
-            maybe_args = configs.take_args(sup_args=args)
+            maybe_args = configs.take_args(parsed_args=parsed_args)
         except (SystemExit, ValueError):
             self.console.print("[red]Add cancelled (incorrect arguments)[/red]")
             return
 
         if isinstance(maybe_args, tuple):
             admin_info, wandb_info = maybe_args
+            
+            #add correct checkpoint num to save path
+            admin_info["save_path"] = str(admin_info["save_path"]) + str(parsed_args.checkpoint_num).zfill(ZFILL)
+            
+            #check that checkpoint exists
+            if not Path(admin_info["save_path"]).exists():
+                self.console.print(f"[red]Add cancelled (save path: {admin_info['save_path']} does not exist)[/red]")
+                return
         else:
             self.console.print("[yellow]Add cancelled (by user)[/yellow]")
             return
 
-        with self.console.status("[bold cyan]Adding run...", spinner="dots"):
+        with self.unwrap_exception("Run added successfully", "Failed to add run"):
             self.que.add_run(admin_info, wandb_info)
-        self.console.print("[bold green]✓[/bold green] Run added to old_runs")
+        
 
     def do_edit(self, arg):
         """Edit with visual confirmation"""
@@ -895,6 +904,16 @@ class QueShell(cmdLib.Cmd):
         )
         return parser
 
+    def _add_checkpoint_num_arg(self, parser: argparse.ArgumentParser, help: str = "Checkpoint number to add when adding a run", default=None) -> argparse.ArgumentParser:
+        """--checkpoint_num / -cpn: checkpoint number to add when adding a run"""
+        parser.add_argument(
+            "--checkpoint_num", "-cpn",
+            type=int,
+            default=default,
+            help=help,
+        )
+        return parser
+
     # Que
     
     def _get_save_parser(self) -> argparse.ArgumentParser:
@@ -951,6 +970,11 @@ class QueShell(cmdLib.Cmd):
         parser = argparse.ArgumentParser(description="Exit queShell", prog="quit")
         parser.add_argument("-ns", "--no_save", action="store_true")
         return parser
+
+    def _get_add_parser(self) -> argparse.ArgumentParser:
+        train_parser = get_train_parser(prog="add", desc='Add a completed training run to old_runs')
+        return self._add_checkpoint_num_arg(train_parser)
+
 
     def _get_list_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="List runs", prog="list")

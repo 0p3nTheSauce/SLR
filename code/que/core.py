@@ -176,7 +176,7 @@ from run_types import (
     SummarisedRes,
 )
 from testing import full_test, load_comp_res
-from configs import print_config, load_config, ZFILL
+from configs import print_config, load_config, ZFILL, get_model_exp_dir, get_model_results_dir
 from utils import enum_dir
 
 
@@ -1128,12 +1128,18 @@ class Que:
 
             if self._is_dup_exp(config):
                 raise QueDupExp
-
-            save_path = Path(arg_dict["save_path"])
-            res_dir = save_path.parent / "results"
-            res_path = res_dir / "best_val_loss.json"
+            self.logger.debug(arg_dict["save_path"][-ZFILL:])
+            self.logger.debug(arg_dict["save_path"])
+            res_dir = get_model_results_dir(
+                get_model_exp_dir(
+                    split=arg_dict["split"],
+                    model=arg_dict["model"],
+                    exp_no=int(arg_dict["exp_no"]),
+                ),
+                checkpoint_num=int(arg_dict["save_path"][-ZFILL:]) #TODO: make explicit checkpoint num
+            )
             try:
-                results = load_comp_res(res_path)
+                results = load_comp_res(res_dir / "best_val_loss.json")
                 self.logger.info("Successfully loaded results")
             except FileNotFoundError:
                 results = full_test(
