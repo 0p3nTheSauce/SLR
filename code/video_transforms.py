@@ -110,7 +110,10 @@ Memory Usage:
 
 #   --- Frame sampling strategies ---
 
-def sample(frames: torch.Tensor, target_length: int, randomise: bool = False) -> torch.Tensor:
+
+def sample(
+    frames: torch.Tensor, target_length: int, randomise: bool = False
+) -> torch.Tensor:
     """Original sampler, uses uniform sampling by taking every nth frame, where n is the step size calculated as total frames divided by target length. If randomise is True, it samples randomly from each chunk of frames instead of taking the first frame of each chunk.
 
     Args:
@@ -140,17 +143,20 @@ def sample(frames: torch.Tensor, target_length: int, randomise: bool = False) ->
 
 
 def correct_num_frames(
-    frames: torch.Tensor, target_length: int = 64, randomise: bool = False
+    frames: torch.Tensor, target_length: Optional[int] = None, randomise: bool = False
 ):
     """Original function to compensate for sample. Corrects the number of frames to match the target length.
     Args:
-      frames (torch.Tensor): The input frames tensor. (T x C x H x W)
-      target_length (int): The target length for the number of frames.
+        frames (torch.Tensor): The input frames tensor. (T x C x H x W)
+        target_length (Optional[int], optional): The target length for the number of frames. Defaults to None.
+        randomise (bool, optional): Whether to randomize the sampling (chunk-wise). Defaults to False.
     Returns:
-      torch.Tensor: The corrected frames tensor with the specified target length.
+        torch.Tensor: The corrected frames tensor with the specified target length.
     """
-    if frames is None or frames.shape[0] == 0:
-        raise ValueError("Input frames tensor is empty or None.")
+    if target_length is None:
+        target_length = frames.shape[0]
+    if frames.shape[0] == 0:
+        raise ValueError("Input frames tensor is empty")
     if target_length <= 0:
         raise ValueError("Target length must be a positive integer.")
     if frames.shape[0] == target_length:
@@ -184,7 +190,7 @@ def correct_num_frames(
 
 
 def pad_frames(frames: torch.Tensor, target_length: int) -> torch.Tensor:
-    """ Original. Pads and trimms to get frames to target length
+    """Original. Pads and trimms to get frames to target length
 
     Args:
         frames (torch.Tensor): Input frames tensor of shape (T, C, H, W).
@@ -260,20 +266,24 @@ def sample_chunked(frames: torch.Tensor, target_length: int) -> torch.Tensor:
 
 def sample_wobbled(
     frames: torch.Tensor,
-    target_length: int,
+    target_length: Optional[int] = None,
     max_wobble: int = 4,
 ) -> torch.Tensor:
     """Sample frames uniformly with a random "wobble" added to the start and end indices, creating a jittered sampling effect.
+    Optionally leave out the target_length argument to just add wobble to but keep all frames.
 
     Args:
         frames (torch.Tensor): The input frames tensor. (T x C x H x W)
-        target_length (int): The desired number of frames after sampling.
+        target_length (Optional[int], optional): The desired number of frames after sampling. Defaults to None.
         max_wobble (int, optional): The maximum amount of wobble to add to the start and end indices. Defaults to 4.
 
     Returns:
         torch.Tensor: The sampled frames tensor.
     """
     T = frames.shape[0]
+    if target_length is None:
+        target_length = T
+
     start = random.randint(-max_wobble, max_wobble)
     end = (T - 1) + random.randint(-max_wobble, max_wobble)
 
@@ -385,25 +395,6 @@ def sample_speed_perturbed(
     indices = torch.linspace(start, start + effective_length - 1, target_length).long()
     return frames[indices]
 
-
-def get_sampler(name: str, kwargs) -> Callable[[torch.Tensor], torch.Tensor]:
-    """Factory function to get a sampling function by name with specified kwargs"""
-    if name == "uniform":
-        return lambda frames: sample_uniform(frames, **kwargs)
-    elif name == "chunked":
-        return lambda frames: sample_chunked(frames, **kwargs)
-    elif name == "wobbled":
-        return lambda frames: sample_wobbled(frames, **kwargs)
-    elif name == "focal_normal":
-        return lambda frames: sample_focal_normal(frames, **kwargs)
-    elif name == "focal_laplace":
-        return lambda frames: sample_focal_laplace(frames, **kwargs)
-    elif name == "focal_beta":
-        return lambda frames: sample_focal_beta(frames, **kwargs)
-    elif name == "speed_perturbed":
-        return lambda frames: sample_speed_perturbed(frames, **kwargs)
-    else:
-        raise ValueError(f"Unknown sampler name: {name}")
 
 # --- Temporal augmentations ---
 

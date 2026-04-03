@@ -12,6 +12,7 @@ import random
 # locals
 from models import NormDict, avail_models, norm_vals
 from run_types import (
+    SamplerConfig,
     ExpInfo,
     WandbInfo,
     RunInfo,
@@ -367,6 +368,7 @@ def _augs_precheck(
     # return AugInfo(**aug_conf)
 
 
+
 def _data_precheck(config: Dict[str, Any], model:str) -> Dict[str, Any]:
     """Builds correct DataInfo structure, and checks for required keys. Also adds defaults for optional keys if not present."""
     if "data" not in config:
@@ -387,8 +389,8 @@ def _data_precheck(config: Dict[str, Any], model:str) -> Dict[str, Any]:
 
     config["data"] = DataInfo(**data_conf)
     return config
-
-
+    
+    
 def load_config(admin: AdminInfo) -> RunInfo:
     """Load config from flat file and merge with command line args
 
