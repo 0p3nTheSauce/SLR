@@ -49,7 +49,7 @@ def test_subrocess2():
         stderr=subprocess.STDOUT,
         bufsize=0
     )
-    return_code = proc.wait()
+    _ = proc.wait()
     
 def test_ex():
     try:
@@ -75,7 +75,7 @@ def test_clear2():
 
 
 def test_instance_typegaurd():
-    valid_dict = preprocess.InstanceDict(
+    valid_dict = preprocess.Instance(
         bbox=[0, 0, 100, 100],
         frame_end=10,
         frame_start=0,
@@ -97,8 +97,8 @@ def test_instance_typegaurd():
         'label_num': 0,
         # 'bbox' key is missing
     }
-    print(video_dataset.is_instance_dict(valid_dict))  # Should print True
-    print(video_dataset.is_instance_dict(invalid_dict))  # Should print False
+    print(preprocess.Instance.model_validate(valid_dict))  # Should print True
+    print(preprocess.Instance.model_validate(invalid_dict))  # Should print False
 
 
 def time_instance_typegaurd():
@@ -107,7 +107,7 @@ def time_instance_typegaurd():
 
     #time how long it takes to load the json and check each dict with the type guard
     start_time = time.time()
-    data = video_dataset.load_data_from_json(json_path, policy='strict')
+    _ = video_dataset.load_data_from_json(json_path, policy='strict')
     end_time = time.time()
     print(f"Time taken to load and check all items: {end_time - start_time} seconds")
     # Time taken to load and check all items: 0.019509077072143555 seconds
@@ -158,9 +158,9 @@ def test_find_runs():
     print(len(runs))
     all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
     for run in runs:
-        split_name = run['admin']['split'] 
-        model_name = run['admin']['model']
-        exp_no = run['admin']['exp_no']
+        split_name = run.admin.split
+        model_name = run.admin.model
+        exp_no = run.admin.exp_no
         cur_split = all_exps[split_name]
         if model_name in cur_split:
             all_exps[split_name][model_name].append(exp_no)
@@ -212,7 +212,7 @@ def test_find_S3D_runs():
     print(len(runs))
     all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
     for run in runs:
-        all_exps[run['admin']['split']][run['admin']['model']] = [run['admin']['exp_no']]
+        all_exps[run.admin.split][run.admin.model] = [run.admin.exp_no]
     
     
     with open('./S3D_32_SAICIST.json', 'w') as f:

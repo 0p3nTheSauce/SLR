@@ -20,23 +20,20 @@ import re
 
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
-from models import norm_vals, get_model, NormDict
-from configs import set_seed
+from models import get_model
+from configs import set_seed, _make_aug_info
 
 from video_dataset import VideoDataset, get_data_set, get_wlasl_info
 from models import avail_models
 from run_types import DataInfo
 from configs import (
     get_avail_splits,
-    RUNS_PATH,
     get_model_results_dir,
     get_model_exp_dir,
     get_model_checkpoint_dir,
-    _augs_precheck
 )
 from run_types import (
     CompRes,
-    DataInfo,
     MinInfo,
     BaseRes,
     ShuffRes,
@@ -333,20 +330,17 @@ def setup_data(
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     test_info = get_wlasl_info(split, set_name=set_name)
 
-    key = "train_augs" if set_name == "train" else "test_augs"
-    aug_info = data_info.get(key)
+    aug_info = data_info.train_augs if set_name == "train" else data_info.test_augs
     if aug_info is None:
         raise ValueError(
             "Augmentation info must be provided in data_info for both train and test sets."
         )
 
     if shuffle:
-        aug_info["temporal_aug"] = "Shuffle"
-
-    data_info[key] = aug_info
+        aug_info.temporal_aug = ["Shuffle"]
 
     test_dataset, perm, shanon_entropy = get_data_set(
-        set_info=test_info, data_info=aug_info
+        set_info=test_info, data_info=data_info
     )
     test_loader = DataLoader(
         test_dataset,
@@ -412,13 +406,11 @@ def test_run(
 
     set_seed()
 
-    # admin = config["admin"]
-    model_name = admin["model"]
-    # data = config["data"]
+    model_name = admin.model
 
     results = {}
 
-    save_path = Path(admin["save_path"])
+    save_path = Path(admin.save_path)
 
     output = checkpoint_dir_to_result_dir(save_path)
 
@@ -427,7 +419,7 @@ def test_run(
 
     dloader, num_classes, m_permt, m_sh_et = setup_data(
         set_name=set_name,
-        split=admin["split"],
+        split=admin.split,
         data_info=data,
         shuffle=shuffle,
     )
@@ -462,9 +454,9 @@ def test_run(
 
     if m_permt is not None and m_sh_et is not None:  # shuffled
         results = ShuffRes(
-            top_k_average_per_class_acc=topk_res["top_k_average_per_class_acc"],
-            top_k_per_instance_acc=topk_res["top_k_per_instance_acc"],
-            average_loss=topk_res["average_loss"],
+            top_k_average_per_class_acc=topk_res.top_k_average_per_class_acc,
+            top_k_per_instance_acc=topk_res.top_k_per_instance_acc,
+            average_loss=topk_res.average_loss,
             perm=m_permt,
             shannon_entropy=m_sh_et,
         )
@@ -578,7 +570,7 @@ def full_test(
     Returns:
                     CompRes: A results dictionary (as described above).
     """
-    save_path = Path(admin["save_path"])
+    save_path = Path(admin.save_path)
 
     # output
     out_dir = checkpoint_dir_to_result_dir(save_path)
@@ -839,14 +831,14 @@ def main():
 
     # Try to load data_info.json, or use provided arguments
     if args.num_frames is not None and args.frame_size is not None:
-        augs = _augs_precheck(None, args.model, args.set_name)
+        augs = _make_aug_info(None, args.model, args.set_name)
         # Use provided arguments
         data = DataInfo(
             num_frames=args.num_frames,
             frame_size=args.frame_size,
             train_augs=augs if args.set_name == "train" else None,
             test_augs=augs if args.set_name != "train" else None,
-		)  
+        )
         print(
             f"Using provided data parameters: num_frames={args.num_frames}, frame_size={args.frame_size}"
         )
@@ -855,14 +847,14 @@ def main():
         try:
             data = load_test_sizes(output)
             print(f"Loaded data info from {data_info_path}")
-            print(f"num_frames={data['num_frames']}, frame_size={data['frame_size']}")
+            print(f"num_frames={data.num_frames}, frame_size={data.frame_size}")
 
             # Allow partial override
             if args.num_frames is not None:
-                data["num_frames"] = args.num_frames
+                data.num_frames = args.num_frames
                 print(f"Overriding num_frames: {args.num_frames}")
             if args.frame_size is not None:
-                data["frame_size"] = args.frame_size
+                data.frame_size = args.frame_size
                 print(f"Overriding frame_size: {args.frame_size}")
 
         except FileNotFoundError:

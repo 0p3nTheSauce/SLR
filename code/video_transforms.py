@@ -1,9 +1,8 @@
 import torch
-from torchvision import tv_tensors
 import torch.nn.functional as F
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as v2
-from typing import Any, Callable, List, TypeAlias, Literal, Tuple, cast
+from typing import Callable, List, Tuple
 import random
 import utils
 import time
@@ -14,7 +13,7 @@ import numpy as np
 
 # locals
 from models import NormDict
-from preprocess import InstanceDict
+from preprocess import Instance
 from run_types import SpatialStrategy, TemporalStrategy, FrameSize_Strategy
 
 
@@ -484,9 +483,9 @@ def crop_frames(frames: torch.Tensor, bbox: List[int]):
     return frames[:, :, y1:y2, x1:x2]
 
 
-def _crop_frames(frames: torch.Tensor, item: InstanceDict):
+def _crop_frames(frames: torch.Tensor, item: Instance):
     """Crop out the bounding box from the frames"""
-    return crop_frames(frames, item["bbox"])
+    return crop_frames(frames, item.bbox)
 
 
 def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):

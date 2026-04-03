@@ -1,4 +1,4 @@
-from typing import Optional, cast, Dict, List, Any
+from typing import Optional
 import shlex
 import configs
 
@@ -8,16 +8,14 @@ import time
 from .shell import QueShell
 
 # from que.shell import QueShell
-from .core import Que, connect_manager, _get_basic_logger
+from .core import Que, connect_manager, _get_basic_logger, WorkerState
 from .tmux import tmux_manager
 import torch
 import torch.nn as nn
 import gc
 import getpass
 import subprocess
-import time
 from pathlib import Path
-import json
 
 
 
@@ -196,7 +194,7 @@ def test_shared_dict_proc1():
     print("before changing")
     print(wstate)
     print("after changing")
-    wstate["current_run_id"] = "debugging"
+    wstate.current_run_id = "debugging"
     print(wstate)
 
 
@@ -206,7 +204,7 @@ def test_shared_dict_proc2():
     print("before changing")
     print(wstate)
     print("after changing")
-    wstate["current_run_id"] = "debugging_2"
+    wstate.current_run_id = "debugging_2"
     print(wstate)
 
 
@@ -225,12 +223,12 @@ def reset_state():
     server.set_state(
         server=None,
         daemon=None,
-        worker={
+        worker=WorkerState.model_validate({
             "task": "inactive",
             "current_run_id": None,
             "working_pid": None,
             "exception": None,
-        },
+        }),
     )
 
 

@@ -1,4 +1,4 @@
-from typing import Optional, TypedDict
+from typing import Optional
 import logging
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
@@ -8,7 +8,6 @@ import time
 from .core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
-    WORKER_NAME,
     connect_manager,
     DaemonState,
 )
@@ -53,7 +52,7 @@ class Daemon:
 
     def set_state(self, state: DaemonState) -> None:
         self.state = state
-        if self.state['awake']:
+        if self.state.awake:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
             self.logger.warning("There was likely a power outage/system failure which triggered this")
             #it is likely cur_run will have a run in it, so we must recover this run
@@ -70,7 +69,7 @@ class Daemon:
         self.worker_process.join()
 
 
-        self.worker.state['working_pid'] = None
+        self.worker.state.working_pid = None
         # If worker died naturally (crash or finish)
         exit_code = self.worker_process.exitcode
         if exit_code == 0:
@@ -78,7 +77,7 @@ class Daemon:
         else:
             self.logger.warning(f"Worker process ended with exit code: {exit_code}")
 
-            if self.state['stop_on_fail']:
+            if self.state.stop_on_fail:
                 self.logger.info("stop_on_fail is True. Not restarting.")
                 return False
 
@@ -155,8 +154,8 @@ class Daemon:
                 time.sleep(1.0)  # Prevent tight loop on error
 
         self.logger.info("Supervisor process exiting.")
-        self.state['awake'] = False
-        self.state['supervisor_pid'] = None
+        self.state.awake = False
+        self.state.supervisor_pid = None
         
 
     def start_supervisor(self, recover_run: bool = False) -> None:
@@ -173,12 +172,12 @@ class Daemon:
 
         self.stop_daemon_event.clear()  # Reset event in case it was set previously
         self.stop_worker_event.clear()
-        self.state['awake'] = True
+        self.state.awake = True
         
 
         self.supervisor_process = Process(target=self.supervise, args=(recover_run,))
         self.supervisor_process.start()
-        self.state['supervisor_pid'] = self.supervisor_process.pid
+        self.state.supervisor_pid = self.supervisor_process.pid
         self.logger.info(
             f"Supervisor launched (Child PID: {self.supervisor_process.pid})"
         )
@@ -200,13 +199,13 @@ class Daemon:
 
             if not self.worker_process.is_alive():
                 self.worker_process = None
-                self.worker.state['working_pid'] = None
+                self.worker.state.working_pid = None
 
             self.logger.info("Worker stopped.")
         else:
             self.logger.warning("No worker process to stop")
             self.worker_process = None
-            self.worker.state['working_pid'] = None
+            self.worker.state.working_pid = None
 
     def stop_supervisor(
         self,
@@ -236,7 +235,7 @@ class Daemon:
             
             if not self.supervisor_process.is_alive():
                 self.supervisor_process = None
-                self.state['supervisor_pid'] = None
+                self.state.supervisor_pid = None
                 
             self.logger.info("Supervisor stopped.")
 

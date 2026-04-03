@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 # import os
 import json
@@ -8,30 +8,23 @@ from typing import (
     Callable,
     cast,
     Optional,
-    Any,
     Tuple,
     Literal,
     TypedDict,
     Union,
     List,
-    TypeGuard,
     TypeAlias,
 )
-from torchvision.transforms import v2
-from video_transforms import Shuffle
 
 # local imports
 from utils import load_rgb_frames_from_video
 from video_transforms import (
     correct_num_frames,
-    _resize_by_diagonal,
-    _crop_frames,
     get_transform,
 )
 from run_types import DataInfo
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
-from models import NormDict
-from preprocess import InstanceDict, AVAIL_SETS, is_instance_dict
+from preprocess import Instance, AVAIL_SETS
 
 ############################# Dictionaries and Types #############################
 
@@ -50,13 +43,13 @@ LOAD_DATA_POLICY: TypeAlias = Literal["strict", "accepting"]
 
 def load_data_from_json(
     json_path: Union[str, Path], policy: LOAD_DATA_POLICY
-) -> List[InstanceDict]:
-    """Load list of InstanceDict from a json file
+) -> List[Instance]:
+    """Load list of Instance from a json file
 
     Args:
         json_path (Union[str, Path]): Path to json file
     Returns:
-        List[InstanceDict]: List of InstanceDicts
+        List[Instance]: List of Instances
     """
     with open(json_path, "r") as f:
         data = json.load(f)
@@ -64,11 +57,8 @@ def load_data_from_json(
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    for item in (
-        data
-    ):  # NOTE: Overhead is actually mininmal on strict ~0.019 s for WLASL2000 train.
-        if not is_instance_dict(item) and policy == "strict":
-            raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
+    if policy == 'strict':
+        return [Instance.model_validate(item) for item in data]
 
     return data
 
@@ -112,7 +102,7 @@ class VideoDataset(Dataset):
         num_frames: Optional[int] = None,
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         item_transforms: Optional[
-            Callable[[torch.Tensor, InstanceDict], torch.Tensor]
+            Callable[[torch.Tensor, Instance], torch.Tensor]
         ] = None,
         include_meta: bool = False,
         load_policy: LOAD_DATA_POLICY = "accepting",
@@ -126,10 +116,10 @@ class VideoDataset(Dataset):
         :param transforms: A Transform function to apply to raw videos.
         :type transforms: Optional[Callable[[torch.Tensor], torch.Tensor]]
         :param item_transforms: A Transform function to apply to raw videos.
-        :type item_transforms: Optional[Callable[[torch.Tensor, InstanceDict], torch.Tensor]]
+        :type item_transforms: Optional[Callable[[torch.Tensor, Instance], torch.Tensor]]
         :param include_meta: Boolean flag to include extra meta information
         :type include_meta: bool
-        :param load_policy: Load data that does not match List[InstanceDict] exactly. For backwards compatibility with older preprocessing strategies.
+        :param load_policy: Load data that does not match List[Instance] exactly. For backwards compatibility with older preprocessing strategies.
         :type load_policy: LOAD_DATA_POLICY
         """
         self.root = set_info["root"]
@@ -143,8 +133,8 @@ class VideoDataset(Dataset):
             set_info["labels"]
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
-        self.data: List[InstanceDict] = load_data_from_json(instances_path, load_policy)
-        self.classes = set([inst["label_num"] for inst in self.data])
+        self.data: List[Instance] = load_data_from_json(instances_path, load_policy)
+        self.classes = set([inst.label_num for inst in self.data])
         self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
@@ -165,7 +155,7 @@ class VideoDataset(Dataset):
         return sampled_frames.to(torch.uint8)
 
     def __getitem__(self, idx):
-        item = cast(InstanceDict, self.data[idx])
+        item = cast(Instance, self.data[idx])
         frames = self.__manual_load__(item)
 
         if self.item_transforms is not None:
@@ -175,9 +165,9 @@ class VideoDataset(Dataset):
             frames = self.transforms(frames)
 
         if self.include_meta:
-            result = {"frames": frames} | item
+            result = {"frames": frames} | item.model_dump()
         else:
-            result = result = {"frames": frames, "label_num": item["label_num"]}
+            result = result = {"frames": frames, "label_num": item.label_num}
 
         return result
 
@@ -223,22 +213,22 @@ def get_data_set(
     # elif cropping == "Bbox":
     #     item_transforms = _crop_frames
 
-    aug_info = data_info.get('train_augs') if set_info['set_name'] == 'train' else data_info.get('test_augs')
+    aug_info = data_info.train_augs if set_info['set_name'] == 'train' else data_info.test_augs
     if aug_info is None:
-        raise ValueError("Augmentation info must be provided in data_info for both train and test sets.")
+        raise ValueError(f"Augmentation info not provided in data_info for set: {set_info['set_name']}.")
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
-        num_frames=data_info["num_frames"],
-        frame_size=data_info["frame_size"],
-        norm_dict=aug_info["norm_dict"],
-        frame_size_strategy=aug_info["frame_size_strategy"],
-        temporal_aug=aug_info["temporal_aug"],
-        spatial_augment=aug_info["spatial_aug"]
+        num_frames=data_info.num_frames,
+        frame_size=data_info.frame_size,
+        norm_dict=aug_info.norm_dict,
+        frame_size_strategy=aug_info.frame_size_strategy,
+        temporal_aug=aug_info.temporal_aug,
+        spatial_augment=aug_info.spatial_aug
     )
 
     dataset = VideoDataset(
         set_info,
-        num_frames=data_info["num_frames"],
+        num_frames=data_info.num_frames,
         transforms=transform,
         item_transforms=None, # item_transforms, #TODO: add item transforms back in when we have them
     )

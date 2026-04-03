@@ -1,4 +1,4 @@
-from typing import  List, Tuple, Union , Optional
+from typing import List, Tuple, Union, Optional
 from wandb.sdk.wandb_run import Run
 from run_types import StopperOn, StopperState
 from multiprocessing.synchronize import Event as EventClass
@@ -31,8 +31,8 @@ class EarlyStopper:
 
     Methods:
         step(score): Updates the early stopping state based on the current score.
-        state_dict(): Returns the current state as a dictionary.
-        load_state_dict(state_dict): Loads state from a dictionary.
+        state_dict(): Returns the current state as a StopperState model.
+        load_state_dict(state_dict): Loads state from a StopperState model.
 
     Static Methods:
         config_precheck(config): Validates the early stopping configuration.
@@ -49,37 +49,36 @@ class EarlyStopper:
 
     def __init__(
         self,
-        arg_dict: Optional[StopperOn]=None,
-        metric: Union[Tuple[str, str], List[str]]=("val", "loss"),
-        mode: str ="min",
-        patience: int =20,
-        min_delta: float=0.01,
-        on: bool=True,
-        wandb_run: Optional[Run]=None,
-        event: Optional[EventClass]=None, #if in a multiprocessing context, can pass an Event to signal stopping
+        arg_dict: Optional[StopperOn] = None,
+        metric: Union[Tuple[str, str], List[str]] = ("val", "loss"),
+        mode: str = "min",
+        patience: int = 20,
+        min_delta: float = 0.01,
+        on: bool = True,
+        wandb_run: Optional[Run] = None,
+        event: Optional[EventClass] = None, # if in a multiprocessing context, can pass an Event to signal stopping
     ):
         """Initialize the EarlyStopper."""
         
         if arg_dict:  # coming straight from configs.py
-            # self.on = arg_dict.get("on", True)
             self.on = True
-            metric = arg_dict.get("metric", metric)
-            mode = arg_dict.get("mode", mode)
-            patience = arg_dict.get("patience", patience)
-            min_delta = arg_dict.get("min_delta", min_delta)
+            metric = arg_dict.metric
+            mode = arg_dict.mode
+            patience = arg_dict.patience
+            min_delta = arg_dict.min_delta
         else:
             self.on = on
             
         if isinstance(metric, list):
             metric = (metric[0], metric[1])
 
-        check_dict: StopperOn = {
-            'metric': metric,
-            'mode': mode,
-            'patience': patience,
-            'min_delta': min_delta
-        }
-        self.config_precheck(check_dict)
+        check_config = StopperOn(
+            metric=metric,
+            mode=mode,
+            patience=patience,
+            min_delta=min_delta
+        )
+        self.config_precheck(check_config)
         
         self.phase = metric[0]
         self.metric = metric[1]
@@ -142,53 +141,53 @@ class EarlyStopper:
 
     @staticmethod
     def config_precheck(config: StopperOn) -> None:
+        # Convert to tuple for consistent checking if it arrived as a list
+        metric_tuple = tuple(config.metric) if isinstance(config.metric, list) else config.metric
         
-        if config["metric"] not in EarlyStopper.available_metrics:
+        if metric_tuple not in EarlyStopper.available_metrics:
             raise ValueError(
-                f"Invalid metric: {config['metric']}. Available metrics: {EarlyStopper.available_metrics}"
+                f"Invalid metric: {config.metric}. Available metrics: {EarlyStopper.available_metrics}"
             )
-        if config['mode'] not in EarlyStopper.available_modes:
+        if config.mode not in EarlyStopper.available_modes:
             raise ValueError(
-                f"Invalid mode: {config['mode']}. Available modes: {EarlyStopper.available_modes}"
+                f"Invalid mode: {config.mode}. Available modes: {EarlyStopper.available_modes}"
             )
-        if config["patience"] <= 0:
+        if config.patience <= 0:
             raise ValueError(
-                f"Patience must be a positive integer, got {config['patience']}"
+                f"Patience must be a positive integer, got {config.patience}"
             )
-        if config["min_delta"] < 0:
+        if config.min_delta < 0:
             raise ValueError(
-                f"Min delta must be non-negative, got {config['min_delta']}"
+                f"Min delta must be non-negative, got {config.min_delta}"
             )
 
     def state_dict(self) -> StopperState:
-        """Return the current state as a dictionary.
+        """Return the current state as a StopperState model.
         
         Returns:
-            Dictionary containing the current state.
+            StopperState model containing the current state.
         """
         
-        return {
-            "on": self.on,
-            "phase": self.phase,
-            "metric": self.metric,
-            "mode": self.mode,
-            "patience": self.patience,
-            "min_delta": self.min_delta,
-            "curr_epoch": self.curr_epoch,
-            "best_score": self.best_score,
-            "best_epoch": self.best_epoch,
-            "counter": self.counter,
-            "stop": self.stop,
-            "stopped_by_event" : self.stopped_by_event
-        }
+        return StopperState(
+            on=self.on,
+            phase=self.phase,
+            metric=self.metric,
+            mode=self.mode,
+            patience=self.patience,
+            min_delta=self.min_delta,
+            curr_epoch=self.curr_epoch,
+            best_score=self.best_score,
+            best_epoch=self.best_epoch,
+            counter=self.counter,
+            stop=self.stop,
+            stopped_by_event=self.stopped_by_event
+        )
 
     def load_state_dict(self, state_dict: StopperState) -> None:
-        """Load state from a dictionary.
+        """Load state from a StopperState model.
         
         Args:
-            state_dict: Dictionary containing state to restore.
+            state_dict: StopperState model containing state to restore.
         """
-        for key, value in state_dict.items():
+        for key, value in state_dict.model_dump().items():
             setattr(self, key, value)
-
-

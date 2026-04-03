@@ -22,11 +22,10 @@ from configs import (
     SEED,
     RunInfo,
     WandbInfo,
-    SchedInfo,
-    OptimizerInfo,
 )
+from run_types import SchedInfo, OptimizerInfo
 from stopping import EarlyStopper, StopperOn
-from models import get_model, norm_vals, NormDict, extend_classifier
+from models import get_model, extend_classifier
 from utils import wandb_manager
 from testing import save_test_sizes
 
@@ -34,21 +33,21 @@ from testing import save_test_sizes
 def setup_data(config: RunInfo
 ) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
     # NOTE: update for other datasets
-    train_info = get_wlasl_info(config["admin"]["split"], set_name="train")
-    val_info = get_wlasl_info(config["admin"]["split"], set_name="val")
+    train_info = get_wlasl_info(config.admin.split, set_name="train")
+    val_info = get_wlasl_info(config.admin.split, set_name="val")
 
     train_dataset, _, _ = get_data_set(
         set_info=train_info,
-        data_info=config["data"],
+        data_info=config.data,
     )
     val_dataset, _, _ = get_data_set(
         set_info=val_info,
-        data_info=config["data"],
+        data_info=config.data,
     )
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config["training"]["batch_size"],
+        batch_size=config.training.batch_size,
         shuffle=True,
         num_workers=2,
         pin_memory=True,
@@ -79,50 +78,50 @@ def get_scheduler(
         # Identity scheduler - multiplies LR by 1.0 (no change)
         return no_sched
 
-    warmup_sched = sched_conf["warm_up"]
+    warmup_sched = sched_conf.warm_up
     warmup_epochs = 0
     if warmup_sched is not None:
         warmup_scheduler = optim.lr_scheduler.LinearLR(
             optimizer,
-            start_factor=warmup_sched["start_factor"],
-            end_factor=warmup_sched["end_factor"],
-            total_iters=warmup_sched["warmup_epochs"],
+            start_factor=warmup_sched.start_factor,
+            end_factor=warmup_sched.end_factor,
+            total_iters=warmup_sched.warmup_epochs,
         )
-        if sched_conf["type"] == "WarmOnly":
+        if sched_conf.type == "WarmOnly":
             return warmup_scheduler
 
-        warmup_epochs = warmup_sched["warmup_epochs"]
+        warmup_epochs = warmup_sched.warmup_epochs
     else:
         warmup_scheduler = optim.lr_scheduler.LambdaLR(
             optimizer, lr_lambda=lambda epoch: 1.0
         )
 
-    if sched_conf["type"] == "CosineAnnealingLR":
+    if sched_conf.type == "CosineAnnealingLR":
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=sched_conf["tmax"], eta_min=sched_conf["eta_min"]
+            optimizer, T_max=sched_conf.tmax, eta_min=sched_conf.eta_min
         )
-    elif sched_conf["type"] == "CosineAnnealingWarmRestarts":
+    elif sched_conf.type == "CosineAnnealingWarmRestarts":
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer,
-            T_0=sched_conf["t0"],
-            T_mult=sched_conf["tmult"],
-            eta_min=sched_conf["eta_min"],
+            T_0=sched_conf.t0,
+            T_mult=sched_conf.tmult,
+            eta_min=sched_conf.eta_min,
         )
-    elif sched_conf["type"] == "ReduceLROnPlateau":
+    elif sched_conf.type == "ReduceLROnPlateau":
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
-            mode=sched_conf["mode"],
-            factor=sched_conf["factor"],
-            patience=sched_conf["patience"],
-            threshold=sched_conf["threshold"],
-            threshold_mode=sched_conf["threshold_mode"],
-            cooldown=sched_conf["cooldown"],
-            min_lr=sched_conf["min_lr"],
-            eps=sched_conf["eps"],
+            mode=sched_conf.mode,
+            factor=sched_conf.factor,
+            patience=sched_conf.patience,
+            threshold=sched_conf.threshold,
+            threshold_mode=sched_conf.threshold_mode,
+            cooldown=sched_conf.cooldown,
+            min_lr=sched_conf.min_lr,
+            eps=sched_conf.eps,
         )
     else:
         # should not be possible to get here
-        raise ValueError(f"Scheduler type {sched_conf['type']} not recognized.")
+        raise ValueError(f"Scheduler type {sched_conf.type} not recognized.")
 
     return optim.lr_scheduler.SequentialLR(
         optimizer, schedulers=[warmup_scheduler, scheduler], milestones=[warmup_epochs]
@@ -145,27 +144,27 @@ def _setup_wandb(
     config: RunInfo, wandb_info: WandbInfo, run_id_required: bool = True
 ) -> Run:
     # wandb_info = config["wandb"]
-    admin = config["admin"]
+    admin = config.admin
 
-    run_name = f"{admin['model']}_{admin['split']}_exp{admin['exp_no']}"
-    if admin["recover"]:
-        if wandb_info["run_id"] is not None:
-            run_id = wandb_info["run_id"]
+    run_name = f"{admin.model}_{admin.split}_exp{admin.exp_no}"
+    if admin.recover:
+        if wandb_info.run_id is not None:
+            run_id = wandb_info.run_id
         else:
             run_id = wandb_manager.get_run_id(
                 run_name,
-                wandb_info["entity"],
-                wandb_info["project"],
+                wandb_info.entity,
+                wandb_info.project,
                 idx=-1,  # last if same name
             )
         if run_id is not None:
             print(f"Resuming run with ID: {run_id}")
 
             run = wandb.init(
-                entity=wandb_info["entity"],
-                project=wandb_info["project"],
+                entity=wandb_info.entity,
+                project=wandb_info.project,
                 name=run_name,
-                tags=wandb_info["tags"],
+                tags=wandb_info.tags,
                 config=cast(
                     Dict[str, Any], config
                 ),  # cast to reguler dict for wandb init
@@ -182,10 +181,10 @@ def _setup_wandb(
     print(f"Starting new run with name: {run_name}")
 
     run = wandb.init(
-        entity=wandb_info["entity"],
-        project=wandb_info["project"],
+        entity=wandb_info.entity,
+        project=wandb_info.project,
         name=run_name,
-        tags=wandb_info["tags"],
+        tags=wandb_info.tags,
         config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
     )
     print(f"Run ID: {run.id}")
@@ -199,17 +198,17 @@ def get_optimizer(model: torch.nn.Module, conf: OptimizerInfo) -> optim.AdamW:
     param_groups = [
         {
             "params": model.backbone.parameters(),
-            "lr": conf["backbone_init_lr"],  # Low LR for pretrained backbone
-            "weight_decay": conf["backbone_weight_decay"],  # also higher weight decay
+            "lr": conf.backbone_init_lr,  # Low LR for pretrained backbone
+            "weight_decay": conf.backbone_weight_decay,  # also higher weight decay
         },
         {
             "params": model.classifier.parameters(),
-            "lr": conf["classifier_init_lr"],  # Higher LR for new classifier
-            "weight_decay": conf["classifier_weight_decay"],  # lower weight decay
+            "lr": conf.classifier_init_lr,  # Higher LR for new classifier
+            "weight_decay": conf.classifier_weight_decay,  # lower weight decay
         },
     ]
 
-    return optim.AdamW(param_groups, eps=conf["eps"])
+    return optim.AdamW(param_groups, eps=conf.eps)
 
 
 def save_checkpoint(checkpoint_data: Dict[str, Any], save_path: Path):
@@ -304,11 +303,11 @@ def train_loop(
     dataloaders, num_classes = setup_data(config)
 
     # setup model
-    drop_p = config["model_params"]["drop_p"]
+    drop_p = config.model_params.drop_p
 
-    if config["admin"]["weight_path"]:
+    if config.admin.weight_path:
         model = load_pretrained(
-            Path(config["admin"]["weight_path"]),
+            Path(config.admin.weight_path),
             model_name=model_name,
             drop_p=drop_p,
             final_classes=num_classes,
@@ -324,12 +323,12 @@ def train_loop(
     best_val_loss = float("inf")
     best_val_acc = float("-inf")
 
-    optimizer = get_optimizer(model, config["optimizer"])
-    scheduler = get_scheduler(optimizer, config.get("scheduler", None))
+    optimizer = get_optimizer(model, config.optimizer)
+    scheduler = get_scheduler(optimizer, config.scheduler)
 
     loss_func = nn.CrossEntropyLoss()
 
-    save_path = Path(config["admin"]["save_path"])
+    save_path = Path(config.admin.save_path)
 
     # if we are continuing from last checkpoint, set 'load'
     if recover:
@@ -345,7 +344,7 @@ def train_loop(
         save_path.mkdir(parents=True, exist_ok=True)
 
     # save frame size and num frames for convenient testing
-    save_test_sizes(config["data"], save_path.parent)
+    save_test_sizes(config.data, save_path.parent)
 
     # early stopping setup
     stopping_metrics = {
@@ -353,7 +352,7 @@ def train_loop(
         "train": {"loss": 0.0, "acc": 0.0},
     }
     stopper = get_stopper(
-        arg_dict=config.get("early_stopping", None), wandb_run=wandb_run, event=event
+        arg_dict=config.early_stopping, wandb_run=wandb_run, event=event
     )
 
     if load:
@@ -379,8 +378,8 @@ def train_loop(
         print(f"Loaded model from {load}")
 
     # train it
-    while epoch < config["training"]["max_epoch"] and not stopper.stop:
-        print(f"Epoch {epoch}/{config['training']['max_epoch']}")
+    while epoch < config.training.max_epoch and not stopper.stop:
+        print(f"Epoch {epoch}/{config.training.max_epoch}")
         print("-" * 10)
 
         epoch += 1
@@ -427,12 +426,12 @@ def train_loop(
                     step_corrects += predicted.eq(target).sum().item()
                     step_samples += batch_size
 
-                    scaled_loss = loss / config["training"]["update_per_step"]
+                    scaled_loss = loss / config.training.update_per_step
                     scaled_loss.backward()
 
                     accumulated_steps += 1
 
-                    if accumulated_steps == config["training"]["update_per_step"]:
+                    if accumulated_steps == config.training.update_per_step:
                         optimizer.step()
                         optimizer.zero_grad()
                         steps += 1
@@ -518,7 +517,7 @@ def train_loop(
         # Save checkpoint
         if (
             epoch % save_every == 0
-            or not epoch < config["training"]["max_epoch"]
+            or not epoch < config.training.max_epoch
             or stopper.stop
         ):
             checkpoint_data = {
@@ -567,7 +566,7 @@ def main():
     print(f"Run name: {run.name}")  # Human-readable name
     print(f"Run path: {run.path}")  # entity/project/run_id format
 
-    train_loop(admin["model"], config, run, recover=admin["recover"])
+    train_loop(admin.model, config, run, recover=admin.recover)
     run.finish()
 
 

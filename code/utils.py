@@ -4,7 +4,6 @@ import cv2
 from logging import Logger
 import numpy as np
 import matplotlib.pyplot as plt
-import json
 import re
 from pathlib import Path
 import shutil
@@ -12,7 +11,7 @@ from argparse import ArgumentParser
 import wandb
 import time
 import subprocess
-from typing import Callable, Optional, Dict, Any
+from typing import Optional
 from multiprocessing.synchronize import Event as EventClass
 import math
 

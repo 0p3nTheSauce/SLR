@@ -1,5 +1,4 @@
 import argparse
-import getpass
 from multiprocessing import Event
 from multiprocessing.managers import DictProxy
 # from multiprocessing.managers import BaseManager
@@ -10,7 +9,7 @@ import json
 import os
 import signal
 import sys
-from typing import Optional, Union, Tuple, Any, TypeGuard
+from typing import Optional, Union, Tuple
 from pathlib import Path
 
 from .core import (
@@ -23,8 +22,6 @@ from .core import (
     QUE_NAME,
     SERVER_NAME,
     DAEMON_NAME,
-    TRAINING_NAME,
-    TRAINING_LOG_PATH,
     WORKER_NAME,
     ServerState,
     WorkerState,
@@ -32,8 +29,8 @@ from .core import (
     read_server_state,
     # Process_states
 )
-from .daemon import Daemon, DaemonState
-from .worker import Worker, WorkerState
+from .daemon import Daemon
+from .worker import Worker
 
 
 class ServerContext:
@@ -144,7 +141,7 @@ class ServerContext:
 
             if self.save_on_shutdown:
                 self.server_logger.info("Saving server state...")
-                self.daemon.state["awake"] = False #if being stopped by signal, probably don't want to be awake when restarted
+                self.daemon.state.awake = False #if being stopped by signal, probably don't want to be awake when restarted
                 self.server_pid = None #similarly, we have no need to save an old pid
                 self.save_state()
             
@@ -168,9 +165,9 @@ class ServerContext:
         worker: Optional[WorkerState] = None,
     ) -> None:
         if server is not None:
-            self.server_pid = server["server_pid"]
-            self.daemon.set_state(server["daemon_state"])
-            self.worker.set_state(server["worker_state"])
+            self.server_pid = server.server_pid
+            self.daemon.set_state(server.daemon_state)
+            self.worker.set_state(server.worker_state)
         if daemon is not None:
             self.daemon.set_state(daemon)
         if worker is not None:
@@ -204,7 +201,7 @@ class ServerContext:
         try:
             # self.set_state(read_server_state(self.state_path))
             state = read_server_state(self.state_path)
-            state["server_pid"] = self.server_pid #do not reset server_pid after loading
+            state.server_pid = self.server_pid #do not reset server_pid after loading
             self.set_state(state)
             self.server_logger.info(f"Loaded state from: {self.state_path}")
         except Exception as e:

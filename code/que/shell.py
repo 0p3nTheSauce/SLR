@@ -1,7 +1,7 @@
 import webbrowser
 import cmd as cmdLib
 import shlex
-from typing import Optional, List, Any, Dict,cast
+from typing import Optional, List, Any
 import argparse
 import configs
 import time
@@ -38,12 +38,11 @@ from .core import (
     SERVER_LOG_PATH,
     RUN_PATH,
     QueManagerProtocol,
-    ExpQue,
     QueDupExp,
 )
 from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from .tmux import tmux_manager
-from run_types import CleverDict
+
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -357,13 +356,15 @@ class QueShell(cmdLib.Cmd):
             header_style="bold magenta",
         )
 
+        dict_runs = list(map(lambda x: x.model_dump(), runs))
+
         table.add_column("Index", style="cyan", justify="right", width=8)
-        for header in runs[0].keys():
+        for header in dict_runs[0].keys():
             table.add_column(header.capitalize(), style="white")
 
         # runs are a list of Summarised dicts
 
-        for idx, row in enumerate(runs):
+        for idx, row in enumerate(dict_runs):
             row_values = []
             for value in row.values():
                 value_str = str(value)
@@ -390,8 +391,7 @@ class QueShell(cmdLib.Cmd):
             self.console.print("[yellow]Remove cancelled[/yellow]")
 
     def _unpack_keys(self, run: GenExp, key_set: List[str]) -> Any:
-        unpack = cast(Dict[str, Any], run)
-        unpack = run
+        unpack = run.model_dump()
         for k in key_set:
             unpack = unpack[k]
         return unpack
@@ -504,11 +504,11 @@ class QueShell(cmdLib.Cmd):
             admin_info, wandb_info = maybe_args
             
             #add correct checkpoint num to save path
-            admin_info["save_path"] = str(admin_info["save_path"]) + str(parsed_args.checkpoint_num).zfill(ZFILL)
+            admin_info.save_path = str(admin_info.save_path) + str(parsed_args.checkpoint_num).zfill(ZFILL)
             
             #check that checkpoint exists
-            if not Path(admin_info["save_path"]).exists():
-                self.console.print(f"[red]Add cancelled (save path: {admin_info['save_path']} does not exist)[/red]")
+            if not Path(admin_info.save_path).exists():
+                self.console.print(f"[red]Add cancelled (save path: {admin_info.save_path} does not exist)[/red]")
                 return
         else:
             self.console.print("[yellow]Add cancelled (by user)[/yellow]")
@@ -584,10 +584,10 @@ class QueShell(cmdLib.Cmd):
 
         if parsed_args.location is not None and parsed_args.index is not None:
             run = self.que.peak_run(loc=parsed_args.location, idx=parsed_args.index)
-            wandb_info = run["wandb"]
+            wandb_info = run.wandb
             url = (
                 url
-                + f"{wandb_info['entity']}/{wandb_info['project']}/{wandb_info['run_id']}"
+                + f"{wandb_info.entity}/{wandb_info.project}/{wandb_info.run_id}"
             )
         else:
             url = url + f"{parsed_args.entity}/{parsed_args.project}"
@@ -654,7 +654,7 @@ class QueShell(cmdLib.Cmd):
         table.add_column("Details")
 
         # Server section
-        server_pid = status["server_pid"]
+        server_pid = status.server_pid
         server_status = Text()
         if server_pid:
             server_status.append("Running ", style="bold green")
@@ -664,43 +664,43 @@ class QueShell(cmdLib.Cmd):
         table.add_row("Server", server_status)
 
         # Daemon section
-        daemon_state = status["daemon_state"]
+        daemon_state = status.daemon_state
         daemon_table = Table(show_header=False, box=None, padding=(0, 1))
         daemon_table.add_column(style="yellow", width=15)
         daemon_table.add_column()
 
-        awake_icon = "✓" if daemon_state["awake"] else "✗"
-        awake_style = "green" if daemon_state["awake"] else "red"
+        awake_icon = "✓" if daemon_state.awake else "✗"
+        awake_style = "green" if daemon_state.awake else "red"
         daemon_table.add_row("Awake:", Text(awake_icon, style=awake_style))
 
-        stop_icon = "✓" if daemon_state["stop_on_fail"] else "✗"
+        stop_icon = "✓" if daemon_state.stop_on_fail else "✗"
         daemon_table.add_row(
             "Stop on Fail:",
-            Text(stop_icon, style="yellow" if daemon_state["stop_on_fail"] else "dim"),
+            Text(stop_icon, style="yellow" if daemon_state.stop_on_fail else "dim"),
         )
 
-        if daemon_state["supervisor_pid"]:
-            daemon_table.add_row("Supervisor PID:", str(daemon_state["supervisor_pid"]))
+        if daemon_state.supervisor_pid:
+            daemon_table.add_row("Supervisor PID:", str(daemon_state.supervisor_pid))
 
         table.add_row("Daemon", daemon_table)
 
         # Worker section
-        worker_state = status["worker_state"]
+        worker_state = status.worker_state
         worker_table = Table(show_header=False, box=None, padding=(0, 1))
         worker_table.add_column(style="magenta", width=15)
         worker_table.add_column()
 
-        task_style = "bold green" if worker_state["task"] == "training" else "dim"
-        worker_table.add_row("Task:", Text(worker_state["task"], style=task_style))
+        task_style = "bold green" if worker_state.task == "training" else "dim"
+        worker_table.add_row("Task:", Text(worker_state.task, style=task_style))
 
-        if worker_state["current_run_id"]:
-            worker_table.add_row("Run ID:", worker_state["current_run_id"])
+        if worker_state.current_run_id:
+            worker_table.add_row("Run ID:", worker_state.current_run_id)
 
-        if worker_state["working_pid"]:
-            worker_table.add_row("Worker PID:", str(worker_state["working_pid"]))
+        if worker_state.working_pid:
+            worker_table.add_row("Worker PID:", str(worker_state.working_pid))
 
-        if worker_state["exception"]:
-            error_text = Text(worker_state["exception"], style="bold red")
+        if worker_state.exception:
+            error_text = Text(worker_state.exception, style="bold red")
             worker_table.add_row("Exception:", error_text)
 
         table.add_row("Worker", worker_table)

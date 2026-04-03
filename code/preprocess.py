@@ -1,15 +1,13 @@
 from typing import (
-	List,
-	Dict,
-	TypedDict,
-	TypeAlias,
-	Literal,
-	Optional,
-	Any,
-	Tuple,
-	TypeGuard,
-	Union,
+    List,
+    Literal,
+    Optional,
+    Any,
+    Tuple,
+    TypeGuard,
+    Union,
 )
+from pydantic import BaseModel, TypeAdapter
 import json
 import torch
 import tqdm
@@ -22,641 +20,447 @@ import cv2
 from argparse import ArgumentParser
 from pathlib import Path
 
-
 # local imports
-from utils import load_rgb_frames_from_video, cv_load
+from utils import load_rgb_frames_from_video
 from configs import WLASL_ROOT, SPLIT_DIR, RAW_DIR, LABELS_PATH
 
 """Naming convention:
 - set: one of train, test and val
 - split: one of asl100, asl300, asl1000, asl2000"""
 
-AVAIL_SETS: TypeAlias = Literal["train", "val", "test"]
-AVAIL_SPLITS: TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
+AVAIL_SETS = Literal["train", "val", "test"]
+AVAIL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
 
 
-class instance_dict(TypedDict):
-	"""Represents a single instance of a gloss in the dataset.
-	This is the format that the data is currently in, and will be modified by the
-	preprocessing functions.
-
-	Keys:
-	--------
-	- bbox: List[int] # [x_min, y_min, x_max, y_max]
-	- frame_end: int
-	- frame_start: int
-	- instance_id: int
-	- signer_id: int
-	- source: str
-	- split: str
-	- url: str
-	- variation_id: int
-	- video_id: str
-	"""
-
-	bbox: List[int] #[x_min, y_min, x_max, y_max]
-	frame_end: int
-	frame_start: int
-	instance_id: int
-	signer_id: int
-	source: str
-	split: str
-	url: str
-	variation_id: int
-	video_id: str
-
-class InstanceDict(instance_dict):
-	"""Represents a single instance of a gloss in the dataset, with the label_num and label_name added. This is the format that the data will be in after preprocessing.
-
-	Keys:
-	--------
-	- bbox: List[int]
-	- frame_end: int
-	- frame_start: int
-	- instance_id: int
-	- signer_id: int
-	- source: str
-	- split: str (one of available sets, not splits. Uses wlasl name convention)
-	- url: str
-	- variation_id: int
-	- video_id: str
-	- label_num: int
-	- label_name: str
-	"""
-	label_num: int
-	label_name: str
-	
-class wlasl_class_dict(TypedDict):
-	"""Represents a single gloss and its associated instances.
-
-	Keys
-	--------
-	- gloss: str
-	- instances: List[instance_dict]
-	"""
-
-	gloss: str
-	instances: List[instance_dict]
+class RawInstance(BaseModel):
+    """Represents a single raw instance of a gloss in the dataset."""
+    bbox: List[int]  # [x_min, y_min, x_max, y_max]
+    frame_end: int
+    frame_start: int
+    instance_id: int
+    signer_id: int
+    source: str
+    split: str
+    url: str
+    variation_id: int
+    video_id: str
 
 
-
-class BadInstance(InstanceDict):
-	"""Adds reason to an instance that was discarded/modified from the dataset"""
-
-	reason: str
-
-class ErrDict(TypedDict):
-	"""Format for storing bad instances
-	
-	Keys
-	-------
-	- policy: str
-	- num_offenders: int
-	- instances: List[BadInstance]
-	"""
-	policy: str
-	num_offenders: int
-	instances: List[BadInstance]
+class Instance(RawInstance):
+    """Represents a single instance of a gloss in the dataset, with the label_num and label_name added."""
+    label_num: int
+    label_name: str
 
 
-def is_instance_dict(obj: Any) -> TypeGuard[InstanceDict]:
-	"""Type guard to check if a dict is an InstanceDict
-
-	Args:
-			obj (dict): Object to check
-	Returns:
-			TypeGuard[InstanceDict]: True if obj is an InstanceDict, False otherwise
-	"""
-	try:
-		_ = InstanceDict(
-			bbox=obj["bbox"],
-			frame_end=obj["frame_end"],
-			frame_start=obj["frame_start"],
-			instance_id=obj["instance_id"],
-			signer_id=obj["signer_id"],
-			source=obj["source"],
-			split=obj["split"],
-			url=obj["url"],
-			variation_id=obj["variation_id"],
-			video_id=obj["video_id"],
-			label_name=obj["label_name"],
-			label_num=obj["label_num"],
-		)
-		return True
-	except Exception:
-		return False
+class WLASLClass(BaseModel):
+    """Represents a single gloss and its associated raw instances."""
+    gloss: str
+    instances: List[RawInstance]
 
 
-def instance_to_Instance(
-	d: instance_dict,
-	label_num: int,
-	label_name: str,
-) -> InstanceDict:
-	"""Add attributes to convert an instance_dict to and InstanceDict
-
-	Args:
-			d (instance_dict): Data coming in from original WLASL split.json file
-			label_num (int): Numerical label e.g. 0
-			label_name (str): Text label e.g. 'book'
-
-	Returns:
-			InstanceDict: Indtance with extra infor embued
-	"""
-	return {
-		**d,
-		"label_num": label_num,
-		"label_name": label_name,
-	}
+class BadInstance(Instance):
+    """Adds reason to an instance that was discarded/modified from the dataset"""
+    reason: str
 
 
-def Instance_to_Bad(d: InstanceDict, reason: str) -> BadInstance:
-	"""Convert an InstanceDict to a BadInstance by adding a reason
+class ErrLog(BaseModel):
+    """Format for storing bad instances"""
+    policy: str
+    num_offenders: int
+    instances: List[BadInstance]
 
-	Args:
-			d (InstanceDict): Partly processed data which is in the proccess of being cleaned
-			reason (str): Reason to discard/modify instance
 
-	Returns:
-			BadInstance: An Instance with a reason why it isnt a good one.
-	"""
-	return {**d, "reason": reason}
+def is_processed_instance(obj: Any) -> TypeGuard[Instance]:
+    """Type guard to check if an object is a valid Instance dict/object."""
+    try:
+        Instance.model_validate(obj)
+        return True
+    except Exception:
+        return False
+
+
+def instance_to_processed(d: RawInstance, label_num: int, label_name: str) -> Instance:
+    """Convert a RawInstance to a Instance by adding labels."""
+    return Instance(
+        **d.model_dump(),
+        label_num=label_num,
+        label_name=label_name,
+    )
+
+
+def processed_to_bad(d: Instance, reason: str) -> BadInstance:
+    """Convert a Instance to a BadInstance by adding a reason."""
+    return BadInstance(**d.model_dump(), reason=reason)
 
 
 def get_set(
-	lst_wlasl_class_dicts: List[wlasl_class_dict], set_name: AVAIL_SETS
-) -> List[InstanceDict]:
-	"""Filters list of wlasl_class_dict, based on whether the instances are from the provided set_name,
-	As well as converts the instance_dicts to InstanceDicts (adding fields)
-
-	Args:
-			lst_wlasl_class_dicts (List[wlasl_class_dict]): Straight from one of the split.json files in WLASL/splits
-			set_name (AVAIL_SETS): One of train, val or test
-
-	Returns:
-			List[InstanceDict]: The individual instances inside the wlasl_class_list, with label_num and label_name added
-			- class_names: The corresponding text gloss labels of the mod_instances
-	"""
-	mod_instances = []  # instances embued with extra information
-	for i, gloss_d in enumerate(lst_wlasl_class_dicts):
-		for inst in gloss_d["instances"]:
-			if inst["split"] == set_name:
-				mod_instances.append(instance_to_Instance(inst, i, gloss_d["gloss"]))
-	return mod_instances
+    lst_wlasl_class_dicts: List[WLASLClass], set_name: AVAIL_SETS
+) -> List[Instance]:
+    """Filters list of WLASLClass based on whether the instances are from the provided set_name."""
+    mod_instances = []
+    for i, gloss_d in enumerate(lst_wlasl_class_dicts):
+        for inst in gloss_d.instances:
+            if inst.split == set_name:
+                mod_instances.append(instance_to_processed(inst, i, gloss_d.gloss))
+    return mod_instances
 
 
 def output_bad(
-	bad_instances: List[BadInstance],
-	remove_policy: str,
-	log_path: Union[str, Path],
-	fixing_description: str,
+    bad_instances: List[BadInstance],
+    remove_policy: str,
+    log_path: Union[str, Path],
+    fixing_description: str,
 ) -> None:
-	"""Output offending instances to a file.
-			If the remove policy is strict, the instances output here are being removed.
-			If the policy is lenient, then the instances are kept, but the adjustment made to them is saved
-
-	Args:
-			bad_instances (List[BadInstance]): List of offendign instances
-			remove_policy (str): The policy which states whether they were removed or fixed
-			log_path (Union[str, Path]): Output file path
-			fixing_description (str): Description of function which called this method
-	"""
-
-	if len(bad_instances) != 0:
-		err_dict = ErrDict({
-			"policy": remove_policy,
-			"num_offenders": len(bad_instances),
-			"instances": bad_instances,
-		})
-		with open(log_path, "w") as log_file:
-			json.dump(err_dict, log_file, indent=4)
-		print(f"Bad {fixing_description} logged to {log_path}.")
-	else:
-		print(f"No {fixing_description} ranges found")
+    """Output offending instances to a file using Pydantic's JSON serialization."""
+    if len(bad_instances) != 0:
+        err_dict = ErrLog(
+            policy=remove_policy,
+            num_offenders=len(bad_instances),
+            instances=bad_instances,
+        )
+        with open(log_path, "w") as log_file:
+            # use model_dump_json to serialize safely
+            log_file.write(err_dict.model_dump_json(indent=4))
+        print(f"Bad {fixing_description} logged to {log_path}.")
+    else:
+        print(f"No {fixing_description} ranges found")
 
 
 def fix_bad_frame_range(
-	raw_path: Path,
-	instances: List[InstanceDict],
-	log_dir: Path,
-	remove_policy: Literal["strict", "reset"] = "strict",
-	file_extension: str = "bad_frame_ranges.json",
-) -> List[InstanceDict]:
-	"""Remove videos where the file cannot be read, or the start or end frame are impossible.
-	Also logs any bad frames found for particular videos
+    raw_path: Path,
+    instances: List[Instance],
+    log_dir: Path,
+    remove_policy: Literal["strict", "reset"] = "strict",
+    file_extension: str = "bad_frame_ranges.json",
+) -> List[Instance]:
+    """Remove videos where the file cannot be read, or the start or end frame are impossible."""
+    bad_instances: List[BadInstance] = []
+    clean_instances: List[Instance] = []
+    
+    for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
+        vid_path = raw_path / f"{instance.video_id}.mp4"
 
-	Args:
-			raw_path (Path): Path to root directory of videos
-			instances (List[instance]): Instance dictionaries
-			log_dir (Path): Directory to place logged errors
-			remove_policy (Literal["strict", "reset"], optional): If the remove policy is strict,
-					then the instance is removed, otherwise an attempt is made to fix the index. In the case of
-					start: the start frame is set to 0
-					end: the end frame is set to start + numframes
-					Either way the offenders are logged. Defaults to "strict".
-			file_extension (str, optional): Name of output file. Defaults to "bad_frame_ranges.json".
+        cap = cv2.VideoCapture(str(vid_path))
+        if not cap.isOpened():
+            message = f"Could not open video {instance.video_id}. Removing"
+            bad_instances.append(processed_to_bad(instance, message))
+            continue
+        else:
+            num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-	Returns:
-			List[instance]: Instances filtered of incorrect indeces
-	"""
+        start = instance.frame_start
+        end = instance.frame_end
+        
+        if start < 0 or start >= num_frames:
+            message = f"Invalid start frame {start} for video {instance.video_id} with length {num_frames}."
+            if remove_policy == "strict":
+                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
+                continue
+            elif remove_policy == "reset_frames":
+                bad_instances.append(processed_to_bad(instance, message + " Setting to 0."))
+            start = 0
+            
+        if end <= start or end > (start + num_frames):
+            message = f"Invalid end frame {end} for video {instance.video_id} with length {num_frames} and start frame {start}."
+            if remove_policy == "strict":
+                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
+                continue
+            elif remove_policy == "reset_frames":
+                bad_instances.append(processed_to_bad(instance, message + " Setting to num_frames."))
+            end = start + num_frames
+            
+        instance.frame_start = start
+        instance.frame_end = end
+        clean_instances.append(instance)
 
-	bad_instances: List[BadInstance] = []
-	clean_instances: List[InstanceDict] = []
-	for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
-		vid_path = raw_path / (instance["video_id"] + ".mp4")
+    log_path = log_dir / f"{remove_policy}_{file_extension}"
+    output_bad(
+        bad_instances=bad_instances,
+        remove_policy=remove_policy,
+        log_path=log_path,
+        fixing_description="frame range",
+    )
 
-		cap = cv2.VideoCapture(
-			vid_path,
-		)
-		if not cap.isOpened():
-			message = f"Could not open video {instance['video_id']}. Removing"
-			bad_instances.append(Instance_to_Bad(instance, message))
-			continue
-		else:
-			num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-		start = instance["frame_start"]
-		end = instance["frame_end"]
-		if start < 0 or start >= num_frames:
-			message = f"Invalid start frame {start} for video {instance['video_id']} with length {num_frames}."
-			if remove_policy == "strict":
-				bad_instances.append(
-					Instance_to_Bad(instance, message + " Removing instance.")
-				)
-				continue
-			elif remove_policy == "reset_frames":
-				bad_instances.append(
-					Instance_to_Bad(instance, message + " Setting to 0.")
-				)
-			start = 0
-		if end <= start or end > (start + num_frames):
-			message = f"Invalid end frame {end} for video {instance['video_id']} with length {num_frames} and start frame {start}."
-			if remove_policy == "strict":
-				bad_instances.append(
-					Instance_to_Bad(instance, message + " Removing instance.")
-				)
-				continue
-			elif remove_policy == "reset_frames":
-				bad_instances.append(
-					Instance_to_Bad(instance, message + " Setting to num_frames.")
-				)
-			end = start + num_frames
-		instance["frame_start"] = start
-		instance["frame_end"] = end
-		clean_instances.append(instance)
-
-	log_path = log_dir / f"{remove_policy}_{file_extension}"
-	output_bad(
-		bad_instances=bad_instances,
-		remove_policy=remove_policy,
-		log_path=log_path,
-		fixing_description="frame range",
-	)
-
-	return clean_instances
+    return clean_instances
 
 
 def get_largest_bbox(bboxes: List[List[float]]) -> Optional[List[float]]:
-	"""Given a list of bounding boxes, returns the largest bounding box that encompasses all of them, if one exists.
-
-	Args:
-			bboxes (List[List[float]]): List of bounding boxes, where each bounding box is represented as a list of four floats: [x_min, y_min, x_max, y_max].
-
-	Returns:
-			Optional[List[float]]: The largest bounding box that encompasses all of the input bounding boxes, or None if the input list is empty.
-	"""
-	if not bboxes:
-		return None
-	x_min, y_min, x_max, y_max = bboxes[0]
-	for box in bboxes:
-		x1, y1, x2, y2 = box
-		if x1 < x_min:
-			x_min = x1
-		if y1 < y_min:
-			y_min = y1
-		if x2 > x_max:
-			x_max = x2
-		if y2 > y_max:
-			y_max = y2
-	return [x_min, y_min, x_max, y_max]
+    """Given a list of bounding boxes, returns the largest bounding box that encompasses all of them, if one exists."""
+    if not bboxes:
+        return None
+    x_min, y_min, x_max, y_max = bboxes[0]
+    for box in bboxes:
+        x1, y1, x2, y2 = box
+        if x1 < x_min:
+            x_min = x1
+        if y1 < y_min:
+            y_min = y1
+        if x2 > x_max:
+            x_max = x2
+        if y2 > y_max:
+            y_max = y2
+    return [x_min, y_min, x_max, y_max]
 
 
 def fix_bad_bboxes(
-	raw_path: Path,
-	instances: List[InstanceDict],
-	log_dir: Path,
-	remove_policy: Literal["strict", "reset"] = "strict",
-	file_extension: str = "bad_bboxes.json",
-) -> List[InstanceDict]:
-	"""Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video,
-	and taking the largest bounding box across all frames. If no bounding boxes are found,
-	the instance is either removed or the bbox is set to the whole frame, depending on the remove_policy. Logs
-	the offenders either way.
+    raw_path: Path,
+    instances: List[Instance],
+    log_dir: Path,
+    remove_policy: Literal["strict", "reset"] = "strict",
+    file_extension: str = "bad_bboxes.json",
+) -> List[Instance]:
+    """Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video."""
+    model = YOLO("yolov8n.pt")  # Load a pre-trained YOLO model
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-	Args:
-			raw_path (Path): Path to root directory of videos
-			instances (List[instance]): Instance dictionaries
-			log_dir (Path): Directory to place logged errors
-			remove_policy (Literal["strict", "reset"], optional): Policy for handling bad bounding boxes. Defaults to "strict".
-			file_extension (str, optional): File extension for the log file. Defaults to "bad_bboxes.json".
+    bad_instances: List[BadInstance] = []
+    clean_instances: List[Instance] = []
 
-	Raises:
-			ValueError: If an invalid remove_policy is provided.
+    for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
+        vid_path = raw_path / f"{instance.video_id}.mp4"
+        frames = load_rgb_frames_from_video(
+            str(vid_path), instance.frame_start, instance.frame_end
+        )
+        frames = frames.float() / 255.0
 
-	Returns:
-			List[instance]: Instances with corrected bounding boxes, or removed if the policy is strict and no bounding box could be found.
-	"""
+        results = model(frames, device=device, verbose=False)
+        bboxes = []
+        for result in results:
+            person_bboxes = result.boxes.xyxy[result.boxes.cls == 0]
+            if len(person_bboxes) > 0:
+                bboxes.extend(person_bboxes.tolist())
 
-	# TODO: could be a bit faster
-	# NOTE: This function can sometimes bork your conda env, blame ultralytics. If it does remake the env.
-	model = YOLO("yolov8n.pt")  # Load a pre-trained YOLO model
-	device = "cuda" if torch.cuda.is_available() else "cpu"
+        if not bboxes:
+            message = f"No bounding boxes found for video {instance.video_id}."
+            if remove_policy == "strict":
+                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
+                continue
+            elif remove_policy == "reset_bbox":
+                bad_instances.append(processed_to_bad(instance, message + " Using whole frame."))
+                largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
+            else:
+                raise ValueError(f"Invalid remove_policy: {remove_policy}")
+        else:
+            largest_bbox = get_largest_bbox(bboxes)
+            assert largest_bbox is not None, "largest_bbox can not be None here"
 
-	bad_instances: List[BadInstance] = []
-	clean_instances: List[InstanceDict] = []
+        # Round the coordinates to integers and update the Pydantic model
+        largest_bbox = [round(coord) for coord in largest_bbox] 
+        instance.bbox = largest_bbox
+        clean_instances.append(instance)
 
-	for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
-		vid_path = raw_path / (instance["video_id"] + ".mp4")
-		frames = load_rgb_frames_from_video(
-			vid_path, instance["frame_start"], instance["frame_end"]
-		)
-		frames = frames.float() / 255.0
+    log_path = log_dir / f"{remove_policy}_{file_extension}"
 
-		results = model(frames, device=device, verbose=False)
-		bboxes = []
-		for result in results:
-			person_bboxes = result.boxes.xyxy[result.boxes.cls == 0]
-			if len(person_bboxes) > 0:
-				bboxes.extend(person_bboxes.tolist())
+    output_bad(
+        bad_instances=bad_instances,
+        remove_policy=remove_policy,
+        log_path=log_path,
+        fixing_description="bounding boxes",
+    )
 
-		if not bboxes:
-			message = f"No bounding boxes found for video {instance['video_id']}."
-			if remove_policy == "strict":
-				bad_instances.append(
-					Instance_to_Bad(instance, message + " Removing instance.")
-				)
-				continue
-			elif remove_policy == "reset_bbox":
-				bad_instances.append(
-					Instance_to_Bad(instance, message + " Using whole frame.")
-				)
-				largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
-			else:
-				raise ValueError(f"Invalid remove_policy: {remove_policy}")
-		else:
-			largest_bbox = get_largest_bbox(bboxes)
-			assert largest_bbox is not None, "largest_bbox can not be None here"
-
-		largest_bbox = [
-			round(coord) for coord in largest_bbox
-		]  # Round the coordinates to integers
-		clean_instances.append(
-			instance | {"bbox": largest_bbox} #type: ignore
-		)  # update with fresh bbox
-
-	log_path = log_dir / f"{remove_policy}_{file_extension}"
-
-	output_bad(
-		bad_instances=bad_instances,
-		remove_policy=remove_policy,
-		log_path=log_path,
-		fixing_description="bounding boxes",
-	)
-
-	return clean_instances
+    return clean_instances
 
 
 def remove_short_samples(
-	instances: List[InstanceDict],
-	log_dir: Path,
-	cutoff: int = 9,
-	file_extension: str = "removed_short_samples.json",
-) -> List[InstanceDict]:
-	"""Remove samples where the number of frames is less than or equal to the cutoff. Logs any removed samples.
+    instances: List[Instance],
+    log_dir: Path,
+    cutoff: int = 9,
+    file_extension: str = "removed_short_samples.json",
+) -> List[Instance]:
+    """Remove samples where the number of frames is less than or equal to the cutoff."""
+    clean_instances = []
+    short_samples = []
+    
+    for inst in instances:
+        num_frame = inst.frame_end - inst.frame_start
+        if num_frame > cutoff:
+            clean_instances.append(inst)
+        else:
+            # Fixed bug: Append a BadInstance instead of a raw string
+            short_samples.append(
+                processed_to_bad(inst, f"bad number of frames {num_frame} for video {inst.video_id}, removing.")
+            )
 
-	Args:
-			instances (List[InstanceDict]): Instance dictionaries
-			log_dir (Path): Directory to place logged errors
-			cutoff (int, optional): Minimum number of frames required. Defaults to 9.
-			file_extension (str, optional): File name for logging removed samples. Defaults to "removed_short_samples.json".
+    log_path = log_dir / f"cutoff_{cutoff}_{file_extension}"
 
-	Returns:
-			List[InstanceDict]: Instances with short samples removed.
-	"""
+    output_bad(
+        bad_instances=short_samples,
+        remove_policy="strict",
+        log_path=log_path,
+        fixing_description="short samples",
+    )
 
-	clean_instances = []
-	short_samples = []
-	for inst in instances:
-		num_frame = inst["frame_end"] - inst["frame_start"]
-		if num_frame > cutoff:
-			clean_instances.append(inst)
-		else:
-			short_samples.append(
-				f"bad number of frames {num_frame} for video {inst['video_id']}, removing."
-			)
-
-	log_path = log_dir / f"cutoff_{cutoff}_{file_extension}"
-
-	output_bad(
-		bad_instances=short_samples,
-		remove_policy="strict",  # only policy for short samples atm
-		log_path=log_path,
-		fixing_description="short samples",
-	)
-
-	return clean_instances
+    return clean_instances
 
 
 def print_v(s: str, y: bool) -> None:
-	if y:
-		print(s)
+    if y:
+        print(s)
 
 
 def check_paths(
-	split_path: Path, raw_path: Path, output_path: Path, verbose: bool
+    split_path: Path, raw_path: Path, output_path: Path, verbose: bool
 ) -> bool:
-	"""Checks if the provided paths exist and are of the correct type (file or directory).
-	Returns True if all paths are valid, False otherwise. Prints the status of each path based on the verbose flag."""
-	if split_path.exists() and split_path.is_file():
-		print_v(f"split path: {split_path}, found", verbose)
-	else:
-		print(f"split path: {split_path}, not found")
-		return False
-	if raw_path.exists() and raw_path.is_dir():
-		print_v(f"raw path: {raw_path}, found", verbose)
-	else:
-		print(f"raw path: {raw_path}, not found")
-		return False
-	if output_path.exists() and output_path.is_dir():
-		print_v(f"output path: {output_path}, found", verbose)
-	else:
-		print(f"output path: {output_path}, not found")
-		return False
-	return True
+    """Checks if the provided paths exist and are of the correct type."""
+    if split_path.exists() and split_path.is_file():
+        print_v(f"split path: {split_path}, found", verbose)
+    else:
+        print(f"split path: {split_path}, not found")
+        return False
+    if raw_path.exists() and raw_path.is_dir():
+        print_v(f"raw path: {raw_path}, found", verbose)
+    else:
+        print(f"raw path: {raw_path}, not found")
+        return False
+    if output_path.exists() and output_path.is_dir():
+        print_v(f"output path: {output_path}, found", verbose)
+    else:
+        print(f"output path: {output_path}, not found")
+        return False
+    return True
 
 
 def preprocess_split(
-	split_path: Path,
-	raw_path: Path,
-	output_base: Path,
-	verbose: bool = False,
-	file_extension: str = "_fixed_frange_bboxes_len.json",
-	strictness: Tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
-	do_bboxes: bool = True,
-	length_cuttoff: int = 9
+    split_path: Path,
+    raw_path: Path,
+    output_base: Path,
+    verbose: bool = False,
+    file_extension: str = "_fixed_frange_bboxes_len.json",
+    strictness: Tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
+    do_bboxes: bool = True,
+    length_cuttoff: int = 9
 ) -> None:
-	"""Preprocesses a split of the WLASL dataset by fixing bad frame ranges, fixing bad bounding boxes, and removing short samples.
-	The processed data is saved to the output directory, and any issues found during preprocessing are
-	logged.
+    """Preprocesses a split of the WLASL dataset."""
 
-	Args:
-			split_path (Path): Path to the split json file, which contains the glosses and their associated instances for a particular split (train, val or test).
-			raw_path (Path): Path to the raw video directory.
-			output_base (Path): Path to the output base directory.
-			verbose (bool, optional): If True, print verbose output. Defaults to False.
-			file_extension (str, optional): File extension for the processed instances. Defaults to "_fixed_frange_bboxes_len.json".
-	"""
+    if not check_paths(split_path, raw_path, output_base, verbose):
+        return
 
-	if not check_paths(split_path, raw_path, output_base, verbose):
-		return
+    with open(split_path, "r") as f:
+        raw_json_data = json.load(f)
 
-	with open(split_path, "r") as f:
-		asl_num = json.load(f)
+    if not raw_json_data:
+        print(f"no data found in {split_path}")
+        return
 
-	if not asl_num:
-		print(f"no data found in {split_path}")
-		return
+    # Use Pydantic TypeAdapter to validate the incoming JSON dynamically 
+    wlasl_adapter = TypeAdapter(List[WLASLClass])
+    asl_num = wlasl_adapter.validate_python(raw_json_data)
 
-	# create train, test, val splits
-	train_instances = get_set(asl_num, "train")
-	test_instances = get_set(asl_num, "test")
-	val_instances = get_set(asl_num, "val")
+    # create train, test, val splits
+    train_instances = get_set(asl_num, "train")
+    test_instances = get_set(asl_num, "test")
+    val_instances = get_set(asl_num, "val")
 
-	# setup storage
-	base_name = split_path.name.replace(".json", "")
-	output_dir = output_base / base_name
-	output_dir.mkdir(parents=True, exist_ok=True)
+    # setup storage
+    base_name = split_path.name.replace(".json", "")
+    output_dir = output_base / base_name
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-	print_v(f"Processing {base_name}", verbose)
-	for subset, instances in [
-		("train", train_instances),
-		("test", test_instances),
-		("val", val_instances),
-	]:
-		print_v(f"For split: {subset}", verbose)
-		# fix badly labeled frame ranges
-		print_v("Fixing frame ranges", verbose)
-		instances = fix_bad_frame_range(
-			raw_path=raw_path,
-			instances=instances,
-			log_dir=output_dir,
-			remove_policy=strictness[0],
-			file_extension=f"bad_frame_ranges_{subset}.json",
-		)
+    print_v(f"Processing {base_name}", verbose)
+    for subset, instances in [
+        ("train", train_instances),
+        ("test", test_instances),
+        ("val", val_instances),
+    ]:
+        print_v(f"For split: {subset}", verbose)
+        print_v("Fixing frame ranges", verbose)
+        instances = fix_bad_frame_range(
+            raw_path=raw_path,
+            instances=instances,
+            log_dir=output_dir,
+            remove_policy=strictness[0],
+            file_extension=f"bad_frame_ranges_{subset}.json",
+        )
 
-		
+        if do_bboxes:
+            print_v("Fixing bounding boxes", verbose)
+            instances = fix_bad_bboxes(
+                raw_path=raw_path,
+                instances=instances,
+                log_dir=output_dir,
+                remove_policy=strictness[1],
+                file_extension=f"bad_bboxes_{subset}.json",
+            )
 
-		if do_bboxes:
-			# fix badly labeled bounding boxes
-			print_v("Fixing bounding boxes", verbose)
-			instances = fix_bad_bboxes(
-				raw_path=raw_path,
-				instances=instances,
-				log_dir=output_dir,
-				remove_policy=strictness[1],
-				file_extension=f"bad_bboxes_{subset}.json",
-			)
+        print_v("Removing small samples", verbose)
+        instances = remove_short_samples(
+            instances=instances,
+            log_dir=output_dir,
+            cutoff=length_cuttoff,
+            file_extension=f"removed_short_samples_{subset}.json",
+        )
 
-		# finally, remove short samples
-		print_v("Removing small samples", verbose)
-		instances = remove_short_samples(
-			instances=instances,
-			log_dir=output_dir,
-			cutoff=length_cuttoff,
-			file_extension=f"removed_short_samples_{subset}.json",
-		)
+        print_v("Saving results", verbose)
+        inst_path = output_dir / f"{subset}_instances{file_extension}"
+        with open(inst_path, "w") as f:
+            # Serialize back to JSON list using model_dump
+            json.dump([inst.model_dump() for inst in instances], f, indent=2)
 
-		# save
-		print_v("Saving results", verbose)
-		inst_path = output_dir / f"{subset}_instances{file_extension}"
-		with open(inst_path, "w") as f:
-			json.dump(instances, f, indent=2)
-
-	print()
-	print("------------------------- finished preprocessing ---------------")
-	print()
+    print("\n------------------------- finished preprocessing ---------------\n")
 
 
-# NOTE: it is slow, especially for the bigger datasets, mostly held up
-# by fixing the bounding boxes, but this doesn't totally exhause the GPU.
-# so could potentially allocate more processes to the task
 if __name__ == "__main__":
-	avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
+    avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
 
-	parser = ArgumentParser(description="preprocess.py")
-	parser.add_argument(
-		"asl_split",
-		type=str,
-		choices=avail_splits + ['all'],
-		help="Which WLASL split to preprocess",
-	)
-	parser.add_argument(
-		"-rt",
-		"--root",
-		type=str,
-		help=f"WLASL root if not {WLASL_ROOT}",
-		default=WLASL_ROOT,
-	)
-	parser.add_argument(
-		"-sd",
-		"--split_dir",
-		type=str,
-		help=f"Split directory if not {SPLIT_DIR}",
-		default=SPLIT_DIR,
-	)
-	parser.add_argument(
-		"-rd",
-		"--raw_dir",
-		type=str,
-		help=f"Video directory if not {RAW_DIR}",
-		default=RAW_DIR,
-	)
-	parser.add_argument(
-		"-od",
-		"--output_dir",
-		type=str,
-		help=f"Output directory if not {LABELS_PATH}",
-		default=LABELS_PATH,
-	)
-	parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
-	parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['reset', 'reset'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
-	parser.add_argument('-nb', '--no_bbox', action='store_true', help='Skip intense bbox step')
-	parser.add_argument('-lc', '--length_cutoff', type=int, default=9, help='Minimum number of frames for a sample to be kept.')
-	args = parser.parse_args()
+    parser = ArgumentParser(description="preprocess.py")
+    parser.add_argument(
+        "asl_split",
+        type=str,
+        choices=avail_splits + ['all'],
+        help="Which WLASL split to preprocess",
+    )
+    parser.add_argument(
+        "-rt",
+        "--root",
+        type=str,
+        help=f"WLASL root if not {WLASL_ROOT}",
+        default=WLASL_ROOT,
+    )
+    parser.add_argument(
+        "-sd",
+        "--split_dir",
+        type=str,
+        help=f"Split directory if not {SPLIT_DIR}",
+        default=SPLIT_DIR,
+    )
+    parser.add_argument(
+        "-rd",
+        "--raw_dir",
+        type=str,
+        help=f"Video directory if not {RAW_DIR}",
+        default=RAW_DIR,
+    )
+    parser.add_argument(
+        "-od",
+        "--output_dir",
+        type=str,
+        help=f"Output directory if not {LABELS_PATH}",
+        default=LABELS_PATH,
+    )
+    parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
+    parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['reset', 'reset'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
+    parser.add_argument('-nb', '--no_bbox', action='store_true', help='Skip intense bbox step')
+    parser.add_argument('-lc', '--length_cutoff', type=int, default=9, help='Minimum number of frames for a sample to be kept.')
+    args = parser.parse_args()
 
-	root = Path(args.root)
-	raw_dir = root / args.raw_dir
-	output_dir = Path(args.output_dir)
-	output_dir.mkdir(parents=True, exist_ok=True)
+    root = Path(args.root)
+    raw_dir = root / args.raw_dir
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-	if args.asl_split == 'all':
-		todo_splits = avail_splits
-	else:
-		todo_splits = [args.asl_split]
+    if args.asl_split == 'all':
+        todo_splits = avail_splits
+    else:
+        todo_splits = [args.asl_split]
 
-	for split in todo_splits:
-		split_path = root / args.split_dir / f"{split}.json"
-		preprocess_split(
-			split_path=split_path,
-			raw_path=raw_dir, 
-			output_base=output_dir,
-			verbose=args.verbose,
-			strictness=tuple(args.strictness),
-			do_bboxes=(not args.no_bbox),
-			length_cuttoff=args.length_cutoff,
-		)
-
-
-	
-
-	
-		
+    for split in todo_splits:
+        split_path = root / args.split_dir / f"{split}.json"
+        preprocess_split(
+            split_path=split_path,
+            raw_path=raw_dir, 
+            output_base=output_dir,
+            verbose=args.verbose,
+            strictness=tuple(args.strictness),
+            do_bboxes=(not args.no_bbox),
+            length_cuttoff=args.length_cutoff,
+        )

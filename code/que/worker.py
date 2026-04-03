@@ -1,5 +1,4 @@
 import os
-from multiprocessing import Process
 from typing import Optional, IO, cast
 
 import torch
@@ -11,13 +10,24 @@ import io
 
 from multiprocessing.synchronize import Event as EventClass
 
+from code.run_types import RunInfo
+
 # locals
-from .core import connect_manager, TRAINING_LOG_PATH, WORKER_NAME, SERVER_LOG_PATH, TRAINING_NAME, QueException, WorkerState, Worker_tasks, full_test, CompExpInfo
+from .core import (
+    connect_manager,
+    TRAINING_LOG_PATH,
+    WORKER_NAME,
+    SERVER_LOG_PATH,
+    TRAINING_NAME,
+    QueException,
+    WorkerState,
+    full_test,
+    CompExpInfo,
+)
 
 
 from .core import Que
 from utils import gpu_manager
-from configs import _exp_to_run_info
 from training import train_loop, _setup_wandb
 
 
@@ -44,7 +54,6 @@ class Worker:
         que: Que,
         state: WorkerState,
         stop_event: Optional[EventClass] = None,
-        
     ) -> None:
         self.server_logger = server_logger
         self.que = que
@@ -98,25 +107,26 @@ class Worker:
         run_sum = self.que.stash_next_run()
         self.que.save_state()
 
-        #print a seperator between runs
+        # print a seperator between runs
         self.server_logger.info(self.seperator(run_sum))
         # get next run
         info = self.que.peak_cur_run()
 
-        wandb_info = info["wandb"]
-        admin = info["admin"]
-        config = _exp_to_run_info(info)
+        wandb_info = info.wandb
+        admin = info.admin
+
+        config = RunInfo(**info.model_dump())
 
         # setup wandb run
         with redirect_stdout(self.log_adapter):
             run = _setup_wandb(config, wandb_info, run_id_required=True)
 
         # save run_id for recovering
-        wandb_info["run_id"] = run.id
-        info["wandb"] = wandb_info
+        wandb_info.run_id = run.id
+        info.wandb = wandb_info
 
         # save for server context
-        self.state['current_run_id'] = run.id
+        self.state.current_run_id = run.id
 
         self.server_logger.info("saving my id")
         _ = self.que.pop_cur_run()
@@ -125,20 +135,17 @@ class Worker:
 
         self.server_logger.info(f"Run ID: {run.id}")
         self.server_logger.info(f"Run name: {run.name}")  # Human-readable name
-        self.server_logger.info(
-            f"Run path: {run.path}"
-        )  # entity/project/run_id format
+        self.server_logger.info(f"Run path: {run.path}")  # entity/project/run_id format
 
         with redirect_stdout(self.log_adapter):
             train_loop(
-                admin["model"],
+                admin.model,
                 config,
                 run,
-                recover=admin["recover"],
+                recover=admin.recover,
                 event=self.stop_event,
             )
             run.finish(exit_code=0)
-
 
         self.server_logger.info("_train method completed successfully")
 
@@ -148,30 +155,30 @@ class Worker:
         Currently implemented to be in a process started by the Daemon.
         """
         try:
-            self.state['task'] = "training"
+            self.state.task = "training"
             self._train()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = str(Qe)
-            self.state['working_pid'] = None
+            self.state.exception = str(Qe)
+            self.state.working_pid = None
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
-            self.state['exception'] = "KeyboardInterrupt"
-            self.state['working_pid'] = None
+            self.state.exception = "KeyboardInterrupt"
+            self.state.working_pid = None
             raise
         except Exception as e:
             self.server_logger.error(f"Training run failed due to an error: {e}")
-            self.state['exception'] = str(e)
-            self.state['working_pid'] = None
+            self.state.exception = str(e)
+            self.state.working_pid = None
             self.que.stash_failed_run(str(e))
             self.que.save_state()
             # exit with error
             raise
         finally:
             self.cleanup()
-            self.state['task'] = 'inactive'
-            
+            self.state.task = "inactive"
+
     def _test(self) -> None:
         """Tests the run in cur_runs and moves to old_runs"""
         if not gpu_manager.wait_for_completion(
@@ -184,56 +191,55 @@ class Worker:
             return
         else:
             self.server_logger.info("GPU is available")
-            
+
         fin_run = self.que.peak_cur_run()
         with redirect_stdout(self.log_adapter):
-            results = full_test(admin=fin_run['admin'], data=fin_run['data'], re_test=True)
+            results = full_test(admin=fin_run.admin, data=fin_run.data, re_test=True)
         comp_run = CompExpInfo(
-            admin=fin_run["admin"],
-            training=fin_run["training"],
-            optimizer=fin_run["optimizer"],
-            model_params=fin_run["model_params"],
-            data=fin_run["data"],
-            scheduler=fin_run["scheduler"],
-            early_stopping=fin_run["early_stopping"],
-            wandb=fin_run["wandb"],
+            admin=fin_run.admin,
+            training=fin_run.training,
+            optimizer=fin_run.optimizer,
+            model_params=fin_run.model_params,
+            data=fin_run.data,
+            scheduler=fin_run.scheduler,
+            early_stopping=fin_run.early_stopping,
+            wandb=fin_run.wandb,
             results=results,
         )
         _ = self.que.pop_cur_run()
         self.que.set_cur_run(comp_run)
         self.que.store_fin_run()
         self.server_logger.info("Exiting _test method")
-            
+
     def test(self) -> None:
         try:
-            self.state['task'] = 'testing'
+            self.state.task = "testing"
             self._test()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = str(Qe)
+            self.state.exception = str(Qe)
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
-            self.state['exception'] = "KeyboardInterrupt"
+            self.state.exception = "KeyboardInterrupt"
         except Exception as e:
             self.server_logger.error(f"Testing run failed due to an error: {e}")
-            self.state['exception'] = str(e)
+            self.state.exception = str(e)
             self.que.stash_failed_run(str(e))
             self.que.save_state()
             # exit with error
             raise
         finally:
             self.cleanup()
-            self.state['current_run_id'] = None
-            self.state['task'] = 'inactive'
-    
+            self.state.current_run_id = None
+            self.state.task = "inactive"
+
     def _reset_state(self):
-        self.set_state(WorkerState(
-            task='inactive',
-            current_run_id=None,
-            working_pid=None,
-            exception=None
-        ))
+        self.set_state(
+            WorkerState(
+                task="inactive", current_run_id=None, working_pid=None, exception=None
+            )
+        )
 
     def _reattach_server_logger(self):
         """Re-attach the server log file handler in a spawned child process."""
@@ -241,35 +247,41 @@ class Worker:
         if not logger.handlers:  # avoid duplicate handlers on repeated calls
             handler = logging.FileHandler(SERVER_LOG_PATH)
             handler.setLevel(logging.DEBUG)
-            handler.setFormatter(logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            ))
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                )
+            )
             logger.addHandler(handler)
             logger.setLevel(logging.DEBUG)
         self.server_logger = logger
-    
+
     def _attach_training_loggers(self):
         """Attach the training log file hanlder in a spawned child process"""
         self.training_logger = logging.getLogger(TRAINING_NAME)
         if not self.training_logger.handlers:
             handler = logging.FileHandler(TRAINING_LOG_PATH)
             handler.setLevel(logging.INFO)
-            handler.setFormatter(logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            ))
+            handler.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                )
+            )
             self.training_logger.addHandler(handler)
             self.training_logger.setLevel(logging.INFO)
-            self.training_logger.propagate = False  # match what _setup_training_logger does
+            self.training_logger.propagate = (
+                False  # match what _setup_training_logger does
+            )
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
     def start(self):
         """this is likely started in a seperate process, so que requires connecting"""
-        
+
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
-        self.state['working_pid'] = os.getpid()
-        self.state['exception'] = None
+        self.state.working_pid = os.getpid()
+        self.state.exception = None
 
         self._attach_training_loggers()
         self._reattach_server_logger()
@@ -277,17 +289,12 @@ class Worker:
         self.train()
 
         if self.stop_event is not None and self.stop_event.is_set():
-            self.server_logger.warning(
-                "Training was interrupted by stopping event."
-            )
+            self.server_logger.warning("Training was interrupted by stopping event.")
             self.que.save_state()  # keep current run for recovery
         else:
             self.server_logger.info("Training finished successfully. Running tests")
             self.test()
             self.que.save_state()
-            
-
-
 
 
 if __name__ == "__main__":

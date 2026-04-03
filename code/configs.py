@@ -3,50 +3,30 @@ import argparse
 import ast
 from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
 from utils import enum_dir
-from stopping import EarlyStopper, StopperOn
 from pathlib import Path
 import torch
 import numpy as np
 import random
 
 # locals
-from models import NormDict, avail_models, norm_vals
+from models import avail_models, norm_vals
 from run_types import (
-    SamplerConfig,
-    ExpInfo,
     WandbInfo,
     RunInfo,
     AdminInfo,
-    TrainingInfo,
-    OptimizerInfo,
-    Model_paramsInfo,
-    DataInfo,
-    CosAnealInfo,
-    WarmRestartInfo,
-    SchedInfo,
-    WarmUpSched,
     AugInfo,
-    FrameSize_Strategy,
-    SpatialStrategy,
-    TemporalStrategy
 )
 import json
 
 # constants
-# - wandb
 ENTITY = "ljgoodall2001-rhodes-university"
-# PROJECT = "WLASL-100"
 PROJECT_BASE = "WLASL"
-# - data
-
-# LABELS_PATH = "preprocessed/labels_old"
 LABEL_SUFFIX = "fixed_frange_bboxes_len.json"
 CLASSES_PATH = "./info/wlasl_class_list.json"
 WLASL_ROOT = "../data/WLASL"
 LABELS_PATH = WLASL_ROOT + "/preprocessed/labels"
 RAW_DIR = "WLASL2000"
 SPLIT_DIR = "splits"
-# - training/testing
 RUNS_PATH = "./runs"
 CONFIGS_PATH = "./configfiles"
 ZFILL = 3
@@ -56,17 +36,7 @@ SEED = 42
 def ask_nicely(
     message: str, requirment: Optional[Callable] = None, error: Optional[str] = None
 ) -> str:
-    """Ask user for input, with optional requirement and error message
-
-    Args:
-                    message (str): The message to display when asking for input
-                    requirment (Optional[callable], optional): A function that takes the input and
-                                    returns True if it meets the requirement, False otherwise. Defaults to None.
-                    error (Optional[str], optional): The error message to display if the requirement is not met. Defaults to None.
-
-    Returns:
-                    str: The user input that meets the requirement (if provided)
-    """
+    """Ask user for input, with optional requirement and error message."""
     while True:
         ans = input(message)
         if requirment is None or requirment(ans):
@@ -75,31 +45,11 @@ def ask_nicely(
             print(error if error else "Invalid input, please try again.")
 
 
-def _exp_to_run_info(expInfo: ExpInfo) -> RunInfo:
-    """
-    Convert ExpInfo to RunInfo by removing wandb key.
-    """
-    run_info: RunInfo = {
-        "admin": expInfo["admin"],
-        "training": expInfo["training"],
-        "optimizer": expInfo["optimizer"],
-        "model_params": expInfo["model_params"],
-        "data": expInfo["data"],
-        "scheduler": expInfo["scheduler"],
-        "early_stopping": expInfo["early_stopping"],
-    }
-    return run_info
-
-
 ####################### Utility functions ##############################
 
 
 def set_seed(seed: int = SEED):
-    """Set the random seed across multiple environments, as well as use torch deterministic settings.
-
-    Args:
-                    seed (int, optional): The random seed, otherwise use defined constant. Defaults to SEED.
-    """
+    """Set the random seed across multiple environments."""
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
@@ -109,125 +59,44 @@ def set_seed(seed: int = SEED):
 
 
 def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
-    """Get the available splits from preprocessed labels directory
-
-    Args:
-                    pre_proc_dir (str, optional): The root directory for preprocessed labels. Defaults to LABELS_PATH.
-
-    Raises:
-                    ValueError: If preprocessed directory is invalid.
-
-    Returns:
-                    List[str]: List of available splits.
-    """
-
+    """Get the available splits from preprocessed labels directory."""
     ppd = Path(pre_proc_dir)
     if not ppd.exists() or not ppd.is_dir():
         raise ValueError(
-            f"Invalied preprocessed directory: {pre_proc_dir}, must exist and be directory"
+            f"Invalid preprocessed directory: {pre_proc_dir}, must exist and be a directory"
         )
     return list(map(lambda x: x.name, ppd.iterdir()))
 
 
-def print_config(config_dict):
-    """
-    Print configuration dictionary in a more readable format.
-
-    Args:
-                                                                    config_dict (dict): Dictionary containing configuration sections
-
-    """
-    for section in config_dict.keys():
+def print_config(config: RunInfo):
+    """Print a RunInfo model in a readable format."""
+    for section, data in config.model_dump().items():
         print(f"{section.upper()}:")
-        section_data = config_dict[section]
-
-        # Calculate max key length for alignment
-        if isinstance(section_data, Dict):
-            max_key_len = (
-                max(len(str(k)) for k in section_data.keys()) if section_data else 0
-            )
-        else:
-            max_key_len = len(str(section_data))
-        if isinstance(section_data, dict):
-            for key, value in section_data.items():
+        if isinstance(data, dict):
+            max_key_len = max((len(str(k)) for k in data), default=0)
+            for key, value in data.items():
                 if isinstance(value, dict):
-                    print(f"{key} :")
-                    print(json.dumps(value, indent=4))  # TODO: could be better
-
+                    print(f"  {key}:")
+                    print(json.dumps(value, indent=4))
                 else:
                     print(f"    {key:<{max_key_len}} : {value}")
-
         else:
-            print(section_data)
+            print(f"  {data}")
         print()
 
 
 def get_class_list(classes_path: Union[str, Path] = CLASSES_PATH) -> List[str]:
-    """
-    Retrieve the classes list from file (still under development for other datasets)
-
-    :param classes_path: Path to classes file
-    :type classes_path: Union[str, Path]
-    :return: List of classes ordered by label num. For example, 'book' is label 0.
-    :rtype: List[str]
-    """
+    """Retrieve the classes list from file."""
     with open(classes_path, "r") as f:
         class_list = json.load(f)
-
     return class_list
 
 
 ###################### Config generation ###############################
 
 
-def _schedular_precheck(sched_info: Optional[SchedInfo]) -> None:
-    """Fail early if scheduler config is invalid.
-
-    Args:
-                    config (Dict[str, Any]): Entire training config dictionary.
-
-    Raises:
-                    ValueError: If scheduler type invalid
-                    ValueError: If warmup_epochs negative
-                    ValueError: If start_factor and end_factor not specified for warmup
-                    ValueError: If start_factor and end_factor invalid
-    """
-
-    if sched_info is None:
-        return
-
-    # these have already been implemented
-    valid_types = [
-        "WarmOnly",  # warm up only
-        "ReduceLROnPlateau",
-        "CosineAnnealingLR",
-        "CosineAnnealingWarmRestarts",
-    ]
-
-    if sched_info["type"] not in valid_types:
-        raise ValueError(
-            f"Invalid scheduler type: {sched_info['type']}. Available types: {valid_types}"
-        )
-
-    if "warmup_epochs" in sched_info:
-        if sched_info["warmup_epochs"] < 0:
-            raise ValueError("warmup_epochs must be non-negative")
-        if not (0 < sched_info["start_factor"] < sched_info["end_factor"] <= 1.0):
-            raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
-
-
-def _stopper_precheck(config: Optional[StopperOn]) -> None:
-    """Fail early if stopper is invalid
-
-    Args:
-                    config (Optional[StopperOn]): _description_
-    """
-    if config:
-        EarlyStopper.config_precheck(config)
-
-
 def _convert_type(value: str) -> Any:
-    """Convert string values to appropriate types"""
+    """Convert string values from .ini to appropriate Python types."""
     try:
         return ast.literal_eval(value)
     except (ValueError, SyntaxError):
@@ -235,115 +104,25 @@ def _convert_type(value: str) -> Any:
 
 
 def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
-    """Parse .ini file for wandb config"""
+    """Parse .ini file into a nested dict with correctly typed values."""
     config = configparser.ConfigParser()
     config.read(ini_file)
-
-    # Nested structure
-    wandb_config = {}
-    for section in config.sections():
-        wandb_config[section] = {}
-        for key, value in config[section].items():
-            wandb_config[section][key] = _convert_type(value)
-
-    return wandb_config
+    return {
+        section: {key: _convert_type(value) for key, value in config[section].items()}
+        for section in config.sections()
+    }
 
 
-def _to_exp_info(config: Dict[str, Any]) -> RunInfo:
-    """Convert raw config to typed ExperimentInfo"""
-
-    # Optional sections with None default
-    scheduler = None
-    if "scheduler" in config:
-        # Converts warmup to subdict
-        warm_up = None
-        if "warmup_epochs" in config["scheduler"]:
-            warm_up = WarmUpSched(
-                start_factor=config["scheduler"]["start_factor"],
-                end_factor=config["scheduler"]["end_factor"],
-                warmup_epochs=config["scheduler"]["warmup_epochs"],
-            )
-
-        if config["scheduler"]["type"] == "CosineAnnealingLR":
-            scheduler = CosAnealInfo(
-                type=config["scheduler"]["type"],
-                tmax=config["scheduler"]["tmax"],
-                eta_min=config["scheduler"]["eta_min"],
-                warm_up=warm_up,
-            )
-        elif config["scheduler"]["type"] == "CosineAnnealingWarmRestarts":
-            scheduler = WarmRestartInfo(
-                type=config["scheduler"]["type"],
-                t0=config["scheduler"]["t0"],
-                tmult=config["scheduler"]["tmult"],
-                eta_min=config["scheduler"]["eta_min"],
-                warm_up=warm_up,
-            )
-
-    early_stopping = None
-    if "early_stopping" in config:
-        early_stopping = StopperOn(
-            metric=config["early_stopping"]["metric"],  # Convert to list/tuple
-            mode=config["early_stopping"]["mode"],
-            patience=config["early_stopping"]["patience"],
-            min_delta=config["early_stopping"]["min_delta"],
-        )
-
-    return RunInfo(
-        admin=AdminInfo(**config["admin"]),
-        training=TrainingInfo(**config["training"]),
-        optimizer=OptimizerInfo(
-            **config["optimizer"]
-        ),  # Shorthand if keys match exactly
-        model_params=Model_paramsInfo(**config["model_params"]),
-        data=DataInfo(**config["data"]),
-        scheduler=scheduler,
-        early_stopping=early_stopping,
-    )
-
-
-def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:
-    """Add equivalent batch size"""
-    conf["training"]["batch_size_equivalent"] = (
-        conf["training"]["batch_size"] * conf["training"]["update_per_step"]
-    )
-    return conf
-
-
-def _model_params_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
-    """If model params not present, add dropout = None as default"""
-    if "model_params" not in config:
-        config["model_params"] = {"drop_p": None}
-    elif "drop_p" not in config["model_params"]:
-        config["model_params"]["drop_p"] = None
-    return config
-
-
-_VALID_FRAME_SIZE = set(FrameSize_Strategy.__args__)
-_VALID_SPATIAL = set(SpatialStrategy.__args__)
-_VALID_TEMPORAL = set(TemporalStrategy.__args__)
-
-def _validate_aug_conf(aug_conf: Dict[str, Any]) -> None:
-    if (fs := aug_conf.get("frame_size_strategy")):
-        invalid = set(fs) - _VALID_FRAME_SIZE
-        if invalid:
-            raise ValueError(f"Invalid frame_size_strategy values: {invalid}. Must be one of {_VALID_FRAME_SIZE}")
-
-    if (sa := aug_conf.get("spatial_aug")):
-        invalid = set(sa) - _VALID_SPATIAL
-        if invalid:
-            raise ValueError(f"Invalid spatial_aug values: {invalid}. Must be one of {_VALID_SPATIAL}")
-
-    if (ta := aug_conf.get("temporal_aug")):
-        if ta not in _VALID_TEMPORAL:
-            raise ValueError(f"Invalid temporal_aug: {ta!r}. Must be one of {_VALID_TEMPORAL}")
-
-def _augs_precheck(
+def _make_aug_info(
     aug_conf: Optional[Dict[str, Any]],
     model_name: str,
     mode: Literal["train", "test", "val"],
 ) -> AugInfo:
-    """Check that augmentations are valid, and add defaults if not present"""
+    """Build an AugInfo model, filling in defaults when aug_conf is None.
+
+    Validation of strategy values is handled by AugInfo's Literal type annotations —
+    pydantic will raise a ValidationError automatically on invalid values.
+    """
     if aug_conf is None:
         aug_conf = {"norm_dict": norm_vals(model_name)}
         if mode == "train":
@@ -352,170 +131,57 @@ def _augs_precheck(
         else:
             aug_conf["frame_size_strategy"] = ["Centre_crop"]
 
-    # set rest to None if not present
-    for key in AugInfo.__annotations__.keys():
-        if (key not in aug_conf):
-            aug_conf[key] = None if key == 'norm_dict' else []
-
-    if aug_conf["norm_dict"] == "on":
+    # Resolve the "on" shorthand for norm_dict
+    if aug_conf.get("norm_dict") == "on":
         aug_conf["norm_dict"] = norm_vals(model_name)
 
-
-    _validate_aug_conf(aug_conf)
-    return AugInfo(**aug_conf)
+    return AugInfo.model_validate(aug_conf)
 
 
-    # return AugInfo(**aug_conf)
-
-
-
-def _data_precheck(config: Dict[str, Any], model:str) -> Dict[str, Any]:
-    """Builds correct DataInfo structure, and checks for required keys. Also adds defaults for optional keys if not present."""
-    if "data" not in config:
-        raise ValueError("Data section is required in config")
-    data_conf = config["data"]
-    if "num_frames" not in data_conf or "frame_size" not in data_conf:
-        raise ValueError("num_frames and frame_size are required in data config")
-    
-    # check if train_augs and test_augs are present, if not add defaults
-    data_conf["train_augs"] = _augs_precheck(
-        config.get("train_augs"), model, mode="train"
-    )
-    data_conf["test_augs"] = _augs_precheck(
-        config.get("test_augs"), model, mode="test"
-    )
-    # for now val is the same as test
-    # data_conf['val_augs'] = _augs_precheck(data_conf.get('val_augs'), config['admin']['model'], mode='val')
-
-    config["data"] = DataInfo(**data_conf)
-    return config
-    
-    
 def load_config(admin: AdminInfo) -> RunInfo:
-    """Load config from flat file and merge with command line args
+    """Load config from .ini file and merge with AdminInfo from CLI.
 
     Args:
-        admin (Dict[str, Any]): Admin args from command line
+        admin: Parsed admin info from command line arguments.
+
+    Returns:
+        RunInfo: Fully validated config model for the run.
 
     Raises:
-        ValueError: If config path not found, or there are issues with the config
-        KeyError: Various issues with config file
-
-    Returns:
-        ExperimentInfo: Dictionary containing all required information for a run
+        FileNotFoundError: If config file doesn't exist.
+        pydantic.ValidationError: If config values fail validation.
     """
-
-    conf_path = Path(admin["config_path"])
+    conf_path = Path(admin.config_path)
     if not conf_path.exists():
-        # raise ValueError(f"{conf_path} not found")
         raise FileNotFoundError(f"{conf_path} not found")
 
-    config = parse_ini_config(admin["config_path"])
-    config = _add_eq_bs(config)
-    config = _model_params_precheck(config)
-    config = _data_precheck(config, admin['model'])
-    ndict = {"admin": admin}
-    ndict.update(config)
+    raw = parse_ini_config(admin.config_path)
 
-    r_info = _to_exp_info(ndict)
+    # Resolve augmentations before handing off to pydantic
+    data_conf = raw.get("data", {})
+    data_conf["train_augs"] = _make_aug_info(raw.pop("train_augs", None), admin.model, "train")
+    data_conf["test_augs"] = _make_aug_info(raw.pop("test_augs", None), admin.model, "test")
+    raw["data"] = data_conf
 
-    _stopper_precheck(r_info.get("early_stopping"))
-    _schedular_precheck(r_info.get("scheduler"))
+    # Nest warmup into the scheduler subdict so pydantic sees the right shape
+    if "scheduler" in raw and "warmup_epochs" in raw["scheduler"]:
+        sched = raw["scheduler"]
+        raw["scheduler"]["warm_up"] = {
+            "start_factor": sched.pop("start_factor"),
+            "end_factor": sched.pop("end_factor"),
+            "warmup_epochs": sched.pop("warmup_epochs"),
+        }
 
-    return r_info
-
-
-def get_train_parser(
-    prog: Optional[str] = None, desc: str = "Train a model"
-) -> argparse.ArgumentParser:
-    """Get parser for a training configuration
-
-    Args:
-                    prog (Optional[str], optional): Script name, (e.g. train.py). Defaults to None.
-                    desc (str, optional): Program desctiption. Defaults to "Train a model".
-
-    Returns:
-                    argparse.ArgumentParser: Parser which takes training arguments
-    """
-    models_available = avail_models()
-    splits_available = get_avail_splits()
-
-    parser = argparse.ArgumentParser(description=desc, prog=prog)
-
-    # admin
-    parser.add_argument(
-        "model",
-        type=str,
-        choices=models_available,
-        help="Model name from one of the implemented models",
-    )
-    parser.add_argument(
-        "split",
-        type=str,
-        choices=splits_available,
-        help="The class split, one of",
-    )
-    experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
-    experiment_gen_type.add_argument(
-        "-en", "--exp_no", type=int, help="Experiment number (e.g. 10)"
-    )
-    experiment_gen_type.add_argument(
-        "-c", "--config_path", help="path to config .ini file"
-    )
-    parser.add_argument(
-        "-ds",
-        "--dataset",
-        type=str,
-        choices=["WLASL"],
-        help="Not implemented yet",
-        default="WLASL",
-    )
-
-    parser.add_argument(
-        "-r", "--recover", action="store_true", help="Recover from last checkpoint"
-    )
-    parser.add_argument(
-        "-ri",
-        "--run_id",
-        type=str,
-        default=None,
-        help="The run id to use (especially when also usign recover)",
-    )
-    parser.add_argument(
-        "-p",
-        "--project",
-        type=str,
-        help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)",
-    )
-    parser.add_argument(
-        "-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}"
-    )
-    parser.add_argument(
-        "-t", "--tags", nargs="+", type=str, help="Additional wandb tags"
-    )
-
-    parser.add_argument(
-        "-w", "--weights_path", type=str, help="Path to model pretrained weights"
-    )
-    parser.add_argument(
-        "-na", "--no_ask", action="store_true", help="Don't ask for confirmation"
-    )
-
-    parser.add_argument(
-        "-nec",
-        "--no_enum_chck",
-        action="store_true",
-        help="Do not enumerate the checkpoint dir num (for output)",
-    )
-
-    return parser
+    # pydantic handles: type coercion, required field checks, discriminated union
+    # dispatch, WarmUpSched factor validation, EarlyStopper metric checks, defaults
+    return RunInfo.model_validate({"admin": admin.model_dump(), **raw})
 
 
-def get_next_expno(split: str, model: str, runs_path: str = RUNS_PATH):
+###################### Path utilities ###############################
+
+
+def get_next_expno(split: str, model: str, runs_path: str = RUNS_PATH) -> int:
     model_dir = Path(runs_path) / split / model
-    # assert model_dir.exists() and model_dir.is_dir(), (
-    #     f"{model_dir} must exist and be a directory"
-    # )
     if not (model_dir.exists() and model_dir.is_dir()):
         return 0
     model_exps = sorted(model_dir.glob("exp*"))
@@ -529,16 +195,6 @@ def get_model_exp_dir(
     runs_path: str = RUNS_PATH,
     zd: int = ZFILL,
 ) -> Path:
-    """Get the model experiment directory.
-
-    Args:
-            split (str): WLASL split
-            model (str): Model name
-            runs_path (str, optional): Path to runs directory. Defaults to RUNS_PATH.
-            exp_no (int, optional): Experiment number. Defaults to 0.
-    Returns:
-            Path: Path to model experiment directory.
-    """
     return Path(f"{runs_path}/{split}/{model}/exp{str(exp_no).zfill(zd)}")
 
 
@@ -547,37 +203,17 @@ def get_model_checkpoint_dir(
     checkpoint_num: Optional[int] = None,
     zd: int = ZFILL,
 ) -> Path:
-    """Get the path to the model checkpoint directory
-
-    Args:
-        model_exp_dir (Path): Path to experiment directory
-        checkpoint_num (Optional[int], optional): Checkpoint number. Defaults to None.
-
-    Returns:
-        Path: Path to checkpoint directory
-    """
     if checkpoint_num is None:
         return model_exp_dir / "checkpoints"
-    else:
-        return model_exp_dir / f"checkpoints{str(checkpoint_num).zfill(zd)}"
+    return model_exp_dir / f"checkpoints{str(checkpoint_num).zfill(zd)}"
 
 
 def get_model_results_dir(
     model_exp_dir: Path, checkpoint_num: Optional[int] = None, zd: int = ZFILL
 ) -> Path:
-    """Get the path to the model results directory
-
-    Args:
-        model_exp_dir (Path): Path to experiment directory
-        checkpoint_num (Optional[int], optional): Checkpoint number. Defaults to None.
-
-    Returns:
-        Path: Path to checkpoint directory
-    """
     if checkpoint_num is None:
         return model_exp_dir / "results"
-    else:
-        return model_exp_dir / f"results{str(checkpoint_num).zfill(zd)}"
+    return model_exp_dir / f"results{str(checkpoint_num).zfill(zd)}"
 
 
 def get_config_path(
@@ -590,30 +226,47 @@ def get_config_path(
     return Path(configs_dir) / f"{split}/{model}/exp{str(exp_no).zfill(zd)}.ini"
 
 
+###################### Argument parsing ###############################
+
+
+def get_train_parser(
+    prog: Optional[str] = None, desc: str = "Train a model"
+) -> argparse.ArgumentParser:
+    """Get parser for a training configuration."""
+    models_available = avail_models()
+    splits_available = get_avail_splits()
+
+    parser = argparse.ArgumentParser(description=desc, prog=prog)
+
+    parser.add_argument("model", type=str, choices=models_available)
+    parser.add_argument("split", type=str, choices=splits_available)
+
+    experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
+    experiment_gen_type.add_argument("-en", "--exp_no", type=int)
+    experiment_gen_type.add_argument("-c", "--config_path")
+
+    parser.add_argument("-ds", "--dataset", type=str, choices=["WLASL"], default="WLASL")
+    parser.add_argument("-r", "--recover", action="store_true")
+    parser.add_argument("-ri", "--run_id", type=str, default=None)
+    parser.add_argument("-p", "--project", type=str)
+    parser.add_argument("-et", "--entity", type=str, default=ENTITY)
+    parser.add_argument("-t", "--tags", nargs="+", type=str)
+    parser.add_argument("-w", "--weights_path", type=str)
+    parser.add_argument("-na", "--no_ask", action="store_true")
+    parser.add_argument("-nec", "--no_enum_chck", action="store_true")
+
+    return parser
+
+
 def take_args(
     sup_args: Optional[List[str]] = None,
     parsed_args: Optional[argparse.Namespace] = None,
 ) -> Optional[Tuple[AdminInfo, WandbInfo]]:
-    """Retrieve arguments for new training run
-
-    Args:
-            sup_args (Optional[List[str]], optional): Supply arguments instead of taking from command line. Defaults to None.
-            make_dirs (bool, optional): Make output and checkpoint dirs. Defaults to False.
-            ask_bf_ovrite (bool, optional): Ask for permition to overwirte an existing experiment directory. Defaults to True.
-            parsed_args (Optional[argparse.Namespace], Optional): Supply already parsed args, to avoid reparsing. Defaults to None.
-
-    Raises:
-            ValueError: If model or split supplied are not available, or if recovering and save path is invalid.
-
-    Returns:
-            Optional[tuple | argparse.ArgumentParser]: Arguments or parser, if successful.
-    """
-
+    """Retrieve and validate arguments for a new training run."""
     models_available = avail_models()
     splits_available = get_avail_splits()
 
     parser = get_train_parser()
-
     if sup_args:
         args = parser.parse_args(sup_args)
     elif parsed_args:
@@ -622,94 +275,59 @@ def take_args(
         args = parser.parse_args()
 
     if args.split not in splits_available:
-        raise ValueError(
-            f"Sorry {args.split} not processed yet.\n\
-			Currently available: {splits_available}"
-        )
+        raise ValueError(f"{args.split} not processed yet. Available: {splits_available}")
     if args.model not in models_available:
-        raise ValueError(
-            f"Sorry {args.model} not implemented yet.\n\
-			Currently available: {models_available}"
-        )
+        raise ValueError(f"{args.model} not implemented yet. Available: {models_available}")
 
-    # Handle defaults
-    # - wandb project
     if args.project is None:
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
-    # - enumerate experiment number
+
     if args.exp_no is None:
         exp_no = get_next_expno(args.split, args.model)
-
         enum_exp = True
     else:
         exp_no = args.exp_no
         enum_exp = False
-    # - Set config path
+
     if args.config_path is None:
         assert not enum_exp, "Enumerating the experiment is not valid in this case"
         args.config_path = str(get_config_path(args.split, args.model, exp_no))
 
-    output = get_model_exp_dir(
-        split=args.split,
-        model=args.model,
-        exp_no=exp_no,
-    )
+    output = get_model_exp_dir(split=args.split, model=args.model, exp_no=exp_no)
 
-    if enum_exp:  # working with a gerneric config
+    if enum_exp:
         output = enum_dir(output, decimals=ZFILL)
-        # update exp_no
         exp_no = int(output.name[-3:])
 
-    # saving
     save_path = get_model_checkpoint_dir(output)
 
     if not (args.recover or args.no_enum_chck):
-        save_path = enum_dir(save_path, decimals=ZFILL)  # enumerate checkpoint
+        save_path = enum_dir(save_path, decimals=ZFILL)
     elif args.recover:
         if not save_path.exists() or not save_path.is_dir():
-            raise ValueError(
-                f"Cannot recover, {save_path} does not exist or is not a directory"
-            )
+            raise ValueError(f"Cannot recover: {save_path} does not exist or is not a directory")
         if len([f for f in save_path.iterdir() if f.is_file()]) == 0:
-            raise ValueError(f"Cannot recover, {save_path} is empty")
+            raise ValueError(f"Cannot recover: {save_path} is empty")
 
-    args.save_path = str(save_path)
-
-    # Load config
-    arg_dict = vars(args)
-    clean_dict = {}
-
-    redundants = ["project", "tags", "enum_exp", "enum_chck", "entity"]
-
-    for key, value in arg_dict.items():
-        if key in redundants:
-            continue
-        if value is not None:
-            clean_dict[key] = value
-
-    # NOTE: these tags are redundant
-    tags = [
-        # args.split,
-        # args.model,
-        # f"exp-{exp_no}",
-    ]
+    tags = []
     if args.recover:
         tags.append("Recovered")
-    if args.tags is not None:
+    if args.tags:
         tags.extend(args.tags)
 
-    # get weight path
+    weights_path = None
     if args.weights_path:
-        weights_path = Path(args.weights_path)
-        if not weights_path.exists():
-            raise FileNotFoundError(f"File {weights_path} could not be found")
-        else:
-            weights_path = str(weights_path)
-    else:
-        weights_path = None
+        wp = Path(args.weights_path)
+        if not wp.exists():
+            raise FileNotFoundError(f"Weights file not found: {wp}")
+        weights_path = str(wp)
 
+    # Pydantic models — construction is the same, but now validated on init
     wandb_info = WandbInfo(
-        entity=args.entity, project=args.project, tags=tags, run_id=args.run_id
+        entity=args.entity,
+        project=args.project,
+        tags=tags,
+        run_id=args.run_id,
     )
     admin_info = AdminInfo(
         model=args.model,
@@ -718,7 +336,7 @@ def take_args(
         exp_no=str(exp_no).zfill(ZFILL),
         recover=args.recover,
         config_path=args.config_path,
-        save_path=args.save_path,
+        save_path=str(save_path),
         weight_path=weights_path,
     )
 
@@ -726,26 +344,13 @@ def take_args(
 
 
 def main():
-    # try:
-    #     # maybe_args = take_args(available_splits,available_model,
-    #     #                  sup_args=['-x', '5', '-m', 'S3D', '-sp', 'asl100'])
-    #     # maybe_args = take_args(sup_args=["-h"])
-    #     maybe_args = take_args()
-    # except Exception as e:
-    #     maybe_args = None
-    #     print(f"Parsing failed with error: {e}")
-
     maybe_args = take_args()
-
     if isinstance(maybe_args, tuple):
         admin_info, wandb_info = maybe_args
     else:
         return
-    # str_dict(arg_dict, disp=True)
     config = load_config(admin_info)
     print_config(config)
-
-    # print_dict(config)
 
 
 if __name__ == "__main__":
