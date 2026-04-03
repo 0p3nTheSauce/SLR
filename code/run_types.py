@@ -1,4 +1,15 @@
-from typing import TypedDict, Literal, Optional, TypeAlias, Union, List, Tuple, Dict, Any
+from typing import (
+	TypedDict,
+	Literal,
+	Optional,
+	TypeAlias,
+	Union,
+	List,
+	Tuple,
+	Dict,
+	Any,
+	TypeGuard)
+
 from models import NormDict
 
 ########################## EArly stopping #############################
@@ -93,17 +104,25 @@ SchedInfo : TypeAlias = Union[CosAnealInfo, WarmRestartInfo, WarmOnly, ReduceLRO
 
 
 # Define our new augmentation configuration options
-AutoAugmentStrategy: TypeAlias = Literal["IMAGENET", "CIFAR10", "SVHN"]
-TemporalStrategy: TypeAlias = Literal["Shuffle", "Reverse", "Both"]
+SpatialStrategy: TypeAlias = Literal["IMAGENET", "CIFAR10", "SVHN", "Horizontal_flip"]  # Add more strategies as needed
+TemporalStrategy: TypeAlias = Literal["Shuffle", "Reverse"]
 FrameSize_Strategy: TypeAlias = Literal["Centre_crop", "Random_crop", "Scale_and_pad"]
+
+
+class AugInfo(TypedDict):
+	norm_dict: Optional[NormDict]
+	frame_size_strategy: List[FrameSize_Strategy]
+	temporal_aug: List[TemporalStrategy]
+	spatial_aug: List[SpatialStrategy]
+
+
+
 
 class DataInfo(TypedDict):
 	num_frames: int
 	frame_size: int
-	norm_dict: Optional[NormDict]
-	frame_size_strategy: Optional[FrameSize_Strategy]
-	temporal_aug: Optional[TemporalStrategy]
-	spatial_aug: Optional[AutoAugmentStrategy]
+	train_augs: Optional[AugInfo]
+	test_augs: Optional[AugInfo]
 
 class WandbInfo(TypedDict):
 	entity: str

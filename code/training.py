@@ -41,14 +41,9 @@ def setup_data(config: RunInfo
         set_info=train_info,
         data_info=config["data"],
     )
-    val_data_info = config["data"].copy()
-    # override val data aug with test aug 
-    #TODO: add proper handlig for test augs, but for now just hardcode test aug
-    val_data_info["frame_size_strategy"] = "Centre_crop"
-    val_data_info["spatial_aug"] = None
     val_dataset, _, _ = get_data_set(
         set_info=val_info,
-        data_info=val_data_info,
+        data_info=config["data"],
     )
 
     train_loader = DataLoader(

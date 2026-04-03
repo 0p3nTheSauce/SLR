@@ -32,6 +32,7 @@ from configs import (
     get_model_results_dir,
     get_model_exp_dir,
     get_model_checkpoint_dir,
+    _augs_precheck
 )
 from run_types import (
     CompRes,
@@ -182,14 +183,14 @@ def test_topk_clsrep(
     """Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
     Args:
-            model (torch.nn.Module): Initialised model to test.
-            test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
-            seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
-            verbose (bool, optional): Verbose output. Defaults to False.
-            save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
+                    model (torch.nn.Module): Initialised model to test.
+                    test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
+                    seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
+                    verbose (bool, optional): Verbose output. Defaults to False.
+                    save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
 
     Returns:
-            Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
+                    Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
     """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -328,15 +329,24 @@ def setup_data(
     set_name: Literal["train", "test", "val"],
     split: str,
     data_info: DataInfo,
-    shuffle: bool = False, #override for shuffle test
+    shuffle: bool = False,  # override for shuffle test
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     test_info = get_wlasl_info(split, set_name=set_name)
-    test_data_info = data_info.copy()
-    test_data_info['spatial_aug'] = None
+
+    key = "train_augs" if set_name == "train" else "test_augs"
+    aug_info = data_info.get(key)
+    if aug_info is None:
+        raise ValueError(
+            "Augmentation info must be provided in data_info for both train and test sets."
+        )
+
     if shuffle:
-        test_data_info['temporal_aug'] = 'Shuffle'
+        aug_info["temporal_aug"] = "Shuffle"
+
+    data_info[key] = aug_info
+
     test_dataset, perm, shanon_entropy = get_data_set(
-        set_info=test_info, data_info=test_data_info
+        set_info=test_info, data_info=aug_info
     )
     test_loader = DataLoader(
         test_dataset,
@@ -353,10 +363,10 @@ def checkpoint_dir_to_result_dir(checkpoint_dir: Path) -> Path:
     """Find the corresponding results path for the provided checkpoint path
 
     Args:
-            checkpoint_dir (Path): Model checkpoints directory
+                    checkpoint_dir (Path): Model checkpoints directory
 
     Returns:
-            Path: Results save path
+                    Path: Results save path
     """
     chck_str = str(checkpoint_dir)
     reg_digits = re.search(r"\d+$", chck_str)
@@ -381,20 +391,20 @@ def test_run(
     """Perform testing of a model according to the provided configuration.
 
     Args:
-            config (Dict[str, Any]): Run config file.
-            perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
-            test_val (bool, optional): Test on the val set. Defaults to False.
-            test_test (bool, optional): Test on the test set. Defaults to True.
-            check (str, optional): Checkpoint name. Defaults to "best.pth".
-            br_graph (bool, optional): Create bar graph. Defaults to False.
-            cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
-            heatmap (bool, optional): Create heatmap. Defaults to False.
-            disp (bool, optional): Display plots. Defaults to False.
-            save (bool, optional): Save results and plots. Defaults to True.
-            re_test (bool, optional): Test even if results already saved. Defaults to False.
+                    config (Dict[str, Any]): Run config file.
+                    perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+                    test_val (bool, optional): Test on the val set. Defaults to False.
+                    test_test (bool, optional): Test on the test set. Defaults to True.
+                    check (str, optional): Checkpoint name. Defaults to "best.pth".
+                    br_graph (bool, optional): Create bar graph. Defaults to False.
+                    cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+                    heatmap (bool, optional): Create heatmap. Defaults to False.
+                    disp (bool, optional): Display plots. Defaults to False.
+                    save (bool, optional): Save results and plots. Defaults to True.
+                    re_test (bool, optional): Test even if results already saved. Defaults to False.
 
     Returns:
-                                    Optional[Dict[str, Any]]: Results if correct parameters.
+                                                                    Optional[Dict[str, Any]]: Results if correct parameters.
     """
 
     if save_img is None:
@@ -503,8 +513,8 @@ def save_test_sizes(data_specs: DataInfo, save_dir: Path):
     """Save the frame size and number of frames for convenient testing.
 
     Args:
-                    data_specs (DataInfo): Dictionary containing frame_size and num_frames
-                    save_dir (Path): Experiment directory (can retrieve with save_path.parent from AdminInfo)
+                                    data_specs (DataInfo): Dictionary containing frame_size and num_frames
+                                    save_dir (Path): Experiment directory (can retrieve with save_path.parent from AdminInfo)
     """
     fname = save_dir / DATA_FNAME
     with open(fname, "w") as f:
@@ -516,10 +526,10 @@ def load_test_sizes(save_dir: Path) -> DataInfo:
     Filename symmetry with save_test_sizes
 
     Args:
-                    data_path (Path): Path to data_info.json ()
+                                    data_path (Path): Path to data_info.json ()
 
     Returns:
-                    DataInfo: _description_
+                                    DataInfo: _description_
     """
     fname = save_dir / DATA_FNAME
     with open(fname, "r") as f:
@@ -557,16 +567,16 @@ def full_test(
 
 
     Args:
-            admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
-            data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
-            save (bool, optional): Whether to save. Defaults to True.
-            re_test (bool, optional): Re-test even if files exist. Defaults to False.
+                    admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
+                    data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
+                    save (bool, optional): Whether to save. Defaults to True.
+                    re_test (bool, optional): Re-test even if files exist. Defaults to False.
 
     Raises:
-            Exception: If there is an error loading data from data_info.json
+                    Exception: If there is an error loading data from data_info.json
 
     Returns:
-            CompRes: A results dictionary (as described above).
+                    CompRes: A results dictionary (as described above).
     """
     save_path = Path(admin["save_path"])
 
@@ -636,11 +646,11 @@ def get_test_parser(
     """Get parser for testing configuration with subparsers for full/partial test modes
 
     Args:
-                    prog (Optional[str], optional): Script name, (e.g. testing.py). Defaults to None.
-                    desc (str, optional): Program desctiption. Defaults to "Test a model".
+                                    prog (Optional[str], optional): Script name, (e.g. testing.py). Defaults to None.
+                                    desc (str, optional): Program desctiption. Defaults to "Test a model".
 
     Returns:
-                    ArgumentParser: Parser which takes testing arguments
+                                    ArgumentParser: Parser which takes testing arguments
     """
     parser = ArgumentParser(description=desc, prog=prog)
     models_available = avail_models()
@@ -829,15 +839,14 @@ def main():
 
     # Try to load data_info.json, or use provided arguments
     if args.num_frames is not None and args.frame_size is not None:
+        augs = _augs_precheck(None, args.model, args.set_name)
         # Use provided arguments
         data = DataInfo(
             num_frames=args.num_frames,
             frame_size=args.frame_size,
-            norm_dict=norm_vals(args.model),
-            frame_size_strategy="Centre_crop",  # TODO: seperate out for configuration
-            spatial_aug=None,
-            temporal_aug=None,
-        )
+            train_augs=augs if args.set_name == "train" else None,
+            test_augs=augs if args.set_name != "train" else None,
+		)  
         print(
             f"Using provided data parameters: num_frames={args.num_frames}, frame_size={args.frame_size}"
         )

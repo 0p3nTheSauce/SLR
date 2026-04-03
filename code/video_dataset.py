@@ -223,14 +223,17 @@ def get_data_set(
     # elif cropping == "Bbox":
     #     item_transforms = _crop_frames
 
+    aug_info = data_info.get('train_augs') if set_info['set_name'] == 'train' else data_info.get('test_augs')
+    if aug_info is None:
+        raise ValueError("Augmentation info must be provided in data_info for both train and test sets.")
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
         num_frames=data_info["num_frames"],
         frame_size=data_info["frame_size"],
-        norm_dict=data_info["norm_dict"],
-        frame_size_strategy=data_info["frame_size_strategy"],
-        temporal_aug=data_info["temporal_aug"],
-        auto_augment=data_info["spatial_aug"]
+        norm_dict=aug_info["norm_dict"],
+        frame_size_strategy=aug_info["frame_size_strategy"],
+        temporal_aug=aug_info["temporal_aug"],
+        spatial_augment=aug_info["spatial_aug"]
     )
 
     dataset = VideoDataset(

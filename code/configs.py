@@ -10,7 +10,7 @@ import numpy as np
 import random
 
 # locals
-from models import avail_models, norm_vals
+from models import NormDict, avail_models, norm_vals
 from run_types import (
     ExpInfo,
     WandbInfo,
@@ -24,6 +24,10 @@ from run_types import (
     WarmRestartInfo,
     SchedInfo,
     WarmUpSched,
+    AugInfo,
+    FrameSize_Strategy,
+    SpatialStrategy,
+    TemporalStrategy
 )
 import json
 
@@ -304,6 +308,7 @@ def _add_eq_bs(conf: Dict[str, Any]) -> Dict[str, Any]:
     )
     return conf
 
+
 def _model_params_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
     """If model params not present, add dropout = None as default"""
     if "model_params" not in config:
@@ -311,31 +316,79 @@ def _model_params_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
     elif "drop_p" not in config["model_params"]:
         config["model_params"]["drop_p"] = None
     return config
-    
-def _data_precheck(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Builds correct DataInfo structure, and checks for required keys. Also adds defaults for optional keys if not present.
-    """
+
+
+_VALID_FRAME_SIZE = set(FrameSize_Strategy.__args__)
+_VALID_SPATIAL = set(SpatialStrategy.__args__)
+_VALID_TEMPORAL = set(TemporalStrategy.__args__)
+
+def _validate_aug_conf(aug_conf: Dict[str, Any]) -> None:
+    if (fs := aug_conf.get("frame_size_strategy")):
+        invalid = set(fs) - _VALID_FRAME_SIZE
+        if invalid:
+            raise ValueError(f"Invalid frame_size_strategy values: {invalid}. Must be one of {_VALID_FRAME_SIZE}")
+
+    if (sa := aug_conf.get("spatial_aug")):
+        invalid = set(sa) - _VALID_SPATIAL
+        if invalid:
+            raise ValueError(f"Invalid spatial_aug values: {invalid}. Must be one of {_VALID_SPATIAL}")
+
+    if (ta := aug_conf.get("temporal_aug")):
+        if ta not in _VALID_TEMPORAL:
+            raise ValueError(f"Invalid temporal_aug: {ta!r}. Must be one of {_VALID_TEMPORAL}")
+
+def _augs_precheck(
+    aug_conf: Optional[Dict[str, Any]],
+    model_name: str,
+    mode: Literal["train", "test", "val"],
+) -> AugInfo:
+    """Check that augmentations are valid, and add defaults if not present"""
+    if aug_conf is None:
+        aug_conf = {"norm_dict": norm_vals(model_name)}
+        if mode == "train":
+            aug_conf["spatial_aug"] = ["Horizontal_flip"]
+            aug_conf["frame_size_strategy"] = ["Random_crop"]
+        else:
+            aug_conf["frame_size_strategy"] = ["Centre_crop"]
+
+    # set rest to None if not present
+    for key in AugInfo.__annotations__.keys():
+        if (key not in aug_conf):
+            aug_conf[key] = None if key == 'norm_dict' else []
+
+    if aug_conf["norm_dict"] == "on":
+        aug_conf["norm_dict"] = norm_vals(model_name)
+
+
+    _validate_aug_conf(aug_conf)
+    return AugInfo(**aug_conf)
+
+
+    # return AugInfo(**aug_conf)
+
+
+def _data_precheck(config: Dict[str, Any], model:str) -> Dict[str, Any]:
+    """Builds correct DataInfo structure, and checks for required keys. Also adds defaults for optional keys if not present."""
     if "data" not in config:
         raise ValueError("Data section is required in config")
     data_conf = config["data"]
-    #add norm dict if there is not spatial aug
-    if "spatial_aug" not in data_conf or data_conf["spatial_aug"] is None:
-        data_conf["norm_dict"] = norm_vals(config["admin"]["model"])
-    else:
-        data_conf["norm_dict"] = None
-    # add default frame size strategy
-    if "frame_size_strategy" not in data_conf:
-        data_conf["frame_size_strategy"] = None
-    # add default temporal augmentation strategy
-    if "temporal_aug" not in data_conf:
-        data_conf["temporal_aug"] = None
-    # add default spatial augmentation strategy
-    if "spatial_aug" not in data_conf:
-        data_conf["spatial_aug"] = None
-        
+    if "num_frames" not in data_conf or "frame_size" not in data_conf:
+        raise ValueError("num_frames and frame_size are required in data config")
+    
+    # check if train_augs and test_augs are present, if not add defaults
+    data_conf["train_augs"] = _augs_precheck(
+        config.get("train_augs"), model, mode="train"
+    )
+    data_conf["test_augs"] = _augs_precheck(
+        config.get("test_augs"), model, mode="test"
+    )
+    # for now val is the same as test
+    # data_conf['val_augs'] = _augs_precheck(data_conf.get('val_augs'), config['admin']['model'], mode='val')
+
     config["data"] = DataInfo(**data_conf)
     return config
-    
+
+
 def load_config(admin: AdminInfo) -> RunInfo:
     """Load config from flat file and merge with command line args
 
@@ -358,7 +411,7 @@ def load_config(admin: AdminInfo) -> RunInfo:
     config = parse_ini_config(admin["config_path"])
     config = _add_eq_bs(config)
     config = _model_params_precheck(config)
-    config = _data_precheck(config)
+    config = _data_precheck(config, admin['model'])
     ndict = {"admin": admin}
     ndict.update(config)
 
@@ -466,6 +519,7 @@ def get_next_expno(split: str, model: str, runs_path: str = RUNS_PATH):
     model_exps = sorted(model_dir.glob("exp*"))
     return int(model_exps[-1].name[-3:])
 
+
 def get_model_exp_dir(
     split: str,
     model: str,
@@ -507,9 +561,7 @@ def get_model_checkpoint_dir(
 
 
 def get_model_results_dir(
-    model_exp_dir: Path,
-    checkpoint_num: Optional[int] = None,
-    zd: int = ZFILL
+    model_exp_dir: Path, checkpoint_num: Optional[int] = None, zd: int = ZFILL
 ) -> Path:
     """Get the path to the model results directory
 
@@ -531,9 +583,10 @@ def get_config_path(
     model: str,
     exp_no: int = 0,
     configs_dir: str = CONFIGS_PATH,
-    zd: int = ZFILL
+    zd: int = ZFILL,
 ) -> Path:
-    return Path(configs_dir) / f"{split}/{model}/exp{str(exp_no).zfill(zd)}.ini"  
+    return Path(configs_dir) / f"{split}/{model}/exp{str(exp_no).zfill(zd)}.ini"
+
 
 def take_args(
     sup_args: Optional[List[str]] = None,
@@ -583,9 +636,8 @@ def take_args(
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
     # - enumerate experiment number
     if args.exp_no is None:
-        
         exp_no = get_next_expno(args.split, args.model)
-        
+
         enum_exp = True
     else:
         exp_no = args.exp_no
@@ -603,9 +655,9 @@ def take_args(
 
     if enum_exp:  # working with a gerneric config
         output = enum_dir(output, decimals=ZFILL)
-        #update exp_no 
+        # update exp_no
         exp_no = int(output.name[-3:])
-    
+
     # saving
     save_path = get_model_checkpoint_dir(output)
 
