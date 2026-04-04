@@ -7,7 +7,11 @@ from pathlib import Path
 import torch
 import numpy as np
 import random
-
+import json
+try:
+    import tomllib #type: ignore
+except ImportError:
+    import tomli as tomllib
 # locals
 from models import avail_models, norm_vals
 from run_types import (
@@ -15,8 +19,9 @@ from run_types import (
     RunInfo,
     AdminInfo,
     AugInfo,
+    OG_Sampler
 )
-import json
+
 
 # constants
 ENTITY = "ljgoodall2001-rhodes-university"
@@ -30,6 +35,7 @@ SPLIT_DIR = "splits"
 RUNS_PATH = "./runs"
 CONFIGS_PATH = "./configfiles"
 ZFILL = 3
+CONFIG_FILETYPE = '.toml'
 SEED = 42
 
 
@@ -127,9 +133,11 @@ def _make_aug_info(
         aug_conf = {"norm_dict": norm_vals(model_name)}
         if mode == "train":
             aug_conf["spatial_aug"] = ["Horizontal_flip"]
-            aug_conf["frame_size_strategy"] = ["Random_crop"]
+            aug_conf["frame_size_strategy"] = "Random_crop"
+            aug_conf['frame_sampler'] = OG_Sampler()
         else:
-            aug_conf["frame_size_strategy"] = ["Centre_crop"]
+            aug_conf["frame_size_strategy"] = "Centre_crop"
+            aug_conf['frame_sampler'] = OG_Sampler()
 
     # Resolve the "on" shorthand for norm_dict
     if aug_conf.get("norm_dict") == "on":
@@ -138,8 +146,9 @@ def _make_aug_info(
     return AugInfo.model_validate(aug_conf)
 
 
-def load_config(admin: AdminInfo) -> RunInfo:
-    """Load config from .ini file and merge with AdminInfo from CLI.
+def load_config_retro(admin: AdminInfo) -> RunInfo:
+    """ Old config loader for backward compatibility
+    Load config from .ini file and merge with AdminInfo from CLI.
 
     Args:
         admin: Parsed admin info from command line arguments.
@@ -175,6 +184,33 @@ def load_config(admin: AdminInfo) -> RunInfo:
     # pydantic handles: type coercion, required field checks, discriminated union
     # dispatch, WarmUpSched factor validation, EarlyStopper metric checks, defaults
     return RunInfo.model_validate({"admin": admin.model_dump(), **raw})
+
+def load_config(admin: AdminInfo) -> RunInfo:
+    """Load config from .toml file and merge with AdminInfo from CLI.
+    Supports backward compatibility with .ini files, using old loading mechanism.
+
+    Args:
+        admin: Parsed admin info from command line arguments.
+
+    Returns:
+        RunInfo: Fully validated config model for the run.
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist.
+        pydantic.ValidationError: If config values fail validation.
+    """
+    conf_path = Path(admin.config_path)
+    if not conf_path.exists():
+        raise FileNotFoundError(f"{conf_path} not found")
+    
+    if conf_path.name.endswith('.ini'):
+        return load_config_retro(admin)
+    
+    with open(conf_path, 'rb') as f:
+        raw = tomllib.load(f)
+        
+    return RunInfo.model_validate({"admin": admin.model_dump(), **raw})
+    
 
 
 ###################### Path utilities ###############################
@@ -222,8 +258,9 @@ def get_config_path(
     exp_no: int = 0,
     configs_dir: str = CONFIGS_PATH,
     zd: int = ZFILL,
+    file_type: str = CONFIG_FILETYPE
 ) -> Path:
-    return Path(configs_dir) / f"{split}/{model}/exp{str(exp_no).zfill(zd)}.ini"
+    return Path(configs_dir) / f"{split}/{model}/exp{str(exp_no).zfill(zd)}{file_type}"
 
 
 ###################### Argument parsing ###############################
@@ -254,7 +291,7 @@ def get_train_parser(
     parser.add_argument("-w", "--weights_path", type=str)
     parser.add_argument("-na", "--no_ask", action="store_true")
     parser.add_argument("-nec", "--no_enum_chck", action="store_true")
-
+    parser.add_argument("-f", "--config_filetype", type=str, default=CONFIG_FILETYPE)
     return parser
 
 
@@ -291,7 +328,7 @@ def take_args(
 
     if args.config_path is None:
         assert not enum_exp, "Enumerating the experiment is not valid in this case"
-        args.config_path = str(get_config_path(args.split, args.model, exp_no))
+        args.config_path = str(get_config_path(args.split, args.model, exp_no, file_type=args.config_filetype))
 
     output = get_model_exp_dir(split=args.split, model=args.model, exp_no=exp_no)
 

@@ -14,15 +14,18 @@ from typing import (
     Union,
     List,
     TypeAlias,
+    Dict, 
+    Any
 )
 
 # local imports
 from utils import load_rgb_frames_from_video
 from video_transforms import (
-    correct_num_frames,
+    # correct_num_frames,
     get_transform,
+    get_sampler
 )
-from run_types import DataInfo
+from run_types import DataInfo, SamplerConfig, OG_Sampler
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from preprocess import Instance, AVAIL_SETS
 
@@ -31,7 +34,6 @@ from preprocess import Instance, AVAIL_SETS
 
 class DataSetInfo(TypedDict):
     """Necessary info to import datast"""
-
     root: Path
     labels: Path
     label_suff: str
@@ -105,7 +107,8 @@ class VideoDataset(Dataset):
             Callable[[torch.Tensor, Instance], torch.Tensor]
         ] = None,
         include_meta: bool = False,
-        load_policy: LOAD_DATA_POLICY = "accepting",
+        load_policy: LOAD_DATA_POLICY = 'accepting', #NOTE: this may break
+        sampler_config: SamplerConfig = OG_Sampler()  
     ) -> None:
         """
         Custom video dataset, based on the structure of the WLASL dataset
@@ -133,9 +136,16 @@ class VideoDataset(Dataset):
             set_info["labels"]
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
-        self.data: List[Instance] = load_data_from_json(instances_path, load_policy)
-        self.classes = set([inst.label_num for inst in self.data])
+        self.data = load_data_from_json(instances_path, load_policy)
+        if load_policy == 'accepting':
+            self.data = cast(List[Dict[str, Any]], self.data)
+        elif load_policy == 'strict':
+            self.data = [inst.model_dump() for inst in self.data]
+        
+        self.classes = set([inst['label_num'] for inst in self.data])
         self.num_classes = len(self.classes)
+        self.sampler = get_sampler(sampler_config)
+
 
     def __manual_load__(self, item):
         video_path = self.root / (item["video_id"] + ".mp4")
@@ -148,26 +158,27 @@ class VideoDataset(Dataset):
             end=item["frame_end"],
         )
         if self.num_frames is not None:
-            sampled_frames = correct_num_frames(frames, self.num_frames)
+            # sampled_frames = correct_num_frames(frames, self.num_frames)
+            sampled_frames = self.sampler(frames, self.num_frames)
         else:
             sampled_frames = frames
 
         return sampled_frames.to(torch.uint8)
 
     def __getitem__(self, idx):
-        item = cast(Instance, self.data[idx])
+        item = cast(Dict[str, Any], self.data[idx])
         frames = self.__manual_load__(item)
 
         if self.item_transforms is not None:
-            frames = self.item_transforms(frames, item)
+            frames = self.item_transforms(frames, Instance.model_validate(item))
 
         if self.transforms is not None:
             frames = self.transforms(frames)
 
         if self.include_meta:
-            result = {"frames": frames} | item.model_dump()
+            result = {"frames": frames} | item
         else:
-            result = result = {"frames": frames, "label_num": item.label_num}
+            result = result = {"frames": frames, "label_num": item['label_num']}
 
         return result
 
@@ -223,7 +234,7 @@ def get_data_set(
         norm_dict=aug_info.norm_dict,
         frame_size_strategy=aug_info.frame_size_strategy,
         temporal_aug=aug_info.temporal_aug,
-        spatial_augment=aug_info.spatial_aug
+        spatial_aug=aug_info.spatial_aug
     )
 
     dataset = VideoDataset(

@@ -23,21 +23,27 @@ eta_min = 0
 num_frames = 32
 frame_size = 224
 
-[train_augs]
-frame_size_strategy = ['Centre_crop']
-spatial_aug = ['SVHN']
-norm_dict = 'on'
+[data.train_augs]
+frame_size_strategy = 'Centre_crop'
+spatial_aug = ['SVHN', 'Horizontal_flip']
+normalise = true
 
-[test_augs]
-frame_size_strategy = ['Centre_crop']
-norm_dict = 'on'
+[data.train_augs.frame_sampler]
+method = 'og'
+
+[data.test_augs]
+frame_size_strategy = 'Centre_crop'
+normalise = true
+
+[data.test_augs.frame_sampler]
+method = 'og'
 
 [early_stopping]
-metric = ('val', 'loss')
+metric = ['val', 'loss']
 mode = 'min'
 patience = 15
 min_delta = 0.01
 
-;Same as exp048.ini
-; but with new augementation feature
-; and seperate train and test augs
+#Same as exp048.ini
+# but with new augementation feature
+# and seperate train and test augs

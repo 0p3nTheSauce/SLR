@@ -510,7 +510,7 @@ def save_test_sizes(data_specs: DataInfo, save_dir: Path):
     """
     fname = save_dir / DATA_FNAME
     with open(fname, "w") as f:
-        json.dump(data_specs, f, indent=4)
+        json.dump(data_specs.model_dump(), f, indent=4)
 
 
 def load_test_sizes(save_dir: Path) -> DataInfo:
@@ -518,10 +518,10 @@ def load_test_sizes(save_dir: Path) -> DataInfo:
     Filename symmetry with save_test_sizes
 
     Args:
-                                    data_path (Path): Path to data_info.json ()
+        data_path (Path): Path to data_info.json ()
 
     Returns:
-                                    DataInfo: _description_
+        DataInfo: _description_
     """
     fname = save_dir / DATA_FNAME
     with open(fname, "r") as f:

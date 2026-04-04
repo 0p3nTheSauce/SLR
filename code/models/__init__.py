@@ -1,7 +1,7 @@
-from typing import Tuple, TypedDict, Optional
+from typing import Tuple, Optional
 import torch
 import torch.nn as nn
-
+from pydantic import BaseModel
 # locals
 from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
@@ -90,10 +90,9 @@ def avail_models() -> list[str]:
     return model_names
 
 
-class NormDict(TypedDict):
+class NormDict(BaseModel):
     mean: Tuple[float, float, float]
     std: Tuple[float, float, float]
-
 
 def norm_vals(model_name: str) -> NormDict:
     """Get normalization values (mean and std) for a given model.
@@ -139,7 +138,6 @@ def norm_vals(model_name: str) -> NormDict:
         )
 
     return norm_dict[model_name]
-
 
 def extend_classifier(model: nn.Module, final_classes: int):
     """Extend the classifier to final_classes outputs, preserving existing weights."""

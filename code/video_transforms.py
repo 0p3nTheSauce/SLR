@@ -1,20 +1,34 @@
 import torch
 import torch.nn.functional as F
+from torch import Tensor
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as v2
-from typing import Callable, List, Tuple
+from functools import partial
+from typing import Callable, List, Tuple,  Optional
 import random
 import utils
 import time
 import gc
-from typing import Optional
 import statistics
 import numpy as np
 
 # locals
 from models import NormDict
 from preprocess import Instance
-from run_types import SpatialStrategy, TemporalStrategy, FrameSize_Strategy
+from run_types import (
+    SpatialStrategy,
+    TemporalStrategy,
+    Frame_Size_Strategy,
+    SamplerConfig,
+    OG_Sampler,
+    UniformSampler,
+    ChunkedSampler,
+    WobbledSampler,
+    FocalNormalSampler,
+    FocalLaplaceSampler,
+    FocalBetaSampler,
+    SpeedSampler
+)
 
 
 #   --- Bench marking ---
@@ -110,18 +124,16 @@ Memory Usage:
 #   --- Frame sampling strategies ---
 
 
-def sample(
-    frames: torch.Tensor, target_length: int, randomise: bool = False
-) -> torch.Tensor:
+def sample(frames: Tensor, target_length: int, randomise: bool = False) -> Tensor:
     """Original sampler, uses uniform sampling by taking every nth frame, where n is the step size calculated as total frames divided by target length. If randomise is True, it samples randomly from each chunk of frames instead of taking the first frame of each chunk.
 
     Args:
-        frames (torch.Tensor): Input frames tensor of shape (T, C, H, W).
+        frames (Tensor): Input frames tensor of shape (T, C, H, W).
         target_length (int): Desired number of frames after sampling. It probably wont return this consistently so requires padding.
         randomise (bool, optional): Whether to randomize the sampling (chunk-wise). Defaults to False.
 
     Returns:
-        torch.Tensor: Sampled frames tensor of shape (target_length, C, H, W).
+        Tensor: Sampled frames tensor of shape (target_length, C, H, W).
     """
     step = frames.shape[0] // target_length
     if not randomise:
@@ -142,18 +154,16 @@ def sample(
 
 
 def correct_num_frames(
-    frames: torch.Tensor, target_length: Optional[int] = None, randomise: bool = False
+    frames: Tensor, target_length: int, randomise: bool = False
 ):
     """Original function to compensate for sample. Corrects the number of frames to match the target length.
     Args:
-        frames (torch.Tensor): The input frames tensor. (T x C x H x W)
-        target_length (Optional[int], optional): The target length for the number of frames. Defaults to None.
+        frames (Tensor): The input frames tensor. (T x C x H x W)
+        target_length (int): The target length for the number of frames.
         randomise (bool, optional): Whether to randomize the sampling (chunk-wise). Defaults to False.
     Returns:
-        torch.Tensor: The corrected frames tensor with the specified target length.
+        Tensor: The corrected frames tensor with the specified target length.
     """
-    if target_length is None:
-        target_length = frames.shape[0]
     if frames.shape[0] == 0:
         raise ValueError("Input frames tensor is empty")
     if target_length <= 0:
@@ -188,15 +198,15 @@ def correct_num_frames(
             return sampled_frames
 
 
-def pad_frames(frames: torch.Tensor, target_length: int) -> torch.Tensor:
+def pad_frames(frames: Tensor, target_length: int) -> Tensor:
     """Original. Pads and trimms to get frames to target length
 
     Args:
-        frames (torch.Tensor): Input frames tensor of shape (T, C, H, W).
+        frames (Tensor): Input frames tensor of shape (T, C, H, W).
         target_length (int): Desired number of frames after padding.
 
     Returns:
-        torch.Tensor: Padded frames tensor of shape (target_length, C, H, W).
+        Tensor: Padded frames tensor of shape (target_length, C, H, W).
     """
     num_frames = frames.shape[0]
     if num_frames == target_length:
@@ -217,41 +227,31 @@ def pad_frames(frames: torch.Tensor, target_length: int) -> torch.Tensor:
 
 
 def sample_uniform(
-    frames: torch.Tensor,
-    target_length: Optional[int] = None,
-    step: Optional[int] = None,
-) -> torch.Tensor:
+    frames: Tensor,
+    target_length: int
+) -> Tensor:
     """Uniformly sample frames from a video tensor with either target_length or step
 
     Args:
-        frames (torch.Tensor): The input frames tensor. (T x C x H x W)
-        target_length (Optional[int], optional): The desired number of frames after sampling. Defaults to None.
-        step (Optional[int], optional): The step size for uniform sampling. Defaults to None.
+        frames (Tensor): The input frames tensor. (T x C x H x W)
+        target_length (int): The desired number of frames after sampling. 
 
     Returns:
-        torch.Tensor: The sampled frames tensor.
+        Tensor: The sampled frames tensor.
     """
-    assert (target_length is None) != (step is None), (
-        "Exactly one of target_length or step must be provided."
-    )
-
     T = frames.shape[0]
-    if target_length is not None:
-        indices = torch.linspace(0, T - 1, target_length).long()
-        return frames[indices]
-    else:
-        return frames[::step]
+    indices = torch.linspace(0, T - 1, target_length).long()
+    return frames[indices]
 
-
-def sample_chunked(frames: torch.Tensor, target_length: int) -> torch.Tensor:
+def sample_chunked(frames: Tensor, target_length: int) -> Tensor:
     """Sample frames randomly from evenly divided chunks
 
     Args:
-        frames (torch.Tensor): The input frames tensor. (T x C x H x W)
+        frames (Tensor): The input frames tensor. (T x C x H x W)
         target_length (int): The desired number of frames after sampling.
 
     Returns:
-        torch.Tensor: The sampled frames tensor.
+        Tensor: The sampled frames tensor.
     """
     T = frames.shape[0]
     chunk_size = T / target_length
@@ -260,24 +260,42 @@ def sample_chunked(frames: torch.Tensor, target_length: int) -> torch.Tensor:
         for i in range(target_length)
     ]
     indices = [min(i, T - 1) for i in indices]
-    return frames[torch.tensor(indices)]
+    return frames[Tensor(indices)]
 
+def wobble(frames: Tensor, max_wobble: int = 0) -> Tensor:
+    """Add a random wobble to the start and end indeces
 
+    Args:
+        frames (Tensor): TxCxHxW
+        max_wobble (int): Random wobble. Defaults to 4.
+
+    Returns:
+        Tensor: Wobbled Tensor
+    """
+    T = frames.shape[0]
+    start = random.randint(-max_wobble, max_wobble)
+    end = (T - 1) + random.randint(-max_wobble, max_wobble)
+    indices = torch.linspace(start, end, T).long()
+
+    # repeats last frame if index goes out of bounds, which can happen due to wobble
+    indices = indices.clamp(0, T - 1)
+    return frames[indices]
+    
 def sample_wobbled(
-    frames: torch.Tensor,
+    frames: Tensor,
     target_length: Optional[int] = None,
     max_wobble: int = 4,
-) -> torch.Tensor:
+) -> Tensor:
     """Sample frames uniformly with a random "wobble" added to the start and end indices, creating a jittered sampling effect.
     Optionally leave out the target_length argument to just add wobble to but keep all frames.
 
     Args:
-        frames (torch.Tensor): The input frames tensor. (T x C x H x W)
+        frames (Tensor): The input frames tensor. (T x C x H x W)
         target_length (Optional[int], optional): The desired number of frames after sampling. Defaults to None.
         max_wobble (int, optional): The maximum amount of wobble to add to the start and end indices. Defaults to 4.
 
     Returns:
-        torch.Tensor: The sampled frames tensor.
+        Tensor: The sampled frames tensor.
     """
     T = frames.shape[0]
     if target_length is None:
@@ -294,11 +312,11 @@ def sample_wobbled(
 
 
 def sample_focal_normal(
-    frames: torch.Tensor,
+    frames: Tensor,
     target_length: int,
     mean: float = 0.5,
     std: float = 0.25,
-) -> torch.Tensor:
+) -> Tensor:
     """Sample frames with density weighted by a Normal distribution.
 
     Frames near the centre of the video are sampled more frequently,
@@ -307,13 +325,13 @@ def sample_focal_normal(
     at very small std values.
 
     Args:
-        frames (torch.Tensor): Input tensor of shape (T, C, H, W).
+        frames (Tensor): Input tensor of shape (T, C, H, W).
         target_length (int): Number of frames to sample.
         mean (float): Centre of the distribution as a fraction of video length. Default 0.5.
         std (float): Standard deviation as a fraction of video length. Default 0.25.
 
     Returns:
-        torch.Tensor: Sampled frames of shape (target_length, C, H, W).
+        Tensor: Sampled frames of shape (target_length, C, H, W).
     """
     T = frames.shape[0]
     dist = torch.distributions.Normal(mean * (T - 1), std * (T - 1))
@@ -323,11 +341,11 @@ def sample_focal_normal(
 
 
 def sample_focal_laplace(
-    frames: torch.Tensor,
+    frames: Tensor,
     target_length: int,
     mean: float = 0.5,
     diversity: float = 0.175,
-) -> torch.Tensor:
+) -> Tensor:
     """Sample frames with density weighted by a Laplace distribution.
 
     Produces a sharper peak than Normal with heavier tails, concentrating
@@ -335,14 +353,14 @@ def sample_focal_laplace(
     than a tight Normal would. Out-of-range samples are clamped.
 
     Args:
-        frames (torch.Tensor): Input tensor of shape (T, C, H, W).
+        frames (Tensor): Input tensor of shape (T, C, H, W).
         target_length (int): Number of frames to sample.
         mean (float): Centre of the distribution as a fraction of video length. Default 0.5.
         diversity (float): Scale parameter (b) of the Laplace distribution as a fraction
             of video length. Smaller values give a sharper peak. Default 0.175.
 
     Returns:
-        torch.Tensor: Sampled frames of shape (target_length, C, H, W).
+        Tensor: Sampled frames of shape (target_length, C, H, W).
     """
     T = frames.shape[0]
     dist = torch.distributions.Laplace(mean * (T - 1), diversity * (T - 1))
@@ -352,11 +370,11 @@ def sample_focal_laplace(
 
 
 def sample_focal_beta(
-    frames: torch.Tensor,
+    frames: Tensor,
     target_length: int,
     alpha: float = 4.0,
     beta: float = 4.0,
-) -> torch.Tensor:
+) -> Tensor:
     """Sample frames with density weighted by a Beta distribution.
 
     The Beta distribution is naturally bounded to [0, 1], so sampled indices
@@ -367,13 +385,13 @@ def sample_focal_beta(
     or end (alpha > beta) of the video.
 
     Args:
-        frames (torch.Tensor): Input tensor of shape (T, C, H, W).
+        frames (Tensor): Input tensor of shape (T, C, H, W).
         target_length (int): Number of frames to sample.
         alpha (float): First shape parameter. Default 4.0.
         beta (float): Second shape parameter. Default 4.0.
 
     Returns:
-        torch.Tensor: Sampled frames of shape (target_length, C, H, W).
+        Tensor: Sampled frames of shape (target_length, C, H, W).
     """
     T = frames.shape[0]
     dist = torch.distributions.Beta(alpha, beta)
@@ -383,10 +401,10 @@ def sample_focal_beta(
 
 
 def sample_speed_perturbed(
-    frames: torch.Tensor,
+    frames: Tensor,
     target_length: int,
     speed_range: tuple[float, float] = (0.8, 1.2),
-) -> torch.Tensor:
+) -> Tensor:
     T = frames.shape[0]
     speed = random.uniform(*speed_range)
     effective_length = min(T, int(target_length * speed))
@@ -395,13 +413,78 @@ def sample_speed_perturbed(
     return frames[indices]
 
 
+def _apply_wobble_then_sample(frames: Tensor, target_length: int, *, fn: Callable, max_wobble: int) -> Tensor:
+    return fn(wobble(frames, max_wobble), target_length)
+
+def get_sampler(sampler_config: SamplerConfig) -> Callable[[Tensor, int], Tensor]:
+    """
+    Returns a specialized sampling function based on the provided SamplerConfig.
+    The returned function can be described by: f(frames, target_length) -> sampled_frames.
+    """
+    match sampler_config:
+        case OG_Sampler():
+            sampler =  partial(
+                correct_num_frames,
+                randomise=sampler_config.randomise,
+            )
+
+        case UniformSampler():
+            sampler = partial(
+                sample_uniform,
+            )
+
+        case ChunkedSampler():
+            # Note: target_length is required for chunked in your Pydantic model
+            sampler = partial(sample_chunked,)
+
+        case WobbledSampler():
+            return partial(
+                sample_wobbled,
+                max_wobble=sampler_config.max_wobble,
+            )
+
+        case FocalNormalSampler():
+            sampler = partial(
+                sample_focal_normal,
+                mean=sampler_config.mean,
+                std=sampler_config.std,
+            )
+
+        case FocalLaplaceSampler():
+            sampler = partial(
+                sample_focal_laplace,
+                mean=sampler_config.mean,
+                diversity=sampler_config.diversity,
+            )
+
+        case FocalBetaSampler():
+            sampler = partial(
+                sample_focal_beta,
+                alpha=sampler_config.alpha,
+                beta=sampler_config.beta,
+            )
+
+        case SpeedSampler():
+            sampler = partial(
+                sample_speed_perturbed,
+                speed_range=(sampler_config.speed_min, sampler_config.speed_max),
+            )
+
+        case _:
+            raise ValueError(f"Unknown sampler method: {sampler_config.method}")
+
+    if sampler_config.max_wobble > 0:
+        return partial(_apply_wobble_then_sample, fn=sampler, max_wobble=sampler_config.max_wobble)
+    else:
+        return sampler
+
 # --- Temporal augmentations ---
 
 
 class Shuffle(Transform):
     """Shuffle frames using the configs defined seed"""
 
-    def __init__(self, num_frames: int, perm: Optional[torch.Tensor] = None):
+    def __init__(self, num_frames: int, perm: Optional[Tensor] = None):
         super().__init__()
         self.num_frames = num_frames
         if perm is None:
@@ -418,12 +501,12 @@ class Shuffle(Transform):
         assert inpt.size(1) == 3, "Input tensor must have 3 channels (C=3)"
         return inpt.index_select(dim, self.permutation)
 
-    def create_permutation(self) -> torch.Tensor:
+    def create_permutation(self) -> Tensor:
         """Create a random permutation for given number of frames"""
         return torch.randperm(self.num_frames)
 
     @staticmethod
-    def shannon_entropy(perm: torch.Tensor) -> float:
+    def shannon_entropy(perm: Tensor) -> float:
         """Compute the Shannon entropy (bits) between differences of consecutive indeces
 
         Algorythm from:
@@ -432,7 +515,7 @@ class Shuffle(Transform):
                 which was referenced by:
                         https://mikesmathpage.wordpress.com/2017/04/23/card-shuffling-and-shannon-entropy/
         Args:
-                perm (torch.Tensor): Permutation generated by shuffle.
+                perm (Tensor): Permutation generated by shuffle.
         Returns:
                 float: The Shannon entropy in bits
         """
@@ -460,22 +543,40 @@ class ReverseFrames(Transform):
         super().__init__()
         self.p = p
 
-    def _transform(self, inpt: torch.Tensor, params: dict) -> torch.Tensor:
+    def _transform(self, inpt: Tensor, params: dict) -> Tensor:
         if random.random() < self.p:
             # Assuming input is (T, C, H, W), flipping along the time dimension
             return inpt.flip(0)
         return inpt
 
+#currently not used
+def get_temporal_transform(
+    name: str, num_frames: Optional[int] = None, reverse_prob: float = 0.5
+) -> Tuple[Transform, Optional[Tuple]]:
+    if name == "Shuffle":
+        assert num_frames is not None, "num_frames must be specified if Shuffle is used"
+        shuffle_t = Shuffle(num_frames)
+        perm_tensor = shuffle_t.permutation
+
+        sh_e = Shuffle.shannon_entropy(perm_tensor)
+        perm = list(map(int, perm_tensor.numpy()))
+
+        return shuffle_t, (perm, sh_e)
+
+    elif name == "Reverse":
+        return ReverseFrames(reverse_prob), None
+    else:
+        raise ValueError(f"Unknown temporal transform: {name}")
 
 # --- Frame cropping and resizing ---
 
 
-def crop_frames(frames: torch.Tensor, bbox: List[int]):
+def crop_frames(frames: Tensor, bbox: List[int]):
     """
     Crop the frames using the bounding box
 
     :param frames: frames hase shape (num_frames, channels, height, width)
-    :type frames: torch.Tensor
+    :type frames: Tensor
     :param bbox: bbox is a list of [x1, y1, x2, y2] coordinates
     :type bbox: List[int]
     """
@@ -483,12 +584,12 @@ def crop_frames(frames: torch.Tensor, bbox: List[int]):
     return frames[:, :, y1:y2, x1:x2]
 
 
-def _crop_frames(frames: torch.Tensor, item: Instance):
+def _crop_frames(frames: Tensor, item: Instance):
     """Crop out the bounding box from the frames"""
     return crop_frames(frames, item.bbox)
 
 
-def resize_by_diag(frames: torch.Tensor, bbox: list[int], target_diag: int):
+def resize_by_diag(frames: Tensor, bbox: list[int], target_diag: int):
     """
     Resize frame so person bounding box diagonal equals target_diagonal
 
@@ -525,7 +626,7 @@ def _resize_by_diagonal(frames, item):
     return resize_by_diag(frames, item["bbox"], target_diag=256)
 
 
-def scale_and_pad(frames: torch.Tensor, size: int) -> torch.Tensor:
+def scale_and_pad(frames: Tensor, size: int) -> Tensor:
     """Scale the larger side to frame size, then pad boundaries. Assumes T C H W"""
     T, C, H, W = frames.shape
 
@@ -556,8 +657,35 @@ class ScaleAndPad(Transform):
         super().__init__()
         self.size = size
 
-    def _transform(self, inpt: torch.Tensor, params: dict) -> torch.Tensor:
+    def _transform(self, inpt: Tensor, params: dict) -> Tensor:
         return scale_and_pad(inpt, self.size)
+
+
+def get_frame_size_strategy(name: Frame_Size_Strategy, frame_size: int) -> Callable[[Tensor], Tensor]:
+    match name:
+        case "Centre_crop":
+            return v2.CenterCrop(frame_size)
+        case "Random_crop":
+            return v2.RandomCrop(frame_size)
+        case "Scale_and_pad":
+            return ScaleAndPad(frame_size)
+        case "Random_Resized_crop":
+            return v2.RandomResizedCrop(frame_size)
+
+
+# --- Spatial Transforms ---
+
+def get_spatial_transform(name: SpatialStrategy) -> Transform:
+    match name:
+        case "IMAGENET":
+            policy =  v2.AutoAugmentPolicy.IMAGENET
+        case "CIFAR10":
+            policy = v2.AutoAugmentPolicy.CIFAR10
+        case "SVHN":
+            policy = v2.AutoAugmentPolicy.SVHN
+        case "Horizontal_flip":
+            return v2.RandomHorizontalFlip()
+    return v2.AutoAugment(policy=policy)
 
 
 # --- Misc Named transforms and helper functions ---
@@ -580,44 +708,21 @@ def _permute_time_channel(x):
 
 # --- Main transform construction function ---
 
-
-def get_temporal_transform_by_name(
-    name: str, **kwargs
-) -> Tuple[Transform, Optional[Tuple]]:
-    if name == "Shuffle":
-        num_frames = kwargs.get("num_frames")
-        assert num_frames is not None, "num_frames must be specified if Shuffle is used"
-        shuffle_t = Shuffle(num_frames)
-        perm_tensor = shuffle_t.permutation
-
-        sh_e = Shuffle.shannon_entropy(perm_tensor)
-        perm = list(map(int, perm_tensor.numpy()))
-
-        return shuffle_t, (perm, sh_e)
-
-    elif name == "Reverse":
-        return ReverseFrames(**kwargs), None
-    else:
-        raise ValueError(f"Unknown temporal transform: {name}")
-
-
 def get_transform(
     num_frames: Optional[int] = None,
     frame_size: Optional[int] = None,
     norm_dict: Optional[NormDict] = None,
-    frame_size_strategy: List[FrameSize_Strategy] = [],
+    frame_size_strategy: Optional[Frame_Size_Strategy] = None,
     temporal_aug: List[TemporalStrategy] = [],
-    spatial_augment: List[SpatialStrategy] = [],
-) -> Tuple[
-    Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]
-]:
+    spatial_aug: List[SpatialStrategy] = [],
+) -> Tuple[Callable[[Tensor], Tensor], Optional[List[int]], Optional[float]]:
     """Construct transform
 
     Args:
         num_frames (Optional[int], optional): number of frames. Defaults to None.
         frame_size (Optional[int], optional): Frame dimensions (square). Defaults to None.
         norm_dict (Optional[NormDict], optional): Normalisation values. Defaults to None.
-        frame_size_strategy (List[FrameSize_Strategy], optional): How to get frames the right size. Defaults to [].
+        frame_size_strategy (List[Frame_Size_Strategy], optional): How to get frames the right size. Defaults to [].
         temporal_aug (List[TemporalStrategy], optional): Temporal augmentation strategy. Defaults to [].
         spatial_augment (List[SpatialStrategy], optional): Spatial augmentation strategy. Defaults to [].
 
@@ -626,7 +731,7 @@ def get_transform(
         ValueError: If auto_augment is not one of the expected strategies.
 
     Returns:
-        Tuple[Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]]: A tuple containing the composed transform, the permutation of frame indices if shuffling is applied, and the Shannon entropy of the shuffle. The permutation and entropy are None if no shuffling is applied.
+        Tuple[Callable[[Tensor], Tensor], Optional[List[int]], Optional[float]]: A tuple containing the composed transform, the permutation of frame indices if shuffling is applied, and the Shannon entropy of the shuffle. The permutation and entropy are None if no shuffling is applied.
     """
 
     transforms_list = []
@@ -648,50 +753,24 @@ def get_transform(
 
     # --- 3. Spatial Cropping / Flipping ---
     if frame_size is not None:
-        assert frame_size_strategy is not None, (
-            f"Specify Frame sizing strategy, one of {FrameSize_Strategy}"
-        )
+        assert frame_size_strategy is not None,"Frame size strategy must be specified" 
+        transforms_list.append(get_frame_size_strategy(frame_size_strategy, frame_size))
 
-        if frame_size_strategy == "Random_crop":
-            transforms_list.append(v2.RandomCrop(frame_size))
-            # transforms_list.append(v2.RandomHorizontalFlip()) #TODO: seperate out so can apply seperately
-        elif frame_size_strategy == "Centre_crop":
-            transforms_list.append(v2.CenterCrop(frame_size))
-        elif frame_size_strategy == "Scale_and_pad":
-            transforms_list.append(ScaleAndPad(frame_size))
-        else:
-            raise ValueError(f"Unexpected frame resize strategy: {frame_size_strategy}")
-
-    # --- 4. Spatial AutoAugment ---
-    if spatial_augment is not None:
-        policy_dict = {
-            "IMAGENET": v2.AutoAugmentPolicy.IMAGENET,
-            "CIFAR10": v2.AutoAugmentPolicy.CIFAR10,
-            "SVHN": v2.AutoAugmentPolicy.SVHN,
-            "Horizontal_flip": v2.RandomHorizontalFlip(),
-        }
-        if spatial_augment not in policy_dict:
-            raise ValueError(
-                f"spatial_augment must be one of {list(policy_dict.keys())}"
-            )
-        elif spatial_augment == "Horizontal_flip":
-            transforms_list.append(policy_dict[spatial_augment])
-        else:
-            transforms_list.append(
-                v2.RandomHorizontalFlip()
-            )  # TODO: seperate out so can apply seperately
-            transforms_list.append(v2.AutoAugment(policy=policy_dict[spatial_augment]))
+    # --- 4. Spatial Augment ---
+    for aug in spatial_aug:
+        transforms_list.append(get_spatial_transform(aug))
 
     transforms_list.append(v2.Lambda(_normalize_to_float))
 
     if norm_dict is not None:
         transforms_list.append(
-            v2.Normalize(mean=norm_dict["mean"], std=norm_dict["std"])
+            v2.Normalize(mean=norm_dict.mean, std=norm_dict.std)
         )
 
     transforms_list.append(v2.Lambda(_permute_time_channel))
 
     return v2.Compose(transforms_list), perm, sh_e
+
 
 
 if __name__ == "__main__":
