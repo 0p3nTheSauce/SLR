@@ -10,7 +10,7 @@ import io
 
 from multiprocessing.synchronize import Event as EventClass
 
-from code.run_types import RunInfo
+from run_types import RunInfo
 
 # locals
 from .core import (

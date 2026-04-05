@@ -165,9 +165,7 @@ def _setup_wandb(
                 project=wandb_info.project,
                 name=run_name,
                 tags=wandb_info.tags,
-                config=cast(
-                    Dict[str, Any], config
-                ),  # cast to reguler dict for wandb init
+                config=config.model_dump(),  # cast to reguler dict for wandb init
                 id=run_id,
                 resume="must",
             )
@@ -185,7 +183,7 @@ def _setup_wandb(
         project=wandb_info.project,
         name=run_name,
         tags=wandb_info.tags,
-        config=cast(Dict[str, Any], config),  # cast to reguler dict for wandb init
+        config=config.model_dump(),  # cast to reguler dict for wandb init
     )
     print(f"Run ID: {run.id}")
     print(f"Run name: {run.name}")  # Human-readable name

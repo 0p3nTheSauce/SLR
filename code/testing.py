@@ -527,21 +527,14 @@ def load_test_sizes(save_dir: Path) -> DataInfo:
     with open(fname, "r") as f:
         info = json.load(f)
 
-    return cast(DataInfo, info)
+    return DataInfo.model_validate(info)
 
 
 def load_comp_res(save_path: Path) -> CompRes:
     """Load results from file"""
     with open(save_path, "r") as f:
         data = json.load(f)
-    return CompRes(
-        check_name=data["check_name"],
-        best_val_acc=data["best_val_acc"],
-        best_val_loss=data["best_val_loss"],
-        test=data["test"],
-        val=data["val"],
-        test_shuff=data["test_shuff"],
-    )
+    return CompRes.model_validate(data)
 
 
 # TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
@@ -627,7 +620,7 @@ def full_test(
 
     if save:
         with open(res_path, "w") as f:
-            json.dump(results, f, indent=4)
+            json.dump(results.model_dump(), f, indent=4)
 
     return results
 
@@ -873,7 +866,7 @@ def main():
         # Run complete test suite
         print("Running full test suite...")
         results = full_test(admin, data=data, save=args.save, re_test=args.re_test)
-        print(json.dumps(results, indent=4))
+        print(json.dumps(results.model_dump(), indent=4))
     elif args.command == "partial":
         # Run partial test with specified parameters
         print(f"Running partial test on {args.set_name} set...")

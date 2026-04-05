@@ -1,0 +1,54 @@
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 200
+
+[optimizer]
+eps = 1e-5
+backbone_init_lr = 1e-4
+backbone_weight_decay = 1e-3
+classifier_init_lr = 1e-3
+classifier_weight_decay = 1e-3
+
+[model_params]
+drop_p = 0.5
+
+[scheduler] 
+type = 'CosineAnnealingWarmRestarts'
+t0 = 10
+tmult = 2
+eta_min = 0
+
+[data]
+num_frames = 32
+frame_size = 224
+
+[data.train_augs]
+frame_size_strategy = 'Random_crop'
+spatial_aug = ['Horizontal_flip']
+normalise = true
+
+[data.train_augs.frame_sampler]
+method = 'focal_normal'
+max_wobble = 4
+mean = 0.5
+std = 0.25
+
+[data.test_augs]
+frame_size_strategy = 'Centre_crop'
+normalise = true
+
+[data.test_augs.frame_sampler]
+method = 'focal_normal'
+mean = 0.5
+std = 0.25
+
+[early_stopping]
+metric = ['val', 'loss']
+mode = 'min'
+patience = 50
+min_delta = 0.01
+
+# Same as exp052.ini/exp063.toml
+# but with wobble = 4
+# sampler = focal_normal for both

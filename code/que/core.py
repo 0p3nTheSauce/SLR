@@ -775,13 +775,14 @@ class Que:
                 raise QueDupExp
 
             self.logger.debug(arg_dict.save_path[-ZFILL:])
+            checknum = int(arg_dict.save_path[-ZFILL:])  if arg_dict.save_path[-1].isdigit() else None
             res_dir = get_model_results_dir(
                 get_model_exp_dir(
                     split=arg_dict.split,
                     model=arg_dict.model,
                     exp_no=int(arg_dict.exp_no),
                 ),
-                checkpoint_num=int(arg_dict.save_path[-ZFILL:]),
+                checkpoint_num=checknum,
             )
 
             try:

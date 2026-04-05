@@ -246,7 +246,7 @@ class DataInfo(BaseModel):
 		return self
 
 class WandbInfo(BaseModel):
-	entity: str
+	entity: str 
 	project: str
 	tags: List[str]
 	run_id: Optional[str] = None

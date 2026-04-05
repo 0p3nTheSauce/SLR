@@ -417,7 +417,7 @@ class QueShell(cmdLib.Cmd):
 
             # Format as JSON-like syntax
 
-            run_json = json.dumps(run, indent=2)
+            run_json = json.dumps(run.model_dump(), indent=2)
             syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
             self.console.print(
@@ -504,7 +504,8 @@ class QueShell(cmdLib.Cmd):
             admin_info, wandb_info = maybe_args
             
             #add correct checkpoint num to save path
-            admin_info.save_path = str(admin_info.save_path) + str(parsed_args.checkpoint_num).zfill(ZFILL)
+            checknum = str(parsed_args.checkpoint_num).zfill(ZFILL) if parsed_args.checkpoint_num is not None else ''
+            admin_info.save_path = str(admin_info.save_path) + checknum
             
             #check that checkpoint exists
             if not Path(admin_info.save_path).exists():
@@ -515,7 +516,8 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.unwrap_exception("Run added successfully", "Failed to add run"):
-            self.que.add_run(admin_info, wandb_info)
+            with self.console.status("[bold green]Adding run...", spinner="dots"):
+                self.que.add_run(admin_info, wandb_info)
         
 
     def do_edit(self, arg):

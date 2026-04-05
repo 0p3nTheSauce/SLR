@@ -185,7 +185,7 @@ class ServerContext:
             out_path = timestamp_path(out_path)
 
         with open(out_path, "w") as f:
-            json.dump(self.get_state(), f)
+            json.dump(self.get_state().model_dump(), f)
 
         self.server_logger.info(f"Saved state to: {out_path}")
 

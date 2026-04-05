@@ -14,9 +14,9 @@ import time
 from .shell import QueShell
 
 # from que.shell import QueShell
-from .core import Que, connect_manager, _get_basic_logger, WorkerState, TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS
+from .core import Que, connect_manager, _get_basic_logger, WorkerState, TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS, QueLocation
 from .tmux import tmux_manager
-from run_types import RunInfo
+from run_types import RunInfo, FailedExp, CompExpInfo, ExpInfo
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
 
@@ -369,18 +369,60 @@ def update_runs2():
 
 	# for key in KEYS:
 	que_list = all_runs[TO_RUN] + all_runs[CUR_RUN]
+	new_quelist = []
 	for run in que_list:
 		for key in data_default_dict.keys():
 			if key not in run['data']:
 				run['data'][key] = data_default_dict[key]
-		RunInfo.model_validate(run)
+		ExpInfo.model_validate(run)
+		new_quelist.append(run)
   
-	all_runs[TO_RUN] = que_list
+	all_runs[TO_RUN] = new_quelist
 	all_runs[CUR_RUN] = []
  
+	que_list = all_runs[FAIL_RUNS]
+	new_quelist = []
+	for run in que_list:
+		for key in data_default_dict.keys():
+			if key not in run['data']:
+				run['data'][key] = data_default_dict[key]
+		try:
+			FailedExp.model_validate(run)
+		except Exception as e:
+			print(e)
+			continue
+		new_quelist.append(run)
+	all_runs[FAIL_RUNS] = new_quelist
+ 
+	que_list = all_runs[OLD_RUNS]
+	new_quelist = []
+	for run in que_list:
+		for key in data_default_dict.keys():
+			if key not in run['data']:
+				run['data'][key] = data_default_dict[key]
+		if isinstance(run['admin']['exp_no'],int ):
+			run['admin']['exp_no'] = str(run['admin']['exp_no']).zfill(3)
+		CompExpInfo.model_validate(run)
+		new_quelist.append(run)
+	all_runs[OLD_RUNS] = new_quelist
 
+	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+
+def validate_runs(runs_path = '/home/luke/Code/SLR/code/que/Runs_fixed.json'):
+	q = Que(_get_basic_logger(), 
+         runs_path=runs_path)
+	# q.update_runs("to_run", [0], {"status": "updated"})
+	keys : list[QueLocation] = ['to_run', 'cur_run', 'fail_runs', 'old_runs']
+	for key in keys:
+		print(str(key).capitalize())
+		q.disp_runs(key)
+		print('\n', '-'*20, '\n')
 	
+	
+	# q.disp_run("to_run", 0)
 
 if __name__ == "__main__":
 	# test_copy()
-	update_runs2()
+	# update_runs2()
+	validate_runs()
