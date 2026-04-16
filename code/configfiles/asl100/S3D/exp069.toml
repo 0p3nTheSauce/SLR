@@ -29,19 +29,19 @@ spatial_aug = ['Horizontal_flip']
 normalise = true
 
 [data.train_augs.frame_sampler]
-method = 'focal_normal'
+method = 'focal_laplace'
 max_wobble = 4
-mean = 0.5
-std = 0.4
+mean = 0.5 
+diversity = 0.175
 
 [data.test_augs]
 frame_size_strategy = 'Centre_crop'
 normalise = true
 
 [data.test_augs.frame_sampler]
-method = 'focal_normal'
-mean = 0.5
-std = 0.4
+method = 'focal_laplace'
+mean = 0.5 
+diversity = 0.175
 
 [early_stopping]
 metric = ['val', 'loss']
@@ -51,6 +51,5 @@ min_delta = 0.01
 
 # Same as exp052.ini/exp063.toml
 # but with wobble = 4
-# sampler = focal_normal for both
-
-#same as exp067 but with std = 0.4
+# sampler = focal_laplace for both
+# and patience = 15

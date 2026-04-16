@@ -46,9 +46,10 @@ std = 0.25
 [early_stopping]
 metric = ['val', 'loss']
 mode = 'min'
-patience = 50
+patience = 15
 min_delta = 0.01
 
 # Same as exp052.ini/exp063.toml
 # but with wobble = 4
 # sampler = focal_normal for both
+# and patience = 15

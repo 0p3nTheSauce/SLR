@@ -416,8 +416,10 @@ class QueShell(cmdLib.Cmd):
                 title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.keys)}"
 
             # Format as JSON-like syntax
-
-            run_json = json.dumps(run.model_dump(), indent=2)
+            if isinstance(run, dict):
+                run_json = json.dumps(run, indent=2)
+            else:
+                run_json = json.dumps(run.model_dump(), indent=2)
             syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
             self.console.print(

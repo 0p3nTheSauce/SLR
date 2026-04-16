@@ -16,7 +16,7 @@ import numpy as np
 from models import NormDict
 from preprocess import Instance
 from run_types import (
-    SpatialStrategy,
+    SpatialAugConfig,
     TemporalStrategy,
     Frame_Size_Strategy,
     SamplerConfig,
@@ -675,17 +675,9 @@ def get_frame_size_strategy(name: Frame_Size_Strategy, frame_size: int) -> Calla
 
 # --- Spatial Transforms ---
 
-def get_spatial_transform(name: SpatialStrategy) -> Transform:
-    match name:
-        case "IMAGENET":
-            policy =  v2.AutoAugmentPolicy.IMAGENET
-        case "CIFAR10":
-            policy = v2.AutoAugmentPolicy.CIFAR10
-        case "SVHN":
-            policy = v2.AutoAugmentPolicy.SVHN
-        case "Horizontal_flip":
-            return v2.RandomHorizontalFlip()
-    return v2.AutoAugment(policy=policy)
+def get_spatial_transform(config: SpatialAugConfig) -> v2.Transform:
+    return config.build()
+
 
 
 # --- Misc Named transforms and helper functions ---
@@ -714,7 +706,7 @@ def get_transform(
     norm_dict: Optional[NormDict] = None,
     frame_size_strategy: Optional[Frame_Size_Strategy] = None,
     temporal_aug: List[TemporalStrategy] = [],
-    spatial_aug: List[SpatialStrategy] = [],
+    spatial_aug: List[SpatialAugConfig] = [],
 ) -> Tuple[Callable[[Tensor], Tensor], Optional[List[int]], Optional[float]]:
     """Construct transform
 
@@ -724,7 +716,7 @@ def get_transform(
         norm_dict (Optional[NormDict], optional): Normalisation values. Defaults to None.
         frame_size_strategy (List[Frame_Size_Strategy], optional): How to get frames the right size. Defaults to [].
         temporal_aug (List[TemporalStrategy], optional): Temporal augmentation strategy. Defaults to [].
-        spatial_augment (List[SpatialStrategy], optional): Spatial augmentation strategy. Defaults to [].
+        spatial_augment (List[SpatialAugConfig], optional): Spatial augmentation strategy. Defaults to [].
 
     Raises:
         ValueError: If frame_size_strategy is specified without frame_size, or if an unexpected strategy is provided for frame sizing, temporal augmentation, or auto augmentation.

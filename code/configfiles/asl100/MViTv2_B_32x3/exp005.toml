@@ -1,6 +1,6 @@
 [training]
-batch_size = 8
-update_per_step = 1
+batch_size = 1
+update_per_step = 8
 max_epoch = 200
 
 [optimizer]
@@ -30,9 +30,9 @@ normalise = true
 
 [data.train_augs.frame_sampler]
 method = 'focal_normal'
-max_wobble = 4
+wobble = 2
 mean = 0.5
-std = 0.4
+std = 0.3
 
 [data.test_augs]
 frame_size_strategy = 'Centre_crop'
@@ -41,7 +41,7 @@ normalise = true
 [data.test_augs.frame_sampler]
 method = 'focal_normal'
 mean = 0.5
-std = 0.4
+std = 0.3
 
 [early_stopping]
 metric = ['val', 'loss']
@@ -49,8 +49,4 @@ mode = 'min'
 patience = 15
 min_delta = 0.01
 
-# Same as exp052.ini/exp063.toml
-# but with wobble = 4
-# sampler = focal_normal for both
-
-#same as exp067 but with std = 0.4
+#Same as exp067 of S3D, but with wobble = 2, and std = 0.3

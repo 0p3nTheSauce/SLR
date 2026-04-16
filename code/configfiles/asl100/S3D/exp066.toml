@@ -43,9 +43,10 @@ method = 'uniform'
 [early_stopping]
 metric = ['val', 'loss']
 mode = 'min'
-patience = 50
+patience = 15
 min_delta = 0.01
 
 # Same as exp052.ini/exp063.toml
 # but with wobble = 4
 # sampler = chunked
+# and patience = 15

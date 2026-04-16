@@ -15,8 +15,8 @@ drop_p = 0.5
 
 [scheduler] 
 type = 'CosineAnnealingWarmRestarts'
-t0 = 10
-tmult = 2
+t0 = 20
+tmult = 1
 eta_min = 0
 
 [data]
@@ -25,23 +25,23 @@ frame_size = 224
 
 [data.train_augs]
 frame_size_strategy = 'Random_crop'
-spatial_aug = ['Horizontal_flip']
 normalise = true
 
 [data.train_augs.frame_sampler]
-method = 'focal_normal'
-max_wobble = 4
-mean = 0.5
-std = 0.4
+method = 'chunked'
+wobble = 4
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.5
 
 [data.test_augs]
 frame_size_strategy = 'Centre_crop'
 normalise = true
 
 [data.test_augs.frame_sampler]
-method = 'focal_normal'
-mean = 0.5
-std = 0.4
+method = 'uniform'
+
 
 [early_stopping]
 metric = ['val', 'loss']
@@ -49,8 +49,6 @@ mode = 'min'
 patience = 15
 min_delta = 0.01
 
-# Same as exp052.ini/exp063.toml
-# but with wobble = 4
-# sampler = focal_normal for both
-
-#same as exp067 but with std = 0.4
+# same scheduler as exp47
+# matches previos best except with chunked frame sampler and wobble
+# and lower patience

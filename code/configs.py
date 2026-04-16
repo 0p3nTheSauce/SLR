@@ -291,7 +291,7 @@ def get_train_parser(
     parser.add_argument("-w", "--weights_path", type=str)
     parser.add_argument("-na", "--no_ask", action="store_true")
     parser.add_argument("-nec", "--no_enum_chck", action="store_true")
-    parser.add_argument("-f", "--config_filetype", type=str, default=CONFIG_FILETYPE)
+    parser.add_argument("-f", "--config_filetype", type=str, default=CONFIG_FILETYPE, help=f'Config file type, defaults to: {CONFIG_FILETYPE}')
     return parser
 
 

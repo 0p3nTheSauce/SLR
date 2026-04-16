@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 import shlex
 import configs
 import json
@@ -16,7 +16,7 @@ from .shell import QueShell
 # from que.shell import QueShell
 from .core import Que, connect_manager, _get_basic_logger, WorkerState, TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS, QueLocation
 from .tmux import tmux_manager
-from run_types import RunInfo, FailedExp, CompExpInfo, ExpInfo
+from run_types import RunInfo, FailedExp, CompExpInfo, ExpInfo, HorizontalFlipConfig
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
 
@@ -409,9 +409,108 @@ def update_runs2():
 	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
-def validate_runs(runs_path = '/home/luke/Code/SLR/code/que/Runs_fixed.json'):
+
+def fix_spatial(set_augs: Dict[str, Any]) -> Dict[str, Any]:
+	
+	replace_dict = {
+		'Horizontal_flip' : HorizontalFlipConfig().model_dump()
+	}
+
+	new_spatial = []
+	for spatial in set_augs['spatial_aug']:
+		if isinstance(spatial, str):
+	
+			if spatial in replace_dict:
+				new_spatial.append(replace_dict[spatial])
+			else:
+				print(f'{spatial} not in replace_dict')
+		else:
+			print(f"Type: {spatial} not string")  
+	set_augs['spatial_aug'] = new_spatial
+
+	return set_augs
+
+
+
+def fix_temporal(set_augs: Dict[str, Any]) -> Dict[str, Any]:
+	
+	not_allowed_keys = [
+    	"Shuffle" #not sure how this snuck into some configs
+    ]
+	aug_key = 'temporal_aug'
+	new_temporal = []
+	for temporal in set_augs[aug_key]:
+		if isinstance(temporal, str):
+	
+			if temporal in not_allowed_keys:
+				print(f'Skipping: {temporal}')
+			else:
+				print(f'keeping: {temporal}')
+				new_temporal.append(temporal)
+		else:
+			print(f"Type: {temporal} not string")  
+	set_augs[aug_key] = new_temporal
+
+	return set_augs
+
+
+def fix_all(set_augs: Dict[str, Any]) -> Dict[str, Any]:
+    return fix_temporal(fix_spatial(set_augs))
+
+def update_runs3():
+	
+ 
+	replace_dict = {
+		'Horizontal_flip' : HorizontalFlipConfig().model_dump()
+	}
+	
+	with open('/home/luke/Code/SLR/code/que/Runs.json', 'r') as f:
+		all_runs = json.load(f)
+
+	# for key in KEYS:
+	que_list = all_runs[TO_RUN] + all_runs[CUR_RUN]
+	new_quelist = []
+	for run in que_list:
+		ExpInfo.model_validate(run)
+		new_quelist.append(run)
+
+	que_list = all_runs[FAIL_RUNS]
+	new_quelist = []
+	for run in que_list:
+		train_augs = run['data']['train_augs']
+		test_augs = run['data']['test_augs']
+
+		train_augs = fix_all(train_augs)
+		test_augs = fix_all(test_augs)
+  
+		try:
+			FailedExp.model_validate(run)
+		except Exception as e:
+			print(e)
+			continue
+		new_quelist.append(run)
+	all_runs[FAIL_RUNS] = new_quelist
+	
+ 
+	que_list = all_runs[OLD_RUNS]
+	new_quelist = []
+	for run in que_list:
+		train_augs = run['data']['train_augs']
+		test_augs = run['data']['test_augs']
+
+		train_augs = fix_all(train_augs)
+		test_augs = fix_all(test_augs)
+		CompExpInfo.model_validate(run)
+		new_quelist.append(run)
+	all_runs[OLD_RUNS] = new_quelist
+
+	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+
+
+def validate_runs(runs_path = '/home/luke/Code/SLR/code/que/Runs.json'):
 	q = Que(_get_basic_logger(), 
-         runs_path=runs_path)
+		 runs_path=runs_path)
 	# q.update_runs("to_run", [0], {"status": "updated"})
 	keys : list[QueLocation] = ['to_run', 'cur_run', 'fail_runs', 'old_runs']
 	for key in keys:
@@ -424,5 +523,5 @@ def validate_runs(runs_path = '/home/luke/Code/SLR/code/que/Runs_fixed.json'):
 
 if __name__ == "__main__":
 	# test_copy()
-	# update_runs2()
+	# update_runs3()
 	validate_runs()
