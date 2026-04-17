@@ -1,6 +1,7 @@
 */__pycache__
 *.pt
 *.pth
+*.pyth
 *.pyc
 *.zip
 data/
