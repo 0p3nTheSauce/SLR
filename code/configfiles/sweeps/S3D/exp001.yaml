@@ -1,0 +1,139 @@
+program: train.py
+method: bayes
+metric:
+  goal: minimize
+  name: Loss/Val
+parameters:
+  model_params:
+    parameters:
+      drop_p:
+        max: 1
+        min: 0.25
+        distribution: uniform
+  scheduler:
+    parameters:
+      type: CosineAnnealingWarmRestarts
+      warm_up: 
+        parameters:
+          start_factor:
+            max: 0.5
+            min: 0.01
+            distribution: uniform
+          end_factor:
+            max: 1
+            min: 0.5
+            distribution: uniform
+          warmup_epochs:
+            max: 20
+            min: 1
+            distribution: int_uniform
+      tmult:
+        max: 2
+        min: 1
+        distribution: int_uniform
+      eta_min:
+        max: 0.00002
+        min: 0.000005
+        distribution: uniform
+      tmax:
+        max: 200
+        min: 50
+        distribution: int_uniform
+  optimizer:
+    parameters:
+      classifier_weight_decay:
+        max: 0.0002
+        min: 5e-8
+        distribution: uniform
+      backbone_weight_decay:
+        max: 0.0002
+        min: 0.00005
+        distribution: uniform
+      classifier_init_lr:
+        max: 0.002
+        min: 0.0005
+        distribution: uniform
+      backbone_init_lr:
+        max: 0.00002
+        min: 0.000005
+        distribution: uniform
+      eps:
+        max: 0.002
+        min: 0.0005
+        distribution: uniform
+
+--- # Keep certain parameters fixed for all runs 
+
+  training:
+    parameters:
+      update_per_step: 1
+      batch_size: 8
+      max_epoch: 200
+  early_stopping:
+    parameters:
+      metric: ['val', 'loss']
+      mode: min
+      patience: 15
+      min_delta: 0.01
+
+  admin:
+    parameters:
+      config_path:
+        values:
+          - ./configfiles/sweeps/S3D/exp001.yaml
+        distribution: categorical
+      save_path:
+        values:
+          - runs/asl100/MViT_V2_S_exp002/checkpoints
+          - runs/asl100/Swin3D_B_exp000/checkpoints
+          - runs/asl100/Swin3D_B_exp001/checkpoints
+          - runs/asl100/S3D_exp000/checkpoints
+          - runs/asl100/Resnet2D_1D_18_exp000/checkpoints
+          - runs/asl100/Resnet3D_18_exp000/checkpoints
+          - runs/asl100/S3D_exp001/checkpoints
+          - runs/asl100/S3D_exp002/checkpoints
+          - runs/asl100/S3D_exp003/checkpoints
+          - runs/asl100/Resnet3D_18_exp001/checkpoints
+        distribution: categorical
+      recover:
+        values:
+          - "true"
+          - "false"
+        distribution: categorical
+      labels:
+        values:
+          - ./preprocessed/labels/asl100
+        distribution: categorical
+      exp_no:
+        values:
+          - "002"
+          - "000"
+          - "001"
+          - "003"
+        distribution: categorical
+      split:
+        values:
+          - asl100
+        distribution: categorical
+      model:
+        values:
+          - MViT_V2_S
+          - Swin3D_B
+          - S3D
+          - Resnet2D_1D_18
+          - Resnet3D_18
+        distribution: categorical
+      root:
+        values:
+          - ../data/WLASL/WLASL2000
+        distribution: categorical
+  data:
+    parameters:
+      num_frames:
+        max: 64
+        min: 8
+        distribution: int_uniform
+      frame_size:
+        max: 448
+        min: 56
+        distribution: int_uniform

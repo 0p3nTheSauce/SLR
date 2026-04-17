@@ -1,0 +1,41 @@
+training:
+  batch_size: 8
+  update_per_step: 1
+  max_epoch: 200
+
+optimizer:
+  eps: 1.0e-5
+  backbone_init_lr: 1.0e-4
+  backbone_weight_decay: 1.0e-3
+  classifier_init_lr: 1.0e-3
+  classifier_weight_decay: 1.0e-3
+
+model_params:
+  drop_p: 0.5
+
+data:
+  num_frames: 32
+  frame_size: 224
+  train_augs:
+    frame_size_strategy: Random_crop
+    normalise: true
+    frame_sampler:
+      method: og
+      wobble: 0
+    spatial_aug:
+      - type: HORIZONTAL_FLIP
+        p: 0.5
+  test_augs:
+    frame_size_strategy: Centre_crop
+    normalise: true
+    frame_sampler:
+      method: og
+      wobble: 0
+
+early_stopping:
+  metric:
+    - val
+    - loss
+  mode: min
+  patience: 15
+  min_delta: 0.01
