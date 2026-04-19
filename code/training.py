@@ -219,12 +219,12 @@ def save_checkpoint(checkpoint_data: Dict[str, Any], save_path: Path):
     }
     checkpoint_path = save_path / f"checkpoint_{str(checkpoint['epoch']).zfill(3)}.pth"
 
-    torch.save(checkpoint_data, checkpoint_path)
+    torch.save(checkpoint, checkpoint_path)
 
     print(f"Checkpoint saved: {checkpoint_path}")
 
 
-def load_checkpoint(load_path: Path, device: torch.device) -> Dict[str, Any]:
+def load_checkpoint(load_path: Path, device: torch.device, strict: bool = False) -> Dict[str, Any]:
     if load_path.exists():
         checkpoint = torch.load(load_path, map_location=device)
         if "rng_cuda" in checkpoint:
@@ -233,9 +233,14 @@ def load_checkpoint(load_path: Path, device: torch.device) -> Dict[str, Any]:
             np.random.set_state(checkpoint["rng_numpy"])
             random.setstate(checkpoint["rng_python"])
         else:
-            raise Warning(
-                f"Checkpoint: {load_path} without rng state was loaded. Reproducability will be impacted."
-            )
+            if strict:
+                raise Warning(
+                    f"Checkpoint: {load_path} without rng state was loaded. Reproducability will be impacted."
+                )
+            else:
+                print(
+                    f"Checkpoint: {load_path} without rng state was loaded. Reproducability will be impacted."
+                )
         return checkpoint
     else:
         raise ValueError(f"Load path not found: {load_path}")

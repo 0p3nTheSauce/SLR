@@ -1,5 +1,5 @@
 from typing import Dict, List, Any, Optional, Union
-from que.core import Que, QueEmpty, connect_manager, _get_basic_logger
+from que.core import Que, QueEmpty, connect_manager, _get_basic_logger, GenExp
 import json
 import subprocess
 import sys
@@ -115,7 +115,7 @@ def time_instance_typegaurd():
     #Conclusion: The type guard check is very fast, and does not add significant overhead to loading the data. 
 
 
-def test_find_runs():
+def test_find_loc_runs():
     logger = _get_basic_logger()
     
     
@@ -154,7 +154,7 @@ def test_find_runs():
         lambda x: x == 1,
         lambda x: x == 0,
     ]
-    _, runs = q.find_runs('old_runs', key_set, criterions)
+    _, runs = q.find_loc_runs('old_runs', key_set, criterions)
     print(len(runs))
     all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
     for run in runs:
@@ -208,7 +208,7 @@ def test_find_S3D_runs():
         # lambda x: x == 1,
         # lambda x: x == 0,
     ]
-    idxs, runs = q.find_runs('old_runs', key_set, criterions)
+    idxs, runs = q.find_loc_runs('old_runs', key_set, criterions)
     print(len(runs))
     all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
     for run in runs:
@@ -425,6 +425,22 @@ def test_set_nested2():
     print(json.dumps(cd.to_dict(), indent=4)) 
     # print(cd) 
 
+def test_load_checkpoint():
+    from training import load_checkpoint
+    checkpath = Path('runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_015.pth')
+    # print(checkpath.exists())
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    checkpoint = load_checkpoint(checkpath, device, strict=False)
+    print(checkpoint.keys())
+
+
+
+def test_filter_runs():
+    q = Que(_get_basic_logger())
+    _ = q.summarise_runs('old_runs')
+    
+    
+
 if __name__ == '__main__':
     # test_dump_peak()
     # test_dump_peak_server()
@@ -434,7 +450,7 @@ if __name__ == '__main__':
     # test_clear()
     # test_instance_typegaurd()
     # time_instance_typegaurd()
-    # test_find_runs()
+    # test_find_loc_runs()
     # test_find_S3D_runs()
     
     # test_extend_classifier()
@@ -442,4 +458,5 @@ if __name__ == '__main__':
     # reformat_runs()
     # reformat_configs()
     # reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')
-    test_set_nested2()
+    # test_set_nested2()
+    test_load_checkpoint()

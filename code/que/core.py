@@ -6,8 +6,6 @@ simple JSON-backed persistence.  See the original module docstring for the
 full public-API description.  This version uses pydantic BaseModel objects
 throughout instead of TypedDicts / plain dicts.
 """
-
-import traceback
 from typing import (
     Protocol,
     Optional,
@@ -21,6 +19,8 @@ from typing import (
     Union,
     TypeGuard,
 )
+import ast
+import traceback
 from pydantic import BaseModel
 from pathlib import Path
 import json
@@ -93,11 +93,6 @@ QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
 ProcessNames: TypeAlias = Literal["Server", "Daemon", "Worker"]
 SESH_NAME = "train"
 
-
-# ---------------------------------------------------------------------------
-# NOTE: FailedExp is now defined in run_types.py as a pydantic subclass of
-# ExpInfo that adds an `error` field.  Import it from there.
-# ---------------------------------------------------------------------------
 
 GenExp: TypeAlias = Union[ExpInfo, FailedExp, CompExpInfo]
 ExpQue: TypeAlias = Union[List[ExpInfo], List[FailedExp], List[CompExpInfo]]
@@ -223,6 +218,7 @@ def log_and_raise(logger: Logger, task: str = "Operation"):
 def timestamp_path(path: Union[str, Path]) -> str:
     formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     return str(path).replace(".json", f"_{formatted}.json")
+
 
 
 # ---------------------------------------------------------------------------
@@ -846,7 +842,8 @@ class Que:
         """
         with log_and_raise(self.logger, "edit"):
             run = self.peak_run(loc, idx)
-            val = eval(value) if do_eval else value  # noqa: S307 — intentional
+            val = ast.literal_eval(value) if do_eval else value
+
 
             run_dict = run.model_dump()
             run_dict = self.set_nested(run_dict, keys, val)
@@ -861,7 +858,7 @@ class Que:
             _ = self._pop_run(loc, idx)
             self._set_run(loc, idx, new_run)
 
-    def _find_runs(
+    def find_runs(
         self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
     ) -> Tuple[List[int], List[GenExp]]:
         idxs, runs = [], []
@@ -871,7 +868,7 @@ class Que:
                 runs.append(run)
         return idxs, runs  # type: ignore[return-value]
 
-    def find_runs(
+    def find_loc_runs(
         self,
         loc: QueLocation,
         key_set: List[List[str]],
@@ -883,7 +880,7 @@ class Que:
         runs: List[GenExp] = list(self._fetch_state(loc))  # type: ignore[arg-type]
         idxs: List[int] = []
         for k_lst, crit in zip(key_set, criterions):
-            idxs, runs = self._find_runs(runs, k_lst, crit)  # type: ignore[arg-type]
+            idxs, runs = self.find_runs(runs, k_lst, crit)  # type: ignore[arg-type]
         return idxs, runs
 
     def update_runs(self, key_set: List[str], transform: Callable[[Any], Any]) -> None:
