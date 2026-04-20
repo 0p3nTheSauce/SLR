@@ -18,8 +18,8 @@ from typing import (
     Any,
     Union,
     TypeGuard,
-    TypedDict, 
 )
+from typing_extensions import TypedDict
 import ast
 import traceback
 from pydantic import BaseModel
@@ -924,14 +924,27 @@ class Que:
 Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 
 
-class WorkerState(BaseModel):
+# class WorkerState(BaseModel):
+#     task: Worker_tasks
+#     current_run_id: Optional[str]
+#     working_pid: Optional[int]
+#     exception: Optional[str]
+
+
+# class DaemonState(BaseModel):
+#     awake: bool
+#     stop_on_fail: bool
+#     supervisor_pid: Optional[int]
+
+
+class WorkerStateDict(TypedDict):
     task: Worker_tasks
     current_run_id: Optional[str]
     working_pid: Optional[int]
     exception: Optional[str]
 
 
-class DaemonState(BaseModel):
+class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
     supervisor_pid: Optional[int]
@@ -939,13 +952,19 @@ class DaemonState(BaseModel):
 
 class ServerState(BaseModel):
     server_pid: Optional[int]
-    daemon_state: DaemonState
-    worker_state: WorkerState
+    daemon_state: DaemonStateDict
+    worker_state: WorkerStateDict
 
 
 # Type guards now just delegate to pydantic's own validation.
 
-def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
+def is_worker_state(obj: Any) -> TypeGuard[WorkerStateDict]:
+    class WorkerState(BaseModel):
+        task: Worker_tasks
+        current_run_id: Optional[str]
+        working_pid: Optional[int]
+        exception: Optional[str]
+
     try:
         WorkerState.model_validate(obj)
         return True
@@ -953,7 +972,11 @@ def is_worker_state(obj: Any) -> TypeGuard[WorkerState]:
         return False
 
 
-def is_daemon_state(obj: Any) -> TypeGuard[DaemonState]:
+def is_daemon_state(obj: Any) -> TypeGuard[DaemonStateDict]:
+    class DaemonState(BaseModel):
+        awake: bool
+        stop_on_fail: bool
+        supervisor_pid: Optional[int]
     try:
         DaemonState.model_validate(obj)
         return True
@@ -976,7 +999,7 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
     return ServerState.model_validate(data)
 
 
-Process_states: TypeAlias = Union[WorkerState, DaemonState, ServerState]
+Process_states: TypeAlias = Union[WorkerStateDict, DaemonStateDict, ServerState]
 
 
 # ---------------------------------------------------------------------------
@@ -1003,17 +1026,17 @@ class ServerContextProtocol(Protocol):
     def set_state(
         self,
         server: Optional[ServerState],
-        daemon: Optional[DaemonState],
-        worker: Optional[WorkerState],
+        daemon: Optional[DaemonStateDict],
+        worker: Optional[WorkerStateDict],
     ) -> None: ...
 
 
 class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
     def get_daemon(self) -> DaemonProtocol: ...
-    def get_daemon_state(self) -> DaemonState: ...
     def get_worker(self) -> WorkerProtocol: ...
-    def get_worker_state(self) -> WorkerState: ...
+    def get_daemon_state(self) -> DaemonStateDict: ...
+    def get_worker_state(self) -> WorkerStateDict: ...
     def get_server_context(self) -> ServerContextProtocol: ...
 
 
@@ -1027,8 +1050,10 @@ def connect_manager(
     QueManager.register("get_que")
     QueManager.register("get_worker")
     QueManager.register("get_worker_state", proxytype=DictProxy)
-    QueManager.register("get_daemon")
     QueManager.register("get_daemon_state", proxytype=DictProxy)
+    # QueManager.register("get_worker_state")
+    # QueManager.register("get_daemon_state")
+    QueManager.register("get_daemon")
     QueManager.register("get_server_context")
 
     for _ in range(max_retries):

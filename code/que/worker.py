@@ -20,13 +20,12 @@ from .core import (
     SERVER_LOG_PATH,
     TRAINING_NAME,
     QueException,
-    WorkerState,
+    WorkerStateDict,
     full_test,
     CompExpInfo,
+    Que,
 )
 
-
-from .core import Que
 from utils import gpu_manager
 from training import train_loop, _setup_wandb
 
@@ -52,7 +51,7 @@ class Worker:
         self,
         server_logger: Logger,
         que: Que,
-        state: WorkerState,
+        state: WorkerStateDict,
         stop_event: Optional[EventClass] = None,
     ) -> None:
         self.server_logger = server_logger
@@ -62,10 +61,10 @@ class Worker:
 
         self.server_logger.info("Worker initialized")
 
-    def get_state(self) -> WorkerState:
+    def get_state(self) -> WorkerStateDict:
         return self.state
 
-    def set_state(self, state: WorkerState) -> None:
+    def set_state(self, state: WorkerStateDict) -> None:
         self.state = state
 
     def seperator(self, r_str: str) -> str:
@@ -126,7 +125,7 @@ class Worker:
         info.wandb = wandb_info
 
         # save for server context
-        self.state.current_run_id = run.id
+        self.state['current_run_id'] = run.id
 
         self.server_logger.info("saving my id")
         _ = self.que.pop_cur_run()
@@ -155,29 +154,31 @@ class Worker:
         Currently implemented to be in a process started by the Daemon.
         """
         try:
-            self.state.task = "training"
+            # self.state.task = "training"
+            self.state['task'] = "training"
             self._train()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state.exception = str(Qe)
-            self.state.working_pid = None
+            self.state['exception'] = str(Qe)
+            self.state['working_pid'] = None
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
-            self.state.exception = "KeyboardInterrupt"
-            self.state.working_pid = None
+            self.state['exception'] = "KeyboardInterrupt"
+            self.state['working_pid'] = None
             raise
         except Exception as e:
             self.server_logger.error(f"Training run failed due to an error: {e}")
-            self.state.exception = str(e)
-            self.state.working_pid = None
+            self.state['exception'] = str(e)
+            self.state['working_pid'] = None
             self.que.stash_failed_run(str(e))
             self.que.save_state()
             # exit with error
             raise
         finally:
             self.cleanup()
-            self.state.task = "inactive"
+            # self.state.task = "inactive"
+            self.state['task'] = "inactive"
 
     def _test(self) -> None:
         """Tests the run in cur_runs and moves to old_runs"""
@@ -213,30 +214,30 @@ class Worker:
 
     def test(self) -> None:
         try:
-            self.state.task = "testing"
+            self.state['task'] = "testing"
             self._test()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state.exception = str(Qe)
+            self.state['exception'] = str(Qe)
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
-            self.state.exception = "KeyboardInterrupt"
+            self.state['exception'] = "KeyboardInterrupt"
         except Exception as e:
             self.server_logger.error(f"Testing run failed due to an error: {e}")
-            self.state.exception = str(e)
+            self.state['exception'] = str(e)
             self.que.stash_failed_run(str(e))
             self.que.save_state()
             # exit with error
             raise
         finally:
             self.cleanup()
-            self.state.current_run_id = None
-            self.state.task = "inactive"
+            self.state['current_run_id'] = None
+            self.state['task'] = "inactive"
 
     def _reset_state(self):
         self.set_state(
-            WorkerState(
+            WorkerStateDict(
                 task="inactive", current_run_id=None, working_pid=None, exception=None
             )
         )
@@ -280,8 +281,10 @@ class Worker:
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
-        self.state.working_pid = os.getpid()
-        self.state.exception = None
+        # self.state.working_pid = os.getpid()
+        self.state['working_pid'] = os.getpid()
+        # self.state.exception = None
+        self.state['exception'] = None
 
         self._attach_training_loggers()
         self._reattach_server_logger()

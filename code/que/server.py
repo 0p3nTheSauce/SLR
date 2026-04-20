@@ -24,8 +24,8 @@ from .core import (
     DAEMON_NAME,
     WORKER_NAME,
     ServerState,
-    WorkerState,
-    DaemonState,
+    WorkerStateDict,
+    DaemonStateDict,
     read_server_state,
     # Process_states
 )
@@ -79,7 +79,7 @@ class ServerContext:
         self.que = Que(logger=que_logger)
         self.worker = Worker(
             server_logger=worker_logger, que=self.que, stop_event=self.stop_worker_event,
-            state=WorkerState(
+            state=WorkerStateDict(
             task='inactive',
             current_run_id=None,
             working_pid=None,
@@ -91,7 +91,7 @@ class ServerContext:
             logger=daemon_logger,
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
-            state=DaemonState(
+            state=DaemonStateDict(
             awake=awake,
             stop_on_fail=stop_on_fail,
             supervisor_pid=None
@@ -141,7 +141,7 @@ class ServerContext:
 
             if self.save_on_shutdown:
                 self.server_logger.info("Saving server state...")
-                self.daemon.state.awake = False #if being stopped by signal, probably don't want to be awake when restarted
+                self.daemon.state['awake'] = False #if being stopped by signal, probably don't want to be awake when restarted
                 self.server_pid = None #similarly, we have no need to save an old pid
                 self.save_state()
             
@@ -161,8 +161,8 @@ class ServerContext:
     def set_state(
         self,
         server: Optional[ServerState] = None,
-        daemon: Optional[DaemonState] = None,
-        worker: Optional[WorkerState] = None,
+        daemon: Optional[DaemonStateDict] = None,
+        worker: Optional[WorkerStateDict] = None,
     ) -> None:
         if server is not None:
             self.server_pid = server.server_pid

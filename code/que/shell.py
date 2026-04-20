@@ -695,18 +695,18 @@ class QueShell(cmdLib.Cmd):
         daemon_table.add_column(style="yellow", width=15)
         daemon_table.add_column()
 
-        awake_icon = "✓" if daemon_state.awake else "✗"
-        awake_style = "green" if daemon_state.awake else "red"
+        awake_icon = "✓" if daemon_state['awake'] else "✗"
+        awake_style = "green" if daemon_state['awake'] else "red"
         daemon_table.add_row("Awake:", Text(awake_icon, style=awake_style))
 
-        stop_icon = "✓" if daemon_state.stop_on_fail else "✗"
+        stop_icon = "✓" if daemon_state['stop_on_fail'] else "✗"
         daemon_table.add_row(
             "Stop on Fail:",
-            Text(stop_icon, style="yellow" if daemon_state.stop_on_fail else "dim"),
+            Text(stop_icon, style="yellow" if daemon_state['stop_on_fail'] else "dim"),
         )
 
-        if daemon_state.supervisor_pid:
-            daemon_table.add_row("Supervisor PID:", str(daemon_state.supervisor_pid))
+        if daemon_state['supervisor_pid']:
+            daemon_table.add_row("Supervisor PID:", str(daemon_state['supervisor_pid']))
 
         table.add_row("Daemon", daemon_table)
 
@@ -716,17 +716,17 @@ class QueShell(cmdLib.Cmd):
         worker_table.add_column(style="magenta", width=15)
         worker_table.add_column()
 
-        task_style = "bold green" if worker_state.task == "training" else "dim"
-        worker_table.add_row("Task:", Text(worker_state.task, style=task_style))
+        task_style = "bold green" if worker_state['task'] == "training" else "dim"
+        worker_table.add_row("Task:", Text(worker_state['task'], style=task_style))
 
-        if worker_state.current_run_id:
-            worker_table.add_row("Run ID:", worker_state.current_run_id)
+        if worker_state['current_run_id']:
+            worker_table.add_row("Run ID:", worker_state['current_run_id'])
 
-        if worker_state.working_pid:
-            worker_table.add_row("Worker PID:", str(worker_state.working_pid))
+        if worker_state['working_pid']:
+            worker_table.add_row("Worker PID:", str(worker_state['working_pid']))
 
-        if worker_state.exception:
-            error_text = Text(worker_state.exception, style="bold red")
+        if worker_state['exception']:
+            error_text = Text(worker_state['exception'], style="bold red")
             worker_table.add_row("Exception:", error_text)
 
         table.add_row("Worker", worker_table)
