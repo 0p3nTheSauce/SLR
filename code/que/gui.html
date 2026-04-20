@@ -1182,12 +1182,134 @@ function ServerBar({ status, onDaemonStart, onDaemonStop, onWorkerCleanup, onSav
   );
 }
 
+// ---- Status Modal ----
+function StatusModal({ status, onClose, onDaemonStart, onDaemonStop, onWorkerCleanup }) {
+  const [stopOpts, setStopOpts] = useState({ supervisor: true, worker: false, timeout: 10, hard: false });
+
+  if (!status) return null;
+  const { server_pid, daemon_state: d, worker_state: w } = status;
+
+  const workerColor = w.task === 'training' ? 'var(--amber)' : w.task === 'inactive' ? 'var(--muted)' : 'var(--emerald)';
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-title" style={{ marginBottom: 18, fontFamily: 'var(--display)', color: 'var(--cyan)', letterSpacing: 2 }}>
+          SERVER STATUS
+        </div>
+
+        {/* Server */}
+        <div className="section-divider">Server</div>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className={`led ${server_pid ? 'led-on' : 'led-off'}`} />
+            <span style={{ color: 'var(--muted)' }}>PID:</span>
+            <span style={{ color: server_pid ? 'var(--emerald)' : 'var(--rose)' }}>
+              {server_pid ?? 'not running'}
+            </span>
+          </div>
+        </div>
+
+        {/* Daemon */}
+        <div className="section-divider">Daemon</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', marginBottom: 16, fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: 'var(--muted)' }}>Awake:</span>
+            <div className={`led ${d.awake ? 'led-on' : 'led-off'}`} />
+            <span style={{ color: d.awake ? 'var(--emerald)' : 'var(--muted)' }}>{d.awake ? 'yes' : 'no'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: 'var(--muted)' }}>Stop on fail:</span>
+            <span style={{ color: d.stop_on_fail ? 'var(--amber)' : 'var(--muted)' }}>{d.stop_on_fail ? 'yes' : 'no'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span style={{ color: 'var(--muted)' }}>Supervisor PID:</span>
+            <span>{d.supervisor_pid ?? '—'}</span>
+          </div>
+        </div>
+
+        {/* Worker */}
+        <div className="section-divider">Worker</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', marginBottom: 16, fontSize: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ color: 'var(--muted)' }}>Task:</span>
+            <div className={`led ${w.task === 'training' ? 'led-busy' : w.task === 'inactive' ? 'led-off' : 'led-on'}`} />
+            <span style={{ color: workerColor }}>{w.task}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <span style={{ color: 'var(--muted)' }}>Worker PID:</span>
+            <span>{w.working_pid ?? '—'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, gridColumn: '1/-1' }}>
+            <span style={{ color: 'var(--muted)' }}>Run ID:</span>
+            <span style={{ color: 'var(--cyan)' }}>{w.current_run_id ?? '—'}</span>
+          </div>
+          {w.exception && (
+            <div style={{ gridColumn: '1/-1', color: 'var(--rose)', fontSize: 11,
+                          background: 'rgba(251,113,133,0.08)', padding: '6px 10px',
+                          borderRadius: 3, border: '1px solid var(--rose)', wordBreak: 'break-all' }}>
+              ⚠ {w.exception}
+            </div>
+          )}
+        </div>
+
+        {/* Daemon controls */}
+        <div className="section-divider">Daemon Controls</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-filled-emerald" style={{ flex: 1 }} onClick={() => { onDaemonStart(); onClose(); }}>
+              ▶ Start Supervisor
+            </button>
+            <button className="btn btn-filled-rose" style={{ flex: 1 }} onClick={() => onDaemonStop(stopOpts)}>
+              ■ Stop
+            </button>
+            <button className="btn btn-muted" onClick={onWorkerCleanup}>
+              Clear VRAM
+            </button>
+          </div>
+
+          {/* Stop options */}
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 3,
+                        padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: '8px 20px', fontSize: 11 }}>
+            <label className="form-checkbox">
+              <input type="checkbox" checked={stopOpts.supervisor}
+                onChange={e => setStopOpts(o => ({ ...o, supervisor: e.target.checked }))} />
+              Stop supervisor
+            </label>
+            <label className="form-checkbox">
+              <input type="checkbox" checked={stopOpts.worker}
+                onChange={e => setStopOpts(o => ({ ...o, worker: e.target.checked }))} />
+              Stop worker
+            </label>
+            <label className="form-checkbox">
+              <input type="checkbox" checked={stopOpts.hard}
+                onChange={e => setStopOpts(o => ({ ...o, hard: e.target.checked }))} />
+              Force kill
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--muted)' }}>Timeout (s):</span>
+              <input className="form-input" type="number" value={stopOpts.timeout}
+                onChange={e => setStopOpts(o => ({ ...o, timeout: parseInt(e.target.value) }))}
+                style={{ width: 56, padding: '3px 6px', fontSize: 11 }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button className="btn btn-muted" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
 function App() {
   const [queues, setQueues]       = useState({ to_run: [], cur_run: [], old_runs: [], fail_runs: [] });
   const [status, setStatus]       = useState(null);
+  const [showStatus, setShowStatus] = useState(false);
   const [detail, setDetail]       = useState(null);   // { run (summary), idx, loc }
   const [fullRun, setFullRun]     = useState(null);   // full model_dump
   const [loading, setLoading]     = useState({});
@@ -1307,18 +1429,12 @@ function App() {
     } catch (e) { toast(e.message, 'err'); }
   }
 
-  async function daemonStop() {
-    setModal({
-      title: 'Stop daemon?',
-      message: 'Stop the supervisor (and optionally the worker) process?',
-      onConfirm: async () => {
-        try {
-          await apiPost('/daemon/stop', { supervisor: true });
-          toast('Daemon stopped', 'ok');
-          refreshStatus();
-        } catch (e) { toast(e.message, 'err'); }
-      },
-    });
+  async function daemonStop(opts = { supervisor: true, worker: false, timeout: 10, hard: false }) {
+    try {
+      await apiPost('/daemon/stop', opts);
+      toast('Daemon stopped', 'ok');
+      refreshStatus();
+    } catch (e) { toast(e.message, 'err'); }
   }
 
   async function workerCleanup() {
@@ -1365,11 +1481,13 @@ function App() {
         </div>
 
         <div className="topbar-section">
-          <button className="btn btn-muted" onClick={refreshAll} title="Refresh all queues">
-            ↺ Refresh
+          <button className="btn btn-cyan" onClick={() => { refreshStatus(); setShowStatus(true); }}>
+            ⬡ Status
           </button>
+          <button className="btn btn-muted" onClick={refreshAll}>↺ Refresh</button>
         </div>
-      </div>
+
+       </div>
 
       {/* Main */}
       <div className="main">
@@ -1409,6 +1527,15 @@ function App() {
       {/* Overlays */}
       <Toasts toasts={toasts} remove={removeToast} />
       <ConfirmModal modal={modal} onClose={() => setModal(null)} />
+      {showStatus && (
+        <StatusModal
+          status={status}
+          onClose={() => setShowStatus(false)}
+          onDaemonStart={daemonStart}
+          onDaemonStop={async (opts) => { await daemonStop(opts); refreshStatus(); }}
+          onWorkerCleanup={workerCleanup}
+        />
+      )}
     </>
   );
 }
