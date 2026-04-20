@@ -330,7 +330,7 @@ def train_loop(
     scheduler = get_scheduler(optimizer, config.scheduler)
 
     loss_func = nn.CrossEntropyLoss()
-
+    
     save_path = Path(config.admin.save_path)
 
     # if we are continuing from last checkpoint, set 'load'

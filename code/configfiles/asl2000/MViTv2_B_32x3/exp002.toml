@@ -1,0 +1,54 @@
+[training]
+batch_size = 1
+update_per_step = 8
+max_epoch = 200
+
+[optimizer]
+eps = 1e-5
+backbone_init_lr = 1e-4
+backbone_weight_decay = 1e-3
+classifier_init_lr = 1e-3
+classifier_weight_decay = 1e-3
+
+[model_params]
+drop_p = 0.5
+
+
+[data]
+num_frames = 32
+frame_size = 224
+
+[data.train_augs]
+frame_size_strategy = 'Random_crop'
+normalise = true
+
+[data.train_augs.frame_sampler]
+method = 'og'
+wobble = 0
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.5
+
+[data.test_augs]
+frame_size_strategy = 'Centre_crop'
+normalise = true
+
+[data.test_augs.frame_sampler]
+method = 'og'
+wobble = 0
+
+
+[early_stopping]
+metric = ['val', 'loss']
+mode = 'min'
+patience = 50
+min_delta = 0.01
+
+#Same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_S/exp011.ini
+# but with MViTv2_B32x3 and updated augmentations
+# and patience = 15
+
+#same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_B_32x3/exp007.toml
+
+# same as exp000 and exp001. exp001 did not converge, propably patience was too low. Plan to run without weight path and with patience = 50

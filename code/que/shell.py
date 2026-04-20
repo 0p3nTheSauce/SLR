@@ -30,6 +30,7 @@ from .core import (
     CUR_RUN,
     QUE_LOCATIONS,
     SYNONYMS,
+    Que,
     connect_manager,
     ServerState,
     # WorkerState,
@@ -373,7 +374,10 @@ class QueShell(cmdLib.Cmd):
                 parser.error("--filter_keys and --criterion must be used together")
             elif parsed_args.filter_keys:
                 criterion = parse_criterion(parsed_args.criterion)  
-                _, runs = self.que.find_runs(runs, parsed_args.filter_keys, criterion)
+                runs = [
+                    run for run in runs
+                    if criterion(Que.get_nested(run, parsed_args.filter_keys))
+                ]
 
         runs = self.que.summarise(runs)
 
@@ -442,9 +446,9 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.unwrap_exception("", "Display failed"):
-            if parsed_args.list_key_set:
+            if parsed_args.sort_keys:
                 run = self.que.list_runs(
-                    parsed_args.location, parsed_args.list_key_set, parsed_args.reverse
+                    parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
                 )[parsed_args.index]
 
             else:

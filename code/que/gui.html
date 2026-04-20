@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QueShell</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Oxanium:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0b0f1a;
+    --surf:    #111827;
+    --surf2:   #1a2235;
+    --border:  #1e2d45;
+    --text:    #d4dff0;
+    --muted:   #5a6a88;
+    --amber:   #f59e0b;
+    --cyan:    #22d3ee;
+    --emerald: #34d399;
+    --rose:    #fb7185;
+    --indigo:  #818cf8;
+    --mono:    'JetBrains Mono', monospace;
+    --display: 'Oxanium', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Subtle scanline texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ---- Topbar ---- */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: var(--surf);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .topbar-title {
+    font-family: var(--display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--amber);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .topbar-title span {
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22d3ee;
+    box-shadow: 0 0 8px #22d3ee;
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.offline { background: var(--rose); box-shadow: 0 0 8px var(--rose); animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .topbar-spacer { flex: 1; }
+
+  .topbar-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-left: 1px solid var(--border);
+  }
+
+  .topbar-label {
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ---- Buttons ---- */
+  .btn {
+    padding: 5px 12px;
+    border-radius: 3px;
+    border: 1px solid;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+    background: transparent;
+  }
+  .btn:hover { filter: brightness(1.3); }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-amber  { color: var(--amber);   border-color: var(--amber);   }
+  .btn-cyan   { color: var(--cyan);    border-color: var(--cyan);    }
+  .btn-emerald{ color: var(--emerald); border-color: var(--emerald); }
+  .btn-rose   { color: var(--rose);    border-color: var(--rose);    }
+  .btn-muted  { color: var(--muted);   border-color: var(--border);  }
+  .btn-indigo { color: var(--indigo);  border-color: var(--indigo);  }
+
+  .btn-filled-amber   { background: rgba(245,158,11,0.15); color: var(--amber);   border-color: var(--amber); }
+  .btn-filled-rose    { background: rgba(251,113,133,0.15); color: var(--rose);   border-color: var(--rose); }
+  .btn-filled-emerald { background: rgba(52,211,153,0.15);  color: var(--emerald); border-color: var(--emerald); }
+  .btn-filled-cyan    { background: rgba(34,211,238,0.15);  color: var(--cyan);   border-color: var(--cyan); }
+
+  /* ---- Main layout ---- */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ---- Queue columns ---- */
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    flex: 1;
+    overflow: hidden;
+    background: var(--border);
+  }
+
+  .col {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .col-header {
+    padding: 12px 14px 10px;
+    border-bottom: 2px solid;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .col-header-title {
+    font-family: var(--display);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .col-count {
+    font-size: 11px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    border: 1px solid currentColor;
+    opacity: 0.7;
+  }
+
+  .col-actions { margin-left: auto; display: flex; gap: 4px; }
+
+  .col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .col-body::-webkit-scrollbar { width: 4px; }
+  .col-body::-webkit-scrollbar-track { background: transparent; }
+  .col-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* ---- Run cards ---- */
+  .run-card {
+    background: var(--surf);
+    border: 1px solid var(--border);
+    border-left: 3px solid;
+    border-radius: 3px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all 0.12s;
+    position: relative;
+  }
+
+  .run-card:hover {
+    background: var(--surf2);
+    border-color: currentColor;
+  }
+
+  .run-card.selected {
+    background: var(--surf2);
+    box-shadow: 0 0 0 1px currentColor;
+  }
+
+  .card-idx {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .card-model {
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .card-row {
+    display: flex;
+    gap: 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 300;
+  }
+
+  .card-tag {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .card-metrics {
+    margin-top: 6px;
+    display: flex;
+    gap: 8px;
+    font-size: 10px;
+  }
+
+  .card-metric {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .card-metric-label { color: var(--muted); }
+  .card-metric-val   { color: var(--text); font-weight: 500; }
+
+  .card-error {
+    margin-top: 6px;
+    font-size: 10px;
+    color: var(--rose);
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .empty-col {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 1px;
+    opacity: 0.5;
+  }
+
+  /* ---- Right detail panel ---- */
+  .detail-panel {
+    width: 420px;
+    background: var(--surf);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: width 0.2s ease;
+  }
+
+  .detail-panel.hidden { width: 0; border: none; }
+
+  .detail-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .detail-loc-badge {
+    font-family: var(--display);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    border: 1px solid;
+    font-weight: 600;
+  }
+
+  .detail-title {
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .detail-close {
+    margin-left: auto;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 2px;
+  }
+  .detail-close:hover { color: var(--text); background: var(--surf2); }
+
+  .detail-actions {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .detail-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .detail-tab {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.1s;
+    text-transform: uppercase;
+  }
+  .detail-tab.active { color: var(--text); border-bottom-color: var(--indigo); }
+  .detail-tab:hover  { color: var(--text); }
+
+  .detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+  }
+
+  .detail-body::-webkit-scrollbar { width: 4px; }
+  .detail-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  /* ---- JSON display ---- */
+  .json-viewer {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .json-key    { color: #7dd3fc; }
+  .json-str    { color: #86efac; }
+  .json-num    { color: #fdba74; }
+  .json-bool   { color: #c084fc; }
+  .json-null   { color: var(--muted); }
+  .json-brace  { color: var(--muted); }
+
+  /* ---- Action forms ---- */
+  .action-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .form-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+
+  .form-input, .form-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.15s;
+  }
+
+  .form-input:focus, .form-select:focus {
+    border-color: var(--indigo);
+  }
+
+  .form-select option { background: var(--surf2); }
+
+  .form-row { display: flex; gap: 8px; }
+  .form-row .form-group { flex: 1; }
+
+  .form-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .form-submit {
+    padding: 8px;
+    border-radius: 3px;
+    border: 1px solid var(--indigo);
+    background: rgba(129,140,248,0.15);
+    color: var(--indigo);
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.15s;
+    width: 100%;
+    margin-top: 4px;
+  }
+  .form-submit:hover { background: rgba(129,140,248,0.25); }
+
+  /* ---- Modal ---- */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 8000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+
+  .modal {
+    background: var(--surf);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 28px;
+    max-width: 380px;
+    width: 100%;
+  }
+
+  .modal-title {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .modal-msg {
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 22px;
+    line-height: 1.6;
+  }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ---- Toast ---- */
+  .toasts {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .toast {
+    padding: 10px 16px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 260px;
+    animation: slideIn 0.2s ease;
+    pointer-events: all;
+  }
+
+  .toast-ok   { background: #0a2019; border-color: var(--emerald); color: #6ee7b7; }
+  .toast-err  { background: #200a0a; border-color: var(--rose);    color: #fca5a5; }
+  .toast-info { background: #0a0f28; border-color: var(--indigo);  color: #a5b4fc; }
+  .toast-close { margin-left: auto; cursor: pointer; opacity: 0.6; font-size: 16px; }
+  .toast-close:hover { opacity: 1; }
+
+  /* ---- Server sidebar ---- */
+  .server-bar {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surf);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    font-size: 11px;
+  }
+
+  .server-item { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  .server-val  { color: var(--text); }
+
+  .led {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+  .led-on  { background: var(--emerald); box-shadow: 0 0 6px var(--emerald); }
+  .led-off { background: var(--muted); }
+  .led-busy{ background: var(--amber); box-shadow: 0 0 6px var(--amber); animation: pulse 1.5s infinite; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ---- Filter bar ---- */
+  .filter-bar {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .filter-bar .form-input { font-size: 11px; padding: 4px 8px; }
+
+  /* ---- Misc ---- */
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--indigo);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section-divider {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+const API = 'http://localhost:8000/api';
+const LOCS = ['to_run', 'cur_run', 'old_runs', 'fail_runs'];
+const LOC_META = {
+  to_run:    { label: 'To Run',    color: 'var(--amber)',   cls: 'btn-amber',   filledCls: 'btn-filled-amber' },
+  cur_run:   { label: 'Current',   color: 'var(--cyan)',    cls: 'btn-cyan',    filledCls: 'btn-filled-cyan'  },
+  old_runs:  { label: 'Completed', color: 'var(--emerald)', cls: 'btn-emerald', filledCls: 'btn-filled-emerald' },
+  fail_runs: { label: 'Failed',    color: 'var(--rose)',    cls: 'btn-rose',    filledCls: 'btn-filled-rose'  },
+};
+
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
+async function apiFetch(path, opts = {}) {
+  const r = await fetch(`${API}${path}`, opts);
+  const body = await r.json().catch(() => ({ detail: r.statusText }));
+  if (!r.ok) throw new Error(body.detail || r.statusText);
+  return body;
+}
+const apiGet  = path        => apiFetch(path);
+const apiDel  = path        => apiFetch(path, { method: 'DELETE' });
+const apiPost = (path, data) => apiFetch(path, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(data),
+});
+
+// ---------------------------------------------------------------------------
+// JSON syntax-highlighted renderer
+// ---------------------------------------------------------------------------
+function JsonView({ data }) {
+  function colorize(str) {
+    return str
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, match => {
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) return `<span class="json-key">${match}</span>`;
+          return `<span class="json-str">${match}</span>`;
+        }
+        if (/true|false/.test(match)) return `<span class="json-bool">${match}</span>`;
+        if (/null/.test(match)) return `<span class="json-null">${match}</span>`;
+        return `<span class="json-num">${match}</span>`;
+      });
+  }
+  const html = colorize(JSON.stringify(data, null, 2));
+  return <div className="json-viewer" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+// ---------------------------------------------------------------------------
+// Toast manager hook
+// ---------------------------------------------------------------------------
+function useToasts() {
+  const [toasts, setToasts] = useState([]);
+  const id = useRef(0);
+  const add = useCallback((msg, type = 'ok') => {
+    const tid = ++id.current;
+    setToasts(t => [...t, { id: tid, msg, type }]);
+    setTimeout(() => setToasts(t => t.filter(x => x.id !== tid)), 4000);
+  }, []);
+  const remove = useCallback(tid => setToasts(t => t.filter(x => x.id !== tid)), []);
+  return { toasts, toast: add, removeToast: remove };
+}
+
+// ---------------------------------------------------------------------------
+// Components
+// ---------------------------------------------------------------------------
+
+function Toasts({ toasts, remove }) {
+  return (
+    <div className="toasts">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast toast-${t.type}`}>
+          <span>{t.type === 'ok' ? '✓' : t.type === 'err' ? '✗' : 'ℹ'}</span>
+          <span style={{ flex: 1 }}>{t.msg}</span>
+          <span className="toast-close" onClick={() => remove(t.id)}>×</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ConfirmModal({ modal, onClose }) {
+  if (!modal) return null;
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">{modal.title}</div>
+        <div className="modal-msg">{modal.message}</div>
+        <div className="modal-actions">
+          <button className="btn btn-muted" onClick={onClose}>Cancel</button>
+          <button className="btn btn-rose" onClick={() => { modal.onConfirm(); onClose(); }}>
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RunCard({ run, idx, loc, selected, onClick }) {
+  const meta = LOC_META[loc];
+  return (
+    <div
+      className={`run-card ${selected ? 'selected' : ''}`}
+      style={{ borderLeftColor: meta.color, color: meta.color }}
+      onClick={() => onClick(run, idx)}
+    >
+      <span className="card-idx">#{idx}</span>
+      <div className="card-model" style={{ color: 'var(--text)' }}>{run.model}</div>
+      <div className="card-row">
+        <span className="card-tag">{run.split}</span>
+        <span className="card-tag">{run.dataset}</span>
+        <span className="card-tag">exp {run.exp_no}</span>
+      </div>
+      {run.run_id && (
+        <div style={{ marginTop: 5, fontSize: 10, color: 'var(--muted)' }}>
+          id: {run.run_id}
+        </div>
+      )}
+      {(run.best_val_acc != null || run.test_top1_acc != null) && (
+        <div className="card-metrics">
+          {run.best_val_acc != null && (
+            <div className="card-metric">
+              <span className="card-metric-label">val_acc:</span>
+              <span className="card-metric-val" style={{ color: meta.color }}>
+               
+                {run.best_val_acc.toFixed(1)}%
+              </span>
+            </div>
+          )}
+          {run.test_top1_acc != null && (
+            <div className="card-metric">
+              <span className="card-metric-label">top1:</span>
+              <span className="card-metric-val" style={{ color: meta.color }}>
+                {run.test_top1_acc.toFixed(1)}%
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      {run.error && <div className="card-error">⚠ {run.error}</div>}
+    </div>
+  );
+}
+ // {(run.best_val_acc * 100).toFixed(1)}%
+// ---- Action Forms ----
+
+function EditForm({ loc, idx, onSubmit, onCancel }) {
+  const [keys, setKeys]     = useState('');
+  const [value, setValue]   = useState('');
+  const [doEval, setDoEval] = useState(false);
+
+  return (
+    <div className="action-form">
+      <div className="section-divider">Edit Field</div>
+      <div className="form-group">
+        <label className="form-label">Key Path (space-separated)</label>
+        <input className="form-input" placeholder="e.g. admin model" value={keys} onChange={e => setKeys(e.target.value)} />
+      </div>
+      <div className="form-group">
+        <label className="form-label">New Value</label>
+        <input className="form-input" placeholder="value" value={value} onChange={e => setValue(e.target.value)} />
+      </div>
+      <label className="form-checkbox">
+        <input type="checkbox" checked={doEval} onChange={e => setDoEval(e.target.checked)} />
+        Evaluate as Python literal (ast.literal_eval)
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="form-submit" style={{ flex: 1 }}
+          onClick={() => onSubmit({ loc, idx, keys: keys.trim().split(/\s+/), value, do_eval: doEval })}>
+          Apply Edit
+        </button>
+        <button className="btn btn-muted" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function MoveForm({ loc, idx, onSubmit, onCancel }) {
+  const [nLoc, setNLoc]   = useState('to_run');
+  const [ofIdx, setOfIdx] = useState('');
+
+  return (
+    <div className="action-form">
+      <div className="section-divider">Move Run</div>
+      <div className="form-group">
+        <label className="form-label">Destination</label>
+        <select className="form-select" value={nLoc} onChange={e => setNLoc(e.target.value)}>
+          {LOCS.filter(l => l !== loc).map(l =>
+            <option key={l} value={l}>{LOC_META[l].label}</option>
+          )}
+        </select>
+      </div>
+      <div className="form-group">
+        <label className="form-label">End Index (optional, for range move)</label>
+        <input className="form-input" type="number" placeholder="leave empty for single" value={ofIdx}
+          onChange={e => setOfIdx(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="form-submit" style={{ flex: 1 }}
+          onClick={() => onSubmit({ o_loc: loc, n_loc: nLoc, oi_idx: idx, of_idx: ofIdx !== '' ? parseInt(ofIdx) : null })}>
+          Move
+        </button>
+        <button className="btn btn-muted" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function ShuffleForm({ loc, idx, onSubmit, onCancel }) {
+  const [nIdx, setNIdx] = useState('');
+
+  return (
+    <div className="action-form">
+      <div className="section-divider">Reorder Run</div>
+      <div className="form-group">
+        <label className="form-label">Move from #{idx} to position</label>
+        <input className="form-input" type="number" placeholder="new index" value={nIdx}
+          onChange={e => setNIdx(e.target.value)} />
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="form-submit" style={{ flex: 1 }}
+          onClick={() => onSubmit({ loc, o_idx: idx, n_idx: parseInt(nIdx) })}>
+          Reorder
+        </button>
+        <button className="btn btn-muted" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function RecoverForm({ loc, idx, onSubmit, onCancel }) {
+  const [toLoc, setToLoc]         = useState('to_run');
+  const [cleanSlate, setClean]    = useState(false);
+
+  return (
+    <div className="action-form">
+      <div className="section-divider">Recover Run</div>
+      <div className="form-group">
+        <label className="form-label">Recover to</label>
+        <select className="form-select" value={toLoc} onChange={e => setToLoc(e.target.value)}>
+          {LOCS.filter(l => l !== loc).map(l =>
+            <option key={l} value={l}>{LOC_META[l].label}</option>
+          )}
+        </select>
+      </div>
+      <label className="form-checkbox">
+        <input type="checkbox" checked={cleanSlate} onChange={e => setClean(e.target.checked)} />
+        Clean slate (strip results/run_id, new checkpoint dir)
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="form-submit" style={{ flex: 1 }}
+          onClick={() => onSubmit({ from_loc: loc, to_loc: toLoc, index: idx, clean_slate: cleanSlate })}>
+          Recover
+        </button>
+        <button className="btn btn-muted" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function CopyForm({ loc, idx, onSubmit, onCancel }) {
+  const [nLoc, setNLoc]        = useState('to_run');
+  const [nIdx, setNIdx]        = useState('0');
+  const [cleanSlate, setClean] = useState(false);
+
+  return (
+    <div className="action-form">
+      <div className="section-divider">Copy Run</div>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Destination</label>
+          <select className="form-select" value={nLoc} onChange={e => setNLoc(e.target.value)}>
+            {LOCS.filter(l => l !== loc).map(l =>
+              <option key={l} value={l}>{LOC_META[l].label}</option>
+            )}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">At index</label>
+          <input className="form-input" type="number" value={nIdx}
+            onChange={e => setNIdx(e.target.value)} />
+        </div>
+      </div>
+      <label className="form-checkbox">
+        <input type="checkbox" checked={cleanSlate} onChange={e => setClean(e.target.checked)} />
+        Clean slate
+      </label>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="form-submit" style={{ flex: 1 }}
+          onClick={() => onSubmit({ o_loc: loc, o_indexes: [idx], n_loc: nLoc, n_idx: parseInt(nIdx), clean_slate: cleanSlate })}>
+          Copy
+        </button>
+        <button className="btn btn-muted" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// ---- Detail panel ----
+
+function DetailPanel({ detail, fullRun, onClose, onAction }) {
+  const [tab, setTab]       = useState('detail');
+  const [activeForm, setForm] = useState(null);
+
+  if (!detail) return <div className="detail-panel hidden" />;
+
+  const meta = LOC_META[detail.loc];
+  const { run, idx, loc } = detail;
+  const canRecover = loc === 'fail_runs' || loc === 'cur_run';
+
+  function withForm(name) {
+    return () => setForm(activeForm === name ? null : name);
+  }
+
+  async function submitAction(endpoint, data) {
+    await onAction(endpoint, data);
+    setForm(null);
+  }
+
+  const forms = {
+    edit:    <EditForm    loc={loc} idx={idx} onSubmit={d => submitAction('/queue/edit', d)}    onCancel={() => setForm(null)} />,
+    move:    <MoveForm    loc={loc} idx={idx} onSubmit={d => submitAction('/queue/move', d)}    onCancel={() => setForm(null)} />,
+    shuffle: <ShuffleForm loc={loc} idx={idx} onSubmit={d => submitAction('/queue/shuffle', d)} onCancel={() => setForm(null)} />,
+    recover: <RecoverForm loc={loc} idx={idx} onSubmit={d => submitAction('/queue/recover', d)} onCancel={() => setForm(null)} />,
+    copy:    <CopyForm    loc={loc} idx={idx} onSubmit={d => submitAction('/queue/copy', d)}    onCancel={() => setForm(null)} />,
+  };
+
+  return (
+    <div className="detail-panel">
+      <div className="detail-header">
+        <div className="detail-loc-badge" style={{ color: meta.color, borderColor: meta.color }}>
+          {meta.label}
+        </div>
+        <div className="detail-title">{run.model} · #{idx}</div>
+        <div className="detail-close" onClick={onClose}>×</div>
+      </div>
+
+      <div className="detail-actions">
+        <button className="btn btn-indigo" onClick={withForm('edit')}>Edit Field</button>
+        <button className="btn btn-cyan"   onClick={withForm('move')}>Move</button>
+        <button className="btn btn-muted"  onClick={withForm('shuffle')}>Reorder</button>
+        {canRecover && <button className="btn btn-amber" onClick={withForm('recover')}>Recover</button>}
+        <button className="btn btn-emerald" onClick={withForm('copy')}>Copy</button>
+      </div>
+
+      <div className="detail-tabs">
+        {['detail', 'full'].map(t => (
+          <div key={t} className={`detail-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+            {t === 'detail' ? 'Summary' : 'Full JSON'}
+          </div>
+        ))}
+        {activeForm && (
+          <div className="detail-tab active" style={{ color: 'var(--indigo)', borderBottomColor: 'var(--indigo)' }}>
+            {activeForm.charAt(0).toUpperCase() + activeForm.slice(1)}
+          </div>
+        )}
+      </div>
+
+      <div className="detail-body">
+        {activeForm ? forms[activeForm] : tab === 'detail' ? (
+          <JsonView data={run} />
+        ) : fullRun ? (
+          <JsonView data={fullRun} />
+        ) : (
+          <div style={{ color: 'var(--muted)', fontSize: 12 }}>Loading full run…</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Column ----
+function QueueColumn({ loc, runs, selected, onSelect, onClear, loading, onFind, onRefreshLoc }) {
+  const meta = LOC_META[loc];
+  const [filterKeys, setFilterKeys] = useState('');
+  const [criterion, setCriterion]   = useState('');
+  const [filtered, setFiltered]     = useState(null);
+  const [filterErr, setFilterErr]   = useState('');
+  const [filtering, setFiltering]   = useState(false);
+
+  // --- sort state ---
+  const [sortKeys, setSortKeys] = useState('');
+  const [reverse, setReverse]   = useState(false);
+  const [sorted, setSorted]     = useState(null);   // null = no sort active
+  const [sortErr, setSortErr]   = useState('');
+  const [sorting, setSorting]   = useState(false);
+
+  const displayRuns = filtered !== null ? filtered : sorted !== null ? sorted : runs;
+  const isFiltered  = filtered !== null;
+  const isSorted    = sorted !== null;
+
+  useEffect(() => {
+    if (sortKeys.trim()) applySort();
+  }, [reverse]);  // auto re-sort when desc is toggled
+
+  async function applySort() {
+    if (!sortKeys.trim()) {
+      setSorted(null);
+      setSortErr('');
+      return;
+    }
+    setSorting(true);
+    setSortErr('');
+    try {
+      const params = new URLSearchParams();
+      sortKeys.trim().split(/\s+/).forEach(k => params.append('sort_keys', k));
+      if (reverse) params.set('reverse', 'true');
+      const data = await apiGet(`/queue/${loc}?${params}`);
+      setSorted(data);
+    } catch (e) {
+      setSortErr(e.message);
+    } finally {
+      setSorting(false);
+    }
+  }
+
+  function clearSort() {
+    setSorted(null);
+    setSortKeys('');
+    setReverse(false);
+    setSortErr('');
+  }
+
+  // existing filter logic unchanged...
+  async function applyFilter() {
+    if (!filterKeys.trim() && !criterion.trim()) { setFiltered(null); setFilterErr(''); return; }
+    if (!filterKeys.trim() || !criterion.trim()) { setFilterErr('Both keys and criterion are required'); return; }
+    setFiltering(true); setFilterErr('');
+    try {
+      const result = await apiPost('/queue/find', {
+        loc,
+        keys: filterKeys.trim().split(/\s+/),
+        criterion: criterion.trim(),
+      });
+      setFiltered(result.runs);
+    } catch (e) { setFilterErr(e.message); setFiltered(null); }
+    finally { setFiltering(false); }
+  }
+
+  function clearFilter() { setFiltered(null); setFilterKeys(''); setCriterion(''); setFilterErr(''); }
+
+  const isActive = filtered !== null;
+
+  return (
+    <div className="col">
+      <div className="col-header" style={{ borderBottomColor: meta.color }}>
+        <span className="col-header-title" style={{ color: meta.color }}>{meta.label}</span>
+        <span className="col-count" style={{ color: meta.color }}>
+          {isFiltered ? `${filtered.length}/${runs.length}` : runs.length}
+        </span>
+        {(loading || filtering || sorting) && <div className="spinner" style={{ marginLeft: 4 }} />}
+        <div className="col-actions">
+          {runs.length > 0 && (
+            <button className={`btn ${meta.cls}`} style={{ fontSize: 10 }} onClick={() => onClear(loc)}>Clear</button>
+          )}
+        </div>
+      </div>
+
+      {/* Sort bar */}
+      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          <input
+            className="form-input"
+            placeholder="-s keys…  e.g. results best_val_acc"
+            value={sortKeys}
+            onChange={e => setSortKeys(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applySort()}
+            style={{ flex: 1, fontSize: 11,
+                    borderColor: isSorted ? 'var(--amber)' : sortErr ? 'var(--rose)' : 'var(--border)',
+                    color: isSorted ? 'var(--amber)' : 'var(--text)' }}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: reverse ? 'var(--amber)' : 'var(--muted)', fontSize: 11, whiteSpace: 'nowrap', cursor: 'pointer' }}>
+            <input type="checkbox" checked={reverse} onChange={e => setReverse(e.target.checked)} />
+            desc
+          </label>
+          <button className="btn btn-amber" style={{ fontSize: 10, whiteSpace: 'nowrap' }} onClick={applySort}>
+            Sort
+          </button>
+          {isSorted && (
+            <button className="btn btn-rose" style={{ fontSize: 10, whiteSpace: 'nowrap' }} onClick={clearSort}>✕</button>
+          )}
+        </div>
+        {sortErr && <div style={{ fontSize: 10, color: 'var(--rose)', paddingLeft: 2 }}>{sortErr}</div>}
+      </div>
+
+      {/* Filter bar */}
+      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <input
+            className="form-input"
+            placeholder="-f keys…  e.g. admin model"
+            value={filterKeys}
+            onChange={e => setFilterKeys(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applyFilter()}
+            style={{ flex: 1, fontSize: 11 }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          <input
+            className="form-input"
+            placeholder="-c  e.g. lambda x: x == 'S3D'"
+            value={criterion}
+            onChange={e => setCriterion(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applyFilter()}
+            style={{ flex: 1, fontSize: 11,
+                     color: isActive ? 'var(--cyan)' : 'var(--text)',
+                     borderColor: isActive ? 'var(--cyan)' : filterErr ? 'var(--rose)' : 'var(--border)' }}
+          />
+          {isActive
+            ? <button className="btn btn-rose" style={{ fontSize: 10, whiteSpace: 'nowrap' }} onClick={clearFilter}>✕ Reset</button>
+            : <button className="btn btn-cyan" style={{ fontSize: 10, whiteSpace: 'nowrap' }} onClick={applyFilter}>Apply</button>
+          }
+        </div>
+        {filterErr && <div style={{ fontSize: 10, color: 'var(--rose)', paddingLeft: 2 }}>{filterErr}</div>}
+      </div>
+
+      <div className="col-body">
+        {displayRuns.length === 0
+          ? <div className="empty-col">{runs.length === 0 ? '· empty ·' : 'no matches'}</div>
+          : displayRuns.map((run, i) => (
+              <RunCard key={i} run={run} idx={i} loc={loc} selected={selected}
+                onClick={(r, idx) => onSelect(r, idx, loc)} />
+            ))
+        }
+      </div>
+    </div>
+  );
+}
+// ---- Server status bar ----
+
+function ServerBar({ status, onDaemonStart, onDaemonStop, onWorkerCleanup, onSave, onLoad }) {
+  if (!status) return <div className="server-bar"><span style={{ color: 'var(--muted)' }}>Connecting to server…</span></div>;
+
+  const { daemon_state: d, worker_state: w } = status;
+
+  return (
+    <div className="server-bar">
+      <div className="server-item">
+        <div className={`led ${d.awake ? 'led-on' : 'led-off'}`} />
+        <span>Daemon:</span>
+        <span className="server-val">{d.awake ? 'awake' : 'idle'}</span>
+        {d.supervisor_pid && <span style={{ color: 'var(--muted)' }}>pid:{d.supervisor_pid}</span>}
+      </div>
+
+      <div className="server-item">
+        <div className={`led ${w.task === 'training' ? 'led-busy' : w.task === 'inactive' ? 'led-off' : 'led-on'}`} />
+        <span>Worker:</span>
+        <span className="server-val">{w.task}</span>
+        {w.current_run_id && <span style={{ color: 'var(--muted)' }}>· {w.current_run_id}</span>}
+      </div>
+
+      {w.exception && (
+        <div className="server-item" style={{ color: 'var(--rose)' }}>
+          ⚠ {w.exception.slice(0, 40)}
+        </div>
+      )}
+
+      <div style={{ flex: 1 }} />
+
+      {!d.awake
+        ? <button className="btn btn-emerald" onClick={onDaemonStart}>Start Daemon</button>
+        : <button className="btn btn-rose"    onClick={onDaemonStop}>Stop Daemon</button>
+      }
+
+      <button className="btn btn-muted" onClick={onWorkerCleanup}>Clear VRAM</button>
+
+      <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+
+      <button className="btn btn-amber"  onClick={() => onSave('que')}>Save Que</button>
+      <button className="btn btn-indigo" onClick={() => onLoad('que')}>Load Que</button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main App
+// ---------------------------------------------------------------------------
+function App() {
+  const [queues, setQueues]       = useState({ to_run: [], cur_run: [], old_runs: [], fail_runs: [] });
+  const [status, setStatus]       = useState(null);
+  const [detail, setDetail]       = useState(null);   // { run (summary), idx, loc }
+  const [fullRun, setFullRun]     = useState(null);   // full model_dump
+  const [loading, setLoading]     = useState({});
+  const [connected, setConnected] = useState(true);
+  const [modal, setModal]         = useState(null);
+  const { toasts, toast, removeToast } = useToasts();
+
+  // ---- Data fetching ----
+
+  async function refreshLoc(loc) {
+    setLoading(l => ({ ...l, [loc]: true }));
+    try {
+      const data = await apiGet(`/queue/${loc}`);
+      setQueues(q => ({ ...q, [loc]: data }));
+      setConnected(true);
+    } catch (e) {
+      setConnected(false);
+    } finally {
+      setLoading(l => ({ ...l, [loc]: false }));
+    }
+  }
+
+  async function refreshAll() {
+    await Promise.all(LOCS.map(refreshLoc));
+  }
+
+  async function refreshStatus() {
+    try {
+      const s = await apiGet('/status');
+      setStatus(s);
+    } catch {}
+  }
+
+  useEffect(() => {
+    refreshAll();
+    refreshStatus();
+    const interval = setInterval(() => { refreshAll(); refreshStatus(); }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ---- Run selection ----
+
+  async function selectRun(run, idx, loc) {
+    if (detail?.loc === loc && detail?.idx === idx) {
+      setDetail(null);
+      setFullRun(null);
+      return;
+    }
+    setDetail({ run, idx, loc });
+    setFullRun(null);
+    try {
+      const full = await apiGet(`/queue/${loc}/${idx}`);
+      setFullRun(full);
+    } catch {}
+  }
+
+  // ---- Generic action handler ----
+
+  async function handleAction(endpoint, data) {
+    try {
+      await apiPost(endpoint, data);
+      toast(`${endpoint.split('/').pop()} successful`, 'ok');
+      await refreshAll();
+      if (detail) {
+        // re-check if selection still valid
+        const newRuns = queues[detail.loc];
+        if (detail.idx >= newRuns.length) {
+          setDetail(null);
+          setFullRun(null);
+        }
+      }
+    } catch (e) {
+      toast(e.message, 'err');
+      throw e;
+    }
+  }
+
+  // ---- Column actions ----
+
+  function confirmClear(loc) {
+    setModal({
+      title: `Clear ${LOC_META[loc].label}?`,
+      message: `This will permanently remove all ${queues[loc].length} runs from ${loc}.`,
+      onConfirm: async () => {
+        try {
+          await apiPost(`/queue/${loc}/clear`);
+          toast(`Cleared ${loc}`, 'ok');
+          setQueues(q => ({ ...q, [loc]: [] }));
+          if (detail?.loc === loc) { setDetail(null); setFullRun(null); }
+        } catch (e) { toast(e.message, 'err'); }
+      },
+    });
+  }
+
+  function confirmRemove(loc, idx) {
+    setModal({
+      title: 'Remove run?',
+      message: `Remove run #${idx} from ${loc}?`,
+      onConfirm: async () => {
+        try {
+          await apiDel(`/queue/${loc}/${idx}`);
+          toast(`Removed #${idx} from ${loc}`, 'ok');
+          await refreshLoc(loc);
+          if (detail?.loc === loc && detail?.idx === idx) { setDetail(null); setFullRun(null); }
+        } catch (e) { toast(e.message, 'err'); }
+      },
+    });
+  }
+
+  // ---- Daemon / Worker ----
+
+  async function daemonStart() {
+    try {
+      await apiPost('/daemon/start');
+      toast('Daemon started', 'ok');
+      refreshStatus();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  async function daemonStop() {
+    setModal({
+      title: 'Stop daemon?',
+      message: 'Stop the supervisor (and optionally the worker) process?',
+      onConfirm: async () => {
+        try {
+          await apiPost('/daemon/stop', { supervisor: true });
+          toast('Daemon stopped', 'ok');
+          refreshStatus();
+        } catch (e) { toast(e.message, 'err'); }
+      },
+    });
+  }
+
+  async function workerCleanup() {
+    try {
+      await apiPost('/worker/cleanup');
+      toast('VRAM cleared', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  async function saveState(target) {
+    try {
+      await apiPost('/save', { target });
+      toast(`${target} saved`, 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  async function loadState(target) {
+    try {
+      await apiPost('/load', { target });
+      toast(`${target} loaded`, 'ok');
+      refreshAll();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  // ---- Render ----
+
+  return (
+    <>
+      {/* Topbar */}
+      <div className="topbar">
+        <div className="topbar-title">Que<span>Shell</span></div>
+        <div className={`status-dot ${connected ? '' : 'offline'}`} />
+        <span style={{ color: 'var(--muted)', fontSize: 11 }}>
+          {connected ? 'localhost:8000' : 'disconnected'}
+        </span>
+
+        <div className="topbar-spacer" />
+
+        <div className="topbar-section">
+          <span className="topbar-label">Total</span>
+          <span style={{ color: 'var(--text)' }}>
+            {LOCS.reduce((n, l) => n + queues[l].length, 0)} runs
+          </span>
+        </div>
+
+        <div className="topbar-section">
+          <button className="btn btn-muted" onClick={refreshAll} title="Refresh all queues">
+            ↺ Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Main */}
+      <div className="main">
+        <div className="columns">
+          {LOCS.map(loc => (
+            <QueueColumn
+              key={loc}
+              loc={loc}
+              runs={queues[loc]}
+              selected={detail}
+              loading={loading[loc]}
+              onSelect={selectRun}
+              onClear={confirmClear}
+              onRemove={confirmRemove}
+            />
+          ))}
+        </div>
+
+        <DetailPanel
+          detail={detail}
+          fullRun={fullRun}
+          onClose={() => { setDetail(null); setFullRun(null); }}
+          onAction={handleAction}
+        />
+      </div>
+
+      {/* Status bar */}
+      <ServerBar
+        status={status}
+        onDaemonStart={daemonStart}
+        onDaemonStop={daemonStop}
+        onWorkerCleanup={workerCleanup}
+        onSave={saveState}
+        onLoad={loadState}
+      />
+
+      {/* Overlays */}
+      <Toasts toasts={toasts} remove={removeToast} />
+      <ConfirmModal modal={modal} onClose={() => setModal(null)} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
