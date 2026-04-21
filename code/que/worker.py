@@ -1,6 +1,6 @@
 import os
 from typing import Optional, IO, cast
-
+import traceback
 import torch
 import gc
 import logging
@@ -53,13 +53,21 @@ class Worker:
         que: Que,
         state: WorkerStateDict,
         stop_event: Optional[EventClass] = None,
+        do_traceback: bool = True
     ) -> None:
         self.server_logger = server_logger
         self.que = que
         self.stop_event: Optional[EventClass] = stop_event
         self.state = state
-
+        self.do_traceback = do_traceback
         self.server_logger.info("Worker initialized")
+
+
+    def build_exception_info(self, e: Exception) -> str:
+        if self.do_traceback:
+            return f"{str(e)}\n{traceback.format_exc()}"
+        else:
+            return str(e)
 
     def get_state(self) -> WorkerStateDict:
         return self.state
@@ -159,7 +167,7 @@ class Worker:
             self._train()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = str(Qe)
+            self.state['exception'] = self.build_exception_info(Qe)
             self.state['working_pid'] = None
             raise
         except KeyboardInterrupt:
@@ -169,7 +177,7 @@ class Worker:
             raise
         except Exception as e:
             self.server_logger.error(f"Training run failed due to an error: {e}")
-            self.state['exception'] = str(e)
+            self.state['exception'] = self.build_exception_info(e)
             self.state['working_pid'] = None
             self.que.stash_failed_run(str(e))
             self.que.save_state()
@@ -218,15 +226,16 @@ class Worker:
             self._test()
         except QueException as Qe:
             self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = str(Qe)
+            self.state['exception'] = self.build_exception_info(Qe)
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
             self.state['exception'] = "KeyboardInterrupt"
         except Exception as e:
             self.server_logger.error(f"Testing run failed due to an error: {e}")
-            self.state['exception'] = str(e)
-            self.que.stash_failed_run(str(e))
+            err_str = self.build_exception_info(e)
+            self.state['exception'] = err_str
+            self.que.stash_failed_run(err_str)
             self.que.save_state()
             # exit with error
             raise

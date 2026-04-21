@@ -786,7 +786,7 @@ class QueShell(cmdLib.Cmd):
                 return
 
         try:
-            subprocess.run(["tail", "-f", log_file])
+            subprocess.run(["tail", "-f", "-n", str(parsed_args.lines), log_file])
         except KeyboardInterrupt:
             self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
         except FileNotFoundError:
@@ -1267,6 +1267,13 @@ class QueShell(cmdLib.Cmd):
             "-c",
             action="store_true",
             help="Clear the log file instead of tailing",
+        )
+        parser.add_argument(
+            "--lines",
+            "-n",
+            type=int,
+            default=10,
+            help="Number of lines to show from the end of the log file (default: 10)",
         )
 
         return parser
