@@ -5,7 +5,7 @@ from typing import Callable, Optional, List, Any
 import argparse
 import time
 from contextlib import contextmanager
-
+from pydantic import BaseModel
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -20,7 +20,8 @@ from pathlib import Path
 import subprocess
 import getpass
 import traceback
-
+import readline
+import atexit
 # locals
 # import configs
 from .core import (
@@ -72,21 +73,27 @@ def parse_criterion(expr: str) -> Callable[[Any], bool]:
 
 
 
+    
+
+
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
-    # recover_locs = [FAIL_RUNS, CUR_RUN] maybe make this if you feel like it
-
+    # Define the path for the history file
+    HISTORY_FILE = Path().home() / ".que_shell_history"
+    HISTORY_LIMIT = 1000
     def __init__(
         self,
         server: QueManagerProtocol,
         auto_save: bool = True,
     ) -> None:
+        
         super().__init__()
         # Pretty stuff
         self.console = Console()
         self._show_banner()
         self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
         self.intro = ""
+        self._setup_history()
         # Core Objects
         self.tmux_man = tmux_manager()
         self.auto_save = auto_save
@@ -97,7 +104,6 @@ class QueShell(cmdLib.Cmd):
         self.server_context = server.get_server_context()
 
         # - parsing
-        
         self._parser_factories = {
             "create": lambda: get_train_parser(
                 prog="create", desc="Create a new training run"
@@ -121,6 +127,27 @@ class QueShell(cmdLib.Cmd):
             "recover": self._get_recover_parser,
             "wandb": self._get_wandb_parser,
         }
+
+    # command persistence
+
+    def _save_history(self):
+        """Writes the current session history to the file."""
+        with self.unwrap_exception("", "Failed to save command history"):
+            readline.write_history_file(self.HISTORY_FILE)
+    
+    def _setup_history(self):
+        """Loads command history and registers the save function."""
+        if self.HISTORY_FILE.exists():
+            with self.unwrap_exception("", "Failed to load command history"):
+                readline.read_history_file(self.HISTORY_FILE)
+
+        # Set the number of items to save
+        readline.set_history_length(self.HISTORY_LIMIT)
+        
+        # Register the save function to run automatically on exit
+        atexit.register(self._save_history)
+
+
 
     # Exception handling
 
