@@ -1,12 +1,21 @@
-from typing import Tuple, Optional
+from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 from pydantic import BaseModel
+
+
 # locals
+
+#types
+from run_types import NormDict
+
+
 from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
 from .pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from .pytorch_s3d import S3D_basic
+
+
 
 # new mvit
 from .og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
@@ -89,10 +98,6 @@ def avail_models() -> list[str]:
     """
     return model_names
 
-
-class NormDict(BaseModel):
-    mean: Tuple[float, float, float]
-    std: Tuple[float, float, float]
 
 def norm_vals(model_name: str) -> NormDict:
     """Get normalization values (mean and std) for a given model.

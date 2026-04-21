@@ -2,18 +2,16 @@ import configparser
 import argparse
 import ast
 from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
-from utils import enum_dir
+
 from pathlib import Path
-import torch
-import numpy as np
-import random
+
 import json
 try:
     import tomllib #type: ignore
 except ImportError:
     import tomli as tomllib
 # locals
-from models import avail_models, norm_vals
+# from models import avail_models, norm_vals
 from run_types import (
     WandbInfo,
     RunInfo,
@@ -56,6 +54,9 @@ def ask_nicely(
 
 def set_seed(seed: int = SEED):
     """Set the random seed across multiple environments."""
+    import torch
+    import numpy as np
+    import random
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
@@ -124,6 +125,7 @@ def _make_aug_info(
     model_name: str,
     mode: Literal["train", "test", "val"],
 ) -> AugInfo:
+    from models import norm_vals
     """Build an AugInfo model, filling in defaults when aug_conf is None.
 
     Validation of strategy values is handled by AugInfo's Literal type annotations —
@@ -267,11 +269,20 @@ def get_config_path(
 
 
 def get_train_parser(
-    prog: Optional[str] = None, desc: str = "Train a model"
+    prog: Optional[str] = None, desc: str = "Train a model", model_opts: Optional[List[str]] = None, split_opts: Optional[List[str]] = None
 ) -> argparse.ArgumentParser:
+    
     """Get parser for a training configuration."""
-    models_available = avail_models()
-    splits_available = get_avail_splits()
+    if model_opts is None:
+        from models import avail_models
+        models_available = avail_models()
+    else:
+        models_available = model_opts
+        
+    if split_opts is None:
+        splits_available = get_avail_splits()
+    else:
+        splits_available = split_opts
 
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
@@ -300,10 +311,12 @@ def take_args(
     parsed_args: Optional[argparse.Namespace] = None,
 ) -> Optional[Tuple[AdminInfo, WandbInfo]]:
     """Retrieve and validate arguments for a new training run."""
+    from models import avail_models
+    from utils import enum_dir
     models_available = avail_models()
     splits_available = get_avail_splits()
 
-    parser = get_train_parser()
+    parser = get_train_parser(model_opts=models_available, split_opts=splits_available)
     if sup_args:
         args = parser.parse_args(sup_args)
     elif parsed_args:

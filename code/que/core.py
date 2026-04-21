@@ -44,9 +44,9 @@ from run_types import (
     SummarisedRes,
     FailedExp,  # now defined in run_types
 )
-from testing import full_test, load_comp_res
-from configs import print_config, load_config, ZFILL, get_model_exp_dir, get_model_results_dir
-from utils import enum_dir
+
+# from configs import print_config, load_config, ZFILL, get_model_exp_dir, get_model_results_dir
+
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ SYNONYMS = {
 
 QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
 ProcessNames: TypeAlias = Literal["Server", "Daemon", "Worker"]
-SESH_NAME = "train"
+
 
 
 GenExp: TypeAlias = Union[ExpInfo, FailedExp, CompExpInfo]
@@ -346,6 +346,8 @@ class Que:
         Returns:
             ExpInfo: A fresh run without any run-specific state.
         """
+        from utils import enum_dir
+        from configs import ZFILL
         new_save_path = (
             str(enum_dir(run.admin.save_path, decimals=ZFILL))
             if enum_chck
@@ -701,6 +703,7 @@ class Que:
             print(" | ".join(row_parts))
 
     def disp_run(self, loc: QueLocation, idx: int) -> None:
+        from configs import print_config
         print_config(self.peak_run(loc, idx))
 
     def recover_run(
@@ -754,6 +757,7 @@ class Que:
         wandb_dict: WandbInfo,
         add_duplicates: bool = False,
     ) -> None:
+        from configs import load_config
         with log_and_raise(self.logger, "create"):
             config: RunInfo = load_config(arg_dict)
             if self._is_dup_exp(config) and not add_duplicates:
@@ -766,6 +770,8 @@ class Que:
 
     def add_run(self, arg_dict: AdminInfo, wandb_dict: WandbInfo) -> None:
         """Add a fully-tested completed run directly into old_runs."""
+        from testing import full_test, load_comp_res
+        from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
         with log_and_raise(self.logger, "add"):
             config: RunInfo = load_config(arg_dict)
             if self._is_dup_exp(config):

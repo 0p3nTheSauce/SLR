@@ -1,10 +1,17 @@
 from __future__ import annotations
-from typing import Literal, Optional, Union, List, Tuple, Annotated, Any, Dict, Callable
+from typing import TYPE_CHECKING, Literal, Optional, Union, List, Tuple, Annotated, Any, Dict
 from pydantic import BaseModel, Field, model_validator, computed_field
-from torchvision.transforms.functional import InterpolationMode
-from models import NormDict, norm_vals
-import torchvision.transforms.v2 as v2
 
+if TYPE_CHECKING:
+    from torchvision.transforms.functional import InterpolationMode
+    import torchvision.transforms.v2 as v2
+    
+
+
+
+class NormDict(BaseModel):
+    mean: Tuple[float, float, float]
+    std: Tuple[float, float, float]
 
 ####################### Data loading and augmentation #############################
 
@@ -119,6 +126,7 @@ class HorizontalFlipConfig(BaseModel):
     p: float = 0.5
 
     def build(self) -> v2.Transform:
+        import torchvision.transforms.v2 as v2
         return v2.RandomHorizontalFlip(p=self.p)
 
 
@@ -127,6 +135,7 @@ class RandomGrayscaleConfig(BaseModel):
     p: float = 0.1
 
     def build(self) -> v2.Transform:
+        import torchvision.transforms.v2 as v2
         return v2.RandomGrayscale(p=self.p)
 
 
@@ -136,14 +145,17 @@ class GaussianBlurConfig(BaseModel):
     sigma: tuple[float, float] = (0.1, 2.0)
 
     def build(self) -> v2.Transform:
+        import torchvision.transforms.v2 as v2
         return v2.GaussianBlur(kernel_size=self.kernel_size, sigma=self.sigma)
 
 
-_INTERPOLATION_MAP = {
-    "BILINEAR": InterpolationMode.BILINEAR,
-    "BICUBIC": InterpolationMode.BICUBIC,
-    "NEAREST": InterpolationMode.NEAREST,
-}
+def _interp_modes() -> dict[str, InterpolationMode]:
+    from torchvision.transforms.functional import InterpolationMode
+    return {
+        "BILINEAR": InterpolationMode.BILINEAR,
+        "BICUBIC": InterpolationMode.BICUBIC,
+        "NEAREST": InterpolationMode.NEAREST,
+    }
 
 
 
@@ -151,6 +163,7 @@ class AutoAugmentConfig(BaseModel):
     type: Literal["IMAGENET", "CIFAR10", "SVHN"]
 
     def build(self) -> v2.Transform:
+        import torchvision.transforms.v2 as v2
         match self.type:
             case "IMAGENET":
                 return v2.AutoAugment(v2.AutoAugmentPolicy.IMAGENET)
@@ -167,11 +180,12 @@ class RandAugConfig(BaseModel):
     interpolation: Literal["BILINEAR", "BICUBIC", "NEAREST"] = "BILINEAR"
 
     def build(self) -> v2.RandAugment:
+        import torchvision.transforms.v2 as v2
         return v2.RandAugment(
             num_ops=self.num_ops,
             magnitude=self.magnitude,
             num_magnitude_bins=self.num_magnitude_bins,
-            interpolation=_INTERPOLATION_MAP[self.interpolation],
+            interpolation=_interp_modes()[self.interpolation],
         )
 
 SpatialAugConfig = Annotated[
@@ -383,6 +397,7 @@ class RunInfo(BaseModel):
     @model_validator(mode="after")
     def _resolve_norms(self) -> "RunInfo":
         """Substitute norm_dict based on model name when norm=True."""
+        from models import norm_vals
         for aug_info in (self.data.train_augs, self.data.test_augs):
             if aug_info is not None and aug_info.normalise:
                 aug_info.norm_dict = norm_vals(self.admin.model)

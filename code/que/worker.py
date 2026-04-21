@@ -13,6 +13,7 @@ from multiprocessing.synchronize import Event as EventClass
 from run_types import RunInfo
 
 # locals
+from testing import full_test
 from .core import (
     connect_manager,
     TRAINING_LOG_PATH,
@@ -21,7 +22,6 @@ from .core import (
     TRAINING_NAME,
     QueException,
     WorkerStateDict,
-    full_test,
     CompExpInfo,
     Que,
 )

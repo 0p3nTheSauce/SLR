@@ -3,7 +3,6 @@ import cmd as cmdLib
 import shlex
 from typing import Callable, Optional, List, Any
 import argparse
-import configs
 import time
 from contextlib import contextmanager
 
@@ -23,7 +22,7 @@ import getpass
 import traceback
 
 # locals
-from utils import gpu_manager
+# import configs
 from .core import (
     TO_RUN,
     GenExp,
@@ -41,9 +40,9 @@ from .core import (
     QueManagerProtocol,
     QueDupExp,
 )
-from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
+# from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from .tmux import tmux_manager
-
+from configs import get_train_parser
 
 # ---------------------------------------------------------------------------
 # Criterion parsing
@@ -98,8 +97,9 @@ class QueShell(cmdLib.Cmd):
         self.server_context = server.get_server_context()
 
         # - parsing
+        
         self._parser_factories = {
-            "create": lambda: configs.get_train_parser(
+            "create": lambda: get_train_parser(
                 prog="create", desc="Create a new training run"
             ),
             "add": self._get_add_parser,
@@ -505,10 +505,11 @@ class QueShell(cmdLib.Cmd):
 
     def do_create(self, arg):
         """Create with progress indication"""
+        from configs import take_args
         args = shlex.split(arg)
 
         try:
-            maybe_args = configs.take_args(sup_args=args)
+            maybe_args = take_args(sup_args=args)
         except (SystemExit, ValueError):
             self.console.print("[red]Create cancelled (incorrect arguments)[/red]")
             return
@@ -533,13 +534,14 @@ class QueShell(cmdLib.Cmd):
 
     def do_add(self, arg):
         """Add run with feedback"""
+        from configs import ZFILL, take_args
         args = shlex.split(arg)
         parser = self._get_add_parser()
         parsed_args = parser.parse_args(args)
         parsed_args.no_enum_chck = True  # bypass enum check
         # print(parsed_args.checkpoint_num)
         try:
-            maybe_args = configs.take_args(parsed_args=parsed_args)
+            maybe_args = take_args(parsed_args=parsed_args)
         except (SystemExit, ValueError):
             self.console.print("[red]Add cancelled (incorrect arguments)[/red]")
             return
@@ -624,6 +626,7 @@ class QueShell(cmdLib.Cmd):
     #   Worker
 
     def do_worker(self, arg):
+        from utils import gpu_manager
         parsed_args = self._parse_args_or_cancel("worker", arg)
         if parsed_args is None:
             return
@@ -1062,6 +1065,7 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_add_parser(self) -> argparse.ArgumentParser:
+        from configs import get_train_parser
         train_parser = get_train_parser(
             prog="add", desc="Add a completed training run to old_runs"
         )
@@ -1279,6 +1283,7 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_wandb_parser(self) -> argparse.ArgumentParser:
+        from configs import get_avail_splits, ENTITY, PROJECT_BASE
         likely_projects = [
             f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()
         ]
