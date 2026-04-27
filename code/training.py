@@ -228,8 +228,13 @@ def load_checkpoint(load_path: Path, device: torch.device, strict: bool = False)
     if load_path.exists():
         checkpoint = torch.load(load_path, map_location=device)
         if "rng_cuda" in checkpoint:
-            torch.set_rng_state(checkpoint["rng_torch"])
-            torch.cuda.set_rng_state_all(checkpoint["rng_cuda"])
+            # 1. Move the CPU RNG state back to CPU
+            torch.set_rng_state(checkpoint["rng_torch"].cpu())
+            
+            # 2. Move the list of CUDA RNG states back to CPU
+            # (set_rng_state_all expects a list of CPU tensors)
+            cuda_rng_cpu = [t.cpu() for t in checkpoint["rng_cuda"]]
+            torch.cuda.set_rng_state_all(cuda_rng_cpu)
             np.random.set_state(checkpoint["rng_numpy"])
             random.setstate(checkpoint["rng_python"])
         else:

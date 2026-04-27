@@ -1,7 +1,3988 @@
 {
     "to_run": [],
-    "cur_run": [],
+    "cur_run": [
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/MViTv2_B_32x3/exp002/checkpoints",
+                "exp_no": "002",
+                "recover": true,
+                "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp002.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_018.pth"
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "weight_path"
+                ],
+                "run_id": "fu6xxi0x"
+            }
+        }
+    ],
     "old_runs": [
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/MViTv2_B_32x3/exp001/checkpoints",
+                "exp_no": "001",
+                "recover": true,
+                "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp001.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "no_weight_path"
+                ],
+                "run_id": "cjz7502s"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 0.30627871362940273,
+                "best_val_loss": 7.577747735884677,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.0005,
+                        "top5": 0.0026666666666666666,
+                        "top10": 0.00475
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0013893713094824591,
+                        "top5": 0.005904828065300452,
+                        "top10": 0.010072941993747829
+                    },
+                    "average_loss": 7.561856734417263
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.0005,
+                        "top5": 0.002375,
+                        "top10": 0.005583333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0015313935681470138,
+                        "top5": 0.005615109749872384,
+                        "top10": 0.011230219499744768
+                    },
+                    "average_loss": 7.577747735884677
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.0005,
+                        "top5": 0.0026666666666666666,
+                        "top10": 0.00475
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.0013893713094824591,
+                        "top5": 0.005904828065300452,
+                        "top10": 0.010072941993747829
+                    },
+                    "average_loss": 7.561921407879123,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp073/checkpoints",
+                "exp_no": "073",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp073.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "chunked"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "compto47",
+                    "chunked",
+                    "wobble"
+                ],
+                "run_id": "dwy16vgo"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.63905325443787,
+                "best_val_loss": 1.315756610801629,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6343333333333333,
+                        "top5": 0.8746666666666667,
+                        "top10": 0.9263333333333335
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6317829457364341,
+                        "top5": 0.8682170542635659,
+                        "top10": 0.9224806201550387
+                    },
+                    "average_loss": 1.6773878615319548
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6881666666666668,
+                        "top5": 0.8950000000000001,
+                        "top10": 0.9533333333333335
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6804733727810651,
+                        "top5": 0.893491124260355,
+                        "top10": 0.9556213017751479
+                    },
+                    "average_loss": 1.315756610801629
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2955,
+                        "top5": 0.6041666666666666,
+                        "top10": 0.755
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.29457364341085274,
+                        "top5": 0.5968992248062015,
+                        "top10": 0.751937984496124
+                    },
+                    "average_loss": 3.5423725721481696,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp072/checkpoints",
+                "exp_no": "072",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp072.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "chunked"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "compto47",
+                    "chunked"
+                ],
+                "run_id": "wk2vizag"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 64.79289940828403,
+                "best_val_loss": 1.4574884126859873,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6485,
+                        "top5": 0.8696666666666667,
+                        "top10": 0.9279999999999999
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6434108527131783,
+                        "top5": 0.8643410852713178,
+                        "top10": 0.9224806201550387
+                    },
+                    "average_loss": 1.706427529096851
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6359999999999999,
+                        "top5": 0.8988333333333334,
+                        "top10": 0.9496666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6301775147928994,
+                        "top5": 0.893491124260355,
+                        "top10": 0.9467455621301775
+                    },
+                    "average_loss": 1.4574884126859873
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.33716666666666667,
+                        "top5": 0.6108333333333333,
+                        "top10": 0.7591666666666668
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3333333333333333,
+                        "top5": 0.6085271317829457,
+                        "top10": 0.7558139534883721
+                    },
+                    "average_loss": 3.42278679858736,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/MViTv2_B_32x3/exp000/checkpoints",
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp000.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/MViTv2_B_32x3/exp000/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "weight_path"
+                ],
+                "run_id": "ap0prl54"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 47.06482899438489,
+                "best_val_loss": 2.492715574876715,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.4211333333333333,
+                        "top5": 0.754375,
+                        "top10": 0.83575
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.4456408475164988,
+                        "top5": 0.7634595345606113,
+                        "top10": 0.8370962139631817
+                    },
+                    "average_loss": 2.5489800787815695
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.4242083333333333,
+                        "top5": 0.76455,
+                        "top10": 0.8438333333333332
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.44665645737621235,
+                        "top5": 0.7723328228688107,
+                        "top10": 0.8494129657988769
+                    },
+                    "average_loss": 2.492715574876715
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.17044166666666666,
+                        "top5": 0.410275,
+                        "top10": 0.52765
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.18860715526224384,
+                        "top5": 0.42375824939215007,
+                        "top10": 0.5349079541507468
+                    },
+                    "average_loss": 4.529472071121329,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "save_path": "runs/asl1000/MViTv2_B_32x3/exp000/checkpoints",
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp000.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/MViTv2_B_32x3/exp000/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "weight_path"
+                ],
+                "run_id": "5fj94635"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 60.284605433376456,
+                "best_val_loss": 1.7812564772279833,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5686333333333333,
+                        "top5": 0.8399666666666668,
+                        "top10": 0.9026333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5676972281449894,
+                        "top5": 0.8347547974413646,
+                        "top10": 0.896588486140725
+                    },
+                    "average_loss": 1.922578832718704
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.585,
+                        "top5": 0.8617333333333334,
+                        "top10": 0.9133
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5881845623113411,
+                        "top5": 0.858128503665373,
+                        "top10": 0.9111686071582579
+                    },
+                    "average_loss": 1.7812564772279833
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.28281666666666666,
+                        "top5": 0.5807166666666667,
+                        "top10": 0.6843833333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2830490405117271,
+                        "top5": 0.57409381663113,
+                        "top10": 0.6807036247334755
+                    },
+                    "average_loss": 3.6085222168635647,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl300",
+                "save_path": "runs/asl300/MViTv2_B_32x3/exp000/checkpoints",
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "configfiles/asl300/MViTv2_B_32x3/exp000.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/MViTv2_B_32x3/exp007/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-300",
+                "tags": [
+                    "weight_path"
+                ],
+                "run_id": "mgjsrgqn"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 72.91897891231964,
+                "best_val_loss": 1.0851372841732096,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6777222222222222,
+                        "top5": 0.8943333333333332,
+                        "top10": 0.927388888888889
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6706586826347305,
+                        "top5": 0.8877245508982036,
+                        "top10": 0.9221556886227545
+                    },
+                    "average_loss": 1.3647466791338259
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7302222222222222,
+                        "top5": 0.9232222222222223,
+                        "top10": 0.96
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7269700332963374,
+                        "top5": 0.9211986681465039,
+                        "top10": 0.9578246392896781
+                    },
+                    "average_loss": 1.0851372841732096
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.39844444444444443,
+                        "top5": 0.721111111111111,
+                        "top10": 0.831111111111111
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.38622754491017963,
+                        "top5": 0.7140718562874252,
+                        "top10": 0.8218562874251497
+                    },
+                    "average_loss": 2.726192877144363,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp007/checkpoints",
+                "exp_no": "007",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp007.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "mi50bgp8"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 80.4733727810651,
+                "best_val_loss": 0.8549013153919206,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7813333333333332,
+                        "top5": 0.9383333333333332,
+                        "top10": 0.9675
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7751937984496124,
+                        "top5": 0.9341085271317829,
+                        "top10": 0.9651162790697675
+                    },
+                    "average_loss": 0.9199390768020707
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7986666666666669,
+                        "top5": 0.9508333333333333,
+                        "top10": 0.9683333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7899408284023669,
+                        "top5": 0.9497041420118343,
+                        "top10": 0.9674556213017751
+                    },
+                    "average_loss": 0.8549013153919206
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.46266666666666667,
+                        "top5": 0.7891666666666666,
+                        "top10": 0.8674999999999998
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.44573643410852715,
+                        "top5": 0.7790697674418605,
+                        "top10": 0.8643410852713178
+                    },
+                    "average_loss": 2.264060576971577,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp006/checkpoints",
+                "exp_no": "006",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp006.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.3
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.3
+                    },
+                    "temporal_aug": [
+                        "Shuffle"
+                    ],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "retest_exp5",
+                    "focal_normal"
+                ],
+                "run_id": "myd5kelg"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 82.54437869822485,
+                "best_val_loss": 0.7484370168448652,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8221666666666667,
+                        "top5": 0.9141666666666666,
+                        "top10": 0.9558333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.8217054263565892,
+                        "top5": 0.9108527131782945,
+                        "top10": 0.9534883720930233
+                    },
+                    "average_loss": 0.8954527325517994
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8081666666666666,
+                        "top5": 0.9525,
+                        "top10": 0.9758333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.8017751479289941,
+                        "top5": 0.9526627218934911,
+                        "top10": 0.9763313609467456
+                    },
+                    "average_loss": 0.7484370168448652
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5538333333333333,
+                        "top5": 0.8333333333333333,
+                        "top10": 0.9058333333333332
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5387596899224806,
+                        "top5": 0.8217054263565892,
+                        "top10": 0.9031007751937985
+                    },
+                    "average_loss": 2.1172579232810844,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp005/checkpoints",
+                "exp_no": "005",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp005.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.3
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.3
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "d724p9bc"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 81.36094674556213,
+                "best_val_loss": 0.7583662820264627,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7888333333333333,
+                        "top5": 0.9341666666666666,
+                        "top10": 0.9608333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7868217054263565,
+                        "top5": 0.9302325581395349,
+                        "top10": 0.9573643410852714
+                    },
+                    "average_loss": 0.9243070925048971
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8113333333333336,
+                        "top5": 0.9441666666666667,
+                        "top10": 0.9675
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.8076923076923077,
+                        "top5": 0.9437869822485208,
+                        "top10": 0.9674556213017751
+                    },
+                    "average_loss": 0.7583662820264627
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5476666666666666,
+                        "top5": 0.8108333333333333,
+                        "top10": 0.8741666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5387596899224806,
+                        "top5": 0.810077519379845,
+                        "top10": 0.872093023255814
+                    },
+                    "average_loss": 2.083015538180183,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp004/checkpoints",
+                "exp_no": "004",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp004.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "uq6nbs8b"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 81.95266272189349,
+                "best_val_loss": 0.7657652668128466,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7546666666666667,
+                        "top5": 0.925,
+                        "top10": 0.9625
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7441860465116279,
+                        "top5": 0.9224806201550387,
+                        "top10": 0.9612403100775194
+                    },
+                    "average_loss": 0.8949956879183982
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8140000000000001,
+                        "top5": 0.9375,
+                        "top10": 0.9633333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.8076923076923077,
+                        "top5": 0.9378698224852071,
+                        "top10": 0.9644970414201184
+                    },
+                    "average_loss": 0.7657652668128466
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5141666666666667,
+                        "top5": 0.7708333333333333,
+                        "top10": 0.8825
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5,
+                        "top5": 0.7596899224806202,
+                        "top10": 0.8798449612403101
+                    },
+                    "average_loss": 2.2675183835277397,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp071/checkpoints",
+                "exp_no": "071",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp071.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "speed",
+                        "speed_min": 0.8,
+                        "speed_max": 1.2
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "speed_uniform",
+                    "wobble4"
+                ],
+                "run_id": "plwk1pun"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.93491124260355,
+                "best_val_loss": 1.4141776433440583,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.616,
+                        "top5": 0.8533333333333333,
+                        "top10": 0.9308333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6124031007751938,
+                        "top5": 0.8488372093023255,
+                        "top10": 0.9263565891472868
+                    },
+                    "average_loss": 1.8495596846808364
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6955000000000001,
+                        "top5": 0.9141666666666667,
+                        "top10": 0.9500000000000002
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6893491124260355,
+                        "top5": 0.9142011834319527,
+                        "top10": 0.9497041420118343
+                    },
+                    "average_loss": 1.4141776433440583
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.32300000000000006,
+                        "top5": 0.5366666666666666,
+                        "top10": 0.6808333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.313953488372093,
+                        "top5": 0.5348837209302325,
+                        "top10": 0.6744186046511628
+                    },
+                    "average_loss": 4.631545903422003,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp070/checkpoints",
+                "exp_no": "070",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp070.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "focal_beta",
+                        "alpha": 4.0,
+                        "beta": 4.0
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_beta",
+                        "alpha": 4.0,
+                        "beta": 4.0
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "focal_beta",
+                    "wobble4"
+                ],
+                "run_id": "i93k5aht"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 65.68047337278107,
+                "best_val_loss": 1.3941733309650821,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5351666666666667,
+                        "top5": 0.853,
+                        "top10": 0.9071666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5348837209302325,
+                        "top5": 0.8449612403100775,
+                        "top10": 0.9031007751937985
+                    },
+                    "average_loss": 1.7796539627088421
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6496666666666668,
+                        "top5": 0.8975000000000002,
+                        "top10": 0.9316666666666668
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6449704142011834,
+                        "top5": 0.8964497041420119,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.3941733309650821
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.276,
+                        "top5": 0.5491666666666667,
+                        "top10": 0.7241666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2751937984496124,
+                        "top5": 0.5503875968992248,
+                        "top10": 0.7248062015503876
+                    },
+                    "average_loss": 3.6748206262667766,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp069/checkpoints",
+                "exp_no": "069",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp069.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "focal_laplace",
+                        "mean": 0.5,
+                        "diversity": 0.175
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_laplace",
+                        "mean": 0.5,
+                        "diversity": 0.175
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "focal_laplace",
+                    "wobble4"
+                ],
+                "run_id": "y49awc0t"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 62.1301775147929,
+                "best_val_loss": 1.4372902996692278,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.541,
+                        "top5": 0.8233333333333335,
+                        "top10": 0.8983333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5387596899224806,
+                        "top5": 0.8217054263565892,
+                        "top10": 0.8953488372093024
+                    },
+                    "average_loss": 1.8635234424117337
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6078333333333332,
+                        "top5": 0.873,
+                        "top10": 0.93
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6035502958579881,
+                        "top5": 0.8757396449704142,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.4372902996692278
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2826666666666667,
+                        "top5": 0.5316666666666666,
+                        "top10": 0.6975000000000001
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.28294573643410853,
+                        "top5": 0.5310077519379846,
+                        "top10": 0.6976744186046512
+                    },
+                    "average_loss": 3.6104554952909202,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp068/checkpoints",
+                "exp_no": "068",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp068.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.4
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.4
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "iw1t9lf5"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 64.20118343195266,
+                "best_val_loss": 1.4569271332584712,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5543333333333333,
+                        "top5": 0.845,
+                        "top10": 0.9275
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5542635658914729,
+                        "top5": 0.8449612403100775,
+                        "top10": 0.9263565891472868
+                    },
+                    "average_loss": 1.7124649133680505
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6423333333333333,
+                        "top5": 0.8775,
+                        "top10": 0.9350000000000002
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.636094674556213,
+                        "top5": 0.878698224852071,
+                        "top10": 0.9378698224852071
+                    },
+                    "average_loss": 1.4569271332584712
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2771666666666667,
+                        "top5": 0.5816666666666667,
+                        "top10": 0.7125
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.27906976744186046,
+                        "top5": 0.5852713178294574,
+                        "top10": 0.7170542635658915
+                    },
+                    "average_loss": 3.6738203287151934,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp067/checkpoints",
+                "exp_no": "067",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp067.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.25
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "focal_normal",
+                        "mean": 0.5,
+                        "std": 0.25
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "pmxd2d8l"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 65.68047337278107,
+                "best_val_loss": 1.3827074824520822,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5418333333333333,
+                        "top5": 0.8471666666666667,
+                        "top10": 0.9146666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5387596899224806,
+                        "top5": 0.8449612403100775,
+                        "top10": 0.9147286821705426
+                    },
+                    "average_loss": 1.840280445248499
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6453333333333333,
+                        "top5": 0.8908333333333335,
+                        "top10": 0.9341666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.636094674556213,
+                        "top5": 0.8905325443786982,
+                        "top10": 0.9349112426035503
+                    },
+                    "average_loss": 1.3827074824520822
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.298,
+                        "top5": 0.5746666666666667,
+                        "top10": 0.7208333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.29069767441860467,
+                        "top5": 0.5775193798449613,
+                        "top10": 0.7248062015503876
+                    },
+                    "average_loss": 3.636819764652014,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp066/checkpoints",
+                "exp_no": "066",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp066.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "chunked"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "x47jpby5"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 64.49704142011835,
+                "best_val_loss": 1.5262014465804334,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.521,
+                        "top5": 0.8263333333333334,
+                        "top10": 0.8933333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5193798449612403,
+                        "top5": 0.8217054263565892,
+                        "top10": 0.8953488372093024
+                    },
+                    "average_loss": 2.0625352947188187
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6278333333333332,
+                        "top5": 0.8688333333333336,
+                        "top10": 0.9308333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6183431952662722,
+                        "top5": 0.8698224852071006,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.5262014465804334
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.29100000000000004,
+                        "top5": 0.5308333333333334,
+                        "top10": 0.6699999999999998
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.2868217054263566,
+                        "top5": 0.5310077519379846,
+                        "top10": 0.6666666666666666
+                    },
+                    "average_loss": 3.9345428897724997,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp065/checkpoints",
+                "exp_no": "065",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp065.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "wobbled"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "wd0e7dxg"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 67.15976331360947,
+                "best_val_loss": 1.4163289966214034,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6385000000000001,
+                        "top5": 0.8716666666666667,
+                        "top10": 0.9458333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6317829457364341,
+                        "top5": 0.8643410852713178,
+                        "top10": 0.9457364341085271
+                    },
+                    "average_loss": 1.825950738964885
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6631666666666668,
+                        "top5": 0.9008333333333334,
+                        "top10": 0.96
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6568047337278107,
+                        "top5": 0.9023668639053254,
+                        "top10": 0.9615384615384616
+                    },
+                    "average_loss": 1.4163289966214034
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.3118333333333333,
+                        "top5": 0.6075,
+                        "top10": 0.7391666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3023255813953488,
+                        "top5": 0.6007751937984496,
+                        "top10": 0.7325581395348837
+                    },
+                    "average_loss": 4.338277085843426,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp064/checkpoints",
+                "exp_no": "064",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp064.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 4,
+                        "method": "wobbled"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "hk9s8cwq"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 67.75147928994083,
+                "best_val_loss": 1.4165107788493845,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5651666666666667,
+                        "top5": 0.8433333333333333,
+                        "top10": 0.8891666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.562015503875969,
+                        "top5": 0.8410852713178295,
+                        "top10": 0.8914728682170543
+                    },
+                    "average_loss": 1.8236618692715272
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6818333333333334,
+                        "top5": 0.8783333333333334,
+                        "top10": 0.9341666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6775147928994083,
+                        "top5": 0.8816568047337278,
+                        "top10": 0.9349112426035503
+                    },
+                    "average_loss": 1.4165107788493845
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.31966666666666665,
+                        "top5": 0.59,
+                        "top10": 0.7308333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3178294573643411,
+                        "top5": 0.5852713178294574,
+                        "top10": 0.7286821705426356
+                    },
+                    "average_loss": 3.630395136345771,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp063/checkpoints",
+                "exp_no": "063",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp063.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "uniform"
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "uniform_sampler",
+                    "same_as_52"
+                ],
+                "run_id": "h8kapl0k"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.93491124260355,
+                "best_val_loss": 1.4439608427829342,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5568333333333333,
+                        "top5": 0.8596666666666666,
+                        "top10": 0.9041666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5542635658914729,
+                        "top5": 0.8527131782945736,
+                        "top10": 0.9031007751937985
+                    },
+                    "average_loss": 1.8158394864834346
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6351666666666665,
+                        "top5": 0.8825,
+                        "top10": 0.9325
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6272189349112426,
+                        "top5": 0.878698224852071,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.4439608427829342
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.25433333333333336,
+                        "top5": 0.5321666666666667,
+                        "top10": 0.7016666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.25193798449612403,
+                        "top5": 0.5348837209302325,
+                        "top10": 0.6937984496124031
+                    },
+                    "average_loss": 3.912106247880461,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp061/checkpoints",
+                "exp_no": "061",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp061.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingLR",
+                "tmax": 40,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "ruec31f9"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.34319526627219,
+                "best_val_loss": 1.4974083681996468,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6035,
+                        "top5": 0.868,
+                        "top10": 0.9246666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6007751937984496,
+                        "top5": 0.8643410852713178,
+                        "top10": 0.9186046511627907
+                    },
+                    "average_loss": 2.0132922856000723
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6726666666666667,
+                        "top5": 0.9033333333333333,
+                        "top10": 0.9316666666666668
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.665680473372781,
+                        "top5": 0.9023668639053254,
+                        "top10": 0.9319526627218935
+                    },
+                    "average_loss": 1.4974083681996468
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.3493333333333333,
+                        "top5": 0.5974999999999999,
+                        "top10": 0.7208333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3449612403100775,
+                        "top5": 0.5968992248062015,
+                        "top10": 0.7170542635658915
+                    },
+                    "average_loss": 4.0829954019978345,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp062/checkpoints",
+                "exp_no": "062",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp062.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 30,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "wnwr7zj4"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 66.86390532544378,
+                "best_val_loss": 1.4607392998782989,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5943333333333334,
+                        "top5": 0.8446666666666667,
+                        "top10": 0.9166666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5930232558139535,
+                        "top5": 0.8410852713178295,
+                        "top10": 0.9147286821705426
+                    },
+                    "average_loss": 1.8514757169819285
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6655000000000001,
+                        "top5": 0.8933333333333333,
+                        "top10": 0.9441666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6627218934911243,
+                        "top5": 0.893491124260355,
+                        "top10": 0.9437869822485208
+                    },
+                    "average_loss": 1.4607392998782989
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.311,
+                        "top5": 0.5855,
+                        "top10": 0.6883333333333335
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.29844961240310075,
+                        "top5": 0.5813953488372093,
+                        "top10": 0.689922480620155
+                    },
+                    "average_loss": 4.133467295000639,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
         {
             "admin": {
                 "model": "S3D",
@@ -54,7 +4035,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -238,7 +4222,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -419,7 +4406,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -594,7 +4584,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -775,7 +4768,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -950,7 +4946,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -1109,7 +5108,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -1273,7 +5275,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -1437,7 +5442,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -1616,7 +5624,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -1795,7 +5806,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -1959,7 +5973,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -2144,7 +6161,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -2329,7 +6349,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -2509,7 +6532,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -2689,7 +6715,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -2852,7 +6881,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -3015,7 +7047,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -3178,7 +7213,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -3347,7 +7385,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -3516,7 +7557,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -3685,7 +7729,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -3854,7 +7901,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -4023,7 +8073,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -4186,7 +8239,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -4365,7 +8421,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -4534,7 +8593,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -4703,7 +8765,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -4872,7 +8937,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -5041,7 +9109,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -5210,7 +9281,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -5373,7 +9447,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -5542,7 +9619,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -5711,7 +9791,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -5880,7 +9963,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -6049,7 +10135,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -6218,7 +10307,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -6387,7 +10479,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -6556,7 +10651,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -6725,7 +10823,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -6894,7 +10995,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -7063,7 +11167,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -7232,7 +11339,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -7401,7 +11511,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -7570,7 +11683,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -7739,7 +11855,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -7918,7 +12037,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -8087,7 +12209,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -8256,7 +12381,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -8425,7 +12553,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -8594,7 +12725,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -8763,7 +12897,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -8932,7 +13069,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -9101,7 +13241,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -9270,7 +13413,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -9455,7 +13601,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -9640,7 +13789,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -9825,7 +13977,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -10010,7 +14165,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -10195,7 +14353,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -10364,7 +14525,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -10533,7 +14697,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -10706,7 +14873,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -10875,7 +15045,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -11044,7 +15217,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -11229,7 +15405,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -11414,7 +15593,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -11599,7 +15781,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -11784,7 +15969,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -11969,7 +16157,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -12154,7 +16345,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -12342,7 +16536,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -12526,7 +16723,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -12710,7 +16910,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -12894,7 +17097,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -13083,7 +17289,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -13272,7 +17481,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -13461,7 +17673,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -13650,7 +17865,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -13834,7 +18052,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -14018,7 +18239,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -14202,7 +18426,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -14386,7 +18613,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -14570,7 +18800,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -14754,7 +18987,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -14943,7 +19179,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -15128,7 +19367,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -15312,7 +19554,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -15496,7 +19741,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -15664,7 +19912,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -15848,7 +20099,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -16033,7 +20287,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -16217,7 +20474,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -16385,7 +20645,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -16569,7 +20832,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -16753,7 +21019,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -16937,7 +21206,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -17121,7 +21393,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -17305,7 +21580,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -17489,7 +21767,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -17668,7 +21949,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -17852,7 +22136,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -17988,6 +22275,108 @@
     "fail_runs": [
         {
             "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/MViTv2_B_32x3/exp002/checkpoints",
+                "exp_no": "002",
+                "recover": true,
+                "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp002.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_018.pth"
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5
+            },
+            "data": {
+                "num_frames": 32,
+                "frame_size": 224,
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Random_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
+                    ]
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "frame_size_strategy": "Centre_crop",
+                    "frame_sampler": {
+                        "max_wobble": 0,
+                        "method": "og",
+                        "randomise": false
+                    },
+                    "temporal_aug": [],
+                    "spatial_aug": []
+                }
+            },
+            "scheduler": null,
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 50,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "weight_path"
+                ],
+                "run_id": "y385ak95"
+            },
+            "error": "'model_state_dict'"
+        },
+        {
+            "admin": {
                 "model": "S3D",
                 "dataset": "WLASL",
                 "split": "asl100",
@@ -18038,7 +22427,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18143,7 +22535,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18248,7 +22643,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18349,7 +22747,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18456,7 +22857,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18563,7 +22967,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18670,7 +23077,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18781,7 +23191,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {
@@ -18888,7 +23301,10 @@
                     },
                     "temporal_aug": [],
                     "spatial_aug": [
-                        "Horizontal_flip"
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        }
                     ]
                 },
                 "test_augs": {

@@ -385,63 +385,64 @@ class QueShell(cmdLib.Cmd):
 
     def do_list(self, arg):
         """Display runs in a beautiful table"""
-        parsed_args = self._parse_args_or_cancel("list", arg)
-        if parsed_args is None:
-            return
+        with self.console.status("[bold green]Importing...", spinner="dots"):
+            parsed_args = self._parse_args_or_cancel("list", arg)
+            if parsed_args is None:
+                return
 
-        runs = None
+            runs = None
 
-        with self.unwrap_exception("", "Failed to list runs"):
-            runs = self.que.list_runs(
-                parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
-            )
-
-        with self.unwrap_exception("", "Failed to filter runs with criterion"):
-            if bool(parsed_args.filter_keys) != bool(parsed_args.criterion):
-                parser.error("--filter_keys and --criterion must be used together")
-            elif parsed_args.filter_keys:
-                criterion = parse_criterion(parsed_args.criterion)  
-                runs = [
-                    run for run in runs
-                    if criterion(Que.get_nested(run, parsed_args.filter_keys))
-                ]
-
-        runs = self.que.summarise(runs)
-
-        if not runs:
-            self.console.print(
-                Panel(
-                    f"[yellow]No runs found in {parsed_args.location}[/yellow]",
-                    border_style="yellow",
+            with self.unwrap_exception("", "Failed to list runs"):
+                runs = self.que.list_runs(
+                    parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
                 )
+
+            with self.unwrap_exception("", "Failed to filter runs with criterion"):
+                if bool(parsed_args.filter_keys) != bool(parsed_args.criterion):
+                    parser.error("--filter_keys and --criterion must be used together")
+                elif parsed_args.filter_keys:
+                    criterion = parse_criterion(parsed_args.criterion)  
+                    runs = [
+                        run for run in runs
+                        if criterion(Que.get_nested(run, parsed_args.filter_keys))
+                    ]
+
+            runs = self.que.summarise(runs)
+
+            if not runs:
+                self.console.print(
+                    Panel(
+                        f"[yellow]No runs found in {parsed_args.location}[/yellow]",
+                        border_style="yellow",
+                    )
+                )
+                return
+
+            # Create a styled table
+            table = Table(
+                title=f"Runs in {parsed_args.location}",
+                box=box.ROUNDED,
+                border_style="cyan",
+                show_header=True,
+                header_style="bold magenta",
             )
-            return
 
-        # Create a styled table
-        table = Table(
-            title=f"Runs in {parsed_args.location}",
-            box=box.ROUNDED,
-            border_style="cyan",
-            show_header=True,
-            header_style="bold magenta",
-        )
+            dict_runs = list(map(lambda x: x.model_dump(), runs))
 
-        dict_runs = list(map(lambda x: x.model_dump(), runs))
+            table.add_column("Index", style="cyan", justify="right", width=8)
+            for header in dict_runs[0].keys():
+                table.add_column(header.capitalize(), style="white")
 
-        table.add_column("Index", style="cyan", justify="right", width=8)
-        for header in dict_runs[0].keys():
-            table.add_column(header.capitalize(), style="white")
+            # runs are a list of Summarised dicts
 
-        # runs are a list of Summarised dicts
+            for idx, row in enumerate(dict_runs):
+                row_values = []
+                for value in row.values():
+                    value_str = str(value)
+                    row_values.append(value_str)
+                table.add_row(str(idx).zfill(3), *row_values)
 
-        for idx, row in enumerate(dict_runs):
-            row_values = []
-            for value in row.values():
-                value_str = str(value)
-                row_values.append(value_str)
-            table.add_row(str(idx).zfill(3), *row_values)
-
-        self.console.print(table)
+            self.console.print(table)
 
     def do_remove(self, arg):
         """Remove a run with confirmation"""
@@ -468,38 +469,40 @@ class QueShell(cmdLib.Cmd):
 
     def do_display(self, arg):
         """Display run details in a styled panel"""
+        
         parsed_args = self._parse_args_or_cancel("display", arg)
         if parsed_args is None:
             return
 
-        with self.unwrap_exception("", "Display failed"):
-            if parsed_args.sort_keys:
-                run = self.que.list_runs(
-                    parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
-                )[parsed_args.index]
+        with self.console.status("[bold green]Importing...", spinner="dots"):
+            with self.unwrap_exception("", "Display failed"):
+                if parsed_args.sort_keys:
+                    run = self.que.list_runs(
+                        parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
+                    )[parsed_args.index]
 
-            else:
-                run = self.que.peak_run(parsed_args.location, parsed_args.index)
-            title = f"Run {parsed_args.index} in {parsed_args.location}"
-            if parsed_args.display_keys is not None:
-                run = self._unpack_keys(run, parsed_args.display_keys)
-                title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.display_keys)}"
+                else:
+                    run = self.que.peak_run(parsed_args.location, parsed_args.index)
+                title = f"Run {parsed_args.index} in {parsed_args.location}"
+                if parsed_args.display_keys is not None:
+                    run = self._unpack_keys(run, parsed_args.display_keys)
+                    title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.display_keys)}"
 
-            # Format as JSON-like syntax
-            if isinstance(run, dict):
-                run_json = json.dumps(run, indent=2)
-            else:
-                run_json = json.dumps(run.model_dump(), indent=2)
-            syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+                # Format as JSON-like syntax
+                if isinstance(run, dict):
+                    run_json = json.dumps(run, indent=2)
+                else:
+                    run_json = json.dumps(run.model_dump(), indent=2)
+                syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
-            self.console.print(
-                Panel(
-                    syntax,
-                    title=title,
-                    border_style="cyan",
-                    padding=(1, 2),
+                self.console.print(
+                    Panel(
+                        syntax,
+                        title=title,
+                        border_style="cyan",
+                        padding=(1, 2),
+                    )
                 )
-            )
 
     def do_shuffle(self, arg):
         """Reposition with visual confirmation"""
@@ -672,31 +675,32 @@ class QueShell(cmdLib.Cmd):
 
     def do_daemon(self, arg):
         """Interact with the worker"""
-        parsed_args = self._parse_args_or_cancel("daemon", arg)
-        if parsed_args is None:
-            return
-        elif parsed_args.command == "start":
-            with self.unwrap_exception(
-                "Worker process started", "Failed to start worker"
-            ):
-                self.daemon.start_supervisor()
-        elif parsed_args.command == "stop":
-            if parsed_args.supervisor:
+        with self.console.status("[bold green]Starting supervisor...", spinner="dots"):
+            parsed_args = self._parse_args_or_cancel("daemon", arg)
+            if parsed_args is None:
+                return
+            elif parsed_args.command == "start":
                 with self.unwrap_exception(
-                    "Supervisor process stopped", "Failed to stop supervisor"
+                    "Worker process started", "Failed to start worker"
                 ):
-                    self.daemon.stop_supervisor(
-                        timeout=parsed_args.timeout,
-                        hard=parsed_args.hard,
-                        stop_worker=parsed_args.worker,
-                    )
-            else:
-                with self.unwrap_exception(
-                    "Worker process stopped", "Failed to stop worker"
-                ):
-                    self.daemon.stop_worker(
-                        timeout=parsed_args.timeout, hard=parsed_args.hard
-                    )
+                    self.daemon.start_supervisor()
+            elif parsed_args.command == "stop":
+                if parsed_args.supervisor:
+                    with self.unwrap_exception(
+                        "Supervisor process stopped", "Failed to stop supervisor"
+                    ):
+                        self.daemon.stop_supervisor(
+                            timeout=parsed_args.timeout,
+                            hard=parsed_args.hard,
+                            stop_worker=parsed_args.worker,
+                        )
+                else:
+                    with self.unwrap_exception(
+                        "Worker process stopped", "Failed to stop worker"
+                    ):
+                        self.daemon.stop_worker(
+                            timeout=parsed_args.timeout, hard=parsed_args.hard
+                        )
 
     # Server
 
@@ -854,16 +858,17 @@ class QueShell(cmdLib.Cmd):
         :return: Returns parsed args in argparse format, otherwise None if failure.
         :rtype: Namespace | None
         """
-        args = shlex.split(arg)
-        parser = self._get_parser(cmd)
-        if parser:
-            try:
-                return self._apply_synonyms(parser.parse_args(args))
-            except (SystemExit, ValueError):
-                self.console.print(f"[yellow]{cmd} cancelled[/yellow]")
-                return None
-        else:
-            self.console.print(f"[red]{cmd} not found[/red]")
+        with self.unwrap_exception("", f"Failed to parse arguments for {cmd}"):
+            args = shlex.split(arg)
+            parser = self._get_parser(cmd)
+            if parser:
+                try:
+                    return self._apply_synonyms(parser.parse_args(args))
+                except (SystemExit, ValueError):
+                    self.console.print(f"[yellow]{cmd} cancelled[/yellow]")
+                    return None
+            else:
+                self.console.print(f"[red]{cmd} not found[/red]")
 
     def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
         """Get argument parser for a given command"""
