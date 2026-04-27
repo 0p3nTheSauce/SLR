@@ -408,6 +408,10 @@ class QueShell(cmdLib.Cmd):
                     ]
 
             runs = self.que.summarise(runs)
+            
+            #retrieve top n if specified
+            if parsed_args.top_n is not None:
+                runs = runs[:parsed_args.top_n]
 
             if not runs:
                 self.console.print(
@@ -1120,6 +1124,13 @@ class QueShell(cmdLib.Cmd):
             help="List of keys to filter the list by (only display runs where these keys are not None)",
         )
         self._add_criterion_args(parser)
+        parser.add_argument(
+            "--top_n",
+            "-n",
+            type=int,
+            default=None,
+            help="Only display the top n runs after sorting and filtering",
+        )
         return parser
 
     def _get_clear_parser(self) -> argparse.ArgumentParser:

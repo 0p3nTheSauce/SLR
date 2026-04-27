@@ -548,6 +548,9 @@ class Que:
         loc_runs = self._fetch_state(loc)
         if keys:
             return sorted(loc_runs, key=lambda x: self.get_val(x, keys), reverse=reverse)
+        elif reverse:
+            return list(reversed(loc_runs))
+        
         return loc_runs
 
     def select_runs(
