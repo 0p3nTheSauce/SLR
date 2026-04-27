@@ -411,6 +411,28 @@ class ExpInfo(RunInfo):
 class CompExpInfo(ExpInfo):
     results: CompRes
 
+class GenInfo(BaseModel):
+    training: Optional[TrainingInfo] = None
+    optimizer: Optional[OptimizerInfo] = None
+    model_params: Optional[ModelParamsInfo] = None
+    data: Optional[DataInfo] = None
+    scheduler: Optional[SchedInfo] = None
+    early_stopping: Optional[StopperOn] = None
+
+class ResSet(BaseModel):
+    training: Optional[TrainingInfo] = None
+    optimizer: Optional[OptimizerInfo] = None
+    model_params: Optional[ModelParamsInfo] = None
+    data: Optional[DataInfo] = None
+    scheduler: Optional[SchedInfo] = None
+    early_stopping: Optional[StopperOn] = None
+    results : List[RunRes]
+
+class RunRes(BaseModel):
+    admin: AdminInfo
+    results: CompRes
+    early_stopping: Optional[StopperOn] = None
+
 
 class FailedExp(ExpInfo):
     error: str

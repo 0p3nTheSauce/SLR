@@ -1,34 +1,7 @@
 BIG:
-- scrap this and move onto multimodal langage models
+- scrap this and move onto multimodal 
 
-
-Testing TODOS:
-- rate models on recognition per class 
-
-Stats TODOS:
-- compare bounding boxes / plot bounding boxes
-- investigate set level stats
-- investigate how to represent a distribution of distributions
-- compare model recognition per class to instance stats
-- correct removed instances labels?
-
-Augmentation TODOs:
-  general:
-  - investigate different augmentations (color jitter, noise, etc.)
-  - add to config
-  spatial:
-  - investigate resize
-  - investigate cropping
-  - investigate padding
-  - investigate different interpolation methods
-  - investigate different angles
-  - downscaling instead of cropping
-  temporal:
-  - jitter, sample, reverse, shuffle, etc.
 
 Misc TODOs:
 - investigate different angles
-- investigate r2+1d
 - switch from str to Literal for model names
-- reorganise runs folder
-- reorganise preprocessed folder

@@ -1170,6 +1170,13 @@ class QueShell(cmdLib.Cmd):
             help="List of keys to sort the list by",
         )
         self._add_reverse_arg(parser)
+        self._add_genkey_arg(
+            parser,
+            long_name="--filter_keys",
+            short_name="-f",
+            help="List of keys to filter the list by (only display runs where these keys are not None)",
+        )
+        self._add_criterion_args(parser)
 
         return parser
 

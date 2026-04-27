@@ -163,6 +163,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;          /* ← lets the col respect overflow:hidden inside a grid */
   }
 
   .col-header {
@@ -1067,7 +1068,7 @@ function QueueColumn({ loc, runs, selected, onSelect, onClear, loading, onFind, 
       </div>
 
       {/* Sort bar */}
-      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           <input
             className="form-input"
@@ -1094,7 +1095,7 @@ function QueueColumn({ loc, runs, selected, onSelect, onClear, loading, onFind, 
       </div>
 
       {/* Filter bar */}
-      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 5 }}>
           <input
             className="form-input"
