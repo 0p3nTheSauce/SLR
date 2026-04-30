@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Literal, Optional, Union, List, Tuple, Annotated, Any, Dict
+from typing import TYPE_CHECKING, Literal, Optional, Union, List, Tuple, Annotated, Any, Dict, TypeAlias
 from pydantic import BaseModel, Field, model_validator, computed_field
 
 if TYPE_CHECKING:
@@ -411,27 +411,24 @@ class ExpInfo(RunInfo):
 class CompExpInfo(ExpInfo):
     results: CompRes
 
-class GenInfo(BaseModel):
-    training: Optional[TrainingInfo] = None
-    optimizer: Optional[OptimizerInfo] = None
-    model_params: Optional[ModelParamsInfo] = None
-    data: Optional[DataInfo] = None
-    scheduler: Optional[SchedInfo] = None
-    early_stopping: Optional[StopperOn] = None
+# class GenInfo(BaseModel):
+#     training: Optional[TrainingInfo] = None
+#     optimizer: Optional[OptimizerInfo] = None
+#     model_params: Optional[ModelParamsInfo] = None
+#     data: Optional[DataInfo] = None
+#     scheduler: Optional[SchedInfo] = None
+#     early_stopping: Optional[StopperOn] = None
+
+GenInfo: TypeAlias = Dict[str, Any]
+
 
 class ResSet(BaseModel):
-    training: Optional[TrainingInfo] = None
-    optimizer: Optional[OptimizerInfo] = None
-    model_params: Optional[ModelParamsInfo] = None
-    data: Optional[DataInfo] = None
-    scheduler: Optional[SchedInfo] = None
-    early_stopping: Optional[StopperOn] = None
+    spec: GenInfo
     results : List[RunRes]
 
 class RunRes(BaseModel):
     admin: AdminInfo
     results: CompRes
-    early_stopping: Optional[StopperOn] = None
 
 
 class FailedExp(ExpInfo):
@@ -460,8 +457,6 @@ class SummarisedRes(Sumarised):
 class SummarisedError(Sumarised):
     error: str
 
-
-# CleverDict is unrelated to config/typing — kept as-is
 class CleverDict(Dict):
     def __init__(self, dict: Dict[Any, Any]):
         self.dict = dict
@@ -491,6 +486,17 @@ class CleverDict(Dict):
                 next_key = ks.pop(0)
                 d = {k: self._set_inplace({}, next_key, ks, val)}
         return d
+    
+    def pop(self, keys: List[Any], default=None) -> Any:
+        if len(keys) == 1:
+            return self.dict.pop(keys[0], default)
+        
+        # Navigate to the parent of the target key
+        parent = self.dict
+        for key in keys[:-1]:
+            parent = parent[key]
+        
+        return parent.pop(keys[-1], default)
 
     def to_dict(self) -> Dict[Any, Any]:
         return self.dict.copy()
@@ -500,3 +506,14 @@ class CleverDict(Dict):
 
     def __delitem__(self, key):
         raise NotImplementedError
+    
+    def __iter__(self):
+        yield from self._iter_leaves(self.dict, [])
+
+    def _iter_leaves(self, d: Any, path: List[Any]):
+        if isinstance(d, dict):
+            for key, val in d.items():
+                yield from self._iter_leaves(val, path + [key])
+        else:
+            yield path, d
+

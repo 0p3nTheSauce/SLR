@@ -52,7 +52,7 @@ from run_types import (
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-
+SYSTEMD_NAME = 'que-training.service'
 QUE_DIR = Path(__file__).parent
 
 QUE_NAME = "Que"

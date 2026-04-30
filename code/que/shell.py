@@ -22,6 +22,7 @@ import getpass
 import traceback
 import readline
 import atexit
+
 # locals
 # import configs
 from .core import (
@@ -38,9 +39,11 @@ from .core import (
     TRAINING_LOG_PATH,
     SERVER_LOG_PATH,
     RUN_PATH,
+    SYSTEMD_NAME,
     QueManagerProtocol,
     QueDupExp,
 )
+
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from .tmux import tmux_manager
 from configs import get_train_parser
@@ -64,16 +67,13 @@ SAFE_GLOBALS = {
     "list": list,
 }
 
+
 def parse_criterion(expr: str) -> Callable[[Any], bool]:
     """Evaluate a lambda string in a restricted namespace."""
     result = eval(expr, SAFE_GLOBALS)  # noqa: S307
     if not callable(result):
         raise ValueError(f"Criterion must be callable, got: {type(result)}")
-    return result # type: ignore[return-value]
-
-
-
-    
+    return result  # type: ignore[return-value]
 
 
 class QueShell(cmdLib.Cmd):
@@ -81,12 +81,13 @@ class QueShell(cmdLib.Cmd):
     # Define the path for the history file
     HISTORY_FILE = Path().home() / ".que_shell_history"
     HISTORY_LIMIT = 1000
+
     def __init__(
         self,
         server: QueManagerProtocol,
         auto_save: bool = True,
     ) -> None:
-        
+
         super().__init__()
         # Pretty stuff
         self.console = Console()
@@ -134,7 +135,7 @@ class QueShell(cmdLib.Cmd):
         """Writes the current session history to the file."""
         with self.unwrap_exception("", "Failed to save command history"):
             readline.write_history_file(self.HISTORY_FILE)
-    
+
     def _setup_history(self):
         """Loads command history and registers the save function."""
         if self.HISTORY_FILE.exists():
@@ -143,11 +144,9 @@ class QueShell(cmdLib.Cmd):
 
         # Set the number of items to save
         readline.set_history_length(self.HISTORY_LIMIT)
-        
+
         # Register the save function to run automatically on exit
         atexit.register(self._save_history)
-
-
 
     # Exception handling
 
@@ -401,17 +400,18 @@ class QueShell(cmdLib.Cmd):
                 if bool(parsed_args.filter_keys) != bool(parsed_args.criterion):
                     parser.error("--filter_keys and --criterion must be used together")
                 elif parsed_args.filter_keys:
-                    criterion = parse_criterion(parsed_args.criterion)  
+                    criterion = parse_criterion(parsed_args.criterion)
                     runs = [
-                        run for run in runs
+                        run
+                        for run in runs
                         if criterion(Que.get_nested(run, parsed_args.filter_keys))
                     ]
 
             runs = self.que.summarise(runs)
-            
-            #retrieve top n if specified
+
+            # retrieve top n if specified
             if parsed_args.top_n is not None:
-                runs = runs[:parsed_args.top_n]
+                runs = runs[: parsed_args.top_n]
 
             if not runs:
                 self.console.print(
@@ -473,7 +473,7 @@ class QueShell(cmdLib.Cmd):
 
     def do_display(self, arg):
         """Display run details in a styled panel"""
-        
+
         parsed_args = self._parse_args_or_cancel("display", arg)
         if parsed_args is None:
             return
@@ -540,6 +540,7 @@ class QueShell(cmdLib.Cmd):
     def do_create(self, arg):
         """Create with progress indication"""
         from configs import take_args
+
         args = shlex.split(arg)
 
         try:
@@ -569,6 +570,7 @@ class QueShell(cmdLib.Cmd):
     def do_add(self, arg):
         """Add run with feedback"""
         from configs import ZFILL, take_args
+
         args = shlex.split(arg)
         parser = self._get_add_parser()
         parsed_args = parser.parse_args(args)
@@ -661,6 +663,7 @@ class QueShell(cmdLib.Cmd):
 
     def do_worker(self, arg):
         from utils import gpu_manager
+
         parsed_args = self._parse_args_or_cancel("worker", arg)
         if parsed_args is None:
             return
@@ -733,18 +736,18 @@ class QueShell(cmdLib.Cmd):
         daemon_table.add_column(style="yellow", width=15)
         daemon_table.add_column()
 
-        awake_icon = "✓" if daemon_state['awake'] else "✗"
-        awake_style = "green" if daemon_state['awake'] else "red"
+        awake_icon = "✓" if daemon_state["awake"] else "✗"
+        awake_style = "green" if daemon_state["awake"] else "red"
         daemon_table.add_row("Awake:", Text(awake_icon, style=awake_style))
 
-        stop_icon = "✓" if daemon_state['stop_on_fail'] else "✗"
+        stop_icon = "✓" if daemon_state["stop_on_fail"] else "✗"
         daemon_table.add_row(
             "Stop on Fail:",
-            Text(stop_icon, style="yellow" if daemon_state['stop_on_fail'] else "dim"),
+            Text(stop_icon, style="yellow" if daemon_state["stop_on_fail"] else "dim"),
         )
 
-        if daemon_state['supervisor_pid']:
-            daemon_table.add_row("Supervisor PID:", str(daemon_state['supervisor_pid']))
+        if daemon_state["supervisor_pid"]:
+            daemon_table.add_row("Supervisor PID:", str(daemon_state["supervisor_pid"]))
 
         table.add_row("Daemon", daemon_table)
 
@@ -754,17 +757,17 @@ class QueShell(cmdLib.Cmd):
         worker_table.add_column(style="magenta", width=15)
         worker_table.add_column()
 
-        task_style = "bold green" if worker_state['task'] == "training" else "dim"
-        worker_table.add_row("Task:", Text(worker_state['task'], style=task_style))
+        task_style = "bold green" if worker_state["task"] == "training" else "dim"
+        worker_table.add_row("Task:", Text(worker_state["task"], style=task_style))
 
-        if worker_state['current_run_id']:
-            worker_table.add_row("Run ID:", worker_state['current_run_id'])
+        if worker_state["current_run_id"]:
+            worker_table.add_row("Run ID:", worker_state["current_run_id"])
 
-        if worker_state['working_pid']:
-            worker_table.add_row("Worker PID:", str(worker_state['working_pid']))
+        if worker_state["working_pid"]:
+            worker_table.add_row("Worker PID:", str(worker_state["working_pid"]))
 
-        if worker_state['exception']:
-            error_text = Text(worker_state['exception'], style="bold red")
+        if worker_state["exception"]:
+            error_text = Text(worker_state["exception"], style="bold red")
             worker_table.add_row("Exception:", error_text)
 
         table.add_row("Worker", worker_table)
@@ -808,6 +811,27 @@ class QueShell(cmdLib.Cmd):
             log_file = str(TRAINING_LOG_PATH)  # your constant
         elif parsed_args.server:
             log_file = str(SERVER_LOG_PATH)  # your constant
+        elif parsed_args.journalctl:
+            # Use journalctl to stream logs for the systemd service
+            if parsed_args.lines is not None:
+                com = [
+                    "sudo",
+                    "journalctl",
+                    "-u",
+                    SYSTEMD_NAME,
+                    '-f',
+                    "-n",
+                    str(parsed_args.lines),
+                ]
+            else:
+                com = ["sudo", "journalctl", "-u", SYSTEMD_NAME, "-f"]
+            try:
+                subprocess.run(com)
+            except KeyboardInterrupt:
+                self.console.print("\n[cyan]Stopped streaming journalctl logs[/cyan]")
+            except Exception as e:
+                self.console.print(f"[red]Error streaming journalctl logs: {e}[/red]")
+            return
         else:
             raise ValueError("Please specify --worker or --server")
 
@@ -1025,8 +1049,6 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("--n_location", "-nl", **kwargs)  # type: ignore
         return parser
 
-
-
     def _add_checkpoint_num_arg(
         self,
         parser: argparse.ArgumentParser,
@@ -1102,6 +1124,7 @@ class QueShell(cmdLib.Cmd):
 
     def _get_add_parser(self) -> argparse.ArgumentParser:
         from configs import get_train_parser
+
         train_parser = get_train_parser(
             prog="add", desc="Add a completed training run to old_runs"
         )
@@ -1315,7 +1338,12 @@ class QueShell(cmdLib.Cmd):
         group.add_argument(
             "--server", "-s", action="store_true", help="Tail the Server.log file"
         )
-
+        group.add_argument(
+            "--journalctl",
+            "-j",
+            action="store_true",
+            help=f"Tail the systemd journal for {SYSTEMD_NAME} logs (requires sudo privileges)",
+        )
         parser.add_argument(
             "--clear",
             "-c",
@@ -1334,6 +1362,7 @@ class QueShell(cmdLib.Cmd):
 
     def _get_wandb_parser(self) -> argparse.ArgumentParser:
         from configs import get_avail_splits, ENTITY, PROJECT_BASE
+
         likely_projects = [
             f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()
         ]

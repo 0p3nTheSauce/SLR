@@ -10,6 +10,8 @@ import preprocess
 import time
 from pathlib import Path
 
+from run_types import CleverDict
+
 logging.basicConfig(
 		level=logging.INFO,
 		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -220,58 +222,6 @@ def test_find_S3D_runs():
     print(json.dumps(all_exps, indent=4))
     print(idxs)
 
-class CleverDict(Dict):
-    def __init__(self, dict: Dict[Any, Any]):
-        self.dict = dict
-        
-    def __getitem__(self, keys: List[Any]) -> Any:
-        d = self.dict.copy()
-        for key in keys:
-            d = d[key]
-        return d
-    
-    def __setitem__(self, keys: List[Any], val: Any):
-        self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
-
-    def _set_inplace(self, d:Dict[Any, Any], k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
-        
-        if hasattr(d, '__setitem__'):
-            if len(ks) == 0:
-                d[k] = val    
-            else:
-                next_key = ks.pop(0)
-                d[k] = self._set_inplace(d[k],next_key, ks, val)
-        else:
-            if len(ks) == 0:
-                d = {k:val} 
-            else:
-                next_key = ks.pop(0)
-                d = {k: self._set_inplace({},next_key, ks, val)}
-
-        return d          
-        
-    
-    def _create_inplace(self, d:Dict[Any, Any] | Any, k:Any,ks:List[Any], val:Any) -> Dict[Any, Any]:
-        if len(ks) == 0:
-            if hasattr(d, '__setitem__'):
-                d[k] = val
-            else:
-                d = {k:val}
-            return d
-        else:
-            next_key = ks.pop(0)
-            d[k] = self._set_inplace(d[k],next_key, ks, val)
-            return d   
-    
-    def to_dict(self) -> Dict[Any, Any]:
-        return self.dict.copy()
-    
-    
-    def __str__(self) -> str:
-        return str(self.dict)
-    
-    def __delitem__(self, key):
-        raise NotImplementedError
         
 
 def test_set_nested():
@@ -425,6 +375,18 @@ def test_set_nested2():
     print(json.dumps(cd.to_dict(), indent=4)) 
     # print(cd) 
 
+def test_pop_nested():
+    d = {
+        'z': {'a': 0, 'b': 1},
+        'y': {'a': 0, 'b': 1},
+        'x': {'a': 0, 'b': 1}
+    }
+    cd = CleverDict(d)
+    print(cd.to_dict())
+    popped_value = cd.pop(['z', 'a'])
+    print(f"Popped value: {popped_value}")
+    print(cd.to_dict())
+
 def test_load_checkpoint():
     from training import load_checkpoint
     checkpath = Path('runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_015.pth')
@@ -440,6 +402,7 @@ def test_filter_runs():
     _ = q.summarise_runs('old_runs')
     
     
+
 
 if __name__ == '__main__':
     # test_dump_peak()
@@ -459,4 +422,5 @@ if __name__ == '__main__':
     # reformat_configs()
     # reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')
     # test_set_nested2()
-    test_load_checkpoint()
+    # test_load_checkpoint()
+    test_pop_nested()

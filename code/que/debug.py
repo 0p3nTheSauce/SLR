@@ -14,9 +14,9 @@ import time
 from .shell import QueShell
 
 # from que.shell import QueShell
-from .core import Que, connect_manager, _get_basic_logger, WorkerState, TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS, QueLocation
+from .core import Que, connect_manager, _get_basic_logger, TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS, QueLocation
 from .tmux import tmux_manager
-from run_types import RunInfo, FailedExp, CompExpInfo, ExpInfo, HorizontalFlipConfig
+from run_types import RunInfo, FailedExp, CompExpInfo, ExpInfo, HorizontalFlipConfig, AugInfo
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
 
@@ -174,63 +174,6 @@ def test_create():
 	else:
 		print("oops")
 
-
-def test_is_daemon_state():
-	from .core import is_daemon_state, DaemonState
-
-	eg = DaemonState(awake=True, stop_on_fail=True, supervisor_pid=None)
-
-	beg = {"stop_on_fail": True, "supervisor_pid": 1}
-
-	beg1 = {"awake": 1, "stop_on_fail": True, "supervisor_pid": 1}
-
-	print(is_daemon_state(eg))
-	print(is_daemon_state(beg))
-	print(is_daemon_state(beg1))
-
-
-def test_shared_dict_proc1():
-	manager = connect_manager()
-	wstate = manager.get_worker_state()
-	print("before changing")
-	print(wstate)
-	print("after changing")
-	wstate.current_run_id = "debugging"
-	print(wstate)
-
-
-def test_shared_dict_proc2():
-	manager = connect_manager()
-	wstate = manager.get_worker_state()
-	print("before changing")
-	print(wstate)
-	print("after changing")
-	wstate.current_run_id = "debugging_2"
-	print(wstate)
-
-
-def test_shared_dict_proc_opener():
-	p1 = mp.Process(target=test_shared_dict_proc1)
-	p1.start()
-	p1.join()
-	p2 = mp.Process(target=test_shared_dict_proc2)
-	p2.start()
-	p2.join()
-
-
-def reset_state():
-	manager = connect_manager()
-	server = manager.get_server_context()
-	server.set_state(
-		server=None,
-		daemon=None,
-		worker=WorkerState.model_validate({
-			"task": "inactive",
-			"current_run_id": None,
-			"working_pid": None,
-			"exception": None,
-		}),
-	)
 
 
 def connect_manager_ssh(
@@ -521,7 +464,33 @@ def validate_runs(runs_path = '/home/luke/Code/SLR/code/que/Runs.json'):
 	
 	# q.disp_run("to_run", 0)
 
+def update_runs4():
+
+	
+	with open('/home/luke/Code/SLR/code/que/Runs.json', 'r') as f:
+		all_runs = json.load(f)
+
+	# for key in KEYS:
+	
+	
+ 
+	que_list = all_runs[OLD_RUNS]
+	new_quelist = []
+	for run in que_list:
+		train_augs = run['data']['train_augs']
+		test_augs = run['data']['test_augs']
+		AugInfo.model_validate(train_augs)
+		AugInfo.model_validate(test_augs)
+		CompExpInfo.model_validate(run)
+		new_quelist.append(run)
+	all_runs[OLD_RUNS] = new_quelist
+
+	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+
+
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
-	validate_runs()
+	# validate_runs()
+	update_runs4()

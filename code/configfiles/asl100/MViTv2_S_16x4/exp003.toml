@@ -1,6 +1,6 @@
 [training]
-batch_size = 1
-update_per_step = 8
+batch_size = 4
+update_per_step = 2
 max_epoch = 200
 
 [optimizer]
@@ -15,7 +15,7 @@ drop_p = 0.5
 
 
 [data]
-num_frames = 32
+num_frames = 16
 frame_size = 224
 
 [data.train_augs]
@@ -24,7 +24,7 @@ normalise = true
 
 [data.train_augs.frame_sampler]
 method = 'og'
-wobble = 0
+max_wobble = 0
 
 [[data.train_augs.spatial_aug]]
 type = "HORIZONTAL_FLIP"
@@ -36,7 +36,7 @@ normalise = true
 
 [data.test_augs.frame_sampler]
 method = 'og'
-wobble = 0
+max_wobble = 0
 
 
 [early_stopping]
@@ -44,3 +44,10 @@ metric = ['val', 'loss']
 mode = 'min'
 patience = 15
 min_delta = 0.01
+
+#Same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_S/exp011.ini
+# but with MViTv2_S_14x4 and updated augmentations
+# and patience = 15
+# and num frames = 16, batch size = 4, update per step = 2
+
+#same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_B_32x3/exp007.toml
