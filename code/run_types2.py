@@ -32,7 +32,7 @@ class BaseSampler(BaseModel):
     """required target frames"""
 
     # target_length: int #NOTE: leave this then pass f(Tensor, num_frames) -> Tensor
-    numframes: int
+    target_length: int
     max_wobble: int = 0
 
 

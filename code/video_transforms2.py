@@ -4,7 +4,7 @@ from torch import Tensor
 from torchvision.transforms.v2 import Transform
 import torchvision.transforms.v2 as v2
 from functools import partial
-from typing import Callable, List, Tuple,  Optional
+from typing import Any, Callable, Dict, List, Tuple,  Optional
 import random
 import utils
 import time
@@ -433,7 +433,11 @@ def sample_speed_perturbed(
 def _apply_wobble_then_sample(frames: Tensor, target_length: int, *, fn: Callable, max_wobble: int) -> Tensor:
     return fn(wobble(frames, max_wobble), target_length)
 
-def get_sampler(sampler_config: SamplerConfig) -> Callable[[Tensor, int], Tensor]:
+def _call_sampler(frames: Tensor, *, fn: Callable[[Tensor, int], Tensor], target_length: int) -> Tensor:
+    """Because spawn doesn't like lambdas"""
+    return fn(frames, target_length)
+
+def get_sampler(sampler_config: SamplerConfig) -> Transform:
     """
     Returns a specialized sampling function based on the provided SamplerConfig.
     The returned function can be described by: f(frames, target_length) -> sampled_frames.
@@ -455,7 +459,7 @@ def get_sampler(sampler_config: SamplerConfig) -> Callable[[Tensor, int], Tensor
             sampler = partial(sample_chunked,)
 
         case WobbledSampler():
-            return partial(
+            sampler =  partial(
                 sample_wobbled,
                 max_wobble=sampler_config.max_wobble,
             )
@@ -491,9 +495,11 @@ def get_sampler(sampler_config: SamplerConfig) -> Callable[[Tensor, int], Tensor
             raise ValueError(f"Unknown sampler method: {sampler_config.method}")
 
     if sampler_config.max_wobble > 0:
-        return partial(_apply_wobble_then_sample, fn=sampler, max_wobble=sampler_config.max_wobble)
+        final_sampler = partial(_apply_wobble_then_sample, fn=sampler, max_wobble=sampler_config.max_wobble)
     else:
-        return sampler
+        final_sampler = sampler
+
+    return v2.Lambda(partial(_call_sampler, fn=final_sampler, target_length=sampler_config.target_length))
 
 # --- Temporal augmentations ---
 
@@ -606,7 +612,8 @@ def get_temporal_transform(
 def get_temporal_augs(config: TemporalAugs) -> Tuple[Transform, Optional[Tuple]]:
     if isinstance(config, BaseSampler):
         return get_sampler(config), None
-    
+    else:
+        return get_temporal_transform(config)
         
     
 # --- Frame cropping and resizing ---
