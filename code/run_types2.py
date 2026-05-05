@@ -1,17 +1,27 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Literal, Optional, Union, List, Tuple, Annotated, Any, Dict, TypeAlias
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+    Optional,
+    Union,
+    List,
+    Tuple,
+    Annotated,
+    Any,
+    Dict,
+    TypeAlias,
+)
 from pydantic import BaseModel, Field, model_validator, computed_field
 
 if TYPE_CHECKING:
     from torchvision.transforms.functional import InterpolationMode
     import torchvision.transforms.v2 as v2
-    
-
 
 
 class NormDict(BaseModel):
     mean: Tuple[float, float, float]
     std: Tuple[float, float, float]
+
 
 ####################### Data loading and augmentation #############################
 
@@ -22,7 +32,9 @@ class BaseSampler(BaseModel):
     """required target frames"""
 
     # target_length: int #NOTE: leave this then pass f(Tensor, num_frames) -> Tensor
+    numframes: int
     max_wobble: int = 0
+
 
 
 class OG_Sampler(BaseSampler):
@@ -95,12 +107,9 @@ SamplerConfig = Annotated[
 
 ### Temporal augs - currently not used
 
-TemporalStrategy = Literal["Shuffle", "Reverse"]
-
 
 class ShuffleT(BaseModel):
     """Represent the shuffle transform"""
-
     num_frames: int
     # perm optional tensor
 
@@ -110,18 +119,61 @@ class ReverseT(BaseModel):
 
     probability: float = 0.5
 
+class PadFramesT(BaseModel):
+    num_frames: int
+        
 
-TemporalTransforms = Annotated[Union[ShuffleT, ReverseT], Field(discriminator="type")]
+TemporalTransforms = Annotated[Union[
+    ShuffleT,
+    ReverseT,
+    PadFramesT], Field(discriminator="type")]
 
-
+TemporalAugs = Annotated[Union[
+    TemporalTransforms,
+    SamplerConfig
+    ], Field(discriminator="type")]
 ### Spatial augs
 
-Frame_Size_Strategy = Literal[
-    "Centre_crop", "Random_crop", "Random_Resized_crop", "Scale_and_pad"
-]
+
+## Cropping
+class CropConfig(BaseModel):
+    import torchvision.transforms.v2 as v2
+
+    size: int
 
 
+class CentreCropConfig(CropConfig):
+    type: Literal["Centre_crop"] = "Centre_crop"
 
+    def build(self) -> v2.Transform:
+        return v2.CenterCrop(self.size)
+
+
+class RandomCropConfig(CropConfig):
+    type: Literal["Random_crop"] = "Random_crop"
+
+    def build(self) -> v2.Transform:
+        return v2.RandomCrop(self.size)
+
+class ScaleAndPadConfig(CropConfig):
+    type: Literal["Scale_and_pad"] = "Scale_and_pad"
+
+    # def build(self) -> v2.Transform:
+    #     return ScaleAndPad(self.size)
+
+class RandomResizedConfig(CropConfig):
+    type: Literal["Random_Resized_crop"] =  "Random_Resized_crop"
+
+    def build(self) -> v2.Transform:
+        return v2.RandomResizedCrop(self.size)
+
+CropTransforms = Annotated[Union[
+    CentreCropConfig,
+    RandomCropConfig,
+    ScaleAndPadConfig,
+    RandomResizedConfig
+    
+], Field(discriminator="type")]
 
 
 class HorizontalFlipConfig(BaseModel):
@@ -130,6 +182,7 @@ class HorizontalFlipConfig(BaseModel):
 
     def build(self) -> v2.Transform:
         import torchvision.transforms.v2 as v2
+
         return v2.RandomHorizontalFlip(p=self.p)
 
 
@@ -139,6 +192,7 @@ class RandomGrayscaleConfig(BaseModel):
 
     def build(self) -> v2.Transform:
         import torchvision.transforms.v2 as v2
+
         return v2.RandomGrayscale(p=self.p)
 
 
@@ -149,11 +203,13 @@ class GaussianBlurConfig(BaseModel):
 
     def build(self) -> v2.Transform:
         import torchvision.transforms.v2 as v2
+
         return v2.GaussianBlur(kernel_size=self.kernel_size, sigma=self.sigma)
 
 
 def _interp_modes() -> dict[str, InterpolationMode]:
     from torchvision.transforms.functional import InterpolationMode
+
     return {
         "BILINEAR": InterpolationMode.BILINEAR,
         "BICUBIC": InterpolationMode.BICUBIC,
@@ -161,12 +217,12 @@ def _interp_modes() -> dict[str, InterpolationMode]:
     }
 
 
-
 class AutoAugmentConfig(BaseModel):
     type: Literal["IMAGENET", "CIFAR10", "SVHN"]
 
     def build(self) -> v2.Transform:
         import torchvision.transforms.v2 as v2
+
         match self.type:
             case "IMAGENET":
                 return v2.AutoAugment(v2.AutoAugmentPolicy.IMAGENET)
@@ -174,6 +230,7 @@ class AutoAugmentConfig(BaseModel):
                 return v2.AutoAugment(v2.AutoAugmentPolicy.CIFAR10)
             case "SVHN":
                 return v2.AutoAugment(v2.AutoAugmentPolicy.SVHN)
+
 
 class RandAugConfig(BaseModel):
     type: Literal["RANDAUGMENT"]
@@ -184,6 +241,7 @@ class RandAugConfig(BaseModel):
 
     def build(self) -> v2.RandAugment:
         import torchvision.transforms.v2 as v2
+
         return v2.RandAugment(
             num_ops=self.num_ops,
             magnitude=self.magnitude,
@@ -191,20 +249,56 @@ class RandAugConfig(BaseModel):
             interpolation=_interp_modes()[self.interpolation],
         )
 
-SpatialAugConfig = Annotated[
-    Union[AutoAugmentConfig, RandAugConfig, HorizontalFlipConfig, RandomGrayscaleConfig, GaussianBlurConfig],
-    Field(discriminator="type")
+
+SpatialTransforms = Annotated[
+    Union[
+        # CentreCropConfig,
+        # RandomCropConfig,
+        # ScaleAndPadConfig,
+        # RandomResizedConfig,
+        AutoAugmentConfig,
+        RandAugConfig,
+        HorizontalFlipConfig,
+        RandomGrayscaleConfig,
+        GaussianBlurConfig,
+    ],
+    Field(discriminator="type"),
+]
+
+
+SpatialAugs = Annotated[
+    Union[
+        CropTransforms,
+        SpatialTransforms
+    ],
+    Field(discriminator="type"),
 ]
 
 
 class AugInfo(BaseModel):
+    """Augmentation info for a video
+        
+        Attributes:
+            normalise (bool): Flag to fetch norm values during config parsing. Default False.
+            norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
+            temporal_aug (List[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
+            spatial_aug (List[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
+            strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
+        """
     normalise: bool = False
     norm_dict: Optional[NormDict] = None
-    frame_size_strategy: Frame_Size_Strategy
-    frame_sampler: SamplerConfig = OG_Sampler()
-    temporal_aug: List[TemporalStrategy] = []
-    spatial_aug: List[SpatialAugConfig] = []
+    temporal_aug: List[TemporalAugs] = []
+    spatial_aug: List[SpatialAugs] = []
+    strict_size: bool = True
 
+    @model_validator(mode="after")
+    def _validate_augs(self) -> "AugInfo":
+        if self.strict_size:
+            if not any(isinstance(aug, BaseSampler) for aug in self.temporal_aug):
+                raise ValueError("At least one temporal aug must be a sampler")
+            if not any(isinstance(aug, CropConfig) for aug in self.spatial_aug):
+                raise ValueError("At least one spatial aug must be a crop")
+        return self
 
 class DataInfo(BaseModel):
     num_frames: int
@@ -401,9 +495,10 @@ class RunInfo(BaseModel):
     def _resolve_norms(self) -> "RunInfo":
         """Substitute norm_dict based on model name when norm=True."""
         from models import norm_vals
+
         for aug_info in (self.data.train_augs, self.data.test_augs):
             if aug_info is not None and aug_info.normalise:
-                aug_info.norm_dict = norm_vals(self.admin.model)
+                aug_info.norm_dict = norm_vals(self.admin.model) #type: ignore  doesnt liek the 2
         return self
 
 
@@ -413,6 +508,7 @@ class ExpInfo(RunInfo):
 
 class CompExpInfo(ExpInfo):
     results: CompRes
+
 
 # class GenInfo(BaseModel):
 #     training: Optional[TrainingInfo] = None
@@ -427,7 +523,8 @@ GenInfo: TypeAlias = Dict[str, Any]
 
 class ResSet(BaseModel):
     spec: GenInfo
-    results : List[RunRes]
+    results: List[RunRes]
+
 
 class RunRes(BaseModel):
     admin: AdminInfo
@@ -460,6 +557,7 @@ class SummarisedRes(Sumarised):
 class SummarisedError(Sumarised):
     error: str
 
+
 class CleverDict(Dict):
     def __init__(self, dict: Dict[Any, Any]):
         self.dict = dict
@@ -489,16 +587,16 @@ class CleverDict(Dict):
                 next_key = ks.pop(0)
                 d = {k: self._set_inplace({}, next_key, ks, val)}
         return d
-    
+
     def pop(self, keys: List[Any], default=None) -> Any:
         if len(keys) == 1:
             return self.dict.pop(keys[0], default)
-        
+
         # Navigate to the parent of the target key
         parent = self.dict
         for key in keys[:-1]:
             parent = parent[key]
-        
+
         return parent.pop(keys[-1], default)
 
     def to_dict(self) -> Dict[Any, Any]:
@@ -509,7 +607,7 @@ class CleverDict(Dict):
 
     def __delitem__(self, key):
         raise NotImplementedError
-    
+
     def __iter__(self):
         yield from self._iter_leaves(self.dict, [])
 
@@ -519,4 +617,3 @@ class CleverDict(Dict):
                 yield from self._iter_leaves(val, path + [key])
         else:
             yield path, d
-

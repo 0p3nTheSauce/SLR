@@ -9,17 +9,17 @@ from pathlib import Path
 from argparse import ArgumentParser
 import json
 import inspect
+import logging
 
 # locals
-from que.core import Que, _get_basic_logger, ExpQue, GenExp
+from que.core import Que, ExpQue, GenExp
 from run_types import GenInfo, RunRes, CompExpInfo, CleverDict
 from results.saicair.saicair import additional_modifications
 
 
 RESULTS_DIR = Path("results/saicair")
 CONFIG_PATH = RESULTS_DIR / "config.toml"
-logger = _get_basic_logger()
-
+basic_logger = logging.getLogger(__name__)
 
 def load_config(config_path: str, validate: bool = True) -> GenInfo:
     """Load config from .toml file and merge with AdminInfo from CLI.
@@ -49,35 +49,34 @@ def load_config(config_path: str, validate: bool = True) -> GenInfo:
     #     return GenInfo.model_validate(raw, strict=False)
 
 
-def snap(search: Dict[str, Any], spec: Dict[str, Any], debug: bool = False) -> bool:
+def snap(search: Dict[str, Any], spec: Dict[str, Any], logger: logging.Logger) -> bool:
     for key, value in spec.items():
         if key not in search:
-            if debug:
-                print(f"key: {key} not found in search")
-                if key == "wobble":
-                    print(f"search keys: {search.keys()}")
+            
+            logger.debug(f"key: {key} not found in search")
+            if key == "wobble":
+                print(f"search keys: {search.keys()}")
             return False
 
         if isinstance(value, Dict):
             # we only want to check the specified values are present,
             # not that the dictionaries match exctly
-            if not snap(search[key], value, debug):
+            if not snap(search[key], value, logger):
                 # if debug:
                 #     print(f'key: {key} does not match')
                 return False
 
         elif search[key] != value:
-            if debug:
-                print(f"key: {key} search value: {search[key]} spec value: {value}")
+            logger.debug(f"key: {key} search value: {search[key]} spec value: {value}")
             # print(type(value))
             return False
 
     return True
 
 
-def find_runs(runs: ExpQue, spec: GenInfo, debug: bool = False) -> List[GenExp]:
+def find_runs(runs: ExpQue, spec: GenInfo, logger: logging.Logger) -> List[GenExp]:
     # return [run for run in runs if snap(run.model_dump(), spec.model_dump())]
-    return [run for run in runs if snap(run.model_dump(), spec, debug)]
+    return [run for run in runs if snap(run.model_dump(), spec,logger)]
 
 
 def print_json(obj: Any) -> None:
@@ -91,7 +90,11 @@ def output_results(res_set: GenInfo, out_path: Path) -> None:
 
 
 def build_GenInfo(
-    runs: List[CompExpInfo], spec: GenInfo, exclude: List[List[str]] = []
+    runs: List[CompExpInfo],
+    spec: GenInfo,
+    logger: logging.Logger,
+    exclude: List[List[str]] = [],
+    extra_mods: Dict[str, Any] = {},
 ) -> GenInfo:
     run_set = []
     excluded = 0
@@ -102,44 +105,47 @@ def build_GenInfo(
         for key_chain in exclude:
             run_res.pop(key_chain)
 
-        mods = CleverDict(additional_modifications)
+        mods = CleverDict(extra_mods)
 
         if any([not crit(run_res[key_chain]) for key_chain, crit in mods]):
             excluded += 1
             continue
 
         run_set.append(run_res.to_dict())
-    print(f"Excluded {excluded} runs based on additional modifications")
-    # res_set = GenInfo.model_validate({'spec': spec, 'results': run_set})
+    logger.info(f"Excluded {excluded} runs based on additional modifications")
     res_set = {"spec": spec, "results": run_set}
 
     return res_set
-    # for key_chain in exclude:
-    #     res_set.pop(key_chain)
 
-    # print(len(run_set))
-
-    # return GenInfo.model_validate(res_set.to_dict())
 
 
 def load_config_and_find_runs(
-    conf_path: Path, exclude: List[List[str]] = [], debug: bool = False
+    conf_path: Path,
+    exclude: List[List[str]] = [],
+    extra_mods: Dict[str, Any] = {},
+    logger: logging.Logger = basic_logger,
+    logging_level=logging.INFO,
 ) -> Optional[GenInfo]:
     gen_info = load_config(str(conf_path), validate=False)
     print_json(gen_info)
     # find_que_runs(args.out_path)
+    logger.setLevel(logging_level)  # or WARNING, INFO, ERROR, CRITICAL
     q = Que(logger)
     runs = q.list_runs(loc="old_runs")
 
-    found_runs = find_runs(runs, gen_info, debug)
-    print(f"Found {len(found_runs)}/{len(runs)} runs matching the spec")
+    found_runs = find_runs(runs, gen_info, logger)
+    logger.info(f"Found {len(found_runs)}/{len(runs)} runs matching the spec")
 
     if len(found_runs) == 0:
-        print("No runs found matching the spec")
+        logger.warning("No runs found matching the spec")
         return
 
     return build_GenInfo(
-        [cast(CompExpInfo, run) for run in found_runs], gen_info, exclude
+        [cast(CompExpInfo, run) for run in found_runs],
+        gen_info,
+        logger,
+        exclude,
+        extra_mods,
     )
 
 
@@ -176,8 +182,14 @@ def main():
     )
     # parser.add_argument("--num_frames", "-f", help="Number of frames to filter by, default is 16", type=int, default=frames)
     parser.add_argument(
-        "--debug", "-g", help="Enable debug mode for snap function", action="store_true"
+        "--extra_mods",
+        "-m",
+        action="store_true",
+        help=f"Use {RESULTS_DIR}/saicair.py extra modifications",
     )
+    # parser.add_argument(
+    #     "--debug", "-g", help="Enable debug mode for snap function", action="store_true"
+    # )
 
     args = parser.parse_args()
 
@@ -197,7 +209,10 @@ def main():
             out_path = config_path.with_suffix(".json")
         exclude = args.exclude_keys if args.exclude_keys is not None else []
         print(f"Excluding keys: {exclude}")
-        output = load_config_and_find_runs(config_path, exclude, debug=args.debug)
+        extra_mods = additional_modifications if args.extra_mods else {}
+        output = load_config_and_find_runs(
+            config_path, exclude, extra_mods=extra_mods
+        )
         assert output is not None, (
             "No runs found matching the spec, cannot output results"
         )

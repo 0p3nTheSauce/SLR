@@ -300,6 +300,7 @@ def get_train_parser(
     parser.add_argument("-et", "--entity", type=str, default=ENTITY)
     parser.add_argument("-t", "--tags", nargs="+", type=str)
     parser.add_argument("-w", "--weights_path", type=str)
+    parser.add_argument("-b", "--force_weight", action="store_true", help="Use weights_path even if it does not exist")
     parser.add_argument("-na", "--no_ask", action="store_true")
     parser.add_argument("-nec", "--no_enum_chck", action="store_true")
     parser.add_argument("-f", "--config_filetype", type=str, default=CONFIG_FILETYPE, help=f'Config file type, defaults to: {CONFIG_FILETYPE}')
@@ -368,7 +369,7 @@ def take_args(
     weights_path = None
     if args.weights_path:
         wp = Path(args.weights_path)
-        if not wp.exists():
+        if not wp.exists() and not args.force_weight:
             raise FileNotFoundError(f"Weights file not found: {wp}")
         weights_path = str(wp)
 

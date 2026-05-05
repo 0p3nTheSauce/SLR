@@ -539,25 +539,20 @@ class QueShell(cmdLib.Cmd):
 
     def do_create(self, arg):
         """Create with progress indication"""
-        from configs import take_args
-
-        args = shlex.split(arg)
-
-        try:
-            maybe_args = take_args(sup_args=args)
-        except (SystemExit, ValueError):
-            self.console.print("[red]Create cancelled (incorrect arguments)[/red]")
-            return
-
-        if isinstance(maybe_args, tuple):
-            admin_info, wandb_info = maybe_args
-        else:
-            self.console.print("[yellow]Create cancelled (by user)[/yellow]")
-            return
-
         with self.unwrap_exception(
             "Run created successfully", "Failed to create new run"
         ):
+            from configs import take_args
+            args = shlex.split(arg)    
+            maybe_args = take_args(sup_args=args)
+        
+            if isinstance(maybe_args, tuple):
+                admin_info, wandb_info = maybe_args
+            else:
+                self.console.print("[yellow]Create cancelled (by user)[/yellow]")
+                return
+            
+            
             try:
                 self.que.create_run(admin_info, wandb_info)
             except QueDupExp:
@@ -682,7 +677,7 @@ class QueShell(cmdLib.Cmd):
 
     def do_daemon(self, arg):
         """Interact with the worker"""
-        with self.console.status("[bold green]Starting supervisor...", spinner="dots"):
+        with self.console.status("[bold green]Importing...", spinner="dots"):
             parsed_args = self._parse_args_or_cancel("daemon", arg)
             if parsed_args is None:
                 return
