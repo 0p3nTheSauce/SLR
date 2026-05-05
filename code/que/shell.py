@@ -564,7 +564,8 @@ class QueShell(cmdLib.Cmd):
 
     def do_add(self, arg):
         """Add run with feedback"""
-        from configs import ZFILL, take_args
+        with self.console.status("[bold green]Importing...", spinner="dots"):
+            from configs import ZFILL, take_args
 
         args = shlex.split(arg)
         parser = self._get_add_parser()
@@ -599,8 +600,15 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.unwrap_exception("Run added successfully", "Failed to add run"):
-            with self.console.status("[bold green]Adding run...", spinner="dots"):
+            try:
                 self.que.add_run(admin_info, wandb_info)
+            except QueDupExp:
+                # ask if want to create anyway
+                if Confirm.ask(
+                    "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
+                ):
+                    self.que.add_run(admin_info, wandb_info, add_duplicates=True)
+                        
 
     def do_edit(self, arg):
         """Edit with visual confirmation"""

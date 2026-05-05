@@ -6,6 +6,7 @@ simple JSON-backed persistence.  See the original module docstring for the
 full public-API description.  This version uses pydantic BaseModel objects
 throughout instead of TypedDicts / plain dicts.
 """
+
 from typing import (
     Protocol,
     Optional,
@@ -48,11 +49,10 @@ from run_types import (
 # from configs import print_config, load_config, ZFILL, get_model_exp_dir, get_model_results_dir
 
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-SYSTEMD_NAME = 'que-training.service'
+SYSTEMD_NAME = "que-training.service"
 QUE_DIR = Path(__file__).parent
 
 QUE_NAME = "Que"
@@ -94,7 +94,6 @@ QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
 ProcessNames: TypeAlias = Literal["Server", "Daemon", "Worker"]
 
 
-
 GenExp: TypeAlias = Union[ExpInfo, FailedExp, CompExpInfo]
 ExpQue: TypeAlias = Union[List[ExpInfo], List[FailedExp], List[CompExpInfo]]
 
@@ -126,6 +125,7 @@ NO_SORT = SortInfo(key_set=[], reverse=False)
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class QueException(Exception):
     pass
@@ -205,6 +205,7 @@ class QueBusy(QueException):
 # Context manager
 # ---------------------------------------------------------------------------
 
+
 @contextmanager
 def log_and_raise(logger: Logger, task: str = "Operation"):
     try:
@@ -221,10 +222,10 @@ def timestamp_path(path: Union[str, Path]) -> str:
     return str(path).replace(".json", f"_{formatted}.json")
 
 
-
 # ---------------------------------------------------------------------------
 # Que class
 # ---------------------------------------------------------------------------
+
 
 class Que:
     def __init__(
@@ -300,8 +301,12 @@ class Que:
             split=run.admin.split,
             config_path=run.admin.config_path,
             run_id=run_id,
-            best_val_acc=run.results.best_val_acc if isinstance(run, CompExpInfo) else None,
-            best_val_loss=run.results.best_val_loss if isinstance(run, CompExpInfo) else None,
+            best_val_acc=run.results.best_val_acc
+            if isinstance(run, CompExpInfo)
+            else None,
+            best_val_loss=run.results.best_val_loss
+            if isinstance(run, CompExpInfo)
+            else None,
         )
 
         if cls._is_failed_exp(run):
@@ -348,19 +353,24 @@ class Que:
         """
         from utils import enum_dir
         from configs import ZFILL
+
         new_save_path = (
             str(enum_dir(run.admin.save_path, decimals=ZFILL))
             if enum_chck
             else run.admin.save_path
         )
-        new_admin = run.admin.model_copy(update={"recover": False, "save_path": new_save_path})
+        new_admin = run.admin.model_copy(
+            update={"recover": False, "save_path": new_save_path}
+        )
         new_wandb = run.wandb.model_copy(update={"run_id": None})
 
-        return ExpInfo.model_validate({
-            **run.model_dump(exclude={"error", "results"}),
-            "admin": new_admin.model_dump(),
-            "wandb": new_wandb.model_dump(),
-        })
+        return ExpInfo.model_validate(
+            {
+                **run.model_dump(exclude={"error", "results"}),
+                "admin": new_admin.model_dump(),
+                "wandb": new_wandb.model_dump(),
+            }
+        )
 
     @classmethod
     def _get_print_stats(cls, runs: List[Sumarised]) -> Dict[str, int]:
@@ -379,7 +389,9 @@ class Que:
                 stats["max_run_id_len"] = max(stats["max_run_id_len"], len(run.run_id))
             stats["max_dataset_len"] = max(stats["max_dataset_len"], len(run.dataset))
             stats["max_split_len"] = max(stats["max_split_len"], len(run.split))
-            stats["max_config_path_len"] = max(stats["max_config_path_len"], len(run.config_path))
+            stats["max_config_path_len"] = max(
+                stats["max_config_path_len"], len(run.config_path)
+            )
 
         if runs[0].best_val_acc is not None:
             stats["max_best_val_acc_len"] = len("Best Val Acc")
@@ -395,7 +407,9 @@ class Que:
         if in_path is None:
             in_path = self.runs_path
         elif not Path(in_path).exists():
-            self.logger.warning(f"No existing state found at {in_path}. Load unsuccessful.")
+            self.logger.warning(
+                f"No existing state found at {in_path}. Load unsuccessful."
+            )
             return
 
         try:
@@ -403,11 +417,17 @@ class Que:
                 data = json.load(f)
             self.to_run = [ExpInfo.model_validate(r) for r in data.get(TO_RUN, [])]
             self.cur_run = [ExpInfo.model_validate(r) for r in data.get(CUR_RUN, [])]
-            self.old_runs = [CompExpInfo.model_validate(r) for r in data.get(OLD_RUNS, [])]
-            self.fail_runs = [FailedExp.model_validate(r) for r in data.get(FAIL_RUNS, [])]
+            self.old_runs = [
+                CompExpInfo.model_validate(r) for r in data.get(OLD_RUNS, [])
+            ]
+            self.fail_runs = [
+                FailedExp.model_validate(r) for r in data.get(FAIL_RUNS, [])
+            ]
             self.logger.info(f"Loaded que state from {in_path}")
         except FileNotFoundError:
-            self.logger.warning(f"No existing state found at {in_path}. Starting fresh.")
+            self.logger.warning(
+                f"No existing state found at {in_path}. Starting fresh."
+            )
             self.to_run = []
             self.cur_run = []
             self.old_runs = []
@@ -547,10 +567,12 @@ class Que:
     ) -> ExpQue:
         loc_runs = self._fetch_state(loc)
         if keys:
-            return sorted(loc_runs, key=lambda x: self.get_val(x, keys), reverse=reverse)
+            return sorted(
+                loc_runs, key=lambda x: self.get_val(x, keys), reverse=reverse
+            )
         elif reverse:
             return list(reversed(loc_runs))
-        
+
         return loc_runs
 
     def select_runs(
@@ -594,7 +616,9 @@ class Que:
         ]
         if has_results:
             header_parts.append("Best Val Acc".ljust(stats["max_best_val_acc_len"] + 2))
-            header_parts.append("Best Val Loss".ljust(stats["max_best_val_loss_len"] + 2))
+            header_parts.append(
+                "Best Val Loss".ljust(stats["max_best_val_loss_len"] + 2)
+            )
         header_parts.append("Config Path".ljust(stats["max_config_path_len"] + 2))
         if has_error:
             header_parts.append("Error")
@@ -619,14 +643,18 @@ class Que:
             ]
             if has_results:
                 row_parts.append(
-                    (f"{run.best_val_acc:.4f}" if run.best_val_acc is not None else "N/A").ljust(
-                        stats["max_best_val_acc_len"] + 2
-                    )
+                    (
+                        f"{run.best_val_acc:.4f}"
+                        if run.best_val_acc is not None
+                        else "N/A"
+                    ).ljust(stats["max_best_val_acc_len"] + 2)
                 )
                 row_parts.append(
-                    (f"{run.best_val_loss:.4f}" if run.best_val_loss is not None else "N/A").ljust(
-                        stats["max_best_val_loss_len"] + 2
-                    )
+                    (
+                        f"{run.best_val_loss:.4f}"
+                        if run.best_val_loss is not None
+                        else "N/A"
+                    ).ljust(stats["max_best_val_loss_len"] + 2)
                 )
             row_parts.append(run.config_path.ljust(stats["max_config_path_len"] + 2))
             if has_error and isinstance(run, SummarisedError):
@@ -634,7 +662,8 @@ class Que:
 
             if exc is not None:
                 row_parts = [
-                    r for r, h in zip(row_parts, header_parts)
+                    r
+                    for r, h in zip(row_parts, header_parts)
                     if h.strip().lower() not in exc
                 ]
             print(" | ".join(row_parts))
@@ -659,8 +688,12 @@ class Que:
             "Split".ljust(stats["max_split_len"] + 2),
         ]
         if has_results:
-            header_parts.append("Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2))
-            header_parts.append("Best Val Loss".ljust(stats.get("max_best_val_loss_len", 4) + 2))
+            header_parts.append(
+                "Best Val Acc".ljust(stats.get("max_best_val_acc_len", 4) + 2)
+            )
+            header_parts.append(
+                "Best Val Loss".ljust(stats.get("max_best_val_loss_len", 4) + 2)
+            )
         header_parts.append("Config Path".ljust(stats["max_config_path_len"] + 2))
         if has_error:
             header_parts.append("Error")
@@ -685,14 +718,18 @@ class Que:
             ]
             if has_results:
                 row_parts.append(
-                    (f"{run.best_val_acc:.4f}" if run.best_val_acc is not None else "N/A").ljust(
-                        stats.get("max_best_val_acc_len", 4) + 2
-                    )
+                    (
+                        f"{run.best_val_acc:.4f}"
+                        if run.best_val_acc is not None
+                        else "N/A"
+                    ).ljust(stats.get("max_best_val_acc_len", 4) + 2)
                 )
                 row_parts.append(
-                    (f"{run.best_val_loss:.4f}" if run.best_val_loss is not None else "N/A").ljust(
-                        stats.get("max_best_val_loss_len", 4) + 2
-                    )
+                    (
+                        f"{run.best_val_loss:.4f}"
+                        if run.best_val_loss is not None
+                        else "N/A"
+                    ).ljust(stats.get("max_best_val_loss_len", 4) + 2)
                 )
             row_parts.append(run.config_path.ljust(stats["max_config_path_len"] + 2))
             if has_error and isinstance(run, SummarisedError):
@@ -700,13 +737,15 @@ class Que:
 
             if exc is not None:
                 row_parts = [
-                    r for r, h in zip(row_parts, header_parts)
+                    r
+                    for r, h in zip(row_parts, header_parts)
                     if h.strip().lower() not in exc
                 ]
             print(" | ".join(row_parts))
 
     def disp_run(self, loc: QueLocation, idx: int) -> None:
         from configs import print_config
+
         print_config(self.peak_run(loc, idx))
 
     def recover_run(
@@ -761,27 +800,40 @@ class Que:
         add_duplicates: bool = False,
     ) -> None:
         from configs import load_config
+
         with log_and_raise(self.logger, "create"):
             config: RunInfo = load_config(arg_dict)
             if self._is_dup_exp(config) and not add_duplicates:
                 raise QueDupExp
-            exp_info = ExpInfo.model_validate({
-                **config.model_dump(),
-                "wandb": wandb_dict.model_dump(),
-            })
+            exp_info = ExpInfo.model_validate(
+                {
+                    **config.model_dump(),
+                    "wandb": wandb_dict.model_dump(),
+                }
+            )
             self.to_run.append(exp_info)
 
-    def add_run(self, arg_dict: AdminInfo, wandb_dict: WandbInfo) -> None:
+    def add_run(
+        self,
+        arg_dict: AdminInfo,
+        wandb_dict: WandbInfo,
+        add_duplicates: bool = False,
+    ) -> None:
         """Add a fully-tested completed run directly into old_runs."""
         from testing import full_test, load_comp_res
         from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
+
         with log_and_raise(self.logger, "add"):
             config: RunInfo = load_config(arg_dict)
-            if self._is_dup_exp(config):
+            if self._is_dup_exp(config) and not add_duplicates:
                 raise QueDupExp
 
             self.logger.debug(arg_dict.save_path[-ZFILL:])
-            checknum = int(arg_dict.save_path[-ZFILL:])  if arg_dict.save_path[-1].isdigit() else None
+            checknum = (
+                int(arg_dict.save_path[-ZFILL:])
+                if arg_dict.save_path[-1].isdigit()
+                else None
+            )
             res_dir = get_model_results_dir(
                 get_model_exp_dir(
                     split=arg_dict.split,
@@ -798,11 +850,15 @@ class Que:
                 results = full_test(admin=config.admin, data=config.data)
                 self.logger.info("Results not found on disk — ran full_test")
 
-            comp_run = CompExpInfo.model_validate({
-                **config.model_dump(),
-                "wandb": wandb_dict.model_dump(),
-                "results": results if isinstance(results, dict) else results.model_dump(),
-            })
+            comp_run = CompExpInfo.model_validate(
+                {
+                    **config.model_dump(),
+                    "wandb": wandb_dict.model_dump(),
+                    "results": results
+                    if isinstance(results, dict)
+                    else results.model_dump(),
+                }
+            )
             self.old_runs.insert(0, comp_run)
 
     def remove_run(self, loc: QueLocation, idx: int) -> None:
@@ -854,7 +910,6 @@ class Que:
             run = self.peak_run(loc, idx)
             val = ast.literal_eval(value) if do_eval else value
 
-
             run_dict = run.model_dump()
             run_dict = self.set_nested(run_dict, keys, val)
 
@@ -905,7 +960,9 @@ class Que:
                 for idx, run in enumerate(run_list):
                     run_dict = run.model_dump()
                     current_val = self.get_nested(run_dict, key_set)
-                    run_dict = self.set_nested(run_dict, key_set, transform(current_val))
+                    run_dict = self.set_nested(
+                        run_dict, key_set, transform(current_val)
+                    )
                     run_list[idx] = model_cls.model_validate(run_dict)  # type: ignore[index]
 
     def copy_runs(
@@ -967,6 +1024,7 @@ class ServerState(BaseModel):
 
 # Type guards now just delegate to pydantic's own validation.
 
+
 def is_worker_state(obj: Any) -> TypeGuard[WorkerStateDict]:
     class WorkerState(BaseModel):
         task: Worker_tasks
@@ -986,6 +1044,7 @@ def is_daemon_state(obj: Any) -> TypeGuard[DaemonStateDict]:
         awake: bool
         stop_on_fail: bool
         supervisor_pid: Optional[int]
+
     try:
         DaemonState.model_validate(obj)
         return True
@@ -1015,11 +1074,17 @@ Process_states: TypeAlias = Union[WorkerStateDict, DaemonStateDict, ServerState]
 # Protocols / Manager
 # ---------------------------------------------------------------------------
 
+
 class DaemonProtocol(Protocol):
     def start_supervisor(self) -> None: ...
-    def stop_worker(self, timeout: Optional[float] = None, hard: bool = False) -> None: ...
+    def stop_worker(
+        self, timeout: Optional[float] = None, hard: bool = False
+    ) -> None: ...
     def stop_supervisor(
-        self, timeout: Optional[float] = None, hard: bool = False, stop_worker: bool = False
+        self,
+        timeout: Optional[float] = None,
+        hard: bool = False,
+        stop_worker: bool = False,
     ) -> None: ...
 
 
