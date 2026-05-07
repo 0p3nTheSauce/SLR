@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import (
-    TYPE_CHECKING,
     Literal,
     Optional,
     Union,
@@ -12,10 +11,6 @@ from typing import (
     TypeAlias,
 )
 from pydantic import BaseModel, Field, model_validator, computed_field
-
-if TYPE_CHECKING:
-    from torchvision.transforms.functional import InterpolationMode
-    import torchvision.transforms.v2 as v2
 
 
 class NormDict(BaseModel):
@@ -36,51 +31,47 @@ class BaseSampler(BaseModel):
     max_wobble: int = 0
 
 
-
 class OG_Sampler(BaseSampler):
     """Directs to correct_num_frames"""
-
-    method: Literal["og"] = "og"
+    type: Literal["og"] = "og"
     randomise: bool = False
 
 
 class UniformSampler(BaseSampler):
     """Uniformly sampled"""
-
-    method: Literal["uniform"] = "uniform"
+    type: Literal["uniform"] = "uniform"
 
 
 class ChunkedSampler(BaseSampler):
     """Random frames in chunks"""
-
-    method: Literal["chunked"] = "chunked"
+    type: Literal["chunked"] = "chunked"
 
 
 class WobbledSampler(BaseSampler):
-    method: Literal["wobbled"] = "wobbled"
+    type: Literal["wobbled"] = "wobbled"
     max_wobble: int = 4
 
 
 class FocalNormalSampler(BaseSampler):
-    method: Literal["focal_normal"] = "focal_normal"
+    type: Literal["focal_normal"] = "focal_normal"
     mean: float = 0.5
     std: float = 0.25
 
 
 class FocalLaplaceSampler(BaseSampler):
-    method: Literal["focal_laplace"] = "focal_laplace"
+    type: Literal["focal_laplace"] = "focal_laplace"
     mean: float = 0.5
     diversity: float = 0.175
 
 
 class FocalBetaSampler(BaseSampler):
-    method: Literal["focal_beta"] = "focal_beta"
+    type: Literal["focal_beta"] = "focal_beta"
     alpha: float = 4.0
     beta: float = 4.0
 
 
 class SpeedSampler(BaseSampler):
-    method: Literal["speed"] = "speed"
+    type: Literal["speed"] = "speed"
     speed_min: float = 0.8
     speed_max: float = 1.2
 
@@ -102,98 +93,69 @@ SamplerConfig = Annotated[
         ChunkedSampler,
         OG_Sampler,
     ],
-    Field(discriminator="method"),
+    Field(discriminator="type"),
 ]
 
-### Temporal augs - currently not used
+### Temporal augs 
 
 
 class ShuffleT(BaseModel):
-    """Represent the shuffle transform"""
+    type: Literal["shuffle"] = "shuffle"
     num_frames: int
-    # perm optional tensor
-
 
 class ReverseT(BaseModel):
-    """Represents Reverse Frames"""
-
+    type: Literal["reverse"] = "reverse"
     probability: float = 0.5
 
 class PadFramesT(BaseModel):
+    type: Literal["pad"] = "pad"
     num_frames: int
-        
 
-TemporalTransforms = Annotated[Union[
-    ShuffleT,
-    ReverseT,
-    PadFramesT], Field(discriminator="type")]
+TemporalTransforms = Annotated[
+    Union[ShuffleT, ReverseT, PadFramesT], Field(discriminator="type")
+]
 
-TemporalAugs = Annotated[Union[
-    TemporalTransforms,
-    SamplerConfig
-    ], Field(discriminator="type")]
+TemporalAugs = Annotated[
+    Union[TemporalTransforms, SamplerConfig], Field(discriminator="type")
+]
 ### Spatial augs
 
 
 ## Cropping
 class CropConfig(BaseModel):
-    import torchvision.transforms.v2 as v2
-
     size: int
 
 
 class CentreCropConfig(CropConfig):
     type: Literal["Centre_crop"] = "Centre_crop"
 
-    def build(self) -> v2.Transform:
-        return v2.CenterCrop(self.size)
-
 
 class RandomCropConfig(CropConfig):
     type: Literal["Random_crop"] = "Random_crop"
 
-    def build(self) -> v2.Transform:
-        return v2.RandomCrop(self.size)
 
 class ScaleAndPadConfig(CropConfig):
     type: Literal["Scale_and_pad"] = "Scale_and_pad"
 
-    # def build(self) -> v2.Transform:
-    #     return ScaleAndPad(self.size)
 
 class RandomResizedConfig(CropConfig):
-    type: Literal["Random_Resized_crop"] =  "Random_Resized_crop"
+    type: Literal["Random_Resized_crop"] = "Random_Resized_crop"
 
-    def build(self) -> v2.Transform:
-        return v2.RandomResizedCrop(self.size)
 
-CropTransforms = Annotated[Union[
-    CentreCropConfig,
-    RandomCropConfig,
-    ScaleAndPadConfig,
-    RandomResizedConfig
-    
-], Field(discriminator="type")]
+CropTransforms = Annotated[
+    Union[CentreCropConfig, RandomCropConfig, ScaleAndPadConfig, RandomResizedConfig],
+    Field(discriminator="type"),
+]
 
 
 class HorizontalFlipConfig(BaseModel):
     type: Literal["HORIZONTAL_FLIP"] = "HORIZONTAL_FLIP"
     p: float = 0.5
 
-    def build(self) -> v2.Transform:
-        import torchvision.transforms.v2 as v2
-
-        return v2.RandomHorizontalFlip(p=self.p)
-
 
 class RandomGrayscaleConfig(BaseModel):
     type: Literal["RANDOM_GRAYSCALE"]
     p: float = 0.1
-
-    def build(self) -> v2.Transform:
-        import torchvision.transforms.v2 as v2
-
-        return v2.RandomGrayscale(p=self.p)
 
 
 class GaussianBlurConfig(BaseModel):
@@ -201,35 +163,15 @@ class GaussianBlurConfig(BaseModel):
     kernel_size: int = 3
     sigma: tuple[float, float] = (0.1, 2.0)
 
-    def build(self) -> v2.Transform:
-        import torchvision.transforms.v2 as v2
 
-        return v2.GaussianBlur(kernel_size=self.kernel_size, sigma=self.sigma)
-
-
-def _interp_modes() -> dict[str, InterpolationMode]:
-    from torchvision.transforms.functional import InterpolationMode
-
-    return {
-        "BILINEAR": InterpolationMode.BILINEAR,
-        "BICUBIC": InterpolationMode.BICUBIC,
-        "NEAREST": InterpolationMode.NEAREST,
-    }
+InterpMode: TypeAlias = Literal[
+    "nearest", "nearest-exact", "bilinear", "bicubic", "box", "hamming", "lanczos"
+]
 
 
 class AutoAugmentConfig(BaseModel):
     type: Literal["IMAGENET", "CIFAR10", "SVHN"]
-
-    def build(self) -> v2.Transform:
-        import torchvision.transforms.v2 as v2
-
-        match self.type:
-            case "IMAGENET":
-                return v2.AutoAugment(v2.AutoAugmentPolicy.IMAGENET)
-            case "CIFAR10":
-                return v2.AutoAugment(v2.AutoAugmentPolicy.CIFAR10)
-            case "SVHN":
-                return v2.AutoAugment(v2.AutoAugmentPolicy.SVHN)
+    interpolation: InterpMode = "nearest"
 
 
 class RandAugConfig(BaseModel):
@@ -237,25 +179,11 @@ class RandAugConfig(BaseModel):
     num_ops: int = 2
     magnitude: int = 9
     num_magnitude_bins: int = 31
-    interpolation: Literal["BILINEAR", "BICUBIC", "NEAREST"] = "BILINEAR"
-
-    def build(self) -> v2.RandAugment:
-        import torchvision.transforms.v2 as v2
-
-        return v2.RandAugment(
-            num_ops=self.num_ops,
-            magnitude=self.magnitude,
-            num_magnitude_bins=self.num_magnitude_bins,
-            interpolation=_interp_modes()[self.interpolation],
-        )
+    interpolation: InterpMode = "nearest"
 
 
 SpatialTransforms = Annotated[
     Union[
-        # CentreCropConfig,
-        # RandomCropConfig,
-        # ScaleAndPadConfig,
-        # RandomResizedConfig,
         AutoAugmentConfig,
         RandAugConfig,
         HorizontalFlipConfig,
@@ -267,24 +195,22 @@ SpatialTransforms = Annotated[
 
 
 SpatialAugs = Annotated[
-    Union[
-        CropTransforms,
-        SpatialTransforms
-    ],
+    Union[CropTransforms, SpatialTransforms],
     Field(discriminator="type"),
 ]
 
 
 class AugInfo(BaseModel):
     """Augmentation info for a video
-        
-        Attributes:
-            normalise (bool): Flag to fetch norm values during config parsing. Default False.
-            norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
-            temporal_aug (List[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
-            spatial_aug (List[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
-            strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
-        """
+
+    Attributes:
+        normalise (bool): Flag to fetch norm values during config parsing. Default False.
+        norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
+        temporal_aug (List[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
+        spatial_aug (List[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
+        strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
+    """
+
     normalise: bool = False
     norm_dict: Optional[NormDict] = None
     temporal_aug: List[TemporalAugs] = []
@@ -300,18 +226,16 @@ class AugInfo(BaseModel):
                 raise ValueError("At least one spatial aug must be a crop")
         return self
 
+
 class DataInfo(BaseModel):
-    num_frames: int
-    frame_size: int
     train_augs: Optional[AugInfo] = None
     test_augs: Optional[AugInfo] = None
+    strict_augs: bool = True  # from config
 
     @model_validator(mode="after")
     def check_frame_strat(self) -> "DataInfo":
-        if self.train_augs is None and self.test_augs is None:
-            raise ValueError(
-                "At least one aug info must be provided for sampler and croping"
-            )
+        if self.strict_augs and (self.train_augs is None or self.test_augs is None):
+            raise ValueError("Aug info cannot be None if strict_augs enabled")
         return self
 
 
@@ -498,7 +422,7 @@ class RunInfo(BaseModel):
 
         for aug_info in (self.data.train_augs, self.data.test_augs):
             if aug_info is not None and aug_info.normalise:
-                aug_info.norm_dict = norm_vals(self.admin.model) #type: ignore  doesnt liek the 2
+                aug_info.norm_dict = norm_vals(self.admin.model)  # type: ignore  doesnt liek the 2
         return self
 
 

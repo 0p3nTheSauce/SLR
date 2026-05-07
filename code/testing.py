@@ -552,16 +552,16 @@ def full_test(
 
 
     Args:
-                    admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
-                    data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
-                    save (bool, optional): Whether to save. Defaults to True.
-                    re_test (bool, optional): Re-test even if files exist. Defaults to False.
+        admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
+        data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
+        save (bool, optional): Whether to save. Defaults to True.
+        re_test (bool, optional): Re-test even if files exist. Defaults to False.
 
     Raises:
-                    Exception: If there is an error loading data from data_info.json
+        Exception: If there is an error loading data from data_info.json
 
     Returns:
-                    CompRes: A results dictionary (as described above).
+        CompRes: A results dictionary (as described above).
     """
     save_path = Path(admin.save_path)
 
