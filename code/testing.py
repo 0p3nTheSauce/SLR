@@ -25,7 +25,7 @@ from configs import set_seed, _make_aug_info
 
 from video_dataset import VideoDataset, get_data_set, get_wlasl_info
 from models import avail_models
-from run_types import DataInfo
+from run_types import BaseSampler, DataInfo, ShuffleT, TemporalAugs
 from configs import (
     get_avail_splits,
     get_model_results_dir,
@@ -321,12 +321,16 @@ def load_info(dirp: Path, checkname: str):
             resd[fn.name.replace(".json", "")] = json.load(f)
     return resd
 
+def get_last_sampler(conf_list: List[TemporalAugs]):
+    samplers = [(i, c) for i, c in enumerate(conf_list) if isinstance(c, BaseSampler)]
+    return samplers[-1]
 
 def setup_data(
     set_name: Literal["train", "test", "val"],
     split: str,
     data_info: DataInfo,
     shuffle: bool = False,  # override for shuffle test
+    # video_length: Optional[int] = None
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     test_info = get_wlasl_info(split, set_name=set_name)
 
@@ -337,7 +341,15 @@ def setup_data(
         )
 
     if shuffle:
-        aug_info.temporal_aug = ["Shuffle"]
+        
+        try:
+            i, s = get_last_sampler(aug_info.temporal_aug)
+            video_length = s.target_length
+        except IndentationError:
+            raise ValueError('At least one frame sampler has to be present to extract video length')
+        
+        aug_info.temporal_aug.insert(i+1, ShuffleT(num_frames=video_length))
+        # print(aug_info.model_dump())
 
     test_dataset, perm, shanon_entropy = get_data_set(
         set_info=test_info, data_info=data_info
@@ -824,29 +836,32 @@ def main():
 
     # Try to load data_info.json, or use provided arguments
     if args.num_frames is not None and args.frame_size is not None:
-        augs = _make_aug_info(None, args.model, args.set_name)
-        # Use provided arguments
-        data = DataInfo(
-            num_frames=args.num_frames,
-            frame_size=args.frame_size,
-            train_augs=augs if args.set_name == "train" else None,
-            test_augs=augs if args.set_name != "train" else None,
-        )
-        print(
-            f"Using provided data parameters: num_frames={args.num_frames}, frame_size={args.frame_size}"
-        )
+        # augs = _make_aug_info(None, args.model, args.set_name)
+        # # Use provided arguments
+        # data = DataInfo(
+        #     num_frames=args.num_frames,
+        #     frame_size=args.frame_size,
+        #     train_augs=augs if args.set_name == "train" else None,
+        #     test_augs=augs if args.set_name != "train" else None,
+        # )
+        # print(
+        #     f"Using provided data parameters: num_frames={args.num_frames}, frame_size={args.frame_size}"
+        # )
+        raise Warning("This feature is currently not fixed")
     else:
-        # Try to load from data_info.json
+        # Try to load from data_info.json 
         try:
             data = load_test_sizes(output)
             print(f"Loaded data info from {data_info_path}")
-            print(f"num_frames={data.num_frames}, frame_size={data.frame_size}")
+            # print(f"num_frames={data.num_frames}, frame_size={data.frame_size}")
 
             # Allow partial override
             if args.num_frames is not None:
+                raise Warning("This feature is currently not fixed")
                 data.num_frames = args.num_frames
                 print(f"Overriding num_frames: {args.num_frames}")
             if args.frame_size is not None:
+                raise Warning("This feature is currently not fixed")
                 data.frame_size = args.frame_size
                 print(f"Overriding frame_size: {args.frame_size}")
 
@@ -882,7 +897,7 @@ def main():
             disp=args.display,
             save=args.save,
         )
-        print(json.dumps(results, indent=4))
+        print(json.dumps(results.model_dump(), indent=4))
 
 
 if __name__ == "__main__":

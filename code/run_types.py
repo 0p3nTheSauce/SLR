@@ -26,9 +26,9 @@ class NormDict(BaseModel):
 class BaseSampler(BaseModel):
     """required target frames"""
 
-    # target_length: int #NOTE: leave this then pass f(Tensor, num_frames) -> Tensor
+    #f(Tensor, num_frames) -> Tensor
     target_length: int
-    max_wobble: int = 0
+    max_wobble: int = 0 #NOTE: this is probably redundant
 
 
 class OG_Sampler(BaseSampler):
@@ -36,6 +36,8 @@ class OG_Sampler(BaseSampler):
     type: Literal["og"] = "og"
     randomise: bool = False
 
+class PadFramesT(BaseSampler):
+    type: Literal["pad"] = "pad"
 
 class UniformSampler(BaseSampler):
     """Uniformly sampled"""
@@ -82,6 +84,8 @@ class SpeedSampler(BaseSampler):
         return self
 
 
+
+
 SamplerConfig = Annotated[
     Union[
         UniformSampler,
@@ -91,6 +95,7 @@ SamplerConfig = Annotated[
         FocalLaplaceSampler,
         FocalBetaSampler,
         ChunkedSampler,
+        PadFramesT,
         OG_Sampler,
     ],
     Field(discriminator="type"),
@@ -101,18 +106,16 @@ SamplerConfig = Annotated[
 
 class ShuffleT(BaseModel):
     type: Literal["shuffle"] = "shuffle"
-    num_frames: int
+    num_frames: Optional[int] = None
 
 class ReverseT(BaseModel):
     type: Literal["reverse"] = "reverse"
     probability: float = 0.5
 
-class PadFramesT(BaseModel):
-    type: Literal["pad"] = "pad"
-    num_frames: int
+
 
 TemporalTransforms = Annotated[
-    Union[ShuffleT, ReverseT, PadFramesT], Field(discriminator="type")
+    Union[ShuffleT, ReverseT], Field(discriminator="type")
 ]
 
 TemporalAugs = Annotated[
@@ -123,7 +126,7 @@ TemporalAugs = Annotated[
 
 ## Cropping
 class CropConfig(BaseModel):
-    size: int
+    frame_size: int
 
 
 class CentreCropConfig(CropConfig):
@@ -216,26 +219,45 @@ class AugInfo(BaseModel):
     temporal_aug: List[TemporalAugs] = []
     spatial_aug: List[SpatialAugs] = []
     strict_size: bool = True
-
+    target_length: Optional[int] = None
+    frame_size: Optional[int] = None
+    
+    
     @model_validator(mode="after")
     def _validate_augs(self) -> "AugInfo":
-        if self.strict_size:
-            if not any(isinstance(aug, BaseSampler) for aug in self.temporal_aug):
-                raise ValueError("At least one temporal aug must be a sampler")
-            if not any(isinstance(aug, CropConfig) for aug in self.spatial_aug):
-                raise ValueError("At least one spatial aug must be a crop")
+        if not self.strict_size :
+            return self
+        
+        samplers = [augT for augT in self.temporal_aug if isinstance(augT, BaseSampler)]
+        if len(samplers) == 0:
+            raise ValueError("At least one temporal aug must be a sampler")
+        last_sampler = samplers[-1]
+        self.target_length = last_sampler.target_length
+        
+        crops = [augS for augS in self.spatial_aug if isinstance(augS, CropConfig)]
+        last_crop = crops[-1]
+        self.frame_size = last_crop.frame_size
+   
         return self
 
 
 class DataInfo(BaseModel):
     train_augs: Optional[AugInfo] = None
     test_augs: Optional[AugInfo] = None
-    strict_augs: bool = True  # from config
+    strict_size: bool = True    # from config
+    target_length: Optional[int] = None
+    frame_size: Optional[int] = None
 
     @model_validator(mode="after")
     def check_frame_strat(self) -> "DataInfo":
-        if self.strict_augs and (self.train_augs is None or self.test_augs is None):
-            raise ValueError("Aug info cannot be None if strict_augs enabled")
+        if not self.strict_size :
+            return self
+        
+        if self.train_augs is None or self.test_augs is None:
+            raise ValueError("Aug info cannot be None if strict_size enabled")
+        
+        self.train_augs.strict_size = self.test_augs.strict_size = self.strict_size        
+
         return self
 
 
