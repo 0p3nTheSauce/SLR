@@ -10,22 +10,21 @@ from typing import (
     Optional,
     Tuple,
     Literal,
-    TypedDict,
+    # TypedDict,
     Union,
     List,
     TypeAlias,
-    Dict, 
-    Any
+    Dict,
+    Any,
 )
-
+from typing_extensions import TypedDict, Unpack
 # local imports
 from utils import load_rgb_frames_from_video
 from video_transforms import (
     # correct_num_frames,
     get_transform,
-    get_sampler
 )
-from run_types import DataInfo, SamplerConfig, OG_Sampler
+from run_types import DataInfo
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
 from preprocess import Instance, AVAIL_SETS
 
@@ -34,6 +33,7 @@ from preprocess import Instance, AVAIL_SETS
 
 class DataSetInfo(TypedDict):
     """Necessary info to import datast"""
+
     root: Path
     labels: Path
     label_suff: str
@@ -59,7 +59,7 @@ def load_data_from_json(
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    if policy == 'strict':
+    if policy == "strict":
         return [Instance.model_validate(item) for item in data]
 
     return data
@@ -101,14 +101,12 @@ class VideoDataset(Dataset):
     def __init__(
         self,
         set_info: DataSetInfo,
-        num_frames: Optional[int] = None,
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         item_transforms: Optional[
             Callable[[torch.Tensor, Instance], torch.Tensor]
         ] = None,
         include_meta: bool = False,
-        load_policy: LOAD_DATA_POLICY = 'accepting', #NOTE: this may break
-        sampler_config: SamplerConfig = OG_Sampler()  
+        load_policy: LOAD_DATA_POLICY = "accepting",  # NOTE: this may break
     ) -> None:
         """
         Custom video dataset, based on the structure of the WLASL dataset
@@ -129,7 +127,7 @@ class VideoDataset(Dataset):
         if not self.root.exists():
             raise FileNotFoundError(f"Root directory {self.root} does not exist.")
         self.transforms = transforms
-        self.num_frames = num_frames
+
         self.include_meta = include_meta
         self.item_transforms = item_transforms
         instances_path = (
@@ -137,33 +135,24 @@ class VideoDataset(Dataset):
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
         self.data = load_data_from_json(instances_path, load_policy)
-        if load_policy == 'accepting':
+        if load_policy == "accepting":
             self.data = cast(List[Dict[str, Any]], self.data)
-        elif load_policy == 'strict':
+        elif load_policy == "strict":
             self.data = [inst.model_dump() for inst in self.data]
-        
-        self.classes = set([inst['label_num'] for inst in self.data])
-        self.num_classes = len(self.classes)
-        self.sampler = get_sampler(sampler_config)
 
+        self.classes = set([inst["label_num"] for inst in self.data])
+        self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
-        video_path = self.root / (item["video_id"] + ".mp4")
+        video_path = self.root / cast(str, item["video_id"] + ".mp4")
         if video_path.exists() is False:
             raise FileNotFoundError(f"Video file {video_path} does not exist.")
 
-        frames = load_rgb_frames_from_video(
+        return load_rgb_frames_from_video(
             video_path=video_path,
             start=item["frame_start"],
             end=item["frame_end"],
-        )
-        if self.num_frames is not None:
-            # sampled_frames = correct_num_frames(frames, self.num_frames)
-            sampled_frames = self.sampler(frames, self.num_frames)
-        else:
-            sampled_frames = frames
-
-        return sampled_frames.to(torch.uint8)
+        ).to(torch.uint8)
 
     def __getitem__(self, idx):
         item = cast(Dict[str, Any], self.data[idx])
@@ -178,7 +167,7 @@ class VideoDataset(Dataset):
         if self.include_meta:
             result = {"frames": frames} | item
         else:
-            result = result = {"frames": frames, "label_num": item['label_num']}
+            result = result = {"frames": frames, "label_num": item["label_num"]}
 
         return result
 
@@ -188,10 +177,15 @@ class VideoDataset(Dataset):
 
 ################################## Helper functions #######################################
 
-
+class VideoDatasetKwargs(TypedDict, total=False):
+    item_transforms: Optional[Callable[[torch.Tensor, Instance], torch.Tensor]]
+    include_meta: bool
+    load_policy: LOAD_DATA_POLICY
+    
 def get_data_set(
     set_info: DataSetInfo,
-    data_info: DataInfo
+    data_info: DataInfo,
+    **kwargs: Unpack[VideoDatasetKwargs]
 ) -> Tuple[VideoDataset, Optional[List[int]], Optional[float]]:
     """
     Get the training, val or test set. Optionally, load frames unchanged.
@@ -217,35 +211,28 @@ def get_data_set(
     :return: dataset, permutation and shannon entropy
     :rtype: Tuple[VideoDataset, List[int] | None, float | None]
     """
-    # item_transform(frames, item) -> frames
-    # item_transforms = None
-    # if resize_by_diagonal:
-    #     item_transforms = _resize_by_diagonal
-    # elif cropping == "Bbox":
-    #     item_transforms = _crop_frames
 
-    aug_info = data_info.train_augs if set_info['set_name'] == 'train' else data_info.test_augs
+    aug_info = (
+        data_info.train_augs if set_info["set_name"] == "train" else data_info.test_augs
+    )
     if aug_info is None:
-        raise ValueError(f"Augmentation info not provided in data_info for set: {set_info['set_name']}.")
+        raise ValueError(
+            f"Augmentation info not provided in data_info for set: {set_info['set_name']}."
+        )
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
-        num_frames=data_info.num_frames,
-        frame_size=data_info.frame_size,
-        norm_dict=aug_info.norm_dict,
-        frame_size_strategy=aug_info.frame_size_strategy,
+        norm_dict=aug_info.norm_dict,  
         temporal_aug=aug_info.temporal_aug,
-        spatial_aug=aug_info.spatial_aug
+        spatial_aug=aug_info.spatial_aug,
     )
 
     dataset = VideoDataset(
         set_info,
-        num_frames=data_info.num_frames,
         transforms=transform,
-        item_transforms=None, # item_transforms, #TODO: add item transforms back in when we have them
+        **kwargs
     )
 
     return dataset, perm, sh_e
-
 
 if __name__ == "__main__":
     # test_crop()

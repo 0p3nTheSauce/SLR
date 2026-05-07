@@ -27,6 +27,9 @@ from .core import (
 )
 from .tmux import tmux_manager
 from run_types import (
+    CentreCropConfig,
+    RandomCropConfig,
+    ScaleAndPadConfig,
 	RunInfo,
 	FailedExp,
 	CompExpInfo,
@@ -485,18 +488,11 @@ def update_runs4():
 
 def update_runs5():
 
-	from run_types3 import CompExpInfo as CompExpInfo3
-	from run_types3 import ExpInfo as ExpInfo3
-	from run_types3 import ExpInfo as FailedExp3
-	from run_types3 import CentreCropConfig as CentreCropConfig3
-	from run_types3 import RandomCropConfig as RandomCropConfig3
-	from run_types3 import ScaleAndPadConfig as ScaleAndPadConfig3
-
 	def map_frame_size_strat_to_crop_config(fss, sz):
 		return {
-			"Centre_crop": CentreCropConfig3(size=sz).model_dump(),
-			"Random_crop": RandomCropConfig3(size=sz).model_dump(),
-			"Scale_and_pad": ScaleAndPadConfig3(size=sz).model_dump(),
+			"Centre_crop": CentreCropConfig(size=sz).model_dump(),
+			"Random_crop": RandomCropConfig(size=sz).model_dump(),
+			"Scale_and_pad": ScaleAndPadConfig(size=sz).model_dump(),
 		}[fss]
 
 	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
@@ -526,11 +522,11 @@ def update_runs5():
 				data[key][k] = [s] + data[key][k]
 
 			if loc in KEYS[:2]:
-				ExpInfo3.model_validate(run)
+				ExpInfo.model_validate(run)
 			elif loc == KEYS[2]:
-				CompExpInfo3.model_validate(run)
+				CompExpInfo.model_validate(run)
 			else:
-				FailedExp3.model_validate(run)
+				FailedExp.model_validate(run)
 			new_quelist.append(run)
 
 		all_runs[loc] = new_quelist
