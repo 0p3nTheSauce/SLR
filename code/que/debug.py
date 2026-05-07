@@ -490,9 +490,9 @@ def update_runs5():
 
 	def map_frame_size_strat_to_crop_config(fss, sz):
 		return {
-			"Centre_crop": CentreCropConfig(size=sz).model_dump(),
-			"Random_crop": RandomCropConfig(size=sz).model_dump(),
-			"Scale_and_pad": ScaleAndPadConfig(size=sz).model_dump(),
+			"Centre_crop": CentreCropConfig(size=sz).model_dump(), #type: ignore 
+			"Random_crop": RandomCropConfig(size=sz).model_dump(), #type: ignore
+			"Scale_and_pad": ScaleAndPadConfig(size=sz).model_dump(), #type: ignore
 		}[fss]
 
 	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
@@ -536,8 +536,50 @@ def update_runs5():
 		json.dump(all_runs, f, indent=4)
 
 
+
+def update_runs6():
+
+	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	# for key in KEYS:
+
+	# loc = KEYS[0]
+	for loc in KEYS:
+		que_list = all_runs[loc]
+		new_quelist = []
+		for run in que_list:
+			data = run["data"]
+			# nf = data.pop("num_frames")
+			# fs = data.pop("frame_size")
+			keys = ["test_augs", "train_augs"]
+			for key in keys:
+				keys2 = [ 'spatial_aug']
+				for k2 in keys2:
+					for i, aug in enumerate(data[key][k2]):
+						if 'size' in aug:
+							frame_size = aug.pop('size')
+							data[key][k2][i]['frame_size'] = frame_size
+						
+						
+
+			if loc in KEYS[:2]:
+				run = ExpInfo.model_validate(run).model_dump()
+			elif loc == KEYS[2]:
+				run = CompExpInfo.model_validate(run).model_dump()
+			else:
+				run = FailedExp.model_validate(run).model_dump()
+			new_quelist.append(run)
+
+		all_runs[loc] = new_quelist
+	
+
+	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+
+
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
 	# validate_runs()
-	update_runs5()
+	update_runs6()

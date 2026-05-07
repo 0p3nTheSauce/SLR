@@ -256,8 +256,19 @@ class DataInfo(BaseModel):
         if self.train_augs is None or self.test_augs is None:
             raise ValueError("Aug info cannot be None if strict_size enabled")
         
-        self.train_augs.strict_size = self.test_augs.strict_size = self.strict_size        
-
+        self.target_length = self.train_augs.target_length
+        self.frame_size = self.train_augs.frame_size
+    
+        assert self.train_augs.target_length == self.test_augs.target_length, (
+            f"Train/test target_length mismatch: "
+            f"{self.train_augs.target_length} vs {self.test_augs.target_length}"
+        )
+        
+        assert self.train_augs.frame_size == self.test_augs.frame_size, (
+            f"Train/test target_length mismatch: "
+            f"{self.train_augs.frame_size} vs {self.test_augs.frame_size}"
+        )
+        
         return self
 
 
