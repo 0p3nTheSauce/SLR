@@ -4,8 +4,8 @@ from typing import Optional
 import pickle
 
 # locals
-from mvit.detectron2_cp.mvit2d import MViT
-from mvit.configs.mvit2d_conf import MViT_t_3x
+from .mvit.detectron2_cp.mvit2d import MViT
+from .mvit.configs.mvit2d_conf import MViT_t_3x
 
 
 MVITV2_2D_T = MViT_t_3x()

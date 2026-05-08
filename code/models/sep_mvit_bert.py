@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch
 from typing import Optional
 #locals
-from detectron_mvit import MViT_2D_t
+from .detectron_mvit import MViT_2D_t
 
 class TemporalPositionalEncoding(nn.Module):
     def __init__(self, embed_dim, max_frames=64, dropout=0.1):
@@ -35,29 +35,33 @@ class TemporalBERT(nn.Module):
 class MVirTed(nn.Module):
     def __init__(self, mvit, num_classes,embed_dim=512, num_heads=8, num_layers=4, max_frames=64, mvit_out_dim=768):
         super().__init__()
-        self.frame_encoder = MViT_2D_t(mvit)
-        self.proj = nn.Linear(mvit_out_dim, embed_dim)  # if dims don't match
-        self.pos_enc = TemporalPositionalEncoding(embed_dim, max_frames)
-        self.temporal_encoder = TemporalBERT(embed_dim, num_heads, num_layers)
-        self.cls_head = nn.Linear(embed_dim, num_classes)
+        self.backbone = MViT_2D_t(mvit)          # pretrained — gets low LR
+        self.temporal_encoder = nn.Sequential(          # fresh — gets high LR
+            nn.Linear(mvit_out_dim, embed_dim),
+            TemporalPositionalEncoding(embed_dim, max_frames),
+            TemporalBERT(embed_dim, num_heads, num_layers),
+        )
+        self.head = nn.Linear(embed_dim, num_classes)
+        self.classifier = nn.ModuleDict({
+            "temporal_encoder": self.temporal_encoder,
+            "head": self.head,
+        })
 
     def forward(self, frames):
-        B, T, C, H, W = frames.shape
-        feats = self.frame_encoder(frames.view(B * T, C, H, W))  # (B*T, D)
-        feats = feats.view(B, T, -1)                              # (B, T, D)
-        feats = self.proj(feats)                                  # (B, T, embed_dim)
-        feats = self.pos_enc(feats)
-        feats = self.temporal_encoder(feats)                      # (B, T, embed_dim)
-        return self.cls_head(feats.mean(dim=1))                   # (B, num_classes)
+        B, C, T, H, W = frames.shape    
+        feats = self.backbone(frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W))  # (B*T, 768)
+        feats = feats.view(B, T, -1)                         # (B, T, 768)
+        feats = self.temporal_encoder(feats)                 # (B, T, embed_dim)
+        feats = feats.mean(dim=1)                            # (B, embed_dim)
+        return self.head(feats)                              # (B, num_classes)
 
-
-class MVirTed_t(MVirTed):
+class MVirTed_t_basic(MVirTed):
     def __init__(self, num_classes: int, drop_p: Optional[float] = None):
         super().__init__(MViT_2D_t(), num_classes)
 
 
 if __name__ == '__main__':
     frames = torch.rand(1, 16, 3, 112, 112)
-    mvirted = MVirTed_t(100)
+    mvirted = MVirTed_t_basic(100)
     out = mvirted(frames)
     print(out.shape)

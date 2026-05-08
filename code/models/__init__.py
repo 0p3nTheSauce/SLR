@@ -19,6 +19,8 @@ from .pytorch_s3d import S3D_basic
 
 # new mvit
 from .og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
+#custem seperable mvit
+from .sep_mvit_bert import MVirTed_t_basic
 
 S3D = "S3D"
 R3D_18 = "R3D_18"
@@ -31,6 +33,7 @@ MViTv2_S_e = "MViTv2_S_e"
 MViTv1_B = "MViTv1_B"
 MViTv2_S_16x4 = "MViTv2_S_16x4"
 MViTv2_B_32x3 = "MViTv2_B_32x3"
+MVirTed_t = "MVirTed_t"
 
 model_names = [
     S3D,
@@ -44,6 +47,7 @@ model_names = [
     MViTv1_B,
     MViTv2_S_16x4,
     MViTv2_B_32x3,
+    MVirTed_t,
 ]
 
 
@@ -77,6 +81,7 @@ def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> tor
     model_constructors_opdp = { #optional dropout, defaults to original config
         MViTv2_S_16x4: MVITv2_S_16x4_basic,
         MViTv2_B_32x3: MVITv2_B_32x3_basic,
+        MVirTed_t: MVirTed_t_basic,
         }
 
     if model_name not in model_constructors_dp and model_name not in model_constructors_opdp:
@@ -135,6 +140,8 @@ def norm_vals(model_name: str) -> NormDict:
         #new mvit
         MViTv2_S_16x4: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         MViTv2_B_32x3: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        #seperable mvit
+        MVirTed_t: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     }
 
     if model_name not in norm_dict:
@@ -203,4 +210,5 @@ __all__ = [
     "MViTv1B_basic",
     "MVITv2_S_16x4_basic",
     "MVITv2_B_32x3_basic",
+    "MVirTed_t_basic",
 ]
