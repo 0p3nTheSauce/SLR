@@ -136,10 +136,10 @@ def _make_aug_info(
         if mode == "train":
             aug_conf["spatial_aug"] = ["Horizontal_flip"]
             aug_conf["frame_size_strategy"] = "Random_crop"
-            aug_conf['frame_sampler'] = OG_Sampler()
+            aug_conf['frame_sampler'] = OG_Sampler(target_length=aug_conf['target_length'])
         else:
             aug_conf["frame_size_strategy"] = "Centre_crop"
-            aug_conf['frame_sampler'] = OG_Sampler()
+            aug_conf['frame_sampler'] = OG_Sampler(target_length=aug_conf['target_length'])
 
     # Resolve the "on" shorthand for norm_dict
     if aug_conf.get("norm_dict") == "on":

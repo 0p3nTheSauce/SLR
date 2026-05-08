@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 def _unsqueeze(
     x: torch.Tensor, target_dim: int, expand_dim: int
 ) -> tuple[torch.Tensor, int]:
@@ -133,13 +134,13 @@ class MViTv2S_extended(nn.Module):
         new_len = 2 * new_T - 1
 
         for module in self.blocks.modules():
-            if not (hasattr(module, 'rel_pos_t') and module.rel_pos_t is not None):
+            if not (hasattr(module, "rel_pos_t") and module.rel_pos_t is not None):
                 continue
             old_rpt = module.rel_pos_t.data
             if old_rpt.shape[0] == new_len:
                 continue
             rpt = old_rpt.permute(1, 0).unsqueeze(0)
-            rpt = F.interpolate(rpt, size=new_len, mode='linear', align_corners=False)
+            rpt = F.interpolate(rpt, size=new_len, mode="linear", align_corners=False)
             rpt = rpt.squeeze(0).permute(1, 0)
             module.rel_pos_t = nn.Parameter(rpt)
 
@@ -174,6 +175,7 @@ class MViTv2S_extended(nn.Module):
         x = self.classifier(x)
 
         return x
+
 
 class MViTv1B_basic(nn.Module):
     def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
@@ -245,4 +247,3 @@ class MViTv1B_basic(nn.Module):
 
 if __name__ == "__main__":
     model = MViTv2S_extended(num_classes=100)
-    

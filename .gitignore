@@ -9,6 +9,7 @@ data/
 *.jpg
 *.log
 *.lock
+*.pkl
 code/runs/
 code/experiments/
 code/media/
