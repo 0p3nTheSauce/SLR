@@ -33,7 +33,7 @@ class TemporalBERT(nn.Module):
         return self.encoder(x)  # (B, T, C)
     
 class MVirTed(nn.Module):
-    def __init__(self, mvit, num_classes,embed_dim=512, num_heads=8, num_layers=4, max_frames=64, mvit_out_dim=768):
+    def __init__(self, mvit, num_classes, drop_p: Optional[float] = None, embed_dim=512, num_heads=8, num_layers=4, max_frames=64, mvit_out_dim=768):
         super().__init__()
         self.backbone = MViT_2D_t(mvit)          # pretrained — gets low LR
         self.temporal_encoder = nn.Sequential(          # fresh — gets high LR
@@ -41,7 +41,16 @@ class MVirTed(nn.Module):
             TemporalPositionalEncoding(embed_dim, max_frames),
             TemporalBERT(embed_dim, num_heads, num_layers),
         )
-        self.head = nn.Linear(embed_dim, num_classes)
+
+        drop_prob = 0 if drop_p is None else drop_p
+
+        self.head = nn.Sequential(
+            nn.Dropout(drop_prob),
+            nn.Linear(embed_dim, num_classes),
+        )
+        
+        
+        nn.Linear(embed_dim, num_classes)
         self.classifier = nn.ModuleDict({
             "temporal_encoder": self.temporal_encoder,
             "head": self.head,
@@ -57,7 +66,7 @@ class MVirTed(nn.Module):
 
 class MVirTed_t_basic(MVirTed):
     def __init__(self, num_classes: int, drop_p: Optional[float] = None):
-        super().__init__(MViT_2D_t(), num_classes)
+        super().__init__(MViT_2D_t(), num_classes, drop_p=drop_p)
 
 
 if __name__ == '__main__':
