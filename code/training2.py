@@ -1,4 +1,3 @@
-from typing import Optional, Union, cast, Dict, Any, Tuple
 import torch  # type: ignore
 import torch.nn as nn
 import torch.optim as optim
@@ -30,7 +29,8 @@ from utils import wandb_manager
 from testing import save_test_sizes
 
 
-def setup_data(config: RunInfo) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
+def setup_data(config: RunInfo
+) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
     # NOTE: update for other datasets
     train_info = get_wlasl_info(config.admin.split, set_name="train")
     val_info = get_wlasl_info(config.admin.split, set_name="val")
@@ -223,15 +223,13 @@ def save_checkpoint(checkpoint_data: Dict[str, Any], save_path: Path):
     print(f"Checkpoint saved: {checkpoint_path}")
 
 
-def load_checkpoint(
-    load_path: Path, device: torch.device, strict: bool = False
-) -> Dict[str, Any]:
+def load_checkpoint(load_path: Path, device: torch.device, strict: bool = False) -> Dict[str, Any]:
     if load_path.exists():
         checkpoint = torch.load(load_path, map_location=device)
         if "rng_cuda" in checkpoint:
             # 1. Move the CPU RNG state back to CPU
             torch.set_rng_state(checkpoint["rng_torch"].cpu())
-
+            
             # 2. Move the list of CUDA RNG states back to CPU
             # (set_rng_state_all expects a list of CPU tensors)
             cuda_rng_cpu = [t.cpu() for t in checkpoint["rng_cuda"]]
@@ -255,13 +253,13 @@ def load_checkpoint(
 def load_pretrained(
     check_path: Path,
     model_name: str,
-    drop_p: Optional[float],  # uses default if None
+    drop_p: Optional[float], #uses default if None
     final_classes: int,
     extend: bool = True,
 ) -> nn.Module:
     if not check_path.exists():
         raise FileNotFoundError(f"{check_path} does not exist")
-    print(f"Loading pretrained weights from: {check_path}")
+    print(f'Loading pretrained weights from: {check_path}')
     checkpoint = torch.load(check_path)
     if check_path.name == "best.pth":
         state_dict = checkpoint
@@ -274,99 +272,14 @@ def load_pretrained(
         model.load_state_dict(state_dict)
         if og_nc < final_classes:
             model = extend_classifier(model, final_classes=final_classes)
-        print(f"Extending num classes from: {og_nc} to {final_classes}")
+        print(f'Extending num classes from: {og_nc} to {final_classes}')
     else:
         # raise an error if not extend
         model = get_model(model_name, num_classes=final_classes, drop_p=drop_p)
         model.load_state_dict(state_dict)
+    
 
     return model
-
-
-def _init_accumulators() -> Tuple[int, int, float, float]:
-    steps = 0
-    epoch = 0
-    best_val_loss = float("inf")
-    best_val_acc = float("-inf")
-    return epoch, steps, best_val_loss, best_val_acc
-
-
-def load_training(
-    load_path: Path,
-    device: torch.device,
-    model: nn.Module,
-    optimizer: optim.Optimizer,
-    scheduler: optim.lr_scheduler.LRScheduler,
-    stopper: EarlyStopper,
-) -> Tuple[
-    nn.Module,
-    optim.Optimizer,
-    optim.lr_scheduler.LRScheduler,
-    EarlyStopper,
-    int,
-    int,
-    float,
-    float,
-]:
-    """Load training state from a checkpoint
-
-    Args:
-        load_path (Path): path to checkpoint
-        device (torch.device): device to map to
-        model (nn.Module): model to load
-        optimizer (optim.Optimizer): optimizer to load
-        scheduler (optim.lr_scheduler.LRScheduler): scheduler to load
-        stopper (EarlyStopper): stopper to load
-
-    Returns:
-        Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler.LRScheduler, EarlyStopper, int, int, float, float]: model, optimizer, scheduler, stopper, epoch, steps, best_val_loss, best_val_acc
-    """
-    if load_path.name == "best.pth":
-        epoch, steps, best_val_loss, best_val_acc = _init_accumulators()
-        return (
-            model,
-            optimizer,
-            scheduler,
-            stopper,
-            epoch,
-            steps,
-            best_val_loss,
-            best_val_acc,
-        )
-
-    checkpoint = load_checkpoint(load_path, device)
-    model.load_state_dict(checkpoint["model_state_dict"])
-    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-    if "scheduler_state_dict" in checkpoint:
-        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-    if "stopper_state_dict" in checkpoint:
-        stopper.load_state_dict(checkpoint["stopper_state_dict"])
-        if stopper.stopped_by_event:
-            stopper.stop = False  # reset stop if was set by event before
-            stopper.stopped_by_event = False
-    epoch = checkpoint["epoch"] + 1
-    steps = checkpoint["steps"]
-    # best_val_loss = checkpoint["best_val_score"]
-    best_val_loss = float("inf")
-    best_val_acc = float("-inf")
-    if "best_val_loss" in checkpoint:
-        best_val_loss = checkpoint["best_val_loss"]
-    if "best_val_acc" in checkpoint:
-        best_val_acc = checkpoint["best_val_acc"]
-
-    print(f"Resuming from epoch {epoch}, steps {steps}")
-    print(f"Loaded model from {str(load_path)}")
-
-    return (
-        model,
-        optimizer,
-        scheduler,
-        stopper,
-        epoch,
-        steps,
-        best_val_loss,
-        best_val_acc,
-    )
 
 
 def train_loop(
@@ -412,13 +325,16 @@ def train_loop(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    epoch, steps, best_val_loss, best_val_acc = _init_accumulators()
+    steps = 0
+    epoch = 0
+    best_val_loss = float("inf")
+    best_val_acc = float("-inf")
 
     optimizer = get_optimizer(model, config.optimizer)
     scheduler = get_scheduler(optimizer, config.scheduler)
 
     loss_func = nn.CrossEntropyLoss()
-
+    
     save_path = Path(config.admin.save_path)
 
     # if we are continuing from last checkpoint, set 'load'
@@ -447,23 +363,26 @@ def train_loop(
     )
 
     if load:
-        (
-            model,
-            optimizer,
-            scheduler,
-            stopper,
-            epoch,
-            steps,
-            best_val_loss,
-            best_val_acc,
-        ) = load_training(
-            load_path=Path(load),
-            device=device,
-            model=model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            stopper=stopper,
-        )
+        checkpoint = load_checkpoint(Path(load), device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if "scheduler_state_dict" in checkpoint:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        if "stopper_state_dict" in checkpoint:
+            stopper.load_state_dict(checkpoint["stopper_state_dict"])
+            if stopper.stopped_by_event:
+                stopper.stop = False  # reset stop if was set by event before
+                stopper.stopped_by_event = False
+        epoch = checkpoint["epoch"] + 1
+        steps = checkpoint["steps"]
+        # best_val_loss = checkpoint["best_val_score"]
+        if "best_val_loss" in checkpoint:
+            best_val_loss = checkpoint["best_val_loss"]
+        if "best_val_acc" in checkpoint:
+            best_val_acc = checkpoint["best_val_acc"]
+
+        print(f"Resuming from epoch {epoch}, steps {steps}")
+        print(f"Loaded model from {load}")
 
     # train it
     while epoch < config.training.max_epoch and not stopper.stop:
@@ -624,6 +543,7 @@ def train_loop(
     return {"best_val_acc": best_val_acc, "best_val_loss": best_val_loss}
 
 
+
 def main():
     parser = get_train_parser()
 
@@ -656,6 +576,185 @@ def main():
 
     train_loop(admin.model, config, run, recover=admin.recover)
     run.finish()
+
+
+def pretrain_loop(
+    model_name: str,
+    config: RunInfo,
+    wandb_run: Run,
+    load: Optional[Union[Path, str]] = None,
+    save_every: int = 5,
+    recover: bool = False,
+    seed: Optional[int] = SEED,
+    event: Optional[EventClass] = None,
+) -> Optional[Dict[str, float]]:
+    """Pretrain loop for MAE-style self-supervised pretraining.
+
+    Args:
+        model_name (str): Name of the model to pretrain.
+        wandb_run (Run): Wandb run instance for logging.
+        load (Optional[Union[Path, str]], optional): Path to checkpoint to load. Defaults to None.
+        save_every (int, optional): Period of saving (epochs). Defaults to 5.
+        recover (bool, optional): Continue from a failed run. Defaults to False.
+        seed (Optional[int], optional): Random seed value. Defaults to SEED.
+    """
+
+    if seed is not None:
+        set_seed(seed)
+
+    dataloaders, _ = setup_data(config)  # no num_classes needed
+
+    mae_model = get_mae_model(model_name)  # returns SepMViTBERTMAE
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    mae_model.to(device)
+
+    steps = 0
+    epoch = 0
+    best_val_loss = float("inf")
+
+    optimizer = get_optimizer(mae_model.encoder, config.optimizer)
+    scheduler = get_scheduler(optimizer, config.scheduler)
+
+    save_path = Path(config.admin.save_path)
+
+    if recover:
+        files = sorted([f.name for f in save_path.iterdir() if f.is_file()])
+        if len(files) > 0:
+            load = save_path / files[-1]
+    else:
+        save_path.mkdir(parents=True, exist_ok=True)
+
+    save_test_sizes(config.data, save_path.parent)
+
+    stopping_metrics = {"val": {"loss": 0.0}, "train": {"loss": 0.0}}
+    stopper = get_stopper(arg_dict=config.early_stopping, wandb_run=wandb_run, event=event)
+
+    if load:
+        checkpoint = load_checkpoint(Path(load), device)
+        mae_model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        if "scheduler_state_dict" in checkpoint:
+            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+        if "stopper_state_dict" in checkpoint:
+            stopper.load_state_dict(checkpoint["stopper_state_dict"])
+            if stopper.stopped_by_event:
+                stopper.stop = False
+                stopper.stopped_by_event = False
+        epoch = checkpoint["epoch"] + 1
+        steps = checkpoint["steps"]
+        if "best_val_loss" in checkpoint:
+            best_val_loss = checkpoint["best_val_loss"]
+
+        print(f"Resuming from epoch {epoch}, steps {steps}")
+        print(f"Loaded model from {load}")
+
+    while epoch < config.training.max_epoch and not stopper.stop:
+        print(f"Epoch {epoch}/{config.training.max_epoch}")
+        print("-" * 10)
+
+        epoch += 1
+
+        for phase in ["train", "val"]:
+            if phase == "train":
+                mae_model.train()
+            else:
+                mae_model.eval()
+
+            running_loss = 0.0
+            total_samples = 0
+            step_loss = 0.0
+            step_samples = 0
+            accumulated_steps = 0
+
+            for item in dataloaders[phase]:
+                data = item["frames"].to(device)  # no labels needed
+                batch_size = data.size(0)
+                total_samples += batch_size
+
+                if phase == "train":
+                    loss = mae_model(data)
+                else:
+                    with torch.no_grad():
+                        loss = mae_model(data)
+
+                running_loss += loss.item() * batch_size
+
+                if phase == "train":
+                    step_loss += loss.item() * batch_size
+                    step_samples += batch_size
+
+                    scaled_loss = loss / config.training.update_per_step
+                    scaled_loss.backward()
+
+                    accumulated_steps += 1
+
+                    if accumulated_steps == config.training.update_per_step:
+                        optimizer.step()
+                        optimizer.zero_grad()
+                        steps += 1
+
+                        if steps % 10 == 0:
+                            avg_step_loss = step_loss / step_samples
+                            print(f"Step {steps}: Loss: {avg_step_loss:.4f}")
+                            wandb_run.log({
+                                "Loss/Train_Step": avg_step_loss,
+                                "Step": steps,
+                            })
+                            step_loss = 0.0
+                            step_samples = 0
+
+                        accumulated_steps = 0
+
+            epoch_loss = running_loss / total_samples
+            stopping_metrics[phase]["loss"] = epoch_loss
+
+            if phase == stopper.phase:
+                stopper.step(stopping_metrics[phase][stopper.metric])
+
+            print(f"{phase.upper()} - Epoch {epoch}: Loss: {epoch_loss:.4f}")
+            wandb_run.log({
+                f"Loss/{phase.capitalize()}": epoch_loss,
+                "Epoch": epoch,
+            })
+
+            if phase == "val":
+                if epoch_loss < best_val_loss:
+                    best_val_loss = epoch_loss
+                    check_name = save_path / "best.pth"
+                    # save only the encoder weights for fine-tuning
+                    torch.save(mae_model.encoder.state_dict(), check_name)
+                    print(f"Best val loss: {best_val_loss:.4f}, saved to {check_name}")
+
+                wandb_run.log({
+                    "Best/Val_loss": best_val_loss,
+                    "Epoch": epoch,
+                })
+
+                if isinstance(scheduler, ReduceLROnPlateau):
+                    scheduler.step(epoch_loss)
+                else:
+                    scheduler.step()
+
+        if (
+            epoch % save_every == 0
+            or not epoch < config.training.max_epoch
+            or stopper.stop
+        ):
+            checkpoint_data = {
+                "epoch": epoch,
+                "steps": steps,
+                "model_state_dict": mae_model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "scheduler_state_dict": scheduler.state_dict(),
+                "best_val_loss": best_val_loss,
+                "stopper_state_dict": stopper.state_dict(),
+            }
+            save_checkpoint(checkpoint_data, save_path)
+
+    print("Finished pretraining successfully")
+    return {"best_val_loss": best_val_loss}
+
 
 
 if __name__ == "__main__":

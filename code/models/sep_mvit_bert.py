@@ -69,6 +69,10 @@ class MVirTed_t_basic(MVirTed):
         super().__init__(MViT_2D_t(), num_classes, drop_p=drop_p)
 
 
+
+
+
+
 if __name__ == '__main__':
     frames = torch.rand(1, 16, 3, 112, 112)
     mvirted = MVirTed_t_basic(100)
