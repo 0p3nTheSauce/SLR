@@ -17,6 +17,7 @@ from .og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
 #custem seperable mvit
 from .sep_mvit_bert import MVirTed_t_basic, MVirTed
 from .mvirted_mae import SepMViTBERTMAE
+from .detectron_mvit import MViT_2D_t
 
 
 S3D = "S3D"
