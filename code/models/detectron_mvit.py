@@ -46,8 +46,6 @@ class MViT_2D_t(nn.Module):
             # MVITV2_2D_T.pretrain_path
             with open(MVITV2_2D_T.pretrain_path, "rb") as f:
                 checkpoint = pickle.load(f, encoding="latin1")
-            # state_dict = torch.load('/home/luke/Code/SLR/code/models/mvit/weights/model_final_1a1c30.pkl', map_location='cpu')
-            # print(checkpoint['model'].keys())
             bbup_key = "backbone.bottom_up"
             backbone_bottom_up = {
                 k.replace(bbup_key + ".", ""): torch.from_numpy(v)
@@ -66,6 +64,7 @@ class MViT_2D_t(nn.Module):
                     backbone_bottom_up.pop(rem)
 
             self.mvitv2_2d.load_state_dict(backbone_bottom_up)
+            
 
     def forward(self, x):
         # x: (B, C, H, W) — single frame

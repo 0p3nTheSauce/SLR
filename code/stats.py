@@ -37,7 +37,7 @@ import matplotlib.patches as patches
 import numpy as np
 # locals
 from configs import WLASL_ROOT, SPLIT_DIR, CLASSES_PATH
-from preprocess import instance_dict, wlasl_class_dict, InstanceDict
+from preprocess import RawInstance, WLASLClass, Instance
 
 AVAIL_SETS: TypeAlias = Literal["train", "val", "test"]
 AVAIL_SPLITS: TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
@@ -63,7 +63,7 @@ def make_histogram(values: Iterable) -> HistoGram:
 
 
 class instance_stats(TypedDict):
-	"""Represents statistics for instances in a list of InstanceDicts. 
+	"""Represents statistics for instances in a list of Instances. 
 	This can be stats per-class in a set, or, stats for the whole set.
 	Keys
 	---------
@@ -111,26 +111,27 @@ class preproc_class_dict(TypedDict):
 	Keys:
 	--------
 	- gloss: str
-	- instances: List[InstanceDict]
+	- instances: List[Instance]
 	"""
 
 	gloss: str
-	instances: List[InstanceDict]
+	instances: List[Instance]
 
 
 def reverse_preproc_format(
-	preproc_instances: List[InstanceDict], classes:Optional[List[str]] = None,
+	preproc_instances: List[Instance], classes:Optional[List[str]] = None,
 ) -> List[preproc_class_dict]:
-	num_classes = len(set([inst["label_num"] for inst in preproc_instances]))
+	num_classes = len(set([inst.label_num for inst in preproc_instances]))
 	lst_ppcd = [preproc_class_dict(gloss="empty", instances=[])] * num_classes
 	for pp_inst in preproc_instances:
-		label_num = pp_inst["label_num"]
+		label_num = pp_inst.label_num
 		entry = lst_ppcd[label_num]
 		if entry["gloss"] == "empty":
-			if "label_name" in pp_inst:
-				gloss = pp_inst['label_name']
+			if hasattr(pp_inst, "label_name"):
+			# if "label_name" in pp_inst:
+				gloss = pp_inst.label_name
 			elif classes is not None:
-				gloss = classes[pp_inst['label_num']]
+				gloss = classes[pp_inst.label_num]
 			else:
 				raise ValueError('instance does not contain the key: label_name')
 			lst_ppcd[label_num] = preproc_class_dict(
@@ -143,30 +144,30 @@ def reverse_preproc_format(
 
 
 def get_set(
-	instances: List[instance_dict], set_name: AVAIL_SETS
-) -> List[instance_dict]:
+	instances: List[RawInstance], set_name: AVAIL_SETS
+) -> List[RawInstance]:
 	"""Filters instances to only include those belonging to a specific set (train/val/test)."""
 	filtered_instances = []
 	for instance in instances:
-		if instance["split"] == set_name:
+		if instance.split == set_name:
 			filtered_instances.append(instance)
 	return filtered_instances
 
 
 def seperate_by_set(
-	glosses: List[wlasl_class_dict],
-) -> Dict[AVAIL_SETS, List[wlasl_class_dict]]:
+	glosses: List[WLASLClass],
+) -> Dict[AVAIL_SETS, List[WLASLClass]]:
 	"""Separates glosses by their set (train/val/test)."""
 	set_names: List[AVAIL_SETS] = ["train", "val", "test"]
-	sets: Dict[AVAIL_SETS, List[wlasl_class_dict]] = {name: [] for name in set_names}
+	sets: Dict[AVAIL_SETS, List[WLASLClass]] = {name: [] for name in set_names}
 	for gloss in glosses:
-		instances = gloss["instances"]
+		instances = gloss.instances
 		for set_name in sets.keys():
 			filtered_instances = get_set(instances, set_name)
 
-			sets[set_name].append(
-				{"gloss": gloss["gloss"], "instances": filtered_instances}
-			)
+			sets[set_name].append(WLASLClass.model_validate(
+				{"gloss": gloss.gloss, "instances": filtered_instances}
+			))
 	return sets
 
 
@@ -187,12 +188,12 @@ def retrieve_split_data(
 
 
 def collect_instance_stats(
-	instances: Union[List[InstanceDict], List[instance_dict]],
+	instances: Union[List[Instance], List[RawInstance]],
 ) -> instance_stats:
 	"""Collects statistics for a single class based on its instances.
 
 	Args:
-			instances (List[instance_dict]): A list of instances of the same class
+			instances (List[RawInstance]): A list of instances of the same class
 
 	Returns:
 			instance_stats: Statistics for the specific class, collected from all its instances
@@ -209,8 +210,10 @@ def collect_instance_stats(
 	for instance in instances:
 		num_instances += 1
 		instance_with_length = {
-			**instance | {"length": instance["frame_end"] - instance["frame_start"]}
+			**instance.model_dump() | {"length": instance.frame_end - instance.frame_start}
 		}  # add length key
+
+
 		for key, hist in histograms.items():  # do for each type of histogram
 			value = instance_with_length[key]
 			if value in hist:
@@ -228,45 +231,34 @@ def collect_instance_stats(
 	)
 
 
-def get_per_instance_stats(glosses: List[wlasl_class_dict]) -> Dict[str, instance_stats]:
-	"""Collects statistics for all classes in a list of wlasl_class_dicts (recommend seperating into test/val/train first)"""
+def get_per_instance_stats(glosses: List[WLASLClass]) -> Dict[str, instance_stats]:
+	"""Collects statistics for all classes in a list of WLASLClasss (recommend seperating into test/val/train first)"""
 	per_instance_stats = {}
 	for gloss in glosses:
-		class_name = gloss["gloss"]
-		instances = gloss["instances"]
+		class_name = gloss.gloss
+		instances = gloss.instances
 		per_instance_stats[class_name] = collect_instance_stats(instances)
 	return per_instance_stats
 
-
-# def collect_all_instance_stats(glosses: List[wlasl_class_dict]) -> Dict[str, instance_stats]:
-#     """Collects statistics for all classes in a list of wlasl_class_dicts (recommend seperating into test/val/train first)"""
-#     all_instance_stats = {}
-#     for gloss_d in glosses:
-#         class_name = gloss_d["gloss"]
-#         instances = gloss_d["instances"]
-#         per_instance_stats[class_name] = collect_instance_stats(instances)
-#     return per_instance_stats
-
-
-def get_unique_signers(dataset: List[wlasl_class_dict]) -> set[int]:
-	"""Get set of unique sighners in a list of wlasl_class_dicts"""
+def get_unique_signers(dataset: List[WLASLClass]) -> set[int]:
+	"""Get set of unique sighners in a list of WLASLClasss"""
 	signers = set()
 	for gloss_d in dataset:
-		for instance_d in gloss_d["instances"]:
-			signers.add(instance_d["signer_id"])
+		for instance_d in gloss_d.instances:
+			signers.add(instance_d.signer_id)
 	return signers
 
 
-def get_num_instances(dataset: List[wlasl_class_dict]) -> int:
+def get_num_instances(dataset: List[WLASLClass]) -> int:
 	"""Get the number of instances in a dataset"""
 
 	num_instances = 0
 	for gloss_d in dataset:
-		num_instances += len(gloss_d["instances"])
+		num_instances += len(gloss_d.instances)
 	return num_instances
 
 
-def get_set_stats(subset: List[wlasl_class_dict]) -> set_stats:
+def get_set_stats(subset: List[WLASLClass]) -> set_stats:
 	"""Get stats for a particular set (one of test/val.train, seperate first)"""
 	return set_stats(
 		num_instances=get_num_instances(subset),
@@ -275,7 +267,7 @@ def get_set_stats(subset: List[wlasl_class_dict]) -> set_stats:
 	)
 
 
-def get_per_set_stats(glosses: List[wlasl_class_dict]) -> Dict[AVAIL_SETS, set_stats]:
+def get_per_set_stats(glosses: List[WLASLClass]) -> Dict[AVAIL_SETS, set_stats]:
 	"""Seperates into sets, then returns stats per set"""
 	sets = seperate_by_set(glosses)
 	per_set_stats = {}
@@ -284,7 +276,7 @@ def get_per_set_stats(glosses: List[wlasl_class_dict]) -> Dict[AVAIL_SETS, set_s
 	return per_set_stats
 
 
-def get_split_stats(split: List[wlasl_class_dict]) -> split_stats:
+def get_split_stats(split: List[WLASLClass]) -> split_stats:
 	return split_stats(
 		num_classes=len(split),
 		num_instances=get_num_instances(split),
@@ -414,7 +406,9 @@ def plot_distribution(
 	hist_or_bar: Literal['hist', 'bar'] = 'hist',
 	bins: Optional[int] = None,
 	figsize: Tuple[int, int] = (12, 4),
-	show_nums_on_bars:bool=True
+	show_nums_on_bars:bool=True,
+	no_statsy_lines: bool = False,
+	out_path: str = '',
 ) -> None:
 
 	# sorted_items = sorted(
@@ -429,6 +423,7 @@ def plot_distribution(
 	plt.figure(figsize=figsize)
 
 	if categorical:
+		
 		x_pos = range(len(values))
 		plt.bar(
 			x_pos, counts, width=0.8
@@ -453,20 +448,22 @@ def plot_distribution(
 			for x, y in zip(values, counts):
 				plt.text(x, y, str(y), ha='center', va='bottom')
 
-		statsy_listy = [
-			("mean", lambda x: np.mean(x), "red"),
-			("median", lambda x: np.median(x), "blue"),
-			("lower quartile", lambda x: np.percentile(x, 25), "brown"),
-			("upper quartile", lambda x: np.percentile(x, 75), "brown"),
-		]
-		for metric_name, stat_func, colour in statsy_listy:
-			metric_val = stat_func(expanded_values)
-			plt.axvline(
-				metric_val,
-				color=colour,
-				linestyle="--",
-				label=f"{metric_name}: {metric_val:.1f}{' ' + unit if unit else ''}",
-			)
+		if not no_statsy_lines:
+
+			statsy_listy = [
+				("mean", lambda x: np.mean(x), "red"),
+				("median", lambda x: np.median(x), "blue"),
+				("lower quartile", lambda x: np.percentile(x, 25), "brown"),
+				("upper quartile", lambda x: np.percentile(x, 75), "brown"),
+			]
+			for metric_name, stat_func, colour in statsy_listy:
+				metric_val = stat_func(expanded_values)
+				plt.axvline(
+					metric_val,
+					color=colour,
+					linestyle="--",
+					label=f"{metric_name}: {metric_val:.1f}{' ' + unit if unit else ''}",
+				)
 
 	plt.legend()
 
@@ -482,6 +479,10 @@ def plot_distribution(
 		title
 	)
 	plt.tight_layout()
+ 
+	if out_path:
+		plt.savefig(out_path)
+ 
 	plt.show()
 
 
@@ -489,44 +490,85 @@ def plot_distribution(
 
 
 
-#claude
-def plot_bboxes_on_canvas(instances: List[InstanceDict], figsize: Tuple[int, int] = (6,6)) -> None:
-    """Draw bounding boxes for each class on a blank 256x256 canvas, coloured by class."""
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.set_xlim(0, FRAME_WIDTH)
-    ax.set_ylim(0, FRAME_HEIGHT)
-    ax.invert_yaxis()  # image coordinates: y increases downward
-    ax.set_facecolor("#1a1a1a")
-    fig.patch.set_facecolor("#1a1a1a")
+#claude/me
+AverageMethod = Literal["mean", "median"]
 
-    unique_labels = list(set(inst["label_name"] for inst in instances))
-    cmap = plt.cm.get_cmap("tab20", len(unique_labels))
-    colour_map = {label: cmap(i) for i, label in enumerate(unique_labels)}
+def average_bboxes(
+	instances: List[Instance],
+	method: AverageMethod = "mean",
+) -> List[Instance]:
+	"""Return one representative Instance per class with an averaged bounding box."""
+	from collections import defaultdict
+	import numpy as np
 
-    for inst in instances:
-        x1, y1, x2, y2 = inst["bbox"]
-        w, h = x2 - x1, y2 - y1
-        colour = colour_map[inst["label_name"]]
-        rect = patches.Rectangle(
-            (x1, y1), w, h,
-            linewidth=1, edgecolor=colour, facecolor=(*colour[:3], 0.05)
-        )
-        ax.add_patch(rect)
+	groups: dict[str, list[Instance]] = defaultdict(list)
+	for inst in instances:
+		groups[inst.label_name].append(inst)
 
-    ax.set_title("Bounding Boxes by Class", color="white")
-    ax.tick_params(colors="white")
-    plt.tight_layout()
-    plt.show()
+	avg_fn = np.mean if method == "mean" else np.median
+
+	averaged = []
+	for _, insts in groups.items():
+		boxes = np.array([inst.bbox for inst in insts], dtype=float)  # (N, 4)
+		avg_box = avg_fn(boxes, axis=0).round().astype(int).tolist()
+		# Use the first instance as a template, just swap the bbox
+		averaged.append(insts[0].model_copy(update={"bbox": avg_box}))
+
+	return averaged
+
+#claude/me
+def plot_bboxes_on_canvas(
+	instances: List[Instance],
+	figsize: Tuple[int, int] = (6,6),
+	average: bool = True,
+	method: AverageMethod = 'mean',
+	title:str="Bounding Boxes by Class",
+	out_path: str = ''
+	) -> None:
+	"""Draw bounding boxes for each class on a blank 256x256 canvas, coloured by class."""
+	fig, ax = plt.subplots(figsize=figsize)
+	ax.set_xlim(0, FRAME_WIDTH)
+	ax.set_ylim(0, FRAME_HEIGHT)
+	ax.invert_yaxis()  # image coordinates: y increases downward
+	# ax.set_facecolor("#1a1a1a")
+	# fig.patch.set_facecolor("#1a1a1a")
+
+	unique_labels = list(set(inst.label_name for inst in instances))
+	cmap = plt.cm.get_cmap("tab20", len(unique_labels))
+	colour_map = {label: cmap(i) for i, label in enumerate(unique_labels)}
+
+	if average:
+		instances = average_bboxes(instances, method)
+
+	for inst in instances:
+		x1, y1, x2, y2 = inst.bbox
+		w, h = x2 - x1, y2 - y1
+		colour = colour_map[inst.label_name]
+		rect = patches.Rectangle(
+			(x1, y1), w, h,
+			linewidth=1, edgecolor=colour, facecolor=(*colour[:3], 0.05)
+		)
+		ax.add_patch(rect)
+
+	# ax.set_title(title, color="white")
+	# ax.tick_params(colors="white")
+	ax.set_title(title,)
+	# ax.tick_params()
+	plt.tight_layout()
+ 
+	if out_path:
+		plt.savefig(out_path)
+	plt.show()
 
 
 #claude/me
 def plot_dimension_distributions(
-		instances: List[InstanceDict],
+		instances: List[Instance],
 		figsize: Tuple[int, int] = (12, 4),
 		) -> None:
 	"""Histograms of bbox width and height across all instances."""
-	widths  = [inst["bbox"][2] - inst["bbox"][0] for inst in instances]
-	heights = [inst["bbox"][3] - inst["bbox"][1] for inst in instances]
+	widths  = [inst.bbox[2] - inst.bbox[0] for inst in instances]
+	heights = [inst.bbox[3] - inst.bbox[1] for inst in instances]
 
 	fig, axes = plt.subplots(1, 2, figsize=figsize)
 	for ax, data, label in zip(axes, [widths, heights], ["Width (px)", "Height (px)"]):

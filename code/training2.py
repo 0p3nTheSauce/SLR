@@ -1,12 +1,15 @@
+from typing import Optional, Union, cast, Dict, Any, Tuple, Callable
 import torch  # type: ignore
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
+from torch import Tensor
 from pathlib import Path
 import wandb
 from wandb.sdk.wandb_run import Run
 from multiprocessing.synchronize import Event as EventClass
+from os import PathLike
 
 # local imports
 import numpy as np
@@ -22,15 +25,18 @@ from configs import (
     RunInfo,
     WandbInfo,
 )
-from run_types import SchedInfo, OptimizerInfo
+from run_types2 import SchedInfo, OptimizerInfo, MVirTedMaeInfo
 from stopping import EarlyStopper, StopperOn
-from models import get_model, extend_classifier
+from models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
 from utils import wandb_manager
 from testing import save_test_sizes
 
 
-def setup_data(config: RunInfo
-) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
+StrPath = str | PathLike[str]
+LossFn = Callable[..., Tensor]
+
+
+def setup_data(config: RunInfo) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
     # NOTE: update for other datasets
     train_info = get_wlasl_info(config.admin.split, set_name="train")
     val_info = get_wlasl_info(config.admin.split, set_name="val")
@@ -223,13 +229,15 @@ def save_checkpoint(checkpoint_data: Dict[str, Any], save_path: Path):
     print(f"Checkpoint saved: {checkpoint_path}")
 
 
-def load_checkpoint(load_path: Path, device: torch.device, strict: bool = False) -> Dict[str, Any]:
+def load_checkpoint(
+    load_path: Path, device: torch.device, strict: bool = False
+) -> Dict[str, Any]:
     if load_path.exists():
         checkpoint = torch.load(load_path, map_location=device)
         if "rng_cuda" in checkpoint:
             # 1. Move the CPU RNG state back to CPU
             torch.set_rng_state(checkpoint["rng_torch"].cpu())
-            
+
             # 2. Move the list of CUDA RNG states back to CPU
             # (set_rng_state_all expects a list of CPU tensors)
             cuda_rng_cpu = [t.cpu() for t in checkpoint["rng_cuda"]]
@@ -253,13 +261,13 @@ def load_checkpoint(load_path: Path, device: torch.device, strict: bool = False)
 def load_pretrained(
     check_path: Path,
     model_name: str,
-    drop_p: Optional[float], #uses default if None
+    drop_p: Optional[float],  # uses default if None
     final_classes: int,
     extend: bool = True,
 ) -> nn.Module:
     if not check_path.exists():
         raise FileNotFoundError(f"{check_path} does not exist")
-    print(f'Loading pretrained weights from: {check_path}')
+    print(f"Loading pretrained weights from: {check_path}")
     checkpoint = torch.load(check_path)
     if check_path.name == "best.pth":
         state_dict = checkpoint
@@ -272,21 +280,386 @@ def load_pretrained(
         model.load_state_dict(state_dict)
         if og_nc < final_classes:
             model = extend_classifier(model, final_classes=final_classes)
-        print(f'Extending num classes from: {og_nc} to {final_classes}')
+        print(f"Extending num classes from: {og_nc} to {final_classes}")
     else:
         # raise an error if not extend
         model = get_model(model_name, num_classes=final_classes, drop_p=drop_p)
         model.load_state_dict(state_dict)
-    
 
     return model
+
+
+def _init_accumulators() -> Tuple[int, int, float, float, Dict[str, Dict[str, float]]]:
+    steps = 0
+    epoch = 0
+    best_val_loss = float("inf")
+    best_val_acc = float("-inf")
+    # early stopping setup
+    stopping_metrics = {
+        "val": {"loss": 0.0, "acc": 0.0},
+        "train": {"loss": 0.0, "acc": 0.0},
+    }
+
+    return epoch, steps, best_val_loss, best_val_acc, stopping_metrics
+
+
+def _handle_recovery(
+    save_path: Path,
+    recover: bool,
+    load: Optional[StrPath] = None,
+) -> Optional[StrPath]:
+    if recover:
+        files = sorted([f.name for f in save_path.iterdir() if f.is_file()])
+        if len(files) > 0:
+            load = save_path / files[-1]
+    else:
+        save_path.mkdir(parents=True, exist_ok=True)
+
+    return load
+
+
+def load_training(
+    load_path: Path,
+    device: torch.device,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler.LRScheduler,
+    stopper: EarlyStopper,
+) -> Tuple[
+    nn.Module,
+    optim.Optimizer,
+    optim.lr_scheduler.LRScheduler,
+    EarlyStopper,
+    int,
+    int,
+    float,
+    float,
+    Dict[str, Dict[str, float]],
+]:
+    """Load training state from a checkpoint
+
+    Args:
+        load_path (Path): path to checkpoint
+        device (torch.device): device to map to
+        model (nn.Module): model to load
+        optimizer (optim.Optimizer): optimizer to load
+        scheduler (optim.lr_scheduler.LRScheduler): scheduler to load
+        stopper (EarlyStopper): stopper to load
+
+    Returns:
+        Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler.LRScheduler, EarlyStopper, int, int, float, float]: model, optimizer, scheduler, stopper, epoch, steps, best_val_loss, best_val_acc
+    """
+    epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
+    if load_path.name == "best.pth":
+        return (
+            model,
+            optimizer,
+            scheduler,
+            stopper,
+            epoch,
+            steps,
+            best_val_loss,
+            best_val_acc,
+            stopping_metrics,
+        )
+
+    checkpoint = load_checkpoint(load_path, device)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    if "scheduler_state_dict" in checkpoint:
+        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
+    if "stopper_state_dict" in checkpoint:
+        stopper.load_state_dict(checkpoint["stopper_state_dict"])
+        if stopper.stopped_by_event:
+            stopper.stop = False  # reset stop if was set by event before
+            stopper.stopped_by_event = False
+    if "stopping_metrics" in checkpoint:
+        stopping_metrics = checkpoint["stopping_metrics"]
+
+    epoch = checkpoint["epoch"] + 1
+    steps = checkpoint["steps"]
+    # best_val_loss = checkpoint["best_val_score"]
+    best_val_loss = float("inf")
+    best_val_acc = float("-inf")
+    if "best_val_loss" in checkpoint:
+        best_val_loss = checkpoint["best_val_loss"]
+    if "best_val_acc" in checkpoint:
+        best_val_acc = checkpoint["best_val_acc"]
+
+    print(f"Resuming from epoch {epoch}, steps {steps}")
+    print(f"Loaded model from {str(load_path)}")
+
+    return (
+        model,
+        optimizer,
+        scheduler,
+        stopper,
+        epoch,
+        steps,
+        best_val_loss,
+        best_val_acc,
+        stopping_metrics,
+    )
+
+
+def save_training(
+    save_path: Path,
+    save_every: int,
+    max_epoch: int,
+    stopper: EarlyStopper,
+    model: nn.Module,
+    optimizer: optim.Optimizer,
+    scheduler: optim.lr_scheduler.LRScheduler,
+    epoch: int,
+    steps: int,
+    best_val_loss: float,
+    best_val_acc: float,
+    stopping_metrics: Dict[str, Dict[str, float]],
+) -> None:
+    """Save training state checkpoint"""
+
+    if epoch % save_every == 0 or not epoch < max_epoch or stopper.stop:
+        checkpoint_data = {
+            "epoch": epoch,
+            "steps": steps,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+            "best_val_loss": best_val_loss,
+            "best_val_acc": best_val_acc,
+            "stopper_state_dict": stopper.state_dict(),
+            "stopping_metrics": stopping_metrics,
+        }
+        save_checkpoint(checkpoint_data, save_path)
+
+
+def epoch_summary(
+    phase_name: str,
+    wandb_run: Run,
+    epoch: int,
+    epoch_loss: float,
+    epoch_acc: float,
+    running_corrects: int,
+    total_samples: int,
+) -> None:
+    """Print and log metrics for a particular phase in an epoch"""
+
+    # print epoch level output
+    print(f"{phase_name.upper()} - Epoch {epoch}:")
+    print(f"  Loss: {epoch_loss:.4f}")
+    print(f"  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})")
+
+    wandb_run.log(
+        {
+            f"Loss/{phase_name.capitalize()}": epoch_loss,
+            f"Accuracy/{phase_name.capitalize()}": epoch_acc,
+            "Epoch": epoch,
+        }
+    )
+
+
+def train_epoch(
+    model: nn.Module,
+    dataloader: DataLoader[VideoDataset],
+    loss_func: LossFn,
+    optimizer: optim.Optimizer,
+    wandb_run: Run,
+    stopping_metric: Dict[str, float],
+    stopper: EarlyStopper,
+    device: torch.device,
+    epoch: int,
+    steps: int,
+    update_per_step: int,
+) -> int:
+
+    phase_name = "train"
+    model.train()
+
+    # Reset metrics for this phase
+    running_loss = 0.0
+    running_corrects = 0
+    total_samples = 0
+
+    # For step-level logging
+    step_loss = 0.0
+    step_corrects = 0
+    step_samples = 0
+    accumulated_steps = 0
+
+    for item in dataloader:
+        data, target = item["frames"], item["label_num"]
+        data, target = data.to(device), target.to(device)
+        batch_size = data.size(0)
+        total_samples += batch_size
+
+        model_output = model(data)
+
+        # Accumulate metrics
+        loss = loss_func(model_output, target)
+        running_loss += loss.item() * batch_size
+        _, predicted = model_output.max(1)
+        running_corrects += predicted.eq(target).sum().item()
+
+        # Accumulate for step logging
+        step_loss += loss.item() * batch_size
+        step_corrects += predicted.eq(target).sum().item()
+        step_samples += batch_size
+
+        scaled_loss = loss / update_per_step
+        scaled_loss.backward()
+
+        accumulated_steps += 1
+
+        if accumulated_steps == update_per_step:
+            optimizer.step()
+            optimizer.zero_grad()
+            steps += 1
+
+            # Print step level output
+            if steps % 10 == 0:
+                avg_step_loss = step_loss / step_samples
+                step_acc = 100.0 * step_corrects / step_samples
+
+                print(
+                    f"Step {steps}: Loss: {avg_step_loss:.4f}, "
+                    f"Accuracy: {step_acc:.2f}%"
+                )
+
+                wandb_run.log(
+                    {
+                        "Loss/Train_Step": avg_step_loss,
+                        "Accuracy/Train_Step": step_acc,
+                        "Step": steps,
+                    }
+                )
+
+                # Reset step metrics
+                step_loss = 0.0
+                step_corrects = 0
+                step_samples = 0
+
+            # Reset accumulation
+            accumulated_steps = 0
+
+    # calculate  epoch metrics
+    epoch_loss = running_loss / total_samples
+    epoch_acc = 100.0 * running_corrects / total_samples
+
+    # early stopping logic
+    stopping_metric["loss"] = epoch_loss
+    stopping_metric["acc"] = epoch_acc
+    if stopper.phase == phase_name:
+        stopper.step(stopping_metric[stopper.metric])
+
+    # print epoch level output
+    epoch_summary(
+        phase_name=phase_name,
+        wandb_run=wandb_run,
+        epoch=epoch,
+        epoch_loss=epoch_loss,
+        epoch_acc=epoch_acc,
+        running_corrects=running_corrects,
+        total_samples=total_samples,
+    )
+
+    return steps
+
+
+def val_epoch(
+    model: nn.Module,
+    dataloader: DataLoader[VideoDataset],
+    loss_func: LossFn,
+    scheduler: optim.lr_scheduler.LRScheduler,
+    wandb_run: Run,
+    stopping_metric: Dict[str, float],
+    stopper: EarlyStopper,
+    device: torch.device,
+    epoch: int,
+    best_val_loss: float,
+    best_val_acc: float,
+    save_path: Path,
+) -> Tuple[float, float]:
+    phase_name = "val"
+
+    model.eval()
+
+    # Reset metrics for this phase
+    running_loss = 0.0
+    running_corrects = 0
+    total_samples = 0
+
+    for item in dataloader:
+        data, target = item["frames"], item["label_num"]
+        data, target = data.to(device), target.to(device)
+        batch_size = data.size(0)
+        total_samples += batch_size
+
+        with torch.no_grad():
+            model_output = model(data)
+
+        # Accumulate metrics
+        loss = loss_func(model_output, target)
+        running_loss += loss.item() * batch_size
+        _, predicted = model_output.max(1)
+        running_corrects += predicted.eq(target).sum().item()
+
+    # calculate  epoch metrics
+    epoch_loss = running_loss / total_samples
+    epoch_acc = 100.0 * running_corrects / total_samples
+
+    # early stopping logic
+    stopping_metric["loss"] = epoch_loss
+    stopping_metric["acc"] = epoch_acc
+    if phase_name == stopper.phase:
+        stopper.step(stopping_metric[stopper.metric])
+
+    # print epoch level output
+    epoch_summary(
+        phase_name=phase_name,
+        wandb_run=wandb_run,
+        epoch=epoch,
+        epoch_loss=epoch_loss,
+        epoch_acc=epoch_acc,
+        running_corrects=running_corrects,
+        total_samples=total_samples,
+    )
+
+    # Save best model
+    if epoch_loss < best_val_loss:
+        best_val_loss = epoch_loss
+        check_name = save_path / "best.pth"
+        torch.save(model.state_dict(), check_name)
+        print(f"Best validation loss so far: {best_val_loss:.2f}")
+        print(f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)")
+
+    if epoch_acc > best_val_acc:
+        best_val_acc = epoch_acc
+        print(f"Best validation acc so far: {best_val_acc:.2f}")
+
+    # log best validation metrics
+    wandb_run.log(
+        {
+            f"Best/{phase_name.capitalize()}_loss": best_val_loss,
+            f"Best/{phase_name.capitalize()}_acc": best_val_acc,
+            "Epoch": epoch,
+        }
+    )
+
+    # scheduler
+    if isinstance(scheduler, ReduceLROnPlateau):
+        assert epoch_loss is not None, "Should be defined by now"
+        scheduler.step(epoch_loss)
+    else:
+        scheduler.step()
+
+    return best_val_loss, best_val_acc
 
 
 def train_loop(
     model_name: str,
     config: RunInfo,
     wandb_run: Run,
-    load: Optional[Union[Path, str]] = None,
+    load: Optional[StrPath] = None,
     save_every: int = 5,
     recover: bool = False,
     seed: Optional[int] = SEED,
@@ -297,11 +670,14 @@ def train_loop(
     Args:
         model_name (str): Name of the model to train.
         wandb_run (Run): Wandb run instance for logging, and config.
-        load (Optional[Union[Path, str]], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
+        load (Optional[StrPath], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
         save_every (int, optional): Period of saving (epochs). Defaults to 5.
         recover (bool, optional): Continue from a failed run. Defaults to False.
         seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
+        event (Optional[EventClass], optional): Multiprocessing stopping event to pause training. Defaults to None.
 
+    Returns:
+        Optional[Dict[str, float]]: Dictionary with keys: best_val_acc and best_val_loss
     """
 
     if seed is not None:
@@ -325,64 +701,44 @@ def train_loop(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
-    steps = 0
-    epoch = 0
-    best_val_loss = float("inf")
-    best_val_acc = float("-inf")
-
     optimizer = get_optimizer(model, config.optimizer)
     scheduler = get_scheduler(optimizer, config.scheduler)
 
     loss_func = nn.CrossEntropyLoss()
-    
-    save_path = Path(config.admin.save_path)
 
-    # if we are continuing from last checkpoint, set 'load'
-    if recover:
-        fname = ""
-
-        files = sorted([f.name for f in save_path.iterdir() if f.is_file()])
-        if len(files) > 0:
-            fname = files[-1]
-
-        load = save_path / fname
-    else:
-        # make sure save path exists
-        save_path.mkdir(parents=True, exist_ok=True)
-
-    # save frame size and num frames for convenient testing
-    save_test_sizes(config.data, save_path.parent)
-
-    # early stopping setup
-    stopping_metrics = {
-        "val": {"loss": 0.0, "acc": 0.0},
-        "train": {"loss": 0.0, "acc": 0.0},
-    }
     stopper = get_stopper(
         arg_dict=config.early_stopping, wandb_run=wandb_run, event=event
     )
 
-    if load:
-        checkpoint = load_checkpoint(Path(load), device)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        if "scheduler_state_dict" in checkpoint:
-            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        if "stopper_state_dict" in checkpoint:
-            stopper.load_state_dict(checkpoint["stopper_state_dict"])
-            if stopper.stopped_by_event:
-                stopper.stop = False  # reset stop if was set by event before
-                stopper.stopped_by_event = False
-        epoch = checkpoint["epoch"] + 1
-        steps = checkpoint["steps"]
-        # best_val_loss = checkpoint["best_val_score"]
-        if "best_val_loss" in checkpoint:
-            best_val_loss = checkpoint["best_val_loss"]
-        if "best_val_acc" in checkpoint:
-            best_val_acc = checkpoint["best_val_acc"]
+    epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
 
-        print(f"Resuming from epoch {epoch}, steps {steps}")
-        print(f"Loaded model from {load}")
+    save_path = Path(config.admin.save_path)
+
+    # if we are continuing from last checkpoint, set 'load'
+    load = _handle_recovery(save_path=save_path, recover=recover, load=load)
+
+    # save augmentation info for convenient testing
+    save_test_sizes(config.data, save_path.parent)
+
+    if load:
+        (
+            model,
+            optimizer,
+            scheduler,
+            stopper,
+            epoch,
+            steps,
+            best_val_loss,
+            best_val_acc,
+            stopping_metrics,
+        ) = load_training(
+            load_path=Path(load),
+            device=device,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            stopper=stopper,
+        )
 
     # train it
     while epoch < config.training.max_epoch and not stopper.stop:
@@ -390,158 +746,361 @@ def train_loop(
         print("-" * 10)
 
         epoch += 1
-        # training and validation stage
-        for phase in ["train", "val"]:
-            if phase == "train":
-                model.train()
-            else:
-                model.eval()
 
-            # Reset metrics for this phase
-            running_loss = 0.0
-            running_corrects = 0
-            total_samples = 0
+        # training stage
+        phase_name = "train"
+        steps = train_epoch(
+            model=model,
+            dataloader=dataloaders[phase_name],
+            loss_func=loss_func,
+            optimizer=optimizer,
+            wandb_run=wandb_run,
+            stopping_metric=stopping_metrics[phase_name],
+            stopper=stopper,
+            device=device,
+            epoch=epoch,
+            steps=steps,
+            update_per_step=config.training.update_per_step,
+        )
 
-            # For step-level logging (only train phase)
-            step_loss = 0.0
-            step_corrects = 0
-            step_samples = 0
-            accumulated_steps = 0
-            # optimizer.zero_grad()
-
-            for item in dataloaders[phase]:
-                data, target = item["frames"], item["label_num"]
-                data, target = data.to(device), target.to(device)
-                batch_size = data.size(0)
-                total_samples += batch_size
-
-                if phase == "train":
-                    model_output = model(data)
-                else:
-                    with torch.no_grad():
-                        model_output = model(data)
-
-                # Accumulate metrics
-                loss = loss_func(model_output, target)
-                running_loss += loss.item() * batch_size
-                _, predicted = model_output.max(1)
-                running_corrects += predicted.eq(target).sum().item()
-
-                if phase == "train":
-                    # Accumulate for step logging
-                    step_loss += loss.item() * batch_size
-                    step_corrects += predicted.eq(target).sum().item()
-                    step_samples += batch_size
-
-                    scaled_loss = loss / config.training.update_per_step
-                    scaled_loss.backward()
-
-                    accumulated_steps += 1
-
-                    if accumulated_steps == config.training.update_per_step:
-                        optimizer.step()
-                        optimizer.zero_grad()
-                        steps += 1
-
-                        # Print step level output
-                        if steps % 10 == 0:
-                            avg_step_loss = step_loss / step_samples
-                            step_acc = 100.0 * step_corrects / step_samples
-
-                            print(
-                                f"Step {steps}: Loss: {avg_step_loss:.4f}, "
-                                f"Accuracy: {step_acc:.2f}%"
-                            )
-
-                            wandb_run.log(
-                                {
-                                    "Loss/Train_Step": avg_step_loss,
-                                    "Accuracy/Train_Step": step_acc,
-                                    "Step": steps,
-                                }
-                            )
-
-                            # Reset step metrics
-                            step_loss = 0.0
-                            step_corrects = 0
-                            step_samples = 0
-
-                        # Reset accumulation
-                        accumulated_steps = 0
-
-            # calculate  epoch metrics
-            epoch_loss = running_loss / total_samples
-            epoch_acc = 100.0 * running_corrects / total_samples
-
-            # early stopping logic
-            stopping_metrics[phase]["loss"] = epoch_loss
-            stopping_metrics[phase]["acc"] = epoch_acc
-            if phase == stopper.phase:
-                stopper.step(stopping_metrics[phase][stopper.metric])
-
-            # print epoch level output
-            print(f"{phase.upper()} - Epoch {epoch}:")
-            print(f"  Loss: {epoch_loss:.4f}")
-            print(f"  Accuracy: {epoch_acc:.2f}% ({running_corrects}/{total_samples})")
-
-            wandb_run.log(
-                {
-                    f"Loss/{phase.capitalize()}": epoch_loss,
-                    f"Accuracy/{phase.capitalize()}": epoch_acc,
-                    "Epoch": epoch,
-                }
-            )
-
-            # Validation specific logic
-            if phase == "val":
-                # Save best model
-                if epoch_loss < best_val_loss:
-                    best_val_loss = epoch_loss
-                    check_name = save_path / "best.pth"
-                    torch.save(model.state_dict(), check_name)
-                    print(f"Best validation loss so far: {best_val_loss:.2f}")
-                    print(
-                        f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)"
-                    )
-
-                if epoch_acc > best_val_acc:
-                    best_val_acc = epoch_acc
-                    print(f"Best validation acc so far: {best_val_acc:.2f}")
-
-                wandb_run.log(
-                    {
-                        f"Best/{phase.capitalize()}_loss": best_val_loss,
-                        f"Best/{phase.capitalize()}_acc": best_val_acc,
-                        "Epoch": epoch,
-                    }
-                )
-                if isinstance(scheduler, ReduceLROnPlateau):
-                    assert epoch_loss is not None, "Should be defined by now"
-                    scheduler.step(epoch_loss)
-                else:
-                    scheduler.step()
+        # validation stage
+        phase_name = "val"
+        best_val_loss, best_val_acc = val_epoch(
+            model=model,
+            dataloader=dataloaders[phase_name],
+            loss_func=loss_func,
+            scheduler=scheduler,
+            wandb_run=wandb_run,
+            stopping_metric=stopping_metrics[phase_name],
+            stopper=stopper,
+            device=device,
+            epoch=epoch,
+            best_val_loss=best_val_loss,
+            best_val_acc=best_val_acc,
+            save_path=save_path,
+        )
 
         # Save checkpoint
-        if (
-            epoch % save_every == 0
-            or not epoch < config.training.max_epoch
-            or stopper.stop
-        ):
-            checkpoint_data = {
-                "epoch": epoch,
-                "steps": steps,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": scheduler.state_dict(),
-                "best_val_loss": best_val_loss,
-                "best_val_acc": best_val_acc,
-                "stopper_state_dict": stopper.state_dict(),
-            }
-            save_checkpoint(checkpoint_data, save_path)
+        save_training(
+            save_path=save_path,
+            save_every=save_every,
+            max_epoch=config.training.max_epoch,
+            stopper=stopper,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            epoch=epoch,
+            steps=steps,
+            best_val_loss=best_val_loss,
+            best_val_acc=best_val_acc,
+            stopping_metrics=stopping_metrics,
+        )
 
     print("Finished training successfully")
     return {"best_val_acc": best_val_acc, "best_val_loss": best_val_loss}
 
+
+def masked_pretrain_epoch(
+    mae_model: nn.Module,
+    dataloader: DataLoader[VideoDataset],
+    optimizer: optim.Optimizer,
+    wandb_run: Run,
+    stopping_metric: Dict[str, float],
+    stopper: EarlyStopper,
+    device: torch.device,
+    epoch: int,
+    steps: int,
+    update_per_step: int,
+) -> int:
+
+    phase_name = "train"
+    mae_model.train()
+
+    running_loss = 0.0
+    total_samples = 0
+    step_loss = 0.0
+    step_samples = 0
+    accumulated_steps = 0
+
+    for item in dataloader:
+        data = item["frames"].to(device)  # no labels needed
+        batch_size = data.size(0)
+        total_samples += batch_size
+
+        loss = mae_model(data)
+        
+        # Accumulate metrics
+        running_loss += loss.item() * batch_size
+
+        # Accumulate for step logging
+        step_loss += loss.item() * batch_size
+        step_samples += batch_size
+
+        scaled_loss = loss / update_per_step
+        scaled_loss.backward()
+
+        accumulated_steps += 1
+
+        if accumulated_steps == update_per_step:
+            optimizer.step()
+            optimizer.zero_grad()
+            steps += 1
+
+            # Print step level output
+            if steps % 10 == 0:
+                avg_step_loss = step_loss / step_samples
+                print(f"Step {steps}: Loss: {avg_step_loss:.4f}, ")
+
+                wandb_run.log(
+                    {
+                        "Loss/Train_Step": avg_step_loss,
+                        "Step": steps,
+                    }
+                )
+
+                # Reset step metrics
+                step_loss = 0.0
+                step_samples = 0
+
+            # Reset accumulation
+            accumulated_steps = 0
+
+    # calculate  epoch metrics
+    epoch_loss = running_loss / total_samples
+
+    # early stopping logic
+    stopping_metric["loss"] = epoch_loss
+    if stopper.phase == phase_name:
+        stopper.step(stopping_metric[stopper.metric])
+
+    # print epoch level output
+    print(f"{phase_name.upper()} - Epoch {epoch}: Loss: {epoch_loss:.4f}")
+    wandb_run.log(
+        {
+            f"Loss/{phase_name.capitalize()}": epoch_loss,
+            "Epoch": epoch,
+        }
+    )
+
+    return steps
+
+
+def masked_preval_epoch(
+    mae_model: nn.Module,
+    dataloader: DataLoader[VideoDataset],
+    scheduler: optim.lr_scheduler.LRScheduler,
+    wandb_run: Run,
+    stopping_metric: Dict[str, float],
+    stopper: EarlyStopper,
+    device: torch.device,
+    epoch: int,
+    best_val_loss: float,
+    save_path: Path,
+) -> float:
+    phase_name = "val"
+
+    mae_model.eval()
+
+    running_loss = 0.0
+    total_samples = 0
+
+    for item in dataloader:
+        data = item["frames"].to(device)  # no labels needed
+        batch_size = data.size(0)
+        total_samples += batch_size
+
+        with torch.no_grad():
+            loss = mae_model(data)
+
+        # Accumulate metrics
+        running_loss += loss.item() * batch_size
+        
+
+    # calculate  epoch metrics
+    epoch_loss = running_loss / total_samples
+
+    # early stopping logic
+    stopping_metric["loss"] = epoch_loss
+    if phase_name == stopper.phase:
+        stopper.step(stopping_metric[stopper.metric])
+
+    # print epoch level output
+    print(f"{phase_name.upper()} - Epoch {epoch}: Loss: {epoch_loss:.4f}")
+    wandb_run.log(
+        {
+            f"Loss/{phase_name.capitalize()}": epoch_loss,
+            "Epoch": epoch,
+        }
+    )
+
+    # Save best model
+    if epoch_loss < best_val_loss:
+        best_val_loss = epoch_loss
+        check_name = save_path / "best.pth"
+        torch.save(mae_model.state_dict(), check_name)
+        print(f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)")
+
+    # log best validation metrics
+    wandb_run.log(
+        {
+            f"Best/{phase_name.capitalize()}_loss": best_val_loss,
+            "Epoch": epoch,
+        }
+    )
+
+    # scheduler
+    if isinstance(scheduler, ReduceLROnPlateau):
+        assert epoch_loss is not None, "Should be defined by now"
+        scheduler.step(epoch_loss)
+    else:
+        scheduler.step()
+
+    return best_val_loss
+
+
+def pretrain_loop(
+    model_name: str,
+    config: RunInfo,
+    wandb_run: Run,
+    load: Optional[StrPath] = None,
+    save_every: int = 5,
+    recover: bool = False,
+    seed: Optional[int] = SEED,
+    event: Optional[EventClass] = None,
+) -> Optional[Dict[str, float]]:
+    """Pretrain loop for MAE-style self-supervised pretraining.
+
+    Args:
+        model_name (str): Name of the model to pretrain.
+        wandb_run (Run): Wandb run instance for logging.
+        load (Optional[StrPath], optional): Path to checkpoint to load. Defaults to None.
+        save_every (int, optional): Period of saving (epochs). Defaults to 5.
+        recover (bool, optional): Continue from a failed run. Defaults to False.
+        seed (Optional[int], optional): Random seed value. Defaults to SEED.
+        event: Optional[EventClass] = None,
+
+    Returns:
+        Optional[Dict[str, float]]: Dictionary with keys: best_val_loss
+    """
+
+    if seed is not None:
+        set_seed(seed)
+
+    dataloaders, _ = setup_data(config)  # no num_classes needed
+
+    #TODO: generalise model loading
+    
+    assert isinstance(config.model_params, MVirTedMaeInfo), 'not implemented'    
+    encoder_info = config.model_params.encoder_info
+    
+    encoder = MVirTed(
+        MViT_2D_t(),
+        0, #NA
+        encoder_info.drop_p, #NA,
+        embed_dim=encoder_info.embed_dim,
+        num_heads=encoder_info.num_heads,
+        num_layers=encoder_info.num_layers,
+        max_frames=encoder_info.max_frames,
+        mvit_out_dim=encoder_info.mvit_out_dim        
+        )
+    
+    mae_model = get_mae_model(
+        model_name=model_name,
+        encoder=encoder,
+        mask_ratio=config.model_params.mask_ratio,
+        embed_dim=config.model_params.embed_dim
+        )  # returns masked autoencoder model
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    mae_model.to(device)
+
+    optimizer = get_optimizer(mae_model, config.optimizer)
+    scheduler = get_scheduler(optimizer, config.scheduler)
+    stopper = get_stopper(
+        arg_dict=config.early_stopping, wandb_run=wandb_run, event=event
+    )
+
+    epoch, steps, best_val_loss, _, stopping_metrics = _init_accumulators()
+    save_path = Path(config.admin.save_path)
+
+    load = _handle_recovery(save_path=save_path, recover=recover, load=load)
+
+    save_test_sizes(config.data, save_path.parent)
+
+    if load:
+        (
+            mae_model,
+            optimizer,
+            scheduler,
+            stopper,
+            epoch,
+            steps,
+            best_val_loss,
+            _,
+            stopping_metrics,
+        ) = load_training(
+            load_path=Path(load),
+            device=device,
+            model=mae_model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            stopper=stopper,
+        )
+
+    while epoch < config.training.max_epoch and not stopper.stop:
+        print(f"Epoch {epoch}/{config.training.max_epoch}")
+        print("-" * 10)
+
+        epoch += 1
+
+        # training stage
+        phase_name = "train"
+        steps = masked_pretrain_epoch(
+            mae_model=mae_model,
+            dataloader=dataloaders[phase_name],
+            optimizer=optimizer,
+            wandb_run=wandb_run,
+            stopping_metric=stopping_metrics[phase_name],
+            stopper=stopper,
+            device=device,
+            epoch=epoch,
+            steps=steps,
+            update_per_step=config.training.update_per_step,
+        )
+        
+        # validation stage
+        phase_name = "val"
+        best_val_loss = masked_preval_epoch(
+            mae_model=mae_model,
+            dataloader=dataloaders[phase_name],
+            scheduler=scheduler,
+            wandb_run=wandb_run,
+            stopping_metric=stopping_metrics[phase_name],
+            stopper=stopper,
+            device=device,
+            epoch=epoch,
+            best_val_loss=best_val_loss,
+            save_path=save_path,
+        )
+
+        # Save checkpoint
+        save_training(
+            save_path=save_path,
+            save_every=save_every,
+            max_epoch=config.training.max_epoch,
+            stopper=stopper,
+            model=mae_model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            epoch=epoch,
+            steps=steps,
+            best_val_loss=best_val_loss,
+            best_val_acc=0,
+            stopping_metrics=stopping_metrics,
+        )
+
+    print("Finished pretraining successfully")
+    return {"best_val_loss": best_val_loss}
 
 
 def main():
@@ -576,185 +1135,6 @@ def main():
 
     train_loop(admin.model, config, run, recover=admin.recover)
     run.finish()
-
-
-def pretrain_loop(
-    model_name: str,
-    config: RunInfo,
-    wandb_run: Run,
-    load: Optional[Union[Path, str]] = None,
-    save_every: int = 5,
-    recover: bool = False,
-    seed: Optional[int] = SEED,
-    event: Optional[EventClass] = None,
-) -> Optional[Dict[str, float]]:
-    """Pretrain loop for MAE-style self-supervised pretraining.
-
-    Args:
-        model_name (str): Name of the model to pretrain.
-        wandb_run (Run): Wandb run instance for logging.
-        load (Optional[Union[Path, str]], optional): Path to checkpoint to load. Defaults to None.
-        save_every (int, optional): Period of saving (epochs). Defaults to 5.
-        recover (bool, optional): Continue from a failed run. Defaults to False.
-        seed (Optional[int], optional): Random seed value. Defaults to SEED.
-    """
-
-    if seed is not None:
-        set_seed(seed)
-
-    dataloaders, _ = setup_data(config)  # no num_classes needed
-
-    mae_model = get_mae_model(model_name)  # returns SepMViTBERTMAE
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    mae_model.to(device)
-
-    steps = 0
-    epoch = 0
-    best_val_loss = float("inf")
-
-    optimizer = get_optimizer(mae_model.encoder, config.optimizer)
-    scheduler = get_scheduler(optimizer, config.scheduler)
-
-    save_path = Path(config.admin.save_path)
-
-    if recover:
-        files = sorted([f.name for f in save_path.iterdir() if f.is_file()])
-        if len(files) > 0:
-            load = save_path / files[-1]
-    else:
-        save_path.mkdir(parents=True, exist_ok=True)
-
-    save_test_sizes(config.data, save_path.parent)
-
-    stopping_metrics = {"val": {"loss": 0.0}, "train": {"loss": 0.0}}
-    stopper = get_stopper(arg_dict=config.early_stopping, wandb_run=wandb_run, event=event)
-
-    if load:
-        checkpoint = load_checkpoint(Path(load), device)
-        mae_model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        if "scheduler_state_dict" in checkpoint:
-            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        if "stopper_state_dict" in checkpoint:
-            stopper.load_state_dict(checkpoint["stopper_state_dict"])
-            if stopper.stopped_by_event:
-                stopper.stop = False
-                stopper.stopped_by_event = False
-        epoch = checkpoint["epoch"] + 1
-        steps = checkpoint["steps"]
-        if "best_val_loss" in checkpoint:
-            best_val_loss = checkpoint["best_val_loss"]
-
-        print(f"Resuming from epoch {epoch}, steps {steps}")
-        print(f"Loaded model from {load}")
-
-    while epoch < config.training.max_epoch and not stopper.stop:
-        print(f"Epoch {epoch}/{config.training.max_epoch}")
-        print("-" * 10)
-
-        epoch += 1
-
-        for phase in ["train", "val"]:
-            if phase == "train":
-                mae_model.train()
-            else:
-                mae_model.eval()
-
-            running_loss = 0.0
-            total_samples = 0
-            step_loss = 0.0
-            step_samples = 0
-            accumulated_steps = 0
-
-            for item in dataloaders[phase]:
-                data = item["frames"].to(device)  # no labels needed
-                batch_size = data.size(0)
-                total_samples += batch_size
-
-                if phase == "train":
-                    loss = mae_model(data)
-                else:
-                    with torch.no_grad():
-                        loss = mae_model(data)
-
-                running_loss += loss.item() * batch_size
-
-                if phase == "train":
-                    step_loss += loss.item() * batch_size
-                    step_samples += batch_size
-
-                    scaled_loss = loss / config.training.update_per_step
-                    scaled_loss.backward()
-
-                    accumulated_steps += 1
-
-                    if accumulated_steps == config.training.update_per_step:
-                        optimizer.step()
-                        optimizer.zero_grad()
-                        steps += 1
-
-                        if steps % 10 == 0:
-                            avg_step_loss = step_loss / step_samples
-                            print(f"Step {steps}: Loss: {avg_step_loss:.4f}")
-                            wandb_run.log({
-                                "Loss/Train_Step": avg_step_loss,
-                                "Step": steps,
-                            })
-                            step_loss = 0.0
-                            step_samples = 0
-
-                        accumulated_steps = 0
-
-            epoch_loss = running_loss / total_samples
-            stopping_metrics[phase]["loss"] = epoch_loss
-
-            if phase == stopper.phase:
-                stopper.step(stopping_metrics[phase][stopper.metric])
-
-            print(f"{phase.upper()} - Epoch {epoch}: Loss: {epoch_loss:.4f}")
-            wandb_run.log({
-                f"Loss/{phase.capitalize()}": epoch_loss,
-                "Epoch": epoch,
-            })
-
-            if phase == "val":
-                if epoch_loss < best_val_loss:
-                    best_val_loss = epoch_loss
-                    check_name = save_path / "best.pth"
-                    # save only the encoder weights for fine-tuning
-                    torch.save(mae_model.encoder.state_dict(), check_name)
-                    print(f"Best val loss: {best_val_loss:.4f}, saved to {check_name}")
-
-                wandb_run.log({
-                    "Best/Val_loss": best_val_loss,
-                    "Epoch": epoch,
-                })
-
-                if isinstance(scheduler, ReduceLROnPlateau):
-                    scheduler.step(epoch_loss)
-                else:
-                    scheduler.step()
-
-        if (
-            epoch % save_every == 0
-            or not epoch < config.training.max_epoch
-            or stopper.stop
-        ):
-            checkpoint_data = {
-                "epoch": epoch,
-                "steps": steps,
-                "model_state_dict": mae_model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": scheduler.state_dict(),
-                "best_val_loss": best_val_loss,
-                "stopper_state_dict": stopper.state_dict(),
-            }
-            save_checkpoint(checkpoint_data, save_path)
-
-    print("Finished pretraining successfully")
-    return {"best_val_loss": best_val_loss}
-
 
 
 if __name__ == "__main__":

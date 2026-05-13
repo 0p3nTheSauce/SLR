@@ -22,18 +22,21 @@ class SepMViTMAEDecoder(nn.Module):
 class SepMViTBERTMAE(nn.Module):
     def __init__(self, encoder: MVirTed, mask_ratio=0.5, embed_dim=512):
         super().__init__()
-        self.encoder = encoder
-        self.decoder = SepMViTMAEDecoder(embed_dim)
+        self.backbone = encoder.backbone
+        self.classifier = nn.ModuleDict({
+            "temporal_encoder": encoder.classifier['temporal_encoder'],
+            "decoder": SepMViTMAEDecoder(embed_dim),
+        })
         self.mask_ratio = mask_ratio
 
     def forward(self, frames):
         B, C, T, H, W = frames.shape
 
         # 1. Extract all frame features
-        feats = self.encoder.backbone(
+        feats = self.backbone(
             frames.permute(0, 2, 1, 3, 4).reshape(B * T, C, H, W)
         ).view(B, T, -1)                           # (B, T, 768)
-        feats = self.encoder.temporal_encoder(feats)  # (B, T, embed_dim)
+        feats = self.classifier['temporal_encoder'](feats)  # (B, T, embed_dim)
 
         # 2. Mask
         num_masked = int(T * self.mask_ratio)
@@ -49,7 +52,7 @@ class SepMViTBERTMAE(nn.Module):
         masked_feats[torch.arange(B).unsqueeze(1), masked_ids] = 0.0
 
         # 3. Decode and compute loss only on masked positions
-        preds = self.decoder(masked_feats, masked_ids, B, T)
+        preds = self.classifier['decoder'](masked_feats, masked_ids, B, T)
         loss = F.mse_loss(
             preds[torch.arange(B).unsqueeze(1), masked_ids],
             targets[torch.arange(B).unsqueeze(1), masked_ids],

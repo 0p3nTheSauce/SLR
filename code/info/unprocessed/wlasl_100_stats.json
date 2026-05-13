@@ -6,7 +6,7 @@
         "train": {
             "num_instances": 1442,
             "num_signers": 91,
-            "per_class_stats": {
+            "per_instance_stats": {
                 "book": {
                     "num_instances": 30,
                     "length_distribution": {
@@ -6328,7 +6328,7 @@
         "val": {
             "num_instances": 338,
             "num_signers": 69,
-            "per_class_stats": {
+            "per_instance_stats": {
                 "book": {
                     "num_instances": 6,
                     "length_distribution": {
@@ -9087,7 +9087,7 @@
         "test": {
             "num_instances": 258,
             "num_signers": 56,
-            "per_class_stats": {
+            "per_instance_stats": {
                 "book": {
                     "num_instances": 4,
                     "length_distribution": {

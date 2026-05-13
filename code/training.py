@@ -388,7 +388,10 @@ def train_loop(
         save_every (int, optional): Period of saving (epochs). Defaults to 5.
         recover (bool, optional): Continue from a failed run. Defaults to False.
         seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
+        event (Optional[EventClass], optional): Multiprocessing stopping event to pause training. Defaults to None.
 
+    Returns:
+        Optional[Dict[str, float]]: Dictionary with keys: best_val_acc and best_val_loss
     """
 
     if seed is not None:

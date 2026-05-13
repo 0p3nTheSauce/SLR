@@ -6,21 +6,18 @@ from pydantic import BaseModel
 
 # locals
 
-#types
 from run_types import NormDict
-
-
+#pytorch lib models
 from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
 from .pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from .pytorch_s3d import S3D_basic
-
-
-
-# new mvit
+# slowfast mvit
 from .og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
 #custem seperable mvit
-from .sep_mvit_bert import MVirTed_t_basic
+from .sep_mvit_bert import MVirTed_t_basic, MVirTed
+from .mvirted_mae import SepMViTBERTMAE
+
 
 S3D = "S3D"
 R3D_18 = "R3D_18"
@@ -34,6 +31,8 @@ MViTv1_B = "MViTv1_B"
 MViTv2_S_16x4 = "MViTv2_S_16x4"
 MViTv2_B_32x3 = "MViTv2_B_32x3"
 MVirTed_t = "MVirTed_t"
+MVirTed_t_MAE = MVirTed_t + '_MAE'
+
 
 model_names = [
     S3D,
@@ -48,6 +47,7 @@ model_names = [
     MViTv2_S_16x4,
     MViTv2_B_32x3,
     MVirTed_t,
+    MVirTed_t_MAE
 ]
 
 
@@ -55,7 +55,7 @@ def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> tor
     """Get model by name.
 
     Args:
-        model_name (str): One of 'S3D', 'R3D_18', 'R(2+1)D_18', 'Swin3D_T', 'Swin3D_S', 'Swin3D_B', 'MViT_v2S', 'MViT_v1B'
+        model_name (str): One of S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S, Swin3D_B, MViTv2_S, MViTv1_B, MViTv2_S_e, MViTv2_S_16x4, MViTv2_B_32x3, MVirTed_t
         num_classes (int): Number of output classes.
         drop_p (float): Dropout in final classification layer.
 
@@ -65,7 +65,7 @@ def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> tor
     Returns:
             torch.nn.Module: Model instance
     """
-    model_constructors_dp = { #dropouthas to be float at the moment
+    model_constructors_dp = { #dropout has to be float at the moment
         S3D: S3D_basic,
         R3D_18: Resnet3D_18_basic,
         R2plus1D_18: Resnet2_plus1D_18_basic,
@@ -93,6 +93,45 @@ def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> tor
         return model_constructors_dp[model_name](num_classes=num_classes, drop_p=drop_p)
     else:
         return model_constructors_opdp[model_name](num_classes=num_classes, drop_p=drop_p)
+
+
+# def get_mae_encoder(encoder_name: str, encoder: MVirTed, mask_ratio: float, embed_dim: int) -> torch.nn.Module:
+#     """Map a name to an encoder"""
+    
+#     model_constructors = {
+#         MVirTed_t: MVirTed    
+#     }
+    
+#     if model_name not in model_constructors:
+#         raise ValueError(
+#             f"Model {model_name} not recognized. Available models: {', '.join(model_constructors.keys())}"
+#         )
+
+#     return model_constructors[model_name](encoder=encoder, mask_ratio=mask_ratio, embed_dim=embed_dim)
+
+
+def get_mae_model(
+    model_name: str,
+    encoder: MVirTed,
+    mask_ratio: float,
+    embed_dim: int,
+    
+    
+    ) -> torch.nn.Module:
+    """Map a model name to Masked Auto Encoder Name"""
+    
+    model_constructors = {
+        MVirTed_t_MAE: SepMViTBERTMAE        
+    }
+    
+    if model_name not in model_constructors:
+        raise ValueError(
+            f"Model {model_name} not recognized. Available models: {', '.join(model_constructors.keys())}"
+        )
+
+    return model_constructors[model_name](encoder=encoder, mask_ratio=mask_ratio, embed_dim=embed_dim)
+
+
 
 
 def avail_models() -> list[str]:
@@ -141,7 +180,8 @@ def norm_vals(model_name: str) -> NormDict:
         MViTv2_S_16x4: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         MViTv2_B_32x3: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         #seperable mvit
-        MVirTed_t: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
+        MVirTed_t: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+        MVirTed_t_MAE: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     }
 
     if model_name not in norm_dict:
