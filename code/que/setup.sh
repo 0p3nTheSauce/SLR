@@ -237,10 +237,6 @@ ENV_NAME="$ENV_NAME"
 PROJECT_DIR="$PROJECT_DIR"
 QUE_CONFIG_FILE="$QUE_CONFIG_FILE"
 
-# Source conda
-source "\${CONDA_PATH}/etc/profile.d/conda.sh"
-conda activate "\$ENV_NAME"
-
 # ---- Resolve --host, using last-used value as default ----------------------
 
 # Load saved host if config exists
@@ -307,7 +303,8 @@ chown $CURRENT_USER:$CURRENT_GROUP "\$QUE_CONFIG_FILE" 2>/dev/null || true
 # ---- Launch shell.py -------------------------------------------------------
 cd "\$PROJECT_DIR"
 
-exec python -W ignore::UserWarning -m que.shell "\${ARGS[@]}"
+#run with conda, ignore pydantic
+exec "\$CONDA_PATH/envs/\$ENV_NAME/bin/python" -W ignore::UserWarning -m que.shell "\${ARGS[@]}"
 WRAPPER
 
 chmod +x "$COMMAND_PATH"

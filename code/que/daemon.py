@@ -1,4 +1,4 @@
-from typing import Optional, TypedDict
+from typing import Optional
 import logging
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
@@ -8,9 +8,8 @@ import time
 from .core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
-    WORKER_NAME,
     connect_manager,
-    DaemonState,
+    DaemonStateDict,
 )
 from .worker import Worker
 
@@ -23,7 +22,7 @@ class Daemon:
         logger: Logger,
         stop_worker_event: EventClass,
         stop_daemon_event: EventClass,
-        state: DaemonState,
+        state: DaemonStateDict,
     ) -> None:
         self.worker = worker
         self.logger = logger
@@ -48,10 +47,10 @@ class Daemon:
             logger.setLevel(logging.DEBUG)
         self.logger = logger
     
-    def get_state(self) -> DaemonState:
+    def get_state(self) -> DaemonStateDict:
         return self.state
 
-    def set_state(self, state: DaemonState) -> None:
+    def set_state(self, state: DaemonStateDict) -> None:
         self.state = state
         if self.state['awake']:
             self.logger.info("Daemon state is 'awake', starting supervisor...")

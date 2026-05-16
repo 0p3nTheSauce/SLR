@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 # import os
 import json
@@ -6,26 +6,28 @@ import torch
 from pathlib import Path
 from typing import (
     Callable,
+    cast,
     Optional,
-    Any,
     Tuple,
     Literal,
-    TypedDict,
+    # TypedDict,
     Union,
     List,
-    TypeGuard,
     TypeAlias,
+    Dict,
+    Any,
 )
-from torchvision.transforms import v2
-from video_transforms import Shuffle
-
+from typing_extensions import TypedDict, Unpack
 # local imports
 from utils import load_rgb_frames_from_video
-from video_transforms import correct_num_frames, resize_by_diag, crop_frames
-
+from video_transforms import (
+    # correct_num_frames,
+    get_transform,
+)
+from run_types import DataInfo
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
-from models import NormDict
-from preprocess import InstanceDict, AVAIL_SETS, is_instance_dict
+from preprocess import Instance, AVAIL_SETS
+
 ############################# Dictionaries and Types #############################
 
 
@@ -38,16 +40,18 @@ class DataSetInfo(TypedDict):
     set_name: AVAIL_SETS
 
 
+LOAD_DATA_POLICY: TypeAlias = Literal["strict", "accepting"]
 
-LOAD_DATA_POLICY : TypeAlias = Literal['strict', 'accepting']
 
-def load_data_from_json(json_path: Union[str, Path], policy: LOAD_DATA_POLICY) -> List[InstanceDict]:
-    """Load list of InstanceDict from a json file
+def load_data_from_json(
+    json_path: Union[str, Path], policy: LOAD_DATA_POLICY
+) -> List[Instance]:
+    """Load list of Instance from a json file
 
     Args:
         json_path (Union[str, Path]): Path to json file
     Returns:
-        List[InstanceDict]: List of InstanceDicts
+        List[Instance]: List of Instances
     """
     with open(json_path, "r") as f:
         data = json.load(f)
@@ -55,9 +59,8 @@ def load_data_from_json(json_path: Union[str, Path], policy: LOAD_DATA_POLICY) -
     if not isinstance(data, list):
         raise ValueError(f"Data in {json_path} is not a list.")
 
-    for item in data: #NOTE: Overhead is actually mininmal on strict ~0.019 s for WLASL2000 train.
-        if not is_instance_dict(item) and policy == 'strict': 
-            raise ValueError(f"Item {item} in {json_path} is not a valid InstanceDict.")
+    if policy == "strict":
+        return [Instance.model_validate(item) for item in data]
 
     return data
 
@@ -98,13 +101,12 @@ class VideoDataset(Dataset):
     def __init__(
         self,
         set_info: DataSetInfo,
-        num_frames: Optional[int] = None,
         transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
         item_transforms: Optional[
-            Callable[[torch.Tensor, InstanceDict], torch.Tensor]
+            Callable[[torch.Tensor, Instance], torch.Tensor]
         ] = None,
         include_meta: bool = False,
-        load_policy: LOAD_DATA_POLICY = 'accepting'
+        load_policy: LOAD_DATA_POLICY = "accepting",  # NOTE: this may break
     ) -> None:
         """
         Custom video dataset, based on the structure of the WLASL dataset
@@ -115,17 +117,16 @@ class VideoDataset(Dataset):
         :param transforms: A Transform function to apply to raw videos.
         :type transforms: Optional[Callable[[torch.Tensor], torch.Tensor]]
         :param item_transforms: A Transform function to apply to raw videos.
-        :type item_transforms: Optional[Callable[[torch.Tensor, InstanceDict], torch.Tensor]]
+        :type item_transforms: Optional[Callable[[torch.Tensor, Instance], torch.Tensor]]
         :param include_meta: Boolean flag to include extra meta information
         :type include_meta: bool
-        :param load_policy: Load data that does not match List[InstanceDict] exactly. For backwards compatibility with older preprocessing strategies.
+        :param load_policy: Load data that does not match List[Instance] exactly. For backwards compatibility with older preprocessing strategies.
         :type load_policy: LOAD_DATA_POLICY
         """
         self.root = set_info["root"]
         if not self.root.exists():
             raise FileNotFoundError(f"Root directory {self.root} does not exist.")
         self.transforms = transforms
-        self.num_frames = num_frames
         self.include_meta = include_meta
         self.item_transforms = item_transforms
         instances_path = (
@@ -133,39 +134,40 @@ class VideoDataset(Dataset):
             / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
         )
         self.data = load_data_from_json(instances_path, load_policy)
-        self.classes = set([inst['label_num'] for inst in self.data])
+        if load_policy == "accepting":
+            self.data = cast(List[Dict[str, Any]], self.data)
+        elif load_policy == "strict":
+            self.data = [inst.model_dump() for inst in self.data]
+
+        self.classes = set([inst["label_num"] for inst in self.data])
         self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
-        video_path = self.root / (item["video_id"] + ".mp4")
+        video_path = self.root / cast(str, item["video_id"] + ".mp4")
         if video_path.exists() is False:
             raise FileNotFoundError(f"Video file {video_path} does not exist.")
 
-        frames = load_rgb_frames_from_video(
+        return load_rgb_frames_from_video(
             video_path=video_path,
             start=item["frame_start"],
             end=item["frame_end"],
-        )
-        if self.num_frames is not None:
-            sampled_frames = correct_num_frames(frames, self.num_frames)
-        else:
-            sampled_frames = frames
-
-        return sampled_frames.to(torch.uint8)
+        ).to(torch.uint8)
 
     def __getitem__(self, idx):
-        item = self.data[idx]
+        item = cast(Dict[str, Any], self.data[idx])
         frames = self.__manual_load__(item)
 
         if self.item_transforms is not None:
-            frames = self.item_transforms(frames, item)
+            frames = self.item_transforms(frames, Instance.model_validate(item))
 
         if self.transforms is not None:
             frames = self.transforms(frames)
 
-        result = {"frames": frames, "label_num": item["label_num"]}
         if self.include_meta:
-            result.update(item)
+            result = {"frames": frames} | item
+        else:
+            result = result = {"frames": frames, "label_num": item["label_num"]}
+
         return result
 
     def __len__(self):
@@ -174,99 +176,15 @@ class VideoDataset(Dataset):
 
 ################################## Helper functions #######################################
 
-
-def _identity_transform(x):
-    """Identity transform - returns input unchanged"""
-    return x
-
-
-def _normalize_to_float(x):
-    """Convert tensor to float and normalize to [0, 1]"""
-    return x.float() / 255.0
-
-
-def _permute_time_channel(x):
-    """Permute tensor from (C, T, H, W) to (T, C, H, W)"""
-    return x.permute(1, 0, 2, 3)
-
-
-def _resize_by_diagonal(frames, item):
-    """Resize the target diagonal to 256 before random cropping as per wlasl"""
-    return resize_by_diag(frames, item["bbox"], target_diag=256)
-
-
-def _crop_frames(frames, item):
-    """Crop out the bounding box from the frames"""
-    return crop_frames(frames, item["bbox"])
-
-
-Cropping_Strategy: TypeAlias = Literal["Centre", "Random"]
-
-def get_transform(
-    norm_dict: Optional[NormDict] = None,
-    frame_size: Optional[int] = None,
-    shuffle: bool = False,
-    num_frames: Optional[int] = None,
-    crop: Optional[Cropping_Strategy] = None
-    ) -> Tuple[Callable[[torch.Tensor], torch.Tensor], Optional[List[int]], Optional[float]]:
+class VideoDatasetKwargs(TypedDict, total=False):
+    item_transforms: Optional[Callable[[torch.Tensor, Instance], torch.Tensor]]
+    include_meta: bool
+    load_policy: LOAD_DATA_POLICY
     
-    
-    
-    # transform(frames) -> frames
-    if shuffle:
-        assert num_frames is not None, "num_frames must be specified if shuffle is True"
-        maybe_shuffle_t = Shuffle(num_frames)
-        perm = maybe_shuffle_t.permutation
-        sh_e = Shuffle.shannon_entropy(perm)
-        perm = list(map(int, perm.numpy()))
-    else:
-        maybe_shuffle_t = v2.Lambda(_identity_transform)
-        perm = None
-        sh_e = None
-
-    if norm_dict is not None:
-        final_transform = v2.Compose(
-            [
-                maybe_shuffle_t,
-                v2.Lambda(_normalize_to_float),
-                v2.Normalize(mean=norm_dict["mean"], std=norm_dict["std"]),
-                v2.Lambda(_permute_time_channel),
-            ]
-        )
-    else:
-        final_transform = v2.Compose(
-            [
-                maybe_shuffle_t,
-                v2.Lambda(_normalize_to_float),
-                v2.Lambda(_permute_time_channel),
-            ]
-        )
-    transform = final_transform
-
-    if frame_size is not None:
-        assert crop is not None, f'Specify crop, one of {Cropping_Strategy}'
-        
-        if crop == "Random":
-            transform = v2.Compose(
-                [
-                    v2.RandomCrop(frame_size),
-                    v2.RandomHorizontalFlip(),
-                    final_transform,
-                ]
-            )
-        elif crop == "Centre":
-            transform = v2.Compose([v2.CenterCrop(frame_size), final_transform])
-            
-    return transform, perm, sh_e
-
 def get_data_set(
     set_info: DataSetInfo,
-    norm_dict: Optional[NormDict] = None,
-    frame_size: Optional[int] = None,
-    num_frames: Optional[int] = None,
-    shuffle: bool = False,
-    resize_by_diagonal: bool = False,
-    cropping: Literal["Bbox", "Centre", "Random", "Default"] = "Default",
+    data_info: DataInfo,
+    **kwargs: Unpack[VideoDatasetKwargs]
 ) -> Tuple[VideoDataset, Optional[List[int]], Optional[float]]:
     """
     Get the training, val or test set. Optionally, load frames unchanged.
@@ -292,38 +210,28 @@ def get_data_set(
     :return: dataset, permutation and shannon entropy
     :rtype: Tuple[VideoDataset, List[int] | None, float | None]
     """
-    # item_transform(frames, item) -> frames
-    item_transforms = None
-    if resize_by_diagonal:
-        item_transforms = _resize_by_diagonal
-    elif cropping == "Bbox":
-        item_transforms = _crop_frames
 
-    if cropping == 'Default':
-        crop = 'Random' if set_info['set_name'] == 'train' else 'Centre'
-    elif cropping == 'Bbox':
-        crop = None
-    else:
-        crop = cropping
-
+    aug_info = (
+        data_info.train_augs if set_info["set_name"] == "train" else data_info.test_augs
+    )
+    if aug_info is None:
+        raise ValueError(
+            f"Augmentation info not provided in data_info for set: {set_info['set_name']}."
+        )
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
-        norm_dict,
-        frame_size,
-        shuffle,
-        num_frames,
-        crop=crop
+        norm_dict=aug_info.norm_dict,  
+        temporal_aug=aug_info.temporal_aug,
+        spatial_aug=aug_info.spatial_aug,
     )
 
     dataset = VideoDataset(
         set_info,
-        num_frames=num_frames,
         transforms=transform,
-        item_transforms=item_transforms,
+        **kwargs
     )
 
     return dataset, perm, sh_e
-
 
 if __name__ == "__main__":
     # test_crop()

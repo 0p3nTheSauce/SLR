@@ -1,4 +1,5 @@
-from que.core import Que, QueEmpty, connect_manager
+from typing import Dict, List, Any, Optional, Union
+from que.core import Que, QueEmpty, connect_manager, _get_basic_logger, GenExp
 import json
 import subprocess
 import sys
@@ -7,6 +8,10 @@ import torch
 import video_dataset
 import preprocess
 import time
+from pathlib import Path
+
+from run_types import CleverDict
+
 logging.basicConfig(
 		level=logging.INFO,
 		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -46,7 +51,7 @@ def test_subrocess2():
         stderr=subprocess.STDOUT,
         bufsize=0
     )
-    return_code = proc.wait()
+    _ = proc.wait()
     
 def test_ex():
     try:
@@ -72,7 +77,7 @@ def test_clear2():
 
 
 def test_instance_typegaurd():
-    valid_dict = preprocess.InstanceDict(
+    valid_dict = preprocess.Instance(
         bbox=[0, 0, 100, 100],
         frame_end=10,
         frame_start=0,
@@ -94,8 +99,8 @@ def test_instance_typegaurd():
         'label_num': 0,
         # 'bbox' key is missing
     }
-    print(video_dataset.is_instance_dict(valid_dict))  # Should print True
-    print(video_dataset.is_instance_dict(invalid_dict))  # Should print False
+    print(preprocess.Instance.model_validate(valid_dict))  # Should print True
+    print(preprocess.Instance.model_validate(invalid_dict))  # Should print False
 
 
 def time_instance_typegaurd():
@@ -104,12 +109,300 @@ def time_instance_typegaurd():
 
     #time how long it takes to load the json and check each dict with the type guard
     start_time = time.time()
-    data = video_dataset.load_data_from_json(json_path)
+    _ = video_dataset.load_data_from_json(json_path, policy='strict')
     end_time = time.time()
     print(f"Time taken to load and check all items: {end_time - start_time} seconds")
     # Time taken to load and check all items: 0.019509077072143555 seconds
 
     #Conclusion: The type guard check is very fast, and does not add significant overhead to loading the data. 
+
+
+def test_find_loc_runs():
+    logger = _get_basic_logger()
+    
+    
+    q = Que(logger)
+    key_set = [
+        ['admin', 'exp_no'],
+        ['admin', 'model'],
+        ['training', "batch_size_equivalent"],
+        ["optimizer", "eps"],
+        ["optimizer", "backbone_init_lr"],
+        ["optimizer", "backbone_weight_decay"],
+        ["optimizer", "classifier_init_lr"],
+        ["optimizer", "classifier_weight_decay"],
+        ["model_params", "drop_p"],
+        ["data", "num_frames"],
+        ["data", "frame_size"],
+        ["scheduler", "type"],
+        ["scheduler", "t0"],
+        ["scheduler", "tmult"],
+        ["scheduler", "eta_min"],
+    ]
+    criterions = [
+        lambda x: (x != '007') and (x != '046') ,
+        lambda x: x == 'S3D' or x == 'MViTv2_S',
+        lambda x: x == 8,
+        lambda x: x == 1e-05,
+        lambda x: x == 0.0001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.5,
+        lambda x: x == 16,
+        lambda x: x == 224,
+        lambda x: x == "CosineAnnealingWarmRestarts",
+        lambda x: x == 10,
+        lambda x: x == 1,
+        lambda x: x == 0,
+    ]
+    _, runs = q.find_loc_runs('old_runs', key_set, criterions)
+    print(len(runs))
+    all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
+    for run in runs:
+        split_name = run.admin.split
+        model_name = run.admin.model
+        exp_no = run.admin.exp_no
+        cur_split = all_exps[split_name]
+        if model_name in cur_split:
+            all_exps[split_name][model_name].append(exp_no)
+        else:
+            all_exps[split_name][model_name] = [exp_no]
+      
+    with open('./results/wlasl_saicist.json', 'w') as f:
+        json.dump(all_exps,f,indent=2)
+        
+
+def test_find_S3D_runs():
+    logger = _get_basic_logger()
+    
+    
+    q = Que(logger)
+    key_set = [
+        ['admin', 'model'],
+        ['training', "batch_size_equivalent"],
+        ["optimizer", "eps"],
+        ["optimizer", "backbone_init_lr"],
+        ["optimizer", "backbone_weight_decay"],
+        ["optimizer", "classifier_init_lr"],
+        ["optimizer", "classifier_weight_decay"],
+        ["model_params", "drop_p"],
+        ["data", "num_frames"],
+        ["data", "frame_size"],
+    #     ["scheduler", "type"],
+    #     ["scheduler", "t0"],
+    #     ["scheduler", "tmult"],
+    #     ["scheduler", "eta_min"],
+    ]
+    criterions = [
+        lambda x: x == 'S3D',
+        lambda x: x == 8,
+        lambda x: x == 1e-05,
+        lambda x: x == 0.0001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.001,
+        lambda x: x == 0.5,
+        lambda x: x == 32,
+        lambda x: x == 224,
+        # lambda x: x == "CosineAnnealingWarmRestarts",
+        # lambda x: x == 10,
+        # lambda x: x == 1,
+        # lambda x: x == 0,
+    ]
+    idxs, runs = q.find_loc_runs('old_runs', key_set, criterions)
+    print(len(runs))
+    all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
+    for run in runs:
+        all_exps[run.admin.split][run.admin.model] = [run.admin.exp_no]
+    
+    
+    with open('./S3D_32_SAICIST.json', 'w') as f:
+        json.dump(all_exps,f,indent=2)
+    print(json.dumps(all_exps, indent=4))
+    print(idxs)
+
+        
+
+def test_set_nested():
+    a = {a:b for a, b in zip('abcdef', range(5))}
+    b = a.copy()
+    c = a.copy()
+    d = {
+        'z':a,
+        'y':b,
+        'x':c
+    }
+    print(json.dumps(d, indent=4))    
+    cd = CleverDict(d)
+    ks = ['z', 'a']
+    v = 200
+    cd[ks] = v
+    ks = ['x', 'e']
+    v = 300
+    ks = ['x', 'e']
+    print(json.dumps(cd.to_dict(), indent=4)) 
+    print(cd) 
+
+def test_extend_classifier():
+    from models import extend_classifier, get_model
+
+    model = get_model('MViTv2_S', 100, 0.5)
+    print(model.classifier)
+    checkpoint = torch.load('runs/asl100/MViTv2_S_exp011/checkpoints/best.pth')
+    model.load_state_dict(checkpoint)
+    model = extend_classifier(model, 300)
+    print(model.classifier)
+
+def test_get_next_expno():
+    from configs import get_next_expno
+    print(get_next_expno('asl2000', 'MViTv2_S'))
+
+def reformat_runs():
+    from configs import RUNS_PATH
+    runs = Path(RUNS_PATH)
+    asl_split = runs / 'asl100'
+    # for asl_split in runs.iterdir():
+    print('-'*5,f'Working on split: {asl_split}','-'*5)
+    for model_exp_dir in asl_split.iterdir():
+        parts = model_exp_dir.name.rsplit("_exp", maxsplit=1)
+        if len(parts) != 2 or not parts[1].isdigit():
+            print(model_exp_dir.name, 'doesnt match')
+            continue
+        
+        model_name, exp_num = parts
+        
+        new_path = asl_split / model_name / f"exp{exp_num}"
+
+        print(f"{model_exp_dir}  ->  {new_path}")
+        new_path.mkdir(parents=True, exist_ok=True)
+        model_exp_dir.rename(new_path) 
+
+def _reformat_config_path(model_exp_c:Union[Path, str]) -> Path:
+    model_exp_c = Path(model_exp_c)
+    
+    parts = model_exp_c.name.rsplit("_", maxsplit=1)
+    
+    if len(parts) != 2 or not parts[1][-5].isdigit():
+        raise ValueError(f'Parts do not match pattern for: {model_exp_c}. Found parts: {", ".join(parts)}')
+    model_name, exp_num = parts
+    exp_num = exp_num[:-4]
+    return model_exp_c.parent / model_name / f"exp{exp_num}.ini" 
+
+def reformat_configs():
+    from configs import CONFIGS_PATH
+    confs = Path(CONFIGS_PATH)
+    asl_split = confs / 'asl100'
+    # for asl_split in confs.iterdir():
+    print('-'*5,f'Working on split: {asl_split}','-'*5)
+    for model_exp_dir in asl_split.iterdir():
+        
+        try:
+            new_path = _reformat_config_path(model_exp_dir)
+        except ValueError as v:
+            print(v)
+            continue
+
+        print(f"{model_exp_dir}  ->  {new_path}")
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        model_exp_dir.rename(new_path) 
+
+
+def _reformat_path(chck_dir:Union[Path, str]) -> Path:
+    chck_dir = Path(chck_dir)
+    model_exp_dir = chck_dir.parent
+    parts = model_exp_dir.name.rsplit("_exp", maxsplit=1)
+    if len(parts) != 2 or not parts[1].isdigit():
+
+        raise ValueError(f'Parts do not match pattern for: {chck_dir}. Found parts: {", ".join(parts)}')
+    model_name, exp_num = parts
+    return model_exp_dir.parent / model_name / f"exp{exp_num}" / chck_dir.name
+
+def _reformat_weight_path(wpath: Optional[str]) -> Optional[str]:
+    if wpath is None:
+        return wpath
+    wpath_p = Path(wpath)
+    return str(_reformat_path(wpath_p.parent) / wpath_p.name)
+
+def _safe_reformat_conf(model_exp_c:str) -> str:
+    safe_dirs = ['asl100', 'asl300', 'asl1000', 'asl2000']
+    
+    if Path(model_exp_c).parent.name in safe_dirs:    
+        try:
+            ref = str(_reformat_config_path(model_exp_c))
+            print(f'{model_exp_c} -> {ref}') 
+            return ref
+        except (ValueError, IndexError) as e:
+            print(f'skipping {model_exp_c} because of {e}')
+            return model_exp_c
+    else:
+        print(f'skipping: {Path(model_exp_c).name}')
+        return model_exp_c
+
+def reformat_runs_json(runs:str):
+    q= Que(_get_basic_logger(), runs_path = runs)
+    ks = ['admin', 'save_path']
+    ks2 = ['admin']
+    ks3 = ['admin', 'weight_path']
+    ks4 = ['admin', 'config_path']
+    # q.disp_run('old_runs', 0)
+    q.update_runs(ks, lambda x: str(_reformat_path(x)))
+    q.update_runs(ks2, lambda x: x | {'weight_path': None} if 'weight_path' not in x else x)
+    q.update_runs(ks3, _reformat_weight_path)
+    q.update_runs(ks4, _safe_reformat_conf)
+    # q.disp_run('old_runs', 0)
+    q.save_state(out_path=runs.replace('.json', 'c.json'))
+
+
+def test_set_nested2():
+    a = {a:b for a, b in zip('abcdef', range(5))}
+    b = a.copy()
+    c = a.copy()
+    d = {
+        'z':a,
+        'y':b,
+        'x':c
+    }
+    # print(json.dumps(d, indent=4))    
+    cd = CleverDict(d)
+    ks = ['z', 'a']
+    v = 200
+    cd[ks] = v
+    ks = ['x', 'e']
+    v = 300
+    ks = ['x', 'e']
+    cd[ks] = v
+    print(json.dumps(cd.to_dict(), indent=4)) 
+    # print(cd) 
+
+def test_pop_nested():
+    d = {
+        'z': {'a': 0, 'b': 1},
+        'y': {'a': 0, 'b': 1},
+        'x': {'a': 0, 'b': 1}
+    }
+    cd = CleverDict(d)
+    print(cd.to_dict())
+    popped_value = cd.pop(['z', 'a'])
+    print(f"Popped value: {popped_value}")
+    print(cd.to_dict())
+
+def test_load_checkpoint():
+    from training import load_checkpoint
+    checkpath = Path('runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_015.pth')
+    # print(checkpath.exists())
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    checkpoint = load_checkpoint(checkpath, device, strict=False)
+    print(checkpoint.keys())
+
+
+
+def test_filter_runs():
+    q = Que(_get_basic_logger())
+    _ = q.summarise_runs('old_runs')
+    
+    
+
 
 if __name__ == '__main__':
     # test_dump_peak()
@@ -119,5 +412,15 @@ if __name__ == '__main__':
     # test_ex()
     # test_clear()
     # test_instance_typegaurd()
-    time_instance_typegaurd()
+    # time_instance_typegaurd()
+    # test_find_loc_runs()
+    # test_find_S3D_runs()
     
+    # test_extend_classifier()
+    # test_get_next_expno()
+    # reformat_runs()
+    # reformat_configs()
+    # reformat_runs_json('/home/luke/Code/SLR/code/que/Runs.json')
+    # test_set_nested2()
+    # test_load_checkpoint()
+    test_pop_nested()

@@ -1,0 +1,49 @@
+[training]
+batch_size = 1
+update_per_step = 8
+max_epoch = 200
+
+[optimizer]
+eps = 1e-5
+backbone_init_lr = 1e-4
+backbone_weight_decay = 1e-3
+classifier_init_lr = 1e-3
+classifier_weight_decay = 1e-3
+
+[model_params]
+drop_p = 0.5
+
+[scheduler] 
+type = 'CosineAnnealingWarmRestarts'
+t0 = 20
+tmult = 1
+eta_min = 0
+
+[data]
+num_frames = 32
+frame_size = 224
+
+[data.train_augs]
+frame_size_strategy = 'Random_crop'
+spatial_aug = ['Horizontal_flip']
+normalise = true
+
+[data.train_augs.frame_sampler]
+method = 'og'
+
+[data.test_augs]
+frame_size_strategy = 'Centre_crop'
+normalise = true
+
+[data.test_augs.frame_sampler]
+method = 'og'
+
+[early_stopping]
+metric = ['val', 'loss']
+mode = 'min'
+patience = 15
+min_delta = 0.01
+
+#Same as exp002 (previous best)
+# but with new augs
+# should be the same result

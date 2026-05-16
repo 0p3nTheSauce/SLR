@@ -16,6 +16,26 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# ask if want to remove command persistence file
+read -p "Do you want to remove the command persistence file? (y/n): " -n 1 -r REMOVE_PERSISTENCE
+echo "" # Moves to a new line after the (y/n) input
+
+if [[ $REMOVE_PERSISTENCE =~ ^[Yy]$ ]]; then
+    # CRITICAL: Ensure this matches your Python class constant!
+    PERSISTENCE_FILE="$HOME/.que_shell_history" 
+    
+    if [ -f "$PERSISTENCE_FILE" ]; then
+        rm -f "$PERSISTENCE_FILE"
+        echo -e "${GREEN}✓ Command persistence file removed${NC}"
+    else
+        echo -e "${YELLOW}! Command persistence file not found: $PERSISTENCE_FILE — skipping.${NC}"
+    fi
+else
+    echo "Command persistence file kept."
+fi
+
+
+
 # ---------------------------------------------------------------------------
 # Ask: client or server?
 # ---------------------------------------------------------------------------

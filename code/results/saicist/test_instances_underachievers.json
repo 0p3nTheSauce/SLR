@@ -1,0 +1,1142 @@
+[
+    {
+        "bbox": [
+            34,
+            46,
+            213,
+            215
+        ],
+        "frame_end": 55,
+        "frame_start": 1,
+        "instance_id": 18,
+        "signer_id": 20,
+        "source": "handspeak",
+        "split": "test",
+        "url": "https://www.handspeak.com/word/b/before-long.mp4",
+        "variation_id": 0,
+        "video_id": "05735",
+        "label_num": 3,
+        "label_name": "before"
+    },
+    {
+        "bbox": [
+            63,
+            27,
+            192,
+            237
+        ],
+        "frame_end": 74,
+        "frame_start": 1,
+        "instance_id": 20,
+        "signer_id": 38,
+        "source": "startasl",
+        "split": "test",
+        "url": "https://s3-us-west-1.amazonaws.com/files.startasl.com/asldictionary/before.mp4",
+        "variation_id": 1,
+        "video_id": "05727",
+        "label_num": 3,
+        "label_name": "before"
+    },
+    {
+        "bbox": [
+            55,
+            36,
+            202,
+            255
+        ],
+        "frame_end": 44,
+        "frame_start": 1,
+        "instance_id": 23,
+        "signer_id": 10,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/22/22829.mp4",
+        "variation_id": 1,
+        "video_id": "05739",
+        "label_num": 3,
+        "label_name": "before"
+    },
+    {
+        "bbox": [
+            53,
+            34,
+            206,
+            230
+        ],
+        "frame_end": 28,
+        "frame_start": 1,
+        "instance_id": 25,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/5/5971.mp4",
+        "variation_id": 0,
+        "video_id": "05741",
+        "label_num": 3,
+        "label_name": "before"
+    },
+    {
+        "bbox": [
+            51,
+            32,
+            199,
+            232
+        ],
+        "frame_end": 31,
+        "frame_start": 1,
+        "instance_id": 15,
+        "signer_id": 32,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20Thin-fTYMARYgieE.mp4",
+        "variation_id": 1,
+        "video_id": "57941",
+        "label_num": 14,
+        "label_name": "thin"
+    },
+    {
+        "bbox": [
+            45,
+            39,
+            210,
+            223
+        ],
+        "frame_end": 101,
+        "frame_start": 1,
+        "instance_id": 20,
+        "signer_id": 34,
+        "source": "asldeafined",
+        "split": "test",
+        "url": "https://www.asldeafined.com/media/vocabulary/1546575308.9841.mp4",
+        "variation_id": 0,
+        "video_id": "57943",
+        "label_num": 14,
+        "label_name": "thin"
+    },
+    {
+        "bbox": [
+            44,
+            42,
+            215,
+            256
+        ],
+        "frame_end": 55,
+        "frame_start": 1,
+        "instance_id": 21,
+        "signer_id": 14,
+        "source": "handspeak",
+        "split": "test",
+        "url": "https://www.handspeak.com/word/t/thin2.mp4",
+        "variation_id": 1,
+        "video_id": "57944",
+        "label_num": 14,
+        "label_name": "thin"
+    },
+    {
+        "bbox": [
+            49,
+            40,
+            209,
+            225
+        ],
+        "frame_end": 49,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "18316",
+        "label_num": 61,
+        "label_name": "eat"
+    },
+    {
+        "bbox": [
+            43,
+            37,
+            213,
+            251
+        ],
+        "frame_end": 48,
+        "frame_start": 1,
+        "instance_id": 5,
+        "signer_id": 20,
+        "source": "handspeak",
+        "split": "test",
+        "url": "https://www.handspeak.com/word/e/eat-iclpop.mp4",
+        "variation_id": 0,
+        "video_id": "18326",
+        "label_num": 61,
+        "label_name": "eat"
+    },
+    {
+        "bbox": [
+            56,
+            42,
+            212,
+            220
+        ],
+        "frame_end": 24,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "64260",
+        "label_num": 104,
+        "label_name": "yellow"
+    },
+    {
+        "bbox": [
+            42,
+            33,
+            210,
+            222
+        ],
+        "frame_end": 56,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 118,
+        "source": "aslbrick",
+        "split": "test",
+        "url": "http://aslbricks.org/New/ASL-Videos/yellow.mp4",
+        "variation_id": 0,
+        "video_id": "69545",
+        "label_num": 104,
+        "label_name": "yellow"
+    },
+    {
+        "bbox": [
+            44,
+            35,
+            213,
+            222
+        ],
+        "frame_end": 57,
+        "frame_start": 1,
+        "instance_id": 2,
+        "signer_id": 6,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20Hot%20Dog-GRyHhWy9lqE.mp4",
+        "variation_id": 0,
+        "video_id": "28085",
+        "label_num": 1777,
+        "label_name": "hot dog"
+    },
+    {
+        "bbox": [
+            42,
+            34,
+            209,
+            220
+        ],
+        "frame_end": 23,
+        "frame_start": 1,
+        "instance_id": 5,
+        "signer_id": 39,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20What%202-xFO06HB3kFs.mp4",
+        "variation_id": 0,
+        "video_id": "62967",
+        "label_num": 30,
+        "label_name": "what"
+    },
+    {
+        "bbox": [
+            25,
+            50,
+            235,
+            209
+        ],
+        "frame_end": 83,
+        "frame_start": 1,
+        "instance_id": 20,
+        "signer_id": 12,
+        "source": "aslsearch",
+        "split": "test",
+        "url": "http://www.aslsearch.com/signs/videos/what2.mp4",
+        "variation_id": 1,
+        "video_id": "62987",
+        "label_num": 30,
+        "label_name": "what"
+    },
+    {
+        "bbox": [
+            36,
+            49,
+            217,
+            215
+        ],
+        "frame_end": 45,
+        "frame_start": 1,
+        "instance_id": 25,
+        "signer_id": 10,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/23/23463.mp4",
+        "variation_id": 1,
+        "video_id": "62975",
+        "label_num": 30,
+        "label_name": "what"
+    },
+    {
+        "bbox": [
+            61,
+            45,
+            215,
+            222
+        ],
+        "frame_end": 52,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "06822",
+        "label_num": 33,
+        "label_name": "blue"
+    },
+    {
+        "bbox": [
+            58,
+            32,
+            196,
+            234
+        ],
+        "frame_end": 73,
+        "frame_start": 1,
+        "instance_id": 17,
+        "signer_id": 41,
+        "source": "aslsearch",
+        "split": "test",
+        "url": "http://www.aslsearch.com/signs/videos/blue.mp4",
+        "variation_id": 0,
+        "video_id": "06845",
+        "label_num": 33,
+        "label_name": "blue"
+    },
+    {
+        "bbox": [
+            40,
+            41,
+            209,
+            224
+        ],
+        "frame_end": 61,
+        "frame_start": 1,
+        "instance_id": 8,
+        "signer_id": 30,
+        "source": "aslpro",
+        "split": "test",
+        "url": "http://www.aslpro.com/main/h/hearing_aid.swf",
+        "variation_id": 0,
+        "video_id": "26964",
+        "label_num": 1131,
+        "label_name": "hearing aid"
+    },
+    {
+        "bbox": [
+            48,
+            37,
+            208,
+            223
+        ],
+        "frame_end": 54,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "58488",
+        "label_num": 73,
+        "label_name": "time"
+    },
+    {
+        "bbox": [
+            55,
+            41,
+            201,
+            253
+        ],
+        "frame_end": 52,
+        "frame_start": 1,
+        "instance_id": 5,
+        "signer_id": 10,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/23/23948.mp4",
+        "variation_id": 0,
+        "video_id": "58502",
+        "label_num": 73,
+        "label_name": "time"
+    },
+    {
+        "bbox": [
+            49,
+            40,
+            209,
+            225
+        ],
+        "frame_end": 52,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "64082",
+        "label_num": 50,
+        "label_name": "wrong"
+    },
+    {
+        "bbox": [
+            39,
+            44,
+            210,
+            219
+        ],
+        "frame_end": 68,
+        "frame_start": 1,
+        "instance_id": 17,
+        "signer_id": 12,
+        "source": "aslsearch",
+        "split": "test",
+        "url": "http://www.aslsearch.com/signs/videos/wrong.mp4",
+        "variation_id": 0,
+        "video_id": "64097",
+        "label_num": 50,
+        "label_name": "wrong"
+    },
+    {
+        "bbox": [
+            39,
+            46,
+            219,
+            220
+        ],
+        "frame_end": 81,
+        "frame_start": 1,
+        "instance_id": 4,
+        "signer_id": 0,
+        "source": "spreadthesign",
+        "split": "test",
+        "url": "https://media.spreadthesign.com/video/mp4/13/69483.mp4",
+        "variation_id": 1,
+        "video_id": "13325",
+        "label_num": 56,
+        "label_name": "corn"
+    },
+    {
+        "bbox": [
+            52,
+            41,
+            202,
+            227
+        ],
+        "frame_end": 43,
+        "frame_start": 1,
+        "instance_id": 16,
+        "signer_id": 109,
+        "source": "asllex",
+        "split": "test",
+        "url": "https://youtu.be/lPM0S5NBl_0",
+        "variation_id": 0,
+        "video_id": "67530",
+        "label_num": 56,
+        "label_name": "corn"
+    },
+    {
+        "bbox": [
+            54,
+            36,
+            204,
+            229
+        ],
+        "frame_end": 36,
+        "frame_start": 1,
+        "instance_id": 18,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/8/8825.mp4",
+        "variation_id": 0,
+        "video_id": "13334",
+        "label_num": 56,
+        "label_name": "corn"
+    },
+    {
+        "bbox": [
+            50,
+            43,
+            209,
+            223
+        ],
+        "frame_end": 37,
+        "frame_start": 1,
+        "instance_id": 16,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/9/9192.mp4",
+        "variation_id": 0,
+        "video_id": "51233",
+        "label_num": 72,
+        "label_name": "short"
+    },
+    {
+        "bbox": [
+            42,
+            45,
+            213,
+            219
+        ],
+        "frame_end": 52,
+        "frame_start": 1,
+        "instance_id": 17,
+        "signer_id": 83,
+        "source": "aslpro",
+        "split": "test",
+        "url": "http://www.aslpro.com/main/s/short.swf",
+        "variation_id": 1,
+        "video_id": "51234",
+        "label_num": 72,
+        "label_name": "short"
+    },
+    {
+        "bbox": [
+            50,
+            42,
+            210,
+            223
+        ],
+        "frame_end": 35,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "37879",
+        "label_num": 90,
+        "label_name": "need"
+    },
+    {
+        "bbox": [
+            57,
+            36,
+            200,
+            230
+        ],
+        "frame_end": 118,
+        "frame_start": 0,
+        "instance_id": 1,
+        "signer_id": 121,
+        "source": "northtexas",
+        "split": "test",
+        "url": "https://www.youtube.com/watch?v=4Nh1iFv2BMc",
+        "variation_id": 0,
+        "video_id": "70237",
+        "label_num": 90,
+        "label_name": "need"
+    },
+    {
+        "bbox": [
+            43,
+            44,
+            206,
+            220
+        ],
+        "frame_end": 35,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "16190",
+        "label_num": 112,
+        "label_name": "different"
+    },
+    {
+        "bbox": [
+            41,
+            40,
+            218,
+            220
+        ],
+        "frame_end": 49,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 111,
+        "source": "valencia-asl",
+        "split": "test",
+        "url": "https://www.youtube.com/watch?v=iPVMxOaLm18",
+        "variation_id": 0,
+        "video_id": "68034",
+        "label_num": 112,
+        "label_name": "different"
+    },
+    {
+        "bbox": [
+            51,
+            38,
+            208,
+            227
+        ],
+        "frame_end": 58,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "46712",
+        "label_num": 125,
+        "label_name": "red"
+    },
+    {
+        "bbox": [
+            54,
+            24,
+            200,
+            247
+        ],
+        "frame_end": 47,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 118,
+        "source": "aslbrick",
+        "split": "test",
+        "url": "http://aslbricks.org/New/ASL-Videos/red.mp4",
+        "variation_id": 0,
+        "video_id": "69446",
+        "label_num": 125,
+        "label_name": "red"
+    },
+    {
+        "bbox": [
+            48,
+            41,
+            212,
+            222
+        ],
+        "frame_end": 58,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "05296",
+        "label_num": 142,
+        "label_name": "bathroom"
+    },
+    {
+        "bbox": [
+            46,
+            35,
+            204,
+            253
+        ],
+        "frame_end": 73,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 52,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20Bathroom-u7XrB6j-o3E.mp4",
+        "variation_id": 0,
+        "video_id": "05299",
+        "label_num": 142,
+        "label_name": "bathroom"
+    },
+    {
+        "bbox": [
+            48,
+            38,
+            204,
+            224
+        ],
+        "frame_end": 41,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "27194",
+        "label_num": 12,
+        "label_name": "help"
+    },
+    {
+        "bbox": [
+            40,
+            50,
+            229,
+            212
+        ],
+        "frame_end": 51,
+        "frame_start": 1,
+        "instance_id": 8,
+        "signer_id": 17,
+        "source": "asldeafined",
+        "split": "test",
+        "url": "https://www.asldeafined.com/media/vocabulary/1471136062.8464.mp4",
+        "variation_id": 0,
+        "video_id": "27209",
+        "label_num": 12,
+        "label_name": "help"
+    },
+    {
+        "bbox": [
+            65,
+            28,
+            190,
+            254
+        ],
+        "frame_end": 43,
+        "frame_start": 1,
+        "instance_id": 13,
+        "signer_id": 10,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/23/23431.mp4",
+        "variation_id": 0,
+        "video_id": "27213",
+        "label_num": 12,
+        "label_name": "help"
+    },
+    {
+        "bbox": [
+            37,
+            47,
+            213,
+            216
+        ],
+        "frame_end": 41,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "07383",
+        "label_num": 34,
+        "label_name": "bowling"
+    },
+    {
+        "bbox": [
+            64,
+            30,
+            195,
+            251
+        ],
+        "frame_end": 32,
+        "frame_start": 1,
+        "instance_id": 17,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/6/6345.mp4",
+        "variation_id": 0,
+        "video_id": "07400",
+        "label_num": 34,
+        "label_name": "bowling"
+    },
+    {
+        "bbox": [
+            40,
+            48,
+            218,
+            215
+        ],
+        "frame_end": 68,
+        "frame_start": 1,
+        "instance_id": 8,
+        "signer_id": 12,
+        "source": "aslsearch",
+        "split": "test",
+        "url": "http://www.aslsearch.com/signs/videos/right.mp4",
+        "variation_id": 1,
+        "video_id": "48126",
+        "label_num": 95,
+        "label_name": "right"
+    },
+    {
+        "bbox": [
+            59,
+            31,
+            195,
+            254
+        ],
+        "frame_end": 34,
+        "frame_start": 1,
+        "instance_id": 20,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/6/6234.mp4",
+        "variation_id": 0,
+        "video_id": "48115",
+        "label_num": 95,
+        "label_name": "right"
+    },
+    {
+        "bbox": [
+            41,
+            41,
+            211,
+            219
+        ],
+        "frame_end": 73,
+        "frame_start": 1,
+        "instance_id": 3,
+        "signer_id": 59,
+        "source": "asldeafined",
+        "split": "test",
+        "url": "https://www.asldeafined.com/media/vocabulary/1466731128.19.mp4",
+        "variation_id": 1,
+        "video_id": "10186",
+        "label_num": 109,
+        "label_name": "check"
+    },
+    {
+        "bbox": [
+            38,
+            32,
+            210,
+            255
+        ],
+        "frame_end": 54,
+        "frame_start": 1,
+        "instance_id": 14,
+        "signer_id": 5,
+        "source": "aslu",
+        "split": "test",
+        "url": "https://www.youtube.com/watch?v=v-pa2sZr1a8",
+        "variation_id": 0,
+        "video_id": "10195",
+        "label_num": 109,
+        "label_name": "check"
+    },
+    {
+        "bbox": [
+            44,
+            44,
+            214,
+            255
+        ],
+        "frame_end": 50,
+        "frame_start": 1,
+        "instance_id": 15,
+        "signer_id": 30,
+        "source": "aslpro",
+        "split": "test",
+        "url": "http://www.aslpro.com/main/c/check.swf",
+        "variation_id": 0,
+        "video_id": "10196",
+        "label_num": 109,
+        "label_name": "check"
+    },
+    {
+        "bbox": [
+            44,
+            37,
+            214,
+            221
+        ],
+        "frame_end": 52,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "51494",
+        "label_num": 129,
+        "label_name": "sick"
+    },
+    {
+        "bbox": [
+            42,
+            35,
+            211,
+            228
+        ],
+        "frame_end": 63,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 118,
+        "source": "aslbrick",
+        "split": "test",
+        "url": "http://aslbricks.org/New/ASL-Videos/sick.mp4",
+        "variation_id": 0,
+        "video_id": "69470",
+        "label_num": 129,
+        "label_name": "sick"
+    },
+    {
+        "bbox": [
+            38,
+            49,
+            214,
+            213
+        ],
+        "frame_end": 58,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "06550",
+        "label_num": 143,
+        "label_name": "blanket"
+    },
+    {
+        "bbox": [
+            36,
+            48,
+            225,
+            208
+        ],
+        "frame_end": 33,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 39,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20Blanket-56AEFvJQNKM.mp4",
+        "variation_id": 0,
+        "video_id": "06553",
+        "label_num": 143,
+        "label_name": "blanket"
+    },
+    {
+        "bbox": [
+            51,
+            37,
+            205,
+            225
+        ],
+        "frame_end": 30,
+        "frame_start": 1,
+        "instance_id": 4,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/8/8872.mp4",
+        "variation_id": 1,
+        "video_id": "08706",
+        "label_num": 145,
+        "label_name": "call"
+    },
+    {
+        "bbox": [
+            52,
+            40,
+            205,
+            227
+        ],
+        "frame_end": 35,
+        "frame_start": 1,
+        "instance_id": 28,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/6/6738.mp4",
+        "variation_id": 0,
+        "video_id": "08701",
+        "label_num": 145,
+        "label_name": "call"
+    },
+    {
+        "bbox": [
+            47,
+            41,
+            209,
+            219
+        ],
+        "frame_end": 41,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "13258",
+        "label_num": 149,
+        "label_name": "copy"
+    },
+    {
+        "bbox": [
+            49,
+            35,
+            202,
+            256
+        ],
+        "frame_end": 71,
+        "frame_start": 1,
+        "instance_id": 1,
+        "signer_id": 115,
+        "source": "lillybauer",
+        "split": "test",
+        "url": "https://www.youtube.com/watch?v=Oacp14zeUUk",
+        "variation_id": 0,
+        "video_id": "68756",
+        "label_num": 149,
+        "label_name": "copy"
+    },
+    {
+        "bbox": [
+            56,
+            43,
+            212,
+            221
+        ],
+        "frame_end": 38,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "22071",
+        "label_num": 154,
+        "label_name": "first"
+    },
+    {
+        "bbox": [
+            40,
+            42,
+            216,
+            217
+        ],
+        "frame_end": 65,
+        "frame_start": 1,
+        "instance_id": 17,
+        "signer_id": 5,
+        "source": "aslu",
+        "split": "test",
+        "url": "https://www.youtube.com/watch?v=x5l3yT0VW_w",
+        "variation_id": 1,
+        "video_id": "22096",
+        "label_num": 154,
+        "label_name": "first"
+    },
+    {
+        "bbox": [
+            48,
+            39,
+            207,
+            224
+        ],
+        "frame_end": 26,
+        "frame_start": 1,
+        "instance_id": 4,
+        "signer_id": 11,
+        "source": "signingsavvy",
+        "split": "test",
+        "url": "https://www.signingsavvy.com/signs/mp4/6/6854.mp4",
+        "variation_id": 1,
+        "video_id": "03125",
+        "label_num": 181,
+        "label_name": "approve"
+    },
+    {
+        "bbox": [
+            46,
+            40,
+            212,
+            221
+        ],
+        "frame_end": 104,
+        "frame_start": 1,
+        "instance_id": 13,
+        "signer_id": 35,
+        "source": "spreadthesign",
+        "split": "test",
+        "url": "https://media.spreadthesign.com/video/mp4/13/51262.mp4",
+        "variation_id": 0,
+        "video_id": "03120",
+        "label_num": 181,
+        "label_name": "approve"
+    },
+    {
+        "bbox": [
+            51,
+            39,
+            204,
+            225
+        ],
+        "frame_end": 46,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "38206",
+        "label_num": 1833,
+        "label_name": "new york"
+    },
+    {
+        "bbox": [
+            32,
+            50,
+            215,
+            212
+        ],
+        "frame_end": 109,
+        "frame_start": 1,
+        "instance_id": 9,
+        "signer_id": 28,
+        "source": "spreadthesign",
+        "split": "test",
+        "url": "https://media.spreadthesign.com/video/mp4/13/481196.mp4",
+        "variation_id": 0,
+        "video_id": "18289",
+        "label_num": 276,
+        "label_name": "east"
+    },
+    {
+        "bbox": [
+            52,
+            31,
+            203,
+            231
+        ],
+        "frame_end": 39,
+        "frame_start": 1,
+        "instance_id": 11,
+        "signer_id": 31,
+        "source": "signschool",
+        "split": "test",
+        "url": "https://signstock.blob.core.windows.net/signschool/videos/db_uploads/SignSchool%20East-pB8laIXIVQc.mp4",
+        "variation_id": 0,
+        "video_id": "18291",
+        "label_num": 276,
+        "label_name": "east"
+    }
+]

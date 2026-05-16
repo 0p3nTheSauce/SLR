@@ -1,6 +1,7 @@
 */__pycache__
 *.pt
 *.pth
+*.pyth
 *.pyc
 *.zip
 data/
@@ -8,6 +9,7 @@ data/
 *.jpg
 *.log
 *.lock
+*.pkl
 code/runs/
 code/experiments/
 code/media/
@@ -16,6 +18,9 @@ code/wandb/
 code/preprocessed/
 code/que/Server.json
 code/que/Runs.json
+code/que/old_ques/
+code/que/experiments
 .vscode/
 ./.vscode/
+
 

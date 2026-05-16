@@ -1,0 +1,21 @@
+[
+    {
+        "bbox": [
+            49,
+            35,
+            209,
+            221
+        ],
+        "frame_end": 35,
+        "frame_start": 1,
+        "instance_id": 0,
+        "signer_id": 9,
+        "source": "asl5200",
+        "split": "test",
+        "url": "",
+        "variation_id": 0,
+        "video_id": "05997",
+        "label_num": 1633,
+        "label_name": "beside"
+    }
+]

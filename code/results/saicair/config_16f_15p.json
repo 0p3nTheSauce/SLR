@@ -1,0 +1,388 @@
+{
+    "spec": {
+        "training": {
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 1e-05,
+            "backbone_init_lr": 0.0001,
+            "backbone_weight_decay": 0.001,
+            "classifier_init_lr": 0.001,
+            "classifier_weight_decay": 0.001
+        },
+        "model_params": {
+            "drop_p": 0.5
+        },
+        "data": {
+            "num_frames": 16,
+            "frame_size": 224,
+            "train_augs": {
+                "frame_size_strategy": "Random_crop",
+                "normalise": true,
+                "frame_sampler": {
+                    "method": "og"
+                },
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.5
+                    }
+                ]
+            },
+            "test_augs": {
+                "frame_size_strategy": "Centre_crop",
+                "normalise": true,
+                "frame_sampler": {
+                    "method": "og"
+                }
+            }
+        },
+        "early_stopping": {
+            "metric": [
+                "val",
+                "loss"
+            ],
+            "mode": "min",
+            "min_delta": 0.01,
+            "patience": 15
+        }
+    },
+    "results": [
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/S3D/exp001/checkpoints",
+                "exp_no": "001",
+                "recover": false,
+                "config_path": "configfiles/asl2000/S3D/exp001.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/S3D/exp001/checkpoints/best.pth"
+            },
+            "results": {
+                "best_val_acc": 28.50944359367024,
+                "best_val_loss": 4.256252695133673,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.20164166666666666,
+                        "top5": 0.4821583333333333,
+                        "top10": 0.6185916666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.23376172282042376,
+                        "top5": 0.5123306703716568,
+                        "top10": 0.6418895449808961
+                    },
+                    "average_loss": 4.30936044776001
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.21232499999999999,
+                        "top5": 0.5001333333333333,
+                        "top10": 0.6249416666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.239152628892292,
+                        "top5": 0.5219499744767738,
+                        "top10": 0.6465033180193976
+                    },
+                    "average_loss": 4.256252695133673
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "save_path": "runs/asl1000/S3D/exp001/checkpoints",
+                "exp_no": "001",
+                "recover": false,
+                "config_path": "configfiles/asl1000/S3D/exp001.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/S3D/exp003/checkpoints/best.pth"
+            },
+            "results": {
+                "best_val_acc": 36.73997412677878,
+                "best_val_loss": 3.6063328443651206,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.29760000000000003,
+                        "top5": 0.6002166666666667,
+                        "top10": 0.7096333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.30383795309168443,
+                        "top5": 0.599680170575693,
+                        "top10": 0.7057569296375267
+                    },
+                    "average_loss": 3.7455447705896554
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.3123166666666667,
+                        "top5": 0.6195499999999999,
+                        "top10": 0.7179666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3216903837861147,
+                        "top5": 0.6196636481241915,
+                        "top10": 0.7145321259163433
+                    },
+                    "average_loss": 3.6063328443651206
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl300",
+                "save_path": "runs/asl300/S3D/exp003/checkpoints",
+                "exp_no": "003",
+                "recover": false,
+                "config_path": "configfiles/asl300/S3D/exp003.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/S3D/exp075/checkpoints/best.pth"
+            },
+            "results": {
+                "best_val_acc": 43.50721420643729,
+                "best_val_loss": 3.260730293435537,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.3562222222222222,
+                        "top5": 0.6560555555555555,
+                        "top10": 0.7668888888888888
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3532934131736527,
+                        "top5": 0.6482035928143712,
+                        "top10": 0.7604790419161677
+                    },
+                    "average_loss": 3.603627228108726
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.4017777777777778,
+                        "top5": 0.7045555555555555,
+                        "top10": 0.7982777777777779
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.4039955604883463,
+                        "top5": 0.6970033296337403,
+                        "top10": 0.7913429522752498
+                    },
+                    "average_loss": 3.260730293435537
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp075/checkpoints",
+                "exp_no": "075",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp075.toml",
+                "weight_path": null
+            },
+            "results": {
+                "best_val_acc": 52.366863905325445,
+                "best_val_loss": 2.303880117402775,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.40800000000000003,
+                        "top5": 0.7366666666666667,
+                        "top10": 0.8350000000000002
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.4186046511627907,
+                        "top5": 0.7441860465116279,
+                        "top10": 0.8410852713178295
+                    },
+                    "average_loss": 2.615469171146506
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5035,
+                        "top5": 0.7663333333333335,
+                        "top10": 0.8654999999999999
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5059171597633136,
+                        "top5": 0.7662721893491125,
+                        "top10": 0.8609467455621301
+                    },
+                    "average_loss": 2.303880117402775
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_16x4",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/MViTv2_S_16x4/exp000/checkpoints",
+                "exp_no": "000",
+                "recover": true,
+                "config_path": "configfiles/asl2000/MViTv2_S_16x4/exp000.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/MViTv2_S_16x4/exp000/checkpoints/best.pth"
+            },
+            "results": {
+                "best_val_acc": 42.7003573251659,
+                "best_val_loss": 2.722686770927252,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.37617500000000004,
+                        "top5": 0.6977749999999999,
+                        "top10": 0.7924416666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.3990969086488364,
+                        "top5": 0.7061479680444599,
+                        "top10": 0.7964571031608197
+                    },
+                    "average_loss": 2.8271240015346204
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.38684166666666664,
+                        "top5": 0.7171083333333333,
+                        "top10": 0.814275
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.40684022460439,
+                        "top5": 0.7289433384379785,
+                        "top10": 0.8195507912200102
+                    },
+                    "average_loss": 2.722686770927252
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_16x4",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "save_path": "runs/asl1000/MViTv2_S_16x4/exp000/checkpoints",
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "configfiles/asl1000/MViTv2_S_16x4/exp000.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/MViTv2_S_16x4/exp000/checkpoints/best.pth"
+            },
+            "results": {
+                "best_val_acc": 54.80810694264769,
+                "best_val_loss": 1.9804389232382449,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5096333333333333,
+                        "top5": 0.7958833333333333,
+                        "top10": 0.8670833333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5111940298507462,
+                        "top5": 0.7937100213219617,
+                        "top10": 0.8619402985074627
+                    },
+                    "average_loss": 2.156511055295454
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5242666666666667,
+                        "top5": 0.8172166666666667,
+                        "top10": 0.88925
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5295385942216473,
+                        "top5": 0.8154376886589046,
+                        "top10": 0.8865890470030185
+                    },
+                    "average_loss": 1.9804389232382449
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_16x4",
+                "dataset": "WLASL",
+                "split": "asl300",
+                "save_path": "runs/asl300/MViTv2_S_16x4/exp000/checkpoints",
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "configfiles/asl300/MViTv2_S_16x4/exp000.toml",
+                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/MViTv2_S_16x4/exp003/checkpoints/best.pth"
+            },
+            "results": {
+                "best_val_acc": 68.3684794672586,
+                "best_val_loss": 1.292043593583881,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6125555555555555,
+                        "top5": 0.8840555555555557,
+                        "top10": 0.9282222222222223
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6092814371257484,
+                        "top5": 0.8802395209580839,
+                        "top10": 0.9251497005988024
+                    },
+                    "average_loss": 1.564196894572855
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.661,
+                        "top5": 0.893888888888889,
+                        "top10": 0.9316666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6648168701442841,
+                        "top5": 0.8945615982241953,
+                        "top10": 0.93007769145394
+                    },
+                    "average_loss": 1.292043593583881
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_16x4",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_S_16x4/exp003/checkpoints",
+                "exp_no": "003",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_S_16x4/exp003.toml",
+                "weight_path": null
+            },
+            "results": {
+                "best_val_acc": 76.92307692307692,
+                "best_val_loss": 0.9251813271568403,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7321666666666669,
+                        "top5": 0.9141666666666666,
+                        "top10": 0.9591666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7364341085271318,
+                        "top5": 0.9147286821705426,
+                        "top10": 0.9612403100775194
+                    },
+                    "average_loss": 1.09683117974004
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7725,
+                        "top5": 0.9333333333333332,
+                        "top10": 0.9708333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7692307692307693,
+                        "top5": 0.9319526627218935,
+                        "top10": 0.9674556213017751
+                    },
+                    "average_loss": 0.9251813271568403
+                }
+            }
+        }
+    ]
+}

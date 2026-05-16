@@ -1,8 +1,17 @@
 
-Shell:
+Que:
 - add flag to check if changes were made before saving 
-- make a persistent shell history file/ ability to drop in and out of shell like tmux
-- Add more options to logs
+
+Shell:
+- make a persistent shell history file
+- ability to drop in and out of shell like tmux/faster startup
+- Add more options to logs: all options to regular logs, + server logs
+- add top-n to list
+- add more flexibility to run summarisation
+- add a flag to turn into debugging mode. Check debugging mode in unwrap_exception
+- fix argument parsing short flags
+
+
 
 Daemon
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
