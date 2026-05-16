@@ -42,25 +42,27 @@ python preprocess.py asl2000 -ve
 
 ## Usage
 
-Training and testing have the following **positional arguments** in common:
+Training and testing have the following **arguments** in common:
 
-- **MODEL_NAME**: 
+- `MODEL_NAME`: 
     One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S,Swin3D_B, MViTv2_S, MViTv1_B 
-- **SPLIT**: 
+- `SPLIT`: 
     The ASL split, one of: asl100, asl300, asl1000, asl2000
-- **EXP_NO**: 
+- `EXP_NO`: 
     is the experiment number (e.g. 4)
 
-Additionally, both of them by default set a random seed for reproducability. 
+Additionally, both of them by default set a random [seed](./code/configs.py) for reproducability. (Note the [Que](./code/que/README.md) had a bug which broke RNG state during some experiments).
 
 ### Training
 
 #### Postional arguments:
 
-- **trianing.py** **{MODEL_NAME}** **{SPLIT}** **{EXP_NO}** **[OPTIONS]**
+- `trianing.py` {`MODEL_NAME`} {`SPLIT`} [`OPTIONS`]
 
-It is assumed that every run begins with a config file. The config file path can be determined automatically if using the following naming convention (exp_no to 3 units of precision e.g. 004): 
- ./configfiles/**SPLIT**/**MODELNAME**_**EXPNO**.ini
+It is assumed that every run begins with a **config file**. This is specified in either of two ways:
+- The `path` can be specified with `-c` flag. Then `EXP_NO` can be determined automatically based on existing run directories. 
+- The `EXP_NO` can be specified with the `-en` flag. Then the `path` can be determined automatically if using the following naming convention (exp_no to 3 units of precision e.g. 004): 
+ ./configfiles/**SPLIT**/**MODELNAME**_**EXPNO**.toml. 
 
 ```bash
 #for help python train.py -h
@@ -275,3 +277,5 @@ Contributions are welcome! Please open issues or submit pull requests.
 ## License
 
 The data provided in this project is subject to the C-UDA license of the forked WLASL dataset. By downloading or using this data, you agree to the terms of the C-UDA and any downstream redistribution must also comply with these terms. See [C-UDA-1.0.pdf](C-UDA-1.0.pdf)
+
+Some models used are implemented from other repositories. By using any of these models you are implicitly subject to their licenses. See the [models README.md](./code/models/README.md) for more details.  
