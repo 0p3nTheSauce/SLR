@@ -116,7 +116,7 @@ Internally, the Que is composed of the following locations:
 
 Each of these locations can be viewed with `list` command. Alternatively a single run can be viewed in a particular location with the `display` command. 
 
-When using `create` a new training run is specified using the same parser as *training.py* (see [training](../../README.md#training)) and is added to `to_run`. 
+When using `create` a new training run is specified using the same parser as *training.py* (see [training](../../README.md#training)) and is added to `to_run`. `add` also uses this parser, and is used to add already completed runs to `old_runs`
 
 #### Que Daemon
 
@@ -160,6 +160,6 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 
 - `attach` attaches to tmux session (only opens on the shell side)
 - `wandb` open up wandb website
-- `logs` View the logs from the worker, or the server (not inclusive of systemd service logs).
+- `logs` View the logs from the worker, server or systemd service (requires sudo).
 - `save` Save state of que or server to .json file
 - `load` Load state of que or server from .json file
