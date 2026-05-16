@@ -17,7 +17,7 @@ git clone https://github.com/0p3nTheSauce/SLR.git
 cd SLR
 
 #recommend using mini-conda 
-conda env create -f wlasl_gpu.yml #GPU version required for training / testing
+conda env create -f wlasl_gpu.yml #GPU recommended for training / testing
 conda activate wlasl
 
 #alternatively if no GPU available 
@@ -57,16 +57,16 @@ Additionally, both of them by default set a random [seed](./code/configs.py) for
 
 #### Postional arguments:
 
-- `trianing.py` {`MODEL_NAME`} {`SPLIT`} [`OPTIONS`]
+- trianing.py {`MODEL_NAME`} {`SPLIT`} (-en `EXP_NO` | -c `CONFIG_PATH`) [`OPTIONS`]
 
 It is assumed that every run begins with a **config file**. This is specified in either of two ways:
-- The `path` can be specified with `-c` flag. Then `EXP_NO` can be determined automatically based on existing run directories. 
-- The `EXP_NO` can be specified with the `-en` flag. Then the `path` can be determined automatically if using the following naming convention (exp_no to 3 units of precision e.g. 004): 
- ./configfiles/**SPLIT**/**MODELNAME**_**EXPNO**.toml. 
+- The `CONFIG_PATH` can be specified with `-c` flag. Then `EXP_NO` can be determined automatically based on existing run directories. 
+- The `EXP_NO` can be specified with the `-en` flag. Then the `CONFIG_PATH` can be determined automatically if using the following naming convention (exp_no to 3 units of precision e.g. 004): 
+ ./configfiles/`SPLIT`/`MODELNAME`/exp`EXP_NO`.toml. 
 
 ```bash
 #for help python train.py -h
-python training.py S3D asl100 4
+python training.py S3D asl100 -en 4
 ```
 
 #### [Options]
@@ -85,8 +85,6 @@ python training.py S3D asl100 4
 - -ec, --enum_chck      enumerate the checkpoint dir num (for output)
 - -t TAGS [TAGS ...], --tags TAGS [TAGS ...]
                     Additional wandb tags
-- -c CONFIG_PATH, --config_path CONFIG_PATH
-                    path to config .ini file
 - -na, --no_ask         Don't ask for confirmation
 
 #### Output
@@ -95,11 +93,12 @@ python training.py S3D asl100 4
 runs
 ├── asl100
 │   ├── S3D
-│   │   ├── checkpoints
-│   │   │   ├── ...
-│   │   │   ├── best.pth
-│   │   │   └── checkpoint_097.pth
-│   │   └── data_info.json
+│   │   ├──exp000
+│   │   │   ├── checkpoints
+│   │   │   │   ├── ...
+│   │   │   │   ├── best.pth
+│   │   │   │   └── checkpoint_097.pth
+│   │   │   └── data_info.json
 ...
 ```
 *data_info.json* contains the frame size and number of  frames used in training, for easy access when testing. *best.pth* is the model checkpoint with the best validation loss. 
@@ -109,31 +108,31 @@ runs
 
 #### Postional arguments
 
-- **testing.py** **{MODE}** ...
+- testing.py {`MODE`} ...
 
-where **MODE** is:
-- **partial:** Run a test on a single set (e.g. test), with a number of options 
-- **full:** Ticks a comprehensive set of options from *partial*, and bundles the results together. 
+where `MODE` is:
+- `partial`: Run a test on a single set (e.g. test), with a number of options 
+- `full`: Ticks a comprehensive set of options from `partial`, and bundles the results together. 
 
-##### Partial test
-- **testing.py** **partial** **{MODEL_NAME}** **{SPLIT}** **{EXP_NO}** **{SET}** **[OPTIONS]**
+#### Partial test
+- testing.py `partial` {`MODEL_NAME`} {`SPLIT`} {`EXP_NO`} {`SET`} [`OPTIONS`]
 
-where **SET** is on of:
-- **test**
-- **val**
-- **train**
+where `SET` is on of:
+- `test`
+- `val`
+- `train`
 
-*testing.py* *partial* has all the options available to *full* but adds more fine grained control of options, and only does a single test. 
+*testing.py* `partial` has all the options available to `full` but has more fine grained control of options, and only does a single test. 
 
 ```bash
 python testing.py partial S3D asl100 4 test
 ```
 
-##### Full test
+#### Full test
 
-- **testing.py** **full** **{MODEL_NAME}** **{SPLIT}** **{EXP_NO}** **[OPTIONS]**
+- testing.py `full` {`MODEL_NAME`} {`SPLIT`} {`EXP_NO`} [`OPTIONS`]
 
-*testing.py* *full* will automatically choose the *best.pth* checkpoint saved by *training.py*. It evaluates on the test set, the validation set, and the test set with the frames shuffled. Additionally, it creates all the available graphs. 
+*testing.py* `full` will automatically choose the *best.pth* checkpoint saved by *training.py*. It evaluates on the test set, the validation set, and the test set with the frames shuffled. Additionally, it creates all the available graphs. 
 
 ```bash
 python testing.py full S3D asl100 4
@@ -143,7 +142,7 @@ python testing.py full S3D asl100 4
 
 ##### Partial test
 
-*partial* has the options listed below, as well as all the options available to *full* test.
+`partial` has the options listed below, as well as all the options available to `full` test.
 
 - -sf, --shuffle_frames
                         Shuffle the frames when testing
@@ -175,9 +174,9 @@ class TopKRes(TypedDict):
 	top10: float
 ```
 
-##### Partial test
+#### Partial test
 
-*testing.py* *partial* will output either a *BaseRes*:
+*testing.py* `partial` will output either a *BaseRes*:
 
 ```python
 class BaseRes(TypedDict):
@@ -194,7 +193,7 @@ class ShuffRes(BaseRes):
 	shannon_entropy: float
 ```
 
-depending one whether the *shuffle_frames* argument is set. The *average_loss* is the loss calculated for the forward pass of the specified set. 
+depending one whether the `shuffle_frames` argument is set. The *average_loss* is the loss calculated for the forward pass of the specified set. 
 
 When the frames are shuffled, the permutation used, and the shannon entropy of that permutation are included in the results. The Shannon Entropy algorythm used was derived from the first answer of:
     https://stats.stackexchange.com/questions/78591/correlation-between-two-decks-of-cards
@@ -203,29 +202,30 @@ which was referenced by:
 
 Additionaly, the script may output/display 0 or more graphs depending on which flags are set.
 
-If the save flag is set, *testing.py* creates a results directory, inside runs/**SPLIT**/**MODELNAME** _ **EXPNO**. The results for *partial* will have the naming convention: **CHECKPOINTNAME**_**SET**-top-k.json. For example:
+If the save flag is set, *testing.py* creates a results directory, inside runs/`SPLIT`/`MODEL_NAME`/`EXP_NO`. The results for `partial` will have the naming convention: `CHECKPOINT_NAME`_`SET`-top-k.json. For example:
 
 ```bash
 runs
 ├── asl100
 │   ├── S3D
-│   │   ├── checkpoints
-│   │   │   ├── ...
-│   │   │   ├── best.pth
-│   │   │   └── checkpoint_097.pth
-│   │   ├── data_info.json
-│   │   └── results
-│   │       ├── ...
-│   │       └── best_test-top-k.json     
+│   │   ├──exp000
+│   │   │   ├── checkpoints
+│   │   │   │   ├── ...
+│   │   │   │   ├── best.pth
+│   │   │   │   └── checkpoint_097.pth
+│   │   │   ├── data_info.json
+│   │   │   └── results
+│   │   │       ├── ...
+│   │   │       └── best_test-top-k.json     
 ...
 ```
 
-##### Full test
+#### Full test
 
-*full* test prints a *CompRes* TypedDict:
+*full* test prints a *CompRes* Dictionary:
 
 ```python
-class CompRes(TypedDict):
+class CompRes(BaseModel):
 	check_name: str
 	best_val_acc: float
 	best_val_loss: float
@@ -244,22 +244,23 @@ Additionally, all the graphs will be made (heatmap, confusion matrix, bar graph)
 
 The astute observer may notice there is a duplication of validation accuracy and validation loss. This is intentional to confirm that the *training.py* and *testing.py* scripts are consistent with each other. 
 
-If the save flag is set, *testing.py* creates a results directory, inside runs/**SPLIT**/**MODELNAME** _ **EXPNO**. *full* will save all the graphs as .pngs and the results in best_val_loss.json (the checkpoint made from the best val loss)
+If the save flag is set, *testing.py* creates a results directory, inside runs/`SPLIT`/`MODELNAME`/exp`EXP_NO`. `full` will save all the graphs as *.pngs* and the results in *best_val_loss.json* (the checkpoint made from the best val loss). An example is shown below:
 
 ```bash
 runs
 ├── asl100
 │   ├── S3D
-│   │   ├── checkpoints
-│   │   │   ├── ...
-│   │   │   ├── best.pth
-│   │   │   └── checkpoint_097.pth
-│   │   ├── data_info.json
-│   │   └── results
-│   │       ├── best_test-bargraph.png
-│   │       ├── best_test-confmat.png
-│   │       ├── best_test-heatmap.png
-│   │       └── best_val_loss.json  
+│   │   ├──exp000
+│   │   │   ├── checkpoints
+│   │   │   │   ├── ...
+│   │   │   │   ├── best.pth
+│   │   │   │   └── checkpoint_097.pth
+│   │   │   ├── data_info.json
+│   │   │   └── results
+│   │   │       ├── best_test-bargraph.png
+│   │   │       ├── best_test-confmat.png
+│   │   │       ├── best_test-heatmap.png
+│   │   │       └── best_val_loss.json  
 ...
 ```
 

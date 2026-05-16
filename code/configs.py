@@ -271,8 +271,15 @@ def get_config_path(
 def get_train_parser(
     prog: Optional[str] = None, desc: str = "Train a model", model_opts: Optional[List[str]] = None, split_opts: Optional[List[str]] = None
 ) -> argparse.ArgumentParser:
-    
-    """Get parser for a training configuration."""
+    """Get parser for a training configuration
+
+    Args:
+        prog (Optional[str], optional): Script name, (e.g. train.py). Defaults to None.
+        desc (str, optional): Program desctiption. Defaults to "Train a model".
+
+    Returns:
+        argparse.ArgumentParser: Parser which takes training arguments
+    """
     if model_opts is None:
         from models import avail_models
         models_available = avail_models()
@@ -286,23 +293,23 @@ def get_train_parser(
 
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
-    parser.add_argument("model", type=str, choices=models_available)
-    parser.add_argument("split", type=str, choices=splits_available)
+    parser.add_argument("model", type=str, choices=models_available, help="Model name from one of the implemented model")
+    parser.add_argument("split", type=str, choices=splits_available, help="The class split")
 
     experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
-    experiment_gen_type.add_argument("-en", "--exp_no", type=int)
-    experiment_gen_type.add_argument("-c", "--config_path")
+    experiment_gen_type.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
+    experiment_gen_type.add_argument("-c", "--config_path", help="Path to config file")
 
-    parser.add_argument("-ds", "--dataset", type=str, choices=["WLASL"], default="WLASL")
-    parser.add_argument("-r", "--recover", action="store_true")
-    parser.add_argument("-ri", "--run_id", type=str, default=None)
-    parser.add_argument("-p", "--project", type=str)
-    parser.add_argument("-et", "--entity", type=str, default=ENTITY)
-    parser.add_argument("-t", "--tags", nargs="+", type=str)
-    parser.add_argument("-w", "--weights_path", type=str)
+    parser.add_argument("-ds", "--dataset", type=str, choices=["WLASL"], default="WLASL", help="Not implemented yet")
+    parser.add_argument("-r", "--recover", action="store_true", help="Recover from last checkpoint")
+    parser.add_argument("-ri", "--run_id", type=str, default=None, help="The run id to use (especially when also using recover)")
+    parser.add_argument("-p", "--project", type=str, help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)")
+    parser.add_argument("-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}")
+    parser.add_argument("-t", "--tags", nargs="+", type=str, help="Additional wandb tags")
+    parser.add_argument("-w", "--weights_path", type=str, help="Path to model pretrained weights")
     parser.add_argument("-b", "--force_weight", action="store_true", help="Use weights_path even if it does not exist")
-    parser.add_argument("-na", "--no_ask", action="store_true")
-    parser.add_argument("-nec", "--no_enum_chck", action="store_true")
+    parser.add_argument("-na", "--no_ask", action="store_true", help="Don't ask for confirmation")
+    parser.add_argument("-nec", "--no_enum_chck", action="store_true", help="Do not enumerate the checkpoint dir num (for output)")
     parser.add_argument("-f", "--config_filetype", type=str, default=CONFIG_FILETYPE, help=f'Config file type, defaults to: {CONFIG_FILETYPE}')
     return parser
 
