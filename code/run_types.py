@@ -333,8 +333,36 @@ class OptimizerInfo(BaseModel):
     classifier_weight_decay: float
 
 
-class ModelParamsInfo(BaseModel):
+TRAIN_TYPE : TypeAlias = Literal['supervised', 'unsupervised']
+
+
+
+class SupervisedInfo(BaseModel):
     drop_p: Optional[float] = None
+    type: Literal['supervised'] = 'supervised'
+
+class MVirTedInfo(BaseModel):
+    type: Literal['mvir_ted'] = 'mvir_ted'
+    drop_p: Optional[float] = None
+    embed_dim: int = 512
+    num_heads: int = 8
+    num_layers: int = 4
+    max_frames: int = 64
+    mvit_out_dim: int = 768
+
+class UnsupervisedInfo(BaseModel):
+    type: Literal['unsupervised'] = 'unsupervised'
+
+class MVirTedMaeInfo(BaseModel):
+    type: Literal['mvir_ted_mae'] = 'mvir_ted_mae'
+    encoder_info: MVirTedInfo = MVirTedInfo()
+    mask_ratio: float = 0.5
+    embed_dim: int = 512
+
+ModelInfo = Annotated[
+    Union[SupervisedInfo, MVirTedInfo, UnsupervisedInfo, MVirTedMaeInfo],
+    Field(discriminator='type')
+]
 
 
 class WarmUpSched(BaseModel):
@@ -443,7 +471,7 @@ class RunInfo(BaseModel):
     admin: AdminInfo
     training: TrainingInfo
     optimizer: OptimizerInfo
-    model_params: ModelParamsInfo = Field(default_factory=ModelParamsInfo)
+    model_params: ModelInfo = Field(default_factory=SupervisedInfo)
     data: DataInfo
     scheduler: Optional[SchedInfo] = None
     early_stopping: Optional[StopperOn] = None
