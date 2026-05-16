@@ -41,6 +41,7 @@ Citation:
 
 To download the weights, use:
 ```bash
+cd models
 mkdir -p ./mvit/weights/
 wget -P ./mvit/weights/ https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_S_16x4_k400_f302660347.pyth
 wget -P ./mvit/weights/ https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_B_32x3_k400_f304025456.pyth
@@ -76,11 +77,11 @@ To note: the weights from the image classification [repo](https://github.com/fac
 Weights for the B, S and T ImageNet 1K instatiations (pretrained on COCO) can be downloaded as follows:
 
 ```bash
-wget -p ./mvit/weights/ -O MViTV2-T_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_t_3x/f308344828/model_final_c6967a.pkl
+wget -p ./mvit/weights/ -O ./mvit/weights/MViTV2-T_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_t_3x/f308344828/model_final_c6967a.pkl
 
-wget -p ./mvit/weights/ -O MViTV2-S_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_s_3x/f308344647/model_final_279baf.pkl
+wget -p ./mvit/weights/ -O ./mvit/weights/MViTV2-S_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_s_3x/f308344647/model_final_279baf.pkl
 
-wget -p ./mvit/weights/ -O MViTV2-B_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_b_3x/f308109448/model_final_421a91.pkl
+wget -p ./mvit/weights/ -O ./mvit/weights/MViTV2-B_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_b_3x/f308109448/model_final_421a91.pkl
 ```
 
 Citation:
