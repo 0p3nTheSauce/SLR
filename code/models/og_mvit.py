@@ -6,10 +6,10 @@ from .mvit.slowfast.utils.parser import load_model_config
 from .mvit.slowfast.models import head_helper
 import torch.nn as nn
 
-CONF_PATH_16x4 = Path('/home/luke/Code/SLR/code/models/mvit/configs/MVITv2_S_16x4.yaml')
-CONF_PATH_32x3 = Path('/home/luke/Code/SLR/code/models/mvit/configs/MVITv2_B_32x3.yaml')
-WEIGHTS_PATH_16x4 = Path('/home/luke/Code/SLR/code/models/mvit/weights/MViTv2_S_16x4_k400_f302660347.pyth')
-WEIGHTS_PATH_32x3 = Path('/home/luke/Code/SLR/code/models/mvit/weights/MViTv2_B_32x3_k400_f304025456.pyth')
+CONF_PATH_16x4 = Path(__file__).parent.parent / 'configs' / 'MVITv2_S_16x4.yaml'
+CONF_PATH_32x3 = Path(__file__).parent.parent / 'configs' / 'MVITv2_B_32x3.yaml'
+WEIGHTS_PATH_16x4 = Path(__file__).parent.parent / 'weights' / 'MViTv2_S_16x4_k400_f302660347.pyth'
+WEIGHTS_PATH_32x3 = Path(__file__).parent.parent / 'weights' / 'MViTv2_B_32x3_k400_f304025456.pyth'
 
 class MVITv2_basic(MViT):
     def __init__(self, num_classes: int, pretrain_path: Path, cfg_path: Path, drop_p: Optional[float] = None):
