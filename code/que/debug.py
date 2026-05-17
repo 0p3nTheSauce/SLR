@@ -581,5 +581,5 @@ def update_runs6():
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
-	# validate_runs()
-	update_runs6()
+	validate_runs()
+	# update_runs6()
