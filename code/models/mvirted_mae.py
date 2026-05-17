@@ -4,12 +4,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SepMViTMAEDecoder(nn.Module):
-    def __init__(self, embed_dim, num_heads=4, num_layers=2):
+    def __init__(self, embed_dim,mvit_out_dim=768, num_heads=4, num_layers=2):
         super().__init__()
         self.mask_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         nn.init.trunc_normal_(self.mask_token, std=0.02)
         self.decoder = TemporalBERT(embed_dim, num_heads, num_layers)
-        self.proj = nn.Linear(embed_dim, embed_dim)  # reconstruct in feature space
+        self.proj = nn.Linear(embed_dim, mvit_out_dim)  # reconstruct in feature space
 
     def forward(self, visible_feats, visible_ids, masked_ids, B, T):
         embed_dim = visible_feats.size(-1)
@@ -22,12 +22,12 @@ class SepMViTMAEDecoder(nn.Module):
         return self.proj(decoded)
 
 class SepMViTBERTMAE(nn.Module):
-    def __init__(self, encoder: MVirTed, mask_ratio=0.5, embed_dim=512):
+    def __init__(self, encoder: MVirTed, mask_ratio=0.5, embed_dim=512, mvit_out_dim=768):
         super().__init__()
         self.backbone = encoder.backbone
         self.classifier = nn.ModuleDict({
             "temporal_encoder": encoder.classifier['temporal_encoder'],
-            "decoder": SepMViTMAEDecoder(embed_dim),
+            "decoder": SepMViTMAEDecoder(embed_dim, mvit_out_dim),
         })
         self.mask_ratio = mask_ratio
 
