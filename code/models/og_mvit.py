@@ -3,13 +3,24 @@ from pathlib import Path
 import torch
 from .mvit.slowfast.models.video_model_builder import MViT
 from .mvit.slowfast.utils.parser import load_model_config
-from .mvit.slowfast.models import head_helper
+# from .mvit.slowfast.models import head_helper
 import torch.nn as nn
 
-CONF_PATH_16x4 = Path(__file__).parent.parent / 'configs' / 'MVITv2_S_16x4.yaml'
-CONF_PATH_32x3 = Path(__file__).parent.parent / 'configs' / 'MVITv2_B_32x3.yaml'
-WEIGHTS_PATH_16x4 = Path(__file__).parent.parent / 'weights' / 'MViTv2_S_16x4_k400_f302660347.pyth'
-WEIGHTS_PATH_32x3 = Path(__file__).parent.parent / 'weights' / 'MViTv2_B_32x3_k400_f304025456.pyth'
+
+base_conf_path = Path(__file__).parent / 'mvit' / 'configs' 
+base_weights_path = Path(__file__).parent / 'mvit' / 'weights'
+
+
+#3D MViT configs and weights
+CONF_PATH_16x4 = base_conf_path / 'MVITv2_S_16x4.yaml'
+CONF_PATH_32x3 = base_conf_path / 'MVITv2_B_32x3.yaml'
+WEIGHTS_PATH_16x4 = base_weights_path / 'MViTv2_S_16x4_k400_f302660347.pyth'
+WEIGHTS_PATH_32x3 = base_weights_path / 'MViTv2_B_32x3_k400_f304025456.pyth'
+
+# #Image classification configs and weights
+# CONF_PATH_2D_T = base_conf_path / 'MVITv2_T_2D.yaml'
+# WEIGHTS_PATH_2D_T = base_weights_path / 'MViTv2_T_2D_IN1K_ic.pyth'
+
 
 class MVITv2_basic(MViT):
     def __init__(self, num_classes: int, pretrain_path: Path, cfg_path: Path, drop_p: Optional[float] = None):
@@ -46,12 +57,20 @@ class MVITv2_B_32x3_basic(MVITv2_basic):
     def __init__(self, num_classes: int, drop_p: Optional[float] = None, pretrain_path: Path = WEIGHTS_PATH_32x3, cfg_path: Path = CONF_PATH_32x3):
         super().__init__(num_classes, pretrain_path, cfg_path, drop_p)
 
+
+# class MVITv2_T_2D_basic(MVITv2_basic):
+#     def __init__(self, num_classes: int, drop_p: Optional[float] = None, pretrain_path: Path = WEIGHTS_PATH_2D_T, cfg_path: Path = CONF_PATH_2D_T):
+#         super().__init__(num_classes, pretrain_path, cfg_path, drop_p)
+        
+        
+
+
 def get_num_parameters(model: nn.Module) -> int:
     """Get total number of parameters in a model."""
     return sum(p.numel() for p in model.parameters())
 
 if __name__ == "__main__":
-    model = MVITv2_S_16x4_basic(num_classes=100, drop_p=0.0, pretrain_path=WEIGHTS_PATH_16x4, cfg_path=CONF_PATH_16x4)
-    # print(model)
-    # model = MVITv2_B_32x3_basic(num_classes=100, drop_p=0.0, pretrain_path=WEIGHTS_PATH_32x3, cfg_path=CONF_PATH_32x3)
-    print(get_num_parameters(model))
+    
+    print(Path(__file__))
+    # model = MVITv2_T_2D_basic(num_classes=100)
+    # print(f"Number of parameters: {get_num_parameters(model)}")

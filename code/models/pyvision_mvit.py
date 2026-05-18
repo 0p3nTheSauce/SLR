@@ -3,28 +3,22 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Callable, Optional
-
+from enum import Enum
 import torch
 import torch.fx
 import torch.nn as nn
+from typing import Union, TypeVar
+from torchvision.transforms import InterpolationMode
+from torch import Tensor
+import torchvision.transforms.functional as F
+# from ...ops import MLP, StochasticDepth
+# from ...transforms._presets import VideoClassification
+# from ...utils import _log_api_usage_once
+# from .._api import register_model, Weights, WeightsEnum
+# from .._meta import _KINETICS400_CATEGORIES
+# from .._utils import _ovewrite_named_param, handle_legacy_interface
 
-from ...ops import MLP, StochasticDepth
-from ...transforms._presets import VideoClassification
-from ...utils import _log_api_usage_once
-from .._api import register_model, Weights, WeightsEnum
-from .._meta import _KINETICS400_CATEGORIES
-from .._utils import _ovewrite_named_param, handle_legacy_interface
-
-
-__all__ = [
-    "MViT",
-    "MViT_V1_B_Weights",
-    "mvit_v1_b",
-    "MViT_V2_S_Weights",
-    "mvit_v2_s",
-]
-
-
+from .pyvision_helper import MLP, StochasticDepth, WeightsEnum, Weights, _KINETICS400_CATEGORIES, VideoClassification, _ovewrite_named_param
 @dataclass
 class MSBlockConfig:
     num_heads: int
@@ -469,7 +463,7 @@ class MViT(nn.Module):
         # https://github.com/facebookresearch/pytorchvideo/blob/718d0a4/pytorchvideo/models/vision_transformers.py
         # We remove any experimental configuration that didn't make it to the final variants of the models. To represent
         # the configuration of the architecture we use the simplified form suggested at Table 1 of the paper.
-        _log_api_usage_once(self)
+        # _log_api_usage_once(self)
         total_stage_blocks = len(block_setting)
         if total_stage_blocks == 0:
             raise ValueError("The configuration parameter can't be empty.")
@@ -521,6 +515,8 @@ class MViT(nn.Module):
 
             if len(cnf.stride_q) > 0:
                 input_size = [size // stride for size, stride in zip(input_size, cnf.stride_q)]
+                
+                
         self.norm = norm_layer(block_setting[-1].output_channels)
 
         # Classifier module
@@ -665,8 +661,8 @@ class MViT_V2_S_Weights(WeightsEnum):
     DEFAULT = KINETICS400_V1
 
 
-@register_model()
-@handle_legacy_interface(weights=("pretrained", MViT_V1_B_Weights.KINETICS400_V1))
+# @register_model()
+# @handle_legacy_interface(weights=("pretrained", MViT_V1_B_Weights.KINETICS400_V1))
 def mvit_v1_b(*, weights: Optional[MViT_V1_B_Weights] = None, progress: bool = True, **kwargs: Any) -> MViT:
     """
     Constructs a base MViTV1 architecture from
@@ -763,8 +759,8 @@ def mvit_v1_b(*, weights: Optional[MViT_V1_B_Weights] = None, progress: bool = T
     )
 
 
-@register_model()
-@handle_legacy_interface(weights=("pretrained", MViT_V2_S_Weights.KINETICS400_V1))
+# @register_model()
+# @handle_legacy_interface(weights=("pretrained", MViT_V2_S_Weights.KINETICS400_V1))
 def mvit_v2_s(*, weights: Optional[MViT_V2_S_Weights] = None, progress: bool = True, **kwargs: Any) -> MViT:
     """Constructs a small MViTV2 architecture from
     `Multiscale Vision Transformers <https://arxiv.org/abs/2104.11227>`__ and

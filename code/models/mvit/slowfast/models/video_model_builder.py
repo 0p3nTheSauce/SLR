@@ -818,7 +818,7 @@ class MViT(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         # Get parameters.
-        assert cfg.DATA.TRAIN_CROP_SIZE == cfg.DATA.TEST_CROP_SIZE
+        assert cfg.DATA.TRAIN_CROP_SIZE == cfg.DATA.TEST_CROP_SIZE, f'Crop size for training and testing should be the same, but got {cfg.DATA.TRAIN_CROP_SIZE} and {cfg.DATA.TEST_CROP_SIZE}.'
         self.cfg = cfg
         pool_first = cfg.MVIT.POOL_FIRST
         # Prepare input.
