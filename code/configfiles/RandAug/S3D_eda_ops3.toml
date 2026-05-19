@@ -42,7 +42,7 @@ frame_size = 224
 
 [[data.train_augs.spatial_aug]]
 type = "RANDAUGMENT"
-num_ops = 2
+num_ops = 3
 magnitude = 7
 num_magnitude_bins = 31
 interpolation = "bilinear"

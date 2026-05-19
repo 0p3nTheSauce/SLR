@@ -368,6 +368,8 @@ class QueShell(cmdLib.Cmd):
             try:
                 self.que.create_run(admin_info, wandb_info)
             except QueDupExp:
+                # first check if
+
                 # ask if want to create anyway
                 if Confirm.ask(
                     "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
@@ -607,10 +609,23 @@ class QueShell(cmdLib.Cmd):
                 )[parsed_args.index]
 
                 title = f"Run {parsed_args.index} in {parsed_args.location}"
+                
                 if parsed_args.display_keys is not None:
-                    run = self._unpack_keys(run, parsed_args.display_keys)
-                    title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.display_keys)}"
-
+                    
+                    disp_components = {}
+                    
+                    for key_set in parsed_args.display_keys:
+                        
+                        info = Que.get_nested(run, key_set)
+                        if isinstance(info, BaseModel):
+                            info = info.model_dump()
+                        
+                        disp_components = Que.set_nested(
+                            disp_components, key_set, info 
+                        )
+                        
+                    run = disp_components
+                
                 # Format as JSON-like syntax
                 if isinstance(run, dict):
                     run_json = json.dumps(run, indent=2)
@@ -1101,7 +1116,10 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _add_top_n_arg(
-        self, parser: argparse.ArgumentParser, help: str = "How many lines to show", default=None
+        self,
+        parser: argparse.ArgumentParser,
+        help: str = "How many lines to show",
+        default=None,
     ) -> argparse.ArgumentParser:
         parser.add_argument(
             "--top_n",
@@ -1372,6 +1390,7 @@ class QueShell(cmdLib.Cmd):
         self._add_top_n_arg(
             parser,
             help="Number of lines to show from the end of the log file (default: 10)",
+            default=10,
         )
 
         return parser

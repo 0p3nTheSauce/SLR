@@ -272,7 +272,7 @@ def sample_chunked(frames: Tensor, target_length: int) -> Tensor:
 		for i in range(target_length)
 	]
 	indices = [min(i, T - 1) for i in indices]
-	return frames[Tensor(indices)]
+	return frames[Tensor(indices).long()]
 
 
 def wobble(frames: Tensor, max_wobble: int = 0) -> Tensor:

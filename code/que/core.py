@@ -534,7 +534,8 @@ class Que:
                 d[k] = val
             else:
                 next_key = ks.pop(0)
-                d[k] = cls._set_inplace(d[k], next_key, ks, val)
+                old_val = d.get(k, {})
+                d[k] = cls._set_inplace(old_val, next_key, ks, val)
         else:
             if len(ks) == 0:
                 d = {k: val}
