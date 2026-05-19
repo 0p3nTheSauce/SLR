@@ -10,7 +10,7 @@ from typing import (
     Dict,
     TypeAlias,
 )
-from pydantic import BaseModel, Field, model_validator, computed_field
+from pydantic import BaseModel, Field, model_validator, computed_field, field_validator
 
 
 class NormDict(BaseModel):
@@ -235,6 +235,8 @@ class AugInfo(BaseModel):
         self.target_length = last_sampler.target_length
         
         crops = [augS for augS in self.spatial_aug if isinstance(augS, CropConfig)]
+        if len(crops) == 0:
+            raise ValueError("At least one spatial aug must be a crop")
         last_crop = crops[-1]
         self.frame_size = last_crop.frame_size
    
@@ -475,6 +477,14 @@ class RunInfo(BaseModel):
     data: DataInfo
     scheduler: Optional[SchedInfo] = None
     early_stopping: Optional[StopperOn] = None
+
+
+    @field_validator("model_params", mode="before")
+    @classmethod
+    def _default_model_type(cls, v: Any) -> Any:
+        if isinstance(v, dict) and "type" not in v:
+            v = {"type": "supervised", **v}
+        return v
 
     @model_validator(mode="after")
     def _resolve_norms(self) -> "RunInfo":

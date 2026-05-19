@@ -27,15 +27,16 @@ from .core import (
 )
 from .tmux import tmux_manager
 from run_types import (
-    CentreCropConfig,
-    RandomCropConfig,
-    ScaleAndPadConfig,
+	CentreCropConfig,
+	RandomCropConfig,
+	ScaleAndPadConfig,
 	RunInfo,
 	FailedExp,
 	CompExpInfo,
 	ExpInfo,
 	HorizontalFlipConfig,
 	AugInfo,
+
 )
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
@@ -172,16 +173,6 @@ def daemon_stop_supervisor(t: float, hard: bool = False):
 
 	daemon = manager.get_daemon()
 	daemon.stop_supervisor(stop_worker=True, timeout=t, hard=hard)
-
-
-def try_except_finally():
-	try:
-		print("In try block")
-		raise ValueError("An error occurred")
-	except ValueError as ve:
-		print(f"Caught exception: {ve}")
-	finally:
-		print("In finally block")
 
 
 def test_create():
@@ -578,8 +569,44 @@ def update_runs6():
 		json.dump(all_runs, f, indent=4)
 
 
+def update_runs7():
+	from run_types import SupervisedInfo
+	
+	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	# for key in KEYS:
+
+	for loc in KEYS:
+		que_list = all_runs[loc]
+		new_quelist = []
+		for run in que_list:
+			
+   
+			model_params = run["model_params"]	
+			modp = SupervisedInfo.model_validate(model_params)
+			run['model_params'] = modp.model_dump()
+   
+			if loc in KEYS[:2]:
+				run = ExpInfo.model_validate(run).model_dump()
+			elif loc == KEYS[2]:
+				run = CompExpInfo.model_validate(run).model_dump()
+			else:
+				run = FailedExp.model_validate(run).model_dump()
+			
+     
+     
+			new_quelist.append(run)
+
+		all_runs[loc] = new_quelist
+	
+
+	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+
+
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
 	validate_runs()
-	# update_runs6()
+	# update_runs7()
