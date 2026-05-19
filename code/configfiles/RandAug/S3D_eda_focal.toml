@@ -1,0 +1,76 @@
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 200
+
+[optimizer]
+eps = 1e-5
+backbone_init_lr = 1e-4
+backbone_weight_decay = 1e-3
+classifier_init_lr = 1e-3
+classifier_weight_decay = 1e-3
+
+[model_params]
+drop_p = 0.5
+
+[scheduler] 
+type = 'CosineAnnealingWarmRestarts'
+t0 = 20
+tmult = 1
+eta_min = 0
+
+
+#Train augs
+
+[data.train_augs]
+normalise = true
+
+#Sampler
+[[data.train_augs.temporal_aug]]
+target_length = 32
+type = 'focal_normal'
+mean = 0.5
+std = 0.3
+max_wobble = 0
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.5
+
+#Crop
+[[data.train_augs.spatial_aug]]
+type = "Centre_crop"
+frame_size = 224
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 2
+magnitude = 7
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+#Test augs
+
+[data.test_augs]
+normalise = true
+
+#Sampler
+[[data.test_augs.temporal_aug]]
+type = 'focal_normal'
+mean = 0.5
+std = 0.3
+max_wobble = 0
+target_length = 32
+
+#Crop
+[[data.test_augs.spatial_aug]]
+type = "Centre_crop"
+frame_size = 224
+
+[early_stopping]
+metric = ['val', 'loss']
+mode = 'min'
+patience = 15
+min_delta = 0.01
+
+

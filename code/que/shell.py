@@ -357,6 +357,9 @@ class QueShell(cmdLib.Cmd):
             from configs import take_args
 
             args = shlex.split(arg)
+            
+            # parser = self._get_parser("create")
+            # parsed_args = parser.parse_args(args)
             maybe_args = take_args(sup_args=args)
 
             if isinstance(maybe_args, tuple):
@@ -368,8 +371,7 @@ class QueShell(cmdLib.Cmd):
             try:
                 self.que.create_run(admin_info, wandb_info)
             except QueDupExp:
-                # first check if
-
+            
                 # ask if want to create anyway
                 if Confirm.ask(
                     "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"

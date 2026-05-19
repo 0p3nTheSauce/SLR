@@ -296,9 +296,14 @@ def get_train_parser(
     parser.add_argument("model", type=str, choices=models_available, help="Model name from one of the implemented model")
     parser.add_argument("split", type=str, choices=splits_available, help="The class split")
 
-    experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
-    experiment_gen_type.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
-    experiment_gen_type.add_argument("-c", "--config_path", help="Path to config file")
+    # experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
+    # experiment_gen_type.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
+    # experiment_gen_type.add_argument("-c", "--config_path", help="Path to config file")
+
+    # experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
+    parser.add_argument("-c", "--config_path", help="Path to config file")
+
 
     parser.add_argument("-ds", "--dataset", type=str, choices=["WLASL"], default="WLASL", help="Not implemented yet")
     parser.add_argument("-r", "--recover", action="store_true", help="Recover from last checkpoint")
@@ -339,6 +344,9 @@ def take_args(
 
     if args.project is None:
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
+
+    if args.exp_no is None and args.config_path is None:
+        parser.error("Either --exp_no or --config_path must be provided to identify the experiment configuration.")
 
     if args.exp_no is None:
         exp_no = get_next_expno(args.split, args.model)
