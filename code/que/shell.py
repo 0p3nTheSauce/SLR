@@ -70,7 +70,8 @@ SAFE_GLOBALS = {
 
 def parse_criterion(expr: str) -> Callable[[Any], bool]:
     """Evaluate a lambda string in a restricted namespace."""
-    result = eval(expr, SAFE_GLOBALS)  # noqa: S307
+
+    result = eval(f"lambda x: {expr}", SAFE_GLOBALS)  # noqa: S307
     if not callable(result):
         raise ValueError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
@@ -282,16 +283,10 @@ class QueShell(cmdLib.Cmd):
             with self.console.status("[bold green]Saving state...", spinner="dots"):
                 self.do_save("que")
                 self.do_save("server")
-                time.sleep(0.5)  # Brief pause for visual feedback
+                # time.sleep(0.5)  # Brief pause for visual feedback
         else:
             self.console.print("[yellow]Exiting without saving[/yellow]")
 
-        self.console.print(
-            Panel(
-                "[bold green]Thank you for using queShell![/bold green]\n[dim]Queue management made beautiful ✨[/dim]",
-                border_style="green",
-            )
-        )
         return True
 
     def do_exit(self, arg):
@@ -352,190 +347,7 @@ class QueShell(cmdLib.Cmd):
 
         # self.console.print("[bold green]✓[/bold green] Queue state loaded from file")
 
-    def do_recover(self, arg):
-        """Recover a run with status indication"""
-        parsed_args = self._parse_args_or_cancel("recover", arg)
-        if parsed_args is None:
-            return
-        with self.unwrap_exception("Run recovered successfully"):
-            with self.console.status("[bold yellow]Recovering run...", spinner="dots"):
-                self.que.recover_run(
-                    from_loc=parsed_args.o_location,
-                    to_loc=parsed_args.n_location,
-                    index=parsed_args.index,
-                    clean_slate=parsed_args.clean_slate,
-                )
-
-    def do_clear(self, arg):
-        """Clear runs with confirmation"""
-        parsed_args = self._parse_args_or_cancel("clear", arg)
-        if parsed_args is None:
-            return
-
-        # Confirmation prompt
-        if Confirm.ask(
-            f"[bold red]Clear all runs from {parsed_args.location}?[/bold red]"
-        ):
-            with self.unwrap_exception(f"Cleared runs from {parsed_args.location}"):
-                self.que.clear_runs(parsed_args.location)
-            # self.console.print(f"[bold green]✓[/bold green] Cleared runs from {parsed_args.location}")
-        else:
-            self.console.print("[yellow]Clear cancelled[/yellow]")
-
-    def do_list(self, arg):
-        """Display runs in a beautiful table"""
-        with self.console.status("[bold green]Importing...", spinner="dots"):
-            parsed_args = self._parse_args_or_cancel("list", arg)
-            if parsed_args is None:
-                return
-
-            runs = None
-
-            with self.unwrap_exception("", "Failed to list runs"):
-                runs = self.que.list_runs(
-                    parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
-                )
-
-            with self.unwrap_exception("", "Failed to filter runs with criterion"):
-                if bool(parsed_args.filter_keys) != bool(parsed_args.criterion):
-                    parser.error("--filter_keys and --criterion must be used together")
-                elif parsed_args.filter_keys:
-                    criterion = parse_criterion(parsed_args.criterion)
-                    runs = [
-                        run
-                        for run in runs
-                        if criterion(Que.get_nested(run, parsed_args.filter_keys))
-                    ]
-
-            runs = self.que.summarise(runs)
-
-            # retrieve top n if specified
-            if parsed_args.top_n is not None:
-                runs = runs[: parsed_args.top_n]
-
-            if not runs:
-                self.console.print(
-                    Panel(
-                        f"[yellow]No runs found in {parsed_args.location}[/yellow]",
-                        border_style="yellow",
-                    )
-                )
-                return
-
-            # Create a styled table
-            table = Table(
-                title=f"Runs in {parsed_args.location}",
-                box=box.ROUNDED,
-                border_style="cyan",
-                show_header=True,
-                header_style="bold magenta",
-            )
-
-            dict_runs = list(map(lambda x: x.model_dump(), runs))
-
-            table.add_column("Index", style="cyan", justify="right", width=8)
-            for header in dict_runs[0].keys():
-                table.add_column(header.capitalize(), style="white")
-
-            # runs are a list of Summarised dicts
-
-            for idx, row in enumerate(dict_runs):
-                row_values = []
-                for value in row.values():
-                    value_str = str(value)
-                    row_values.append(value_str)
-                table.add_row(str(idx).zfill(3), *row_values)
-
-            self.console.print(table)
-
-    def do_remove(self, arg):
-        """Remove a run with confirmation"""
-        parsed_args = self._parse_args_or_cancel("remove", arg)
-        if parsed_args is None:
-            return
-
-        if Confirm.ask(
-            f"[bold red]Remove run {parsed_args.index} from {parsed_args.location}?[/bold red]"
-        ):
-            with self.unwrap_exception(
-                f"Removed run {parsed_args.index} from {parsed_args.location}"
-            ):
-                self.que.remove_run(parsed_args.location, parsed_args.index)
-            # self.console.print(f"[bold green]✓[/bold green] Removed run {parsed_args.index} from {parsed_args.location}")
-        else:
-            self.console.print("[yellow]Remove cancelled[/yellow]")
-
-    def _unpack_keys(self, run: GenExp, key_set: List[str]) -> Any:
-        unpack = run.model_dump()
-        for k in key_set:
-            unpack = unpack[k]
-        return unpack
-
-    def do_display(self, arg):
-        """Display run details in a styled panel"""
-
-        parsed_args = self._parse_args_or_cancel("display", arg)
-        if parsed_args is None:
-            return
-
-        with self.console.status("[bold green]Importing...", spinner="dots"):
-            with self.unwrap_exception("", "Display failed"):
-                if parsed_args.sort_keys:
-                    run = self.que.list_runs(
-                        parsed_args.location, parsed_args.sort_keys, parsed_args.reverse
-                    )[parsed_args.index]
-
-                else:
-                    run = self.que.peak_run(parsed_args.location, parsed_args.index)
-                title = f"Run {parsed_args.index} in {parsed_args.location}"
-                if parsed_args.display_keys is not None:
-                    run = self._unpack_keys(run, parsed_args.display_keys)
-                    title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.display_keys)}"
-
-                # Format as JSON-like syntax
-                if isinstance(run, dict):
-                    run_json = json.dumps(run, indent=2)
-                else:
-                    run_json = json.dumps(run.model_dump(), indent=2)
-                syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
-
-                self.console.print(
-                    Panel(
-                        syntax,
-                        title=title,
-                        border_style="cyan",
-                        padding=(1, 2),
-                    )
-                )
-
-    def do_shuffle(self, arg):
-        """Reposition with visual confirmation"""
-        parsed_args = self._parse_args_or_cancel("shuffle", arg)
-        if parsed_args is None:
-            return
-
-        with self.unwrap_exception(
-            f"Moved run from position {parsed_args.o_index} to {parsed_args.n_index} in {parsed_args.location}"
-        ):
-            self.que.shuffle(
-                parsed_args.location, parsed_args.o_index, parsed_args.n_index
-            )
-
-    def do_move(self, arg):
-        """Move run with visual feedback"""
-        parsed_args = self._parse_args_or_cancel("move", arg)
-        if parsed_args is None:
-            return
-
-        with self.unwrap_exception(
-            f"Moved run from {parsed_args.o_location} to {parsed_args.n_location}"
-        ):
-            self.que.move(
-                parsed_args.o_location,
-                parsed_args.n_location,
-                parsed_args.oi_index,
-                parsed_args.of_index,
-            )
+    # - direct indexing
 
     def do_create(self, arg):
         """Create with progress indication"""
@@ -543,16 +355,16 @@ class QueShell(cmdLib.Cmd):
             "Run created successfully", "Failed to create new run"
         ):
             from configs import take_args
-            args = shlex.split(arg)    
+
+            args = shlex.split(arg)
             maybe_args = take_args(sup_args=args)
-        
+
             if isinstance(maybe_args, tuple):
                 admin_info, wandb_info = maybe_args
             else:
                 self.console.print("[yellow]Create cancelled (by user)[/yellow]")
                 return
-            
-            
+
             try:
                 self.que.create_run(admin_info, wandb_info)
             except QueDupExp:
@@ -608,7 +420,82 @@ class QueShell(cmdLib.Cmd):
                     "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
                 ):
                     self.que.add_run(admin_info, wandb_info, add_duplicates=True)
-                        
+
+    def do_recover(self, arg):
+        """Recover a run with status indication"""
+        parsed_args = self._parse_args_or_cancel("recover", arg)
+        if parsed_args is None:
+            return
+        with self.unwrap_exception("Run recovered successfully"):
+            with self.console.status("[bold yellow]Recovering run...", spinner="dots"):
+                self.que.recover_run(
+                    from_loc=parsed_args.o_location,
+                    to_loc=parsed_args.n_location,
+                    index=parsed_args.index,
+                    clean_slate=parsed_args.clean_slate,
+                )
+
+    def do_clear(self, arg):
+        """Clear runs with confirmation"""
+        parsed_args = self._parse_args_or_cancel("clear", arg)
+        if parsed_args is None:
+            return
+
+        # Confirmation prompt
+        if Confirm.ask(
+            f"[bold red]Clear all runs from {parsed_args.location}?[/bold red]"
+        ):
+            with self.unwrap_exception(f"Cleared runs from {parsed_args.location}"):
+                self.que.clear_runs(parsed_args.location)
+            # self.console.print(f"[bold green]✓[/bold green] Cleared runs from {parsed_args.location}")
+        else:
+            self.console.print("[yellow]Clear cancelled[/yellow]")
+
+    def do_remove(self, arg):
+        """Remove a run with confirmation"""
+        parsed_args = self._parse_args_or_cancel("remove", arg)
+        if parsed_args is None:
+            return
+
+        if Confirm.ask(
+            f"[bold red]Remove run {parsed_args.index} from {parsed_args.location}?[/bold red]"
+        ):
+            with self.unwrap_exception(
+                f"Removed run {parsed_args.index} from {parsed_args.location}"
+            ):
+                self.que.remove_run(parsed_args.location, parsed_args.index)
+            # self.console.print(f"[bold green]✓[/bold green] Removed run {parsed_args.index} from {parsed_args.location}")
+        else:
+            self.console.print("[yellow]Remove cancelled[/yellow]")
+
+    def do_shuffle(self, arg):
+        """Reposition with visual confirmation"""
+        parsed_args = self._parse_args_or_cancel("shuffle", arg)
+        if parsed_args is None:
+            return
+
+        with self.unwrap_exception(
+            f"Moved run from position {parsed_args.o_index} to {parsed_args.n_index} in {parsed_args.location}"
+        ):
+            self.que.shuffle(
+                parsed_args.location, parsed_args.o_index, parsed_args.n_index
+            )
+
+    def do_move(self, arg):
+        """Move run with visual feedback"""
+        parsed_args = self._parse_args_or_cancel("move", arg)
+        if parsed_args is None:
+            return
+
+        with self.unwrap_exception(
+            f"Moved run from {parsed_args.o_location} to {parsed_args.n_location}"
+        ):
+            self.que.move(
+                parsed_args.o_location,
+                parsed_args.n_location,
+                parsed_args.oi_index,
+                parsed_args.of_index,
+            )
 
     def do_edit(self, arg):
         """Edit with visual confirmation"""
@@ -625,6 +512,121 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.do_eval,
             )
 
+    # - indirect indexing
+
+    def _unpack_keys(self, run: GenExp, key_set: List[str]) -> Any:
+        unpack = run.model_dump()
+        for k in key_set:
+            unpack = unpack[k]
+        return unpack
+
+    def do_list(self, arg):
+        """Display runs in a beautiful table"""
+        with self.console.status("[bold green]Importing...", spinner="dots"):
+            parsed_args = self._parse_args_or_cancel("list", arg)
+            if parsed_args is None:
+                return
+
+            with self.unwrap_exception("", "Failed to list runs"):
+                runs = list(
+                    Que.list_manipulation(
+                        self.que.list_runs(
+                            parsed_args.location,
+                        ),
+                        sort_keys=parsed_args.sort_keys,
+                        reverse=parsed_args.reverse,
+                        filter_keys=parsed_args.filter_keys,
+                        criterions=[
+                            parse_criterion(crit) for crit in parsed_args.criterion
+                        ],
+                    )
+                )
+
+            runs = self.que.summarise(runs)
+
+            # retrieve top n if specified
+            if parsed_args.top_n is not None:
+                runs = runs[: parsed_args.top_n]
+
+            if not runs:
+                self.console.print(
+                    Panel(
+                        f"[yellow]No runs found in {parsed_args.location}[/yellow]",
+                        border_style="yellow",
+                    )
+                )
+                return
+
+            # Create a styled table
+            table = Table(
+                title=f"Runs in {parsed_args.location}",
+                box=box.ROUNDED,
+                border_style="cyan",
+                show_header=True,
+                header_style="bold magenta",
+            )
+
+            dict_runs = list(map(lambda x: x.model_dump(), runs))
+
+            table.add_column("Index", style="cyan", justify="right", width=8)
+            for header in dict_runs[0].keys():
+                table.add_column(header.capitalize(), style="white")
+
+            # runs are a list of Summarised dicts
+
+            for idx, row in enumerate(dict_runs):
+                row_values = []
+                for value in row.values():
+                    value_str = str(value)
+                    row_values.append(value_str)
+                table.add_row(str(idx).zfill(3), *row_values)
+
+            self.console.print(table)
+
+    def do_display(self, arg):
+        """Display run details in a styled panel"""
+
+        parsed_args = self._parse_args_or_cancel("display", arg)
+        if parsed_args is None:
+            return
+
+        with self.console.status("[bold green]Importing...", spinner="dots"):
+            with self.unwrap_exception("", "Display failed"):
+                run = list(
+                    Que.list_manipulation(
+                        self.que.list_runs(
+                            parsed_args.location,
+                        ),
+                        sort_keys=parsed_args.sort_keys,
+                        reverse=parsed_args.reverse,
+                        filter_keys=parsed_args.filter_keys,
+                        criterions=[
+                            parse_criterion(crit) for crit in parsed_args.criterion
+                        ],
+                    )
+                )[parsed_args.index]
+
+                title = f"Run {parsed_args.index} in {parsed_args.location}"
+                if parsed_args.display_keys is not None:
+                    run = self._unpack_keys(run, parsed_args.display_keys)
+                    title = f"Run {parsed_args.index} in {parsed_args.location}: {', '.join(parsed_args.display_keys)}"
+
+                # Format as JSON-like syntax
+                if isinstance(run, dict):
+                    run_json = json.dumps(run, indent=2)
+                else:
+                    run_json = json.dumps(run.model_dump(), indent=2)
+                syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+
+                self.console.print(
+                    Panel(
+                        syntax,
+                        title=title,
+                        border_style="cyan",
+                        padding=(1, 2),
+                    )
+                )
+
     def do_copy(self, arg):
         """Copy a run"""
         parsed_args = self._parse_args_or_cancel("copy", arg)
@@ -636,31 +638,21 @@ class QueShell(cmdLib.Cmd):
             o_idxs = list(map(int, parsed_args.o_indexes))
 
         with self.unwrap_exception("Copy successful", "Copy failed"):
-            self.que.copy_runs(
-                parsed_args.o_location,
-                o_idxs,
-                parsed_args.n_location,
-                parsed_args.n_index,
-                parsed_args.clean_slate,
+            runs = Que.list_manipulation(
+                self.que.list_runs(
+                    parsed_args.o_location,
+                ),
+                sort_keys=parsed_args.sort_keys,
+                reverse=parsed_args.reverse,
+                filter_keys=parsed_args.filter_keys,
+                criterions=[parse_criterion(crit) for crit in parsed_args.criterion],
             )
 
-    def do_wandb(self, arg):
-        """Open the wandb page for a run"""
-        parsed_args = self._parse_args_or_cancel("wandb", arg)
-        if parsed_args is None:
-            return
-
-        url = "https://wandb.ai/"
-
-        if parsed_args.location is not None and parsed_args.index is not None:
-            run = self.que.peak_run(loc=parsed_args.location, idx=parsed_args.index)
-            wandb_info = run.wandb
-            url = url + f"{wandb_info.entity}/{wandb_info.project}/{wandb_info.run_id}"
-        else:
-            url = url + f"{parsed_args.entity}/{parsed_args.project}"
-
-        with self.unwrap_exception("Wandb opened successfully", "Opening wandb failed"):
-            webbrowser.open(url)
+            self.que.place_runs(
+                parsed_args.n_location,
+                [runs[i] for i in o_idxs],
+                index=parsed_args.n_index,
+            )
 
     #   Worker
 
@@ -795,7 +787,25 @@ class QueShell(cmdLib.Cmd):
         elif parsed_args.command == "status":
             self._pretty_status(self.server_context.get_state())
 
-    # Subprocess
+    # Misc / subprocesses
+
+    def do_wandb(self, arg):
+        """Open the wandb page for a run"""
+        parsed_args = self._parse_args_or_cancel("wandb", arg)
+        if parsed_args is None:
+            return
+
+        url = "https://wandb.ai/"
+
+        if parsed_args.location is not None and parsed_args.index is not None:
+            run = self.que.peak_run(loc=parsed_args.location, idx=parsed_args.index)
+            wandb_info = run.wandb
+            url = url + f"{wandb_info.entity}/{wandb_info.project}/{wandb_info.run_id}"
+        else:
+            url = url + f"{parsed_args.entity}/{parsed_args.project}"
+
+        with self.unwrap_exception("Wandb opened successfully", "Opening wandb failed"):
+            webbrowser.open(url)
 
     def do_attach(self, arg):
         """Attach to the que_training tmux session"""
@@ -816,15 +826,15 @@ class QueShell(cmdLib.Cmd):
             log_file = str(SERVER_LOG_PATH)  # your constant
         elif parsed_args.journalctl:
             # Use journalctl to stream logs for the systemd service
-            if parsed_args.lines is not None:
+            if parsed_args.top_n is not None:
                 com = [
                     "sudo",
                     "journalctl",
                     "-u",
                     SYSTEMD_NAME,
-                    '-f',
+                    "-f",
                     "-n",
-                    str(parsed_args.lines),
+                    str(parsed_args.top_n),
                 ]
             else:
                 com = ["sudo", "journalctl", "-u", SYSTEMD_NAME, "-f"]
@@ -851,7 +861,7 @@ class QueShell(cmdLib.Cmd):
                 return
 
         try:
-            subprocess.run(["tail", "-f", "-n", str(parsed_args.lines), log_file])
+            subprocess.run(["tail", "-f", "-n", str(parsed_args.top_n), log_file])
         except KeyboardInterrupt:
             self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
         except FileNotFoundError:
@@ -908,23 +918,70 @@ class QueShell(cmdLib.Cmd):
 
     # --- Argument factory methods ---
 
-    def _add_genkey_arg(
+    def _add_sort_args(
         self,
         parser: argparse.ArgumentParser,
-        long_name: str = "--keys",
-        short_name: str = "-k",
-        help: str = "List of keys to unpack the nested run by",
+        help: str = "List of keys to sort the list by, e.g. -s admin model (ignores None leaves)",
     ) -> argparse.ArgumentParser:
-        """General method for adding a keys argument with customizable flags and help text
-        For example, --sort_keys, -s or --filter_keys, -f
-        """
+        """ "List of keys to sort the list by, e.g. -s admin model (ignores None leaves)"""
         parser.add_argument(
-            long_name,
-            short_name,
+            "--sort_keys",
+            "-s",
+            action="append",
             nargs="+",
             type=str,
             help=help,
+            default=[],
         )
+        return parser
+
+    def _add_reverse_arg(
+        self, parser: argparse.ArgumentParser
+    ) -> argparse.ArgumentParser:
+        """--reverse / -r: sort in descending order"""
+        parser.add_argument(
+            "--reverse",
+            "-r",
+            action="store_true",
+            help="Sort in descending order",
+        )
+        return parser
+
+    def _add_filter_args(
+        self,
+        parser: argparse.ArgumentParser,
+        help: str = "List of keys to filter the list by, e.g. -f results best_val_acc (requires matching --criterion / -c to to filter by, ignores None leaves)",
+    ) -> argparse.ArgumentParser:
+        """ "--filter_keys / -f: List of keys to filter the list by, e.g. -f results best_val_acc (requires matching --criterion / -c to to filter by, ignores None leaves)"""
+        parser.add_argument(
+            "--filter_keys",
+            "-f",
+            nargs="+",
+            type=str,
+            action="append",
+            help=help,
+            default=[],
+        )
+        return parser
+
+    def _add_criterion_args(
+        self,
+        parser: argparse.ArgumentParser,
+        help: str = "criterion to filter runs by, complete the boolean expression 'lambda x: ', e.g. --criterion 'x > 0.8' (requires matching --filter_keys / -f to specify which keys to filter by)",
+    ) -> argparse.ArgumentParser:
+        """--criterion / -c: criterion to filter runs by, complete the boolean expression 'lambda x: ', e.g. --criterion 'x > 0.8' (requires matching --filter_keys / -f to specify which keys to filter by)"""
+        parser.add_argument("--criterion", "-c", action="append", help=help, default=[])
+        return parser
+
+    def _add_list_manipulation_args(
+        self,
+        parser: argparse.ArgumentParser,
+    ) -> argparse.ArgumentParser:
+        """Add common arguments for list manipulation commands like list and display"""
+        parser = self._add_sort_args(parser)
+        parser = self._add_reverse_arg(parser)
+        parser = self._add_filter_args(parser)
+        parser = self._add_criterion_args(parser)
         return parser
 
     def _add_value_args(
@@ -938,19 +995,6 @@ class QueShell(cmdLib.Cmd):
             "-de",
             action="store_true",
             help="Evaluate the provided value to a Python type rather than treating it as a raw string.",
-        )
-        return parser
-
-    def _add_criterion_args(
-        self,
-        parser: argparse.ArgumentParser,
-        help: str = "criterion to filter runs by, evaluates boolean expression with run fields as variables, e.g. --criterion 'accuracy > 0.8' (requires --filter_keys / -f to specify which keys to filter by)",
-    ) -> argparse.ArgumentParser:
-        """--criterion / -c: criterion to filter runs by, evaluates boolean expression with run fields as variables, e.g. --criterion 'accuracy > 0.8' (requires --filter_keys / -f to specify which keys to filter by)"""
-        parser.add_argument(
-            "--criterion",
-            "-c",
-            help=help,
         )
         return parser
 
@@ -987,18 +1031,6 @@ class QueShell(cmdLib.Cmd):
             parser.add_argument(name, type=int)
         else:
             parser.add_argument(flag, short, type=int, default=default)
-        return parser
-
-    def _add_reverse_arg(
-        self, parser: argparse.ArgumentParser
-    ) -> argparse.ArgumentParser:
-        """--reverse / -r: sort in descending order"""
-        parser.add_argument(
-            "--reverse",
-            "-r",
-            action="store_true",
-            help="Sort in descending order",
-        )
         return parser
 
     def _add_clean_slate_arg(
@@ -1068,7 +1100,24 @@ class QueShell(cmdLib.Cmd):
         )
         return parser
 
+    def _add_top_n_arg(
+        self, parser: argparse.ArgumentParser, help: str = "How many lines to show", default=None
+    ) -> argparse.ArgumentParser:
+        parser.add_argument(
+            "--top_n",
+            "-n",
+            type=int,
+            default=default,
+            help=help,
+        )
+        return parser
+
     # Que
+
+    def _get_quit_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Exit queShell", prog="quit")
+        parser.add_argument("-ns", "--no_save", action="store_true")
+        return parser
 
     def _get_save_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
@@ -1119,10 +1168,7 @@ class QueShell(cmdLib.Cmd):
 
         return parser
 
-    def _get_quit_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Exit queShell", prog="quit")
-        parser.add_argument("-ns", "--no_save", action="store_true")
-        return parser
+    # direct indexing
 
     def _get_add_parser(self) -> argparse.ArgumentParser:
         from configs import get_train_parser
@@ -1132,30 +1178,14 @@ class QueShell(cmdLib.Cmd):
         )
         return self._add_checkpoint_num_arg(train_parser)
 
-    def _get_list_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="List runs", prog="list")
-        self._add_location_arg(parser)
-        self._add_genkey_arg(
-            parser,
-            long_name="--sort_keys",
-            short_name="-s",
-            help="List of keys to sort the list by",
+    def _get_recover_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Recover a failed run", prog="recover"
         )
-        self._add_reverse_arg(parser)
-        self._add_genkey_arg(
-            parser,
-            long_name="--filter_keys",
-            short_name="-f",
-            help="List of keys to filter the list by (only display runs where these keys are not None)",
-        )
-        self._add_criterion_args(parser)
-        parser.add_argument(
-            "--top_n",
-            "-n",
-            type=int,
-            default=None,
-            help="Only display the top n runs after sorting and filtering",
-        )
+        self._add_o_location_arg(parser, default=CUR_RUN)
+        self._add_n_location_arg(parser, default=TO_RUN)
+        self._add_index_arg(parser, required=False, default=0)
+        self._add_clean_slate_arg(parser)
         return parser
 
     def _get_clear_parser(self) -> argparse.ArgumentParser:
@@ -1176,80 +1206,6 @@ class QueShell(cmdLib.Cmd):
         parser.add_argument("n_index", type=int)
         return parser
 
-    def _get_display_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Display run config", prog="display"
-        )
-        self._add_location_arg(parser)
-        self._add_index_arg(parser)
-        self._add_genkey_arg(
-            parser,
-            long_name="--display_keys",
-            short_name="-dk",
-            help="List of keys to display within the run",
-        )
-        self._add_genkey_arg(
-            parser,
-            long_name="--sort_keys",
-            short_name="-sk",
-            help="List of keys to sort the list by",
-        )
-        self._add_reverse_arg(parser)
-        self._add_genkey_arg(
-            parser,
-            long_name="--filter_keys",
-            short_name="-f",
-            help="List of keys to filter the list by (only display runs where these keys are not None)",
-        )
-        self._add_criterion_args(parser)
-
-        return parser
-
-    def _get_edit_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Edit run", prog="edit")
-        self._add_location_arg(parser)
-        self._add_index_arg(parser)
-        self._add_genkey_arg(
-            parser,
-            long_name="--edit_keys",
-            short_name="-ek",
-            help="List of keys to edit within the run",
-        )
-        self._add_value_args(parser)
-        return parser
-
-    def _get_copy_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="Copy run", prog="copy")
-        self._add_location_arg(
-            parser, name="o_location", positional=True, help="Origin location"
-        )
-        self._add_location_arg(
-            parser, name="n_location", positional=True, help="Destination location"
-        )
-        self._add_clean_slate_arg(parser)
-        self._add_reverse_arg(parser)
-        self._add_genkey_arg(
-            parser,
-            long_name="--sort_keys",
-            short_name="-s",
-            help="List of keys to sort the list by",
-        )
-        parser.add_argument(
-            "--o_indexes", "-i", nargs="+", type=str, help="List of indexes to copy"
-        )
-        parser.add_argument("-ni", "--n_index", type=int, default=0, help="New index")
-        return parser
-
-    def _get_recover_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(
-            description="Recover a failed run", prog="recover"
-        )
-        self._add_o_location_arg(parser, default=CUR_RUN)
-        self._add_n_location_arg(parser, default=TO_RUN)
-        self._add_index_arg(parser, required=False, default=0)
-        self._add_clean_slate_arg(parser)
-        return parser
-
     def _get_move_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(
             description="Move run between locations", prog="move"
@@ -1262,6 +1218,69 @@ class QueShell(cmdLib.Cmd):
         )
         parser.add_argument("oi_index", type=int)
         parser.add_argument("--of_index", "-of", type=int, default=None)
+        return parser
+
+    def _get_edit_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Edit run", prog="edit")
+        self._add_location_arg(parser)
+        self._add_index_arg(parser)
+
+        parser.add_argument(
+            "--edit_keys",
+            "-ek",
+            nargs="+",
+            type=str,
+            help="List of keys to edit within the run",
+        )
+        self._add_value_args(parser)
+
+        return parser
+
+    # indirect indexing
+
+    def _get_list_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="List runs", prog="list")
+        self._add_location_arg(parser)
+        self._add_list_manipulation_args(parser)
+        self._add_top_n_arg(
+            parser,
+            help="Number of runs to display from the top of the list (default: 10)",
+        )
+        return parser
+
+    def _get_display_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Display run config", prog="display"
+        )
+        self._add_location_arg(parser)
+        self._add_index_arg(parser)
+        parser.add_argument(
+            "--display_keys",
+            "-dk",
+            nargs="+",
+            type=str,
+            action="append",
+            help="List of keys to display within the run",
+        )
+        self._add_list_manipulation_args(parser)
+        return parser
+
+    def _get_copy_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(description="Copy run", prog="copy")
+        self._add_location_arg(
+            parser, name="o_location", positional=True, help="Origin location"
+        )
+        self._add_location_arg(
+            parser, name="n_location", positional=True, help="Destination location"
+        )
+        self._add_clean_slate_arg(parser)
+
+        parser.add_argument(
+            "--o_indexes", "-i", nargs="+", type=str, help="List of indexes to copy"
+        )
+        parser.add_argument("-ni", "--n_index", type=int, default=0, help="New index")
+
+        self._add_list_manipulation_args(parser)
         return parser
 
     # Other
@@ -1350,11 +1369,8 @@ class QueShell(cmdLib.Cmd):
             action="store_true",
             help="Clear the log file instead of tailing",
         )
-        parser.add_argument(
-            "--lines",
-            "-n",
-            type=int,
-            default=10,
+        self._add_top_n_arg(
+            parser,
             help="Number of lines to show from the end of the log file (default: 10)",
         )
 

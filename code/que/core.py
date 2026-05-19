@@ -13,6 +13,7 @@ from typing import (
     Callable,
     List,
     Literal,
+    Sequence,
     TypeAlias,
     Tuple,
     Dict,
@@ -20,7 +21,7 @@ from typing import (
     Union,
     TypeGuard,
 )
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, Unpack
 import ast
 import traceback
 from pydantic import BaseModel
@@ -199,6 +200,16 @@ class QueBusy(QueException):
 
     def __reduce__(self):
         return (self.__class__, (self.message,))
+
+
+# ---------------------------------------------------------------------------
+# Kwargs
+# ---------------------------------------------------------------------------
+class ListManipulationKwargs(TypedDict, total=False):
+    sort_keys: list[list[str]]
+    reverse: bool
+    filter_keys: list[list[str]]
+    criterions: list[Callable[[Any], bool]]
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +562,54 @@ class Que:
     def get_config(cls, next_run: RunInfo) -> str:
         return next_run.admin.config_path
 
+    @classmethod
+    def list_manipulation(
+        cls,
+        runs: Sequence[GenExp],
+        sort_keys: list[list[str]] = [],
+        reverse: bool = False,
+        filter_keys: list[list[str]] = [],
+        criterions: list[Callable[[Any], bool]] = [],
+    ) -> Sequence[GenExp]:
+        """Apply common list manipulation operations
+
+        Args:
+            runs (list[GenExp]): List of runs from any location
+            sort_keys (list[list[str]], optional): List of key sets (indexing into Dict) to sort by. Defaults to [].
+            reverse (bool, optional): Reverse after sort. Defaults to False.
+            filter_keys (list[list[str]], optional): List of key sets (indexing into Dict) to filter by. Must match criterions. Defaults to [].
+            criterions (list[Callable[[Any], bool]], optional): List of criterion to match against the values indexed by filter_keys. Defaults to [].
+
+        Raises:
+            ValueError: If filter keys are not paired with criterions
+
+        Returns:
+            list[GenExp]: _description_
+        """
+        if len(filter_keys) != len(criterions):
+            raise ValueError("filter_key sets and criterions must be equal in length")
+        elif len(filter_keys) > 0:
+            for filter_key_set, crit in zip(filter_keys, criterions):
+                if len(runs) == 0:
+                    break
+
+                runs = [
+                    run for run in runs if crit(Que.get_nested(run, filter_key_set))
+                ]
+
+        if len(sort_keys) > 0:
+            return sorted(
+                runs,
+                key=lambda x: tuple(
+                    Que.get_nested(x, sort_key_set) for sort_key_set in sort_keys
+                ),
+                reverse=reverse,
+            )
+        elif reverse:
+            return list(reversed(runs))
+
+        return runs
+
     def get_val(self, run: GenExp, keys: List[str]) -> Any:
         with log_and_raise(self.logger, "get_nested"):
             return self.get_nested(run, keys)
@@ -559,114 +618,222 @@ class Que:
     # Queue features
     # -----------------------------------------------------------------------
 
+    # Direct indexing
+
+    def create_run(
+        self,
+        arg_dict: AdminInfo,
+        wandb_dict: WandbInfo,
+        add_duplicates: bool = False,
+    ) -> None:
+        from configs import load_config
+
+        with log_and_raise(self.logger, "create"):
+            config: RunInfo = load_config(arg_dict)
+            if self._is_dup_exp(config) and not add_duplicates:
+                raise QueDupExp
+            exp_info = ExpInfo.model_validate(
+                {
+                    **config.model_dump(),
+                    "wandb": wandb_dict.model_dump(),
+                }
+            )
+            self.to_run.append(exp_info)
+
+    def add_run(
+        self,
+        arg_dict: AdminInfo,
+        wandb_dict: WandbInfo,
+        add_duplicates: bool = False,
+    ) -> None:
+        """Add a fully-tested completed run directly into old_runs."""
+        from testing import full_test, load_comp_res
+        from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
+
+        with log_and_raise(self.logger, "add"):
+            config: RunInfo = load_config(arg_dict)
+            if self._is_dup_exp(config) and not add_duplicates:
+                raise QueDupExp
+
+            self.logger.debug(arg_dict.save_path[-ZFILL:])
+            checknum = (
+                int(arg_dict.save_path[-ZFILL:])
+                if arg_dict.save_path[-1].isdigit()
+                else None
+            )
+            res_dir = get_model_results_dir(
+                get_model_exp_dir(
+                    split=arg_dict.split,
+                    model=arg_dict.model,
+                    exp_no=int(arg_dict.exp_no),
+                ),
+                checkpoint_num=checknum,
+            )
+
+            try:
+                results = load_comp_res(res_dir / "best_val_loss.json")
+                self.logger.info("Successfully loaded results")
+            except FileNotFoundError:
+                results = full_test(admin=config.admin, data=config.data)
+                self.logger.info("Results not found on disk — ran full_test")
+
+            comp_run = CompExpInfo.model_validate(
+                {
+                    **config.model_dump(),
+                    "wandb": wandb_dict.model_dump(),
+                    "results": results
+                    if isinstance(results, dict)
+                    else results.model_dump(),
+                }
+            )
+            self.old_runs.insert(0, comp_run)
+
+    def recover_run(
+        self,
+        to_loc: QueLocation = TO_RUN,
+        from_loc: QueLocation = CUR_RUN,
+        index: int = 0,
+        clean_slate: bool = False,
+        enum_chck: bool = False,
+    ) -> None:
+        self.logger.debug(f"clean_slate is set to: {clean_slate}")
+        with log_and_raise(self.logger, "recover"):
+            run = self.peak_run(from_loc, index)
+
+            if clean_slate:
+                self.logger.debug("running _clean_slate")
+                run = self._clean_slate(run, enum_chck)
+            else:
+                self.logger.debug("setting recover to True")
+                # model_copy preserves the concrete subtype for the nested admin model
+                run = run.model_copy(
+                    update={"admin": run.admin.model_copy(update={"recover": True})}
+                )
+
+            if from_loc == FAIL_RUNS:
+                # Strip the error field — re-validate as plain ExpInfo
+                run = ExpInfo.model_validate(
+                    {k: v for k, v in run.model_dump().items() if k != "error"}
+                )
+            elif not clean_slate and run.wandb.run_id is None:
+                raise QueException("Run set to recover but no run_id present")
+
+            _ = self._pop_run(from_loc, index)
+            self._set_run(to_loc, 0, run)
+
+        self.logger.info(
+            f"Recovered Run: {self.run_str(to_loc, 0)} idx {index} from {from_loc} → {to_loc}"
+        )
+
+    def clear_runs(self, loc: QueLocation) -> None:
+        to_clear = self._fetch_state(loc)
+        with log_and_raise(self.logger, f"clear {loc}"):
+            if len(to_clear) > 0:
+                to_clear.clear()
+            else:
+                raise QueEmpty(loc)
+
+    def remove_run(self, loc: QueLocation, idx: int) -> None:
+        with log_and_raise(self.logger, "remove"):
+            _ = self._pop_run(loc, idx)
+
+    def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
+        with log_and_raise(self.logger, "shuffle"):
+            self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
+
+    def _move(self, o_loc: QueLocation, n_loc: QueLocation, oi_idx: int) -> None:
+        run = self.peak_run(o_loc, oi_idx)
+        self._set_run(n_loc, 0, run)
+        _ = self._pop_run(o_loc, oi_idx)
+
+    def move(
+        self,
+        o_loc: QueLocation,
+        n_loc: QueLocation,
+        oi_idx: int,
+        of_idx: Optional[int] = None,
+    ) -> None:
+        with log_and_raise(self.logger, "move"):
+            if of_idx is None:
+                self._move(o_loc, n_loc, oi_idx)
+            else:
+                old_location = self._fetch_state(o_loc)
+                if oi_idx > of_idx:
+                    oi_idx, of_idx = of_idx, oi_idx
+                if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
+                    raise QueIdxOORR(o_loc, oi_idx, of_idx, len(old_location))
+                for _ in range(oi_idx, of_idx + 1):
+                    self._move(o_loc, n_loc, oi_idx)
+
+    def edit_run(
+        self,
+        loc: QueLocation,
+        idx: int,
+        keys: List[str],
+        value: Any,
+        do_eval: bool = False,
+    ) -> None:
+        """Edit a single field (by key path) in a queued run.
+
+        The run is dumped to a plain dict, mutated, then re-validated back to
+        the appropriate pydantic model — so all field validators still run.
+        """
+        with log_and_raise(self.logger, "edit"):
+            run = self.peak_run(loc, idx)
+            val = ast.literal_eval(value) if do_eval else value
+
+            run_dict = run.model_dump()
+            run_dict = self.set_nested(run_dict, keys, val)
+
+            if loc == FAIL_RUNS:
+                new_run: GenExp = FailedExp.model_validate(run_dict)
+            elif loc == OLD_RUNS:
+                new_run = CompExpInfo.model_validate(run_dict)
+            else:
+                new_run = ExpInfo.model_validate(run_dict)
+
+            _ = self._pop_run(loc, idx)
+            self._set_run(loc, idx, new_run)
+
+    # Indirect indexing
+
     def run_str(self, loc: QueLocation, idx: int) -> str:
         return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
 
     def list_runs(
-        self, loc: QueLocation, keys: List[str] = [], reverse: bool = False
+        self, loc: QueLocation, **kwargs: Unpack[ListManipulationKwargs]
     ) -> ExpQue:
-        loc_runs = self._fetch_state(loc)
-        if keys:
-            return sorted(
-                loc_runs, key=lambda x: self.get_val(x, keys), reverse=reverse
-            )
-        elif reverse:
-            return list(reversed(loc_runs))
-
-        return loc_runs
+        return list(Que.list_manipulation(self._fetch_state(loc), **kwargs))
 
     def select_runs(
         self,
         loc: QueLocation,
         indexes: List[int],
-        keys: List[str] = [],
-        reverse: bool = False,
+        **kwargs: Unpack[ListManipulationKwargs],
     ) -> ExpQue:
-        runs = self.list_runs(loc, keys, reverse)
+        """Select runs by index after applying list manipulations."""
+        runs = self.list_runs(loc, **kwargs)
         return [runs[i] for i in indexes]
+
+    def place_runs(
+        self,
+        loc: QueLocation,
+        runs: ExpQue,
+        index: int = 0,
+    ) -> None:
+        """Insert runs by index. Uses 0 as default if runs is empty, and repeats last index up to lenght of runs"""
+        with log_and_raise(self.logger, "place_runs"):
+            for idx, run in enumerate(runs):
+                self._set_run(loc, idx + index, run)
 
     @classmethod
     def summarise(cls, runs: ExpQue) -> List[Sumarised]:
         return [cls._run_sum(run) for run in runs]  # type: ignore[arg-type]
 
     def summarise_runs(
-        self, loc: QueLocation, keys: List[str] = [], reverse: bool = False
+        self, loc: QueLocation, **kwargs: Unpack[ListManipulationKwargs]
     ) -> List[Sumarised]:
-        return self.summarise(self.list_runs(loc, keys, reverse))
-
-    def disp_runs(self, loc: QueLocation, exc: Optional[List[str]] = None) -> None:
-        print(f"{loc} runs".title())
-        runs = self.summarise_runs(loc)
-
-        if len(runs) == 0:
-            print("  No runs available")
-            return
-
-        stats = self._get_print_stats(runs)
-        has_results = runs[0].best_val_acc is not None
-        has_error = isinstance(runs[0], SummarisedError)
-
-        header_parts = [
-            "Idx".ljust(5),
-            "Run ID".ljust(stats.get("max_run_id_len", len("Run Id")) + 2),
-            "Model".ljust(stats["max_model_len"] + 2),
-            "Exp No".ljust(stats["max_exp_no_len"] + 2),
-            "Dataset".ljust(stats["max_dataset_len"] + 2),
-            "Split".ljust(stats["max_split_len"] + 2),
-        ]
-        if has_results:
-            header_parts.append("Best Val Acc".ljust(stats["max_best_val_acc_len"] + 2))
-            header_parts.append(
-                "Best Val Loss".ljust(stats["max_best_val_loss_len"] + 2)
-            )
-        header_parts.append("Config Path".ljust(stats["max_config_path_len"] + 2))
-        if has_error:
-            header_parts.append("Error")
-
-        if exc is not None:
-            header_parts = [h for h in header_parts if h.strip().lower() not in exc]
-
-        header = " | ".join(header_parts)
-        print(header)
-        print("-" * len(header))
-
-        for i, run in enumerate(runs):
-            row_parts = [
-                str(i).ljust(5),
-                (run.run_id if run.run_id is not None else "N/A").ljust(
-                    stats.get("max_run_id_len", len("Run Id")) + 2
-                ),
-                run.model.ljust(stats["max_model_len"] + 2),
-                run.exp_no.ljust(stats["max_exp_no_len"] + 2),
-                run.dataset.ljust(stats["max_dataset_len"] + 2),
-                run.split.ljust(stats["max_split_len"] + 2),
-            ]
-            if has_results:
-                row_parts.append(
-                    (
-                        f"{run.best_val_acc:.4f}"
-                        if run.best_val_acc is not None
-                        else "N/A"
-                    ).ljust(stats["max_best_val_acc_len"] + 2)
-                )
-                row_parts.append(
-                    (
-                        f"{run.best_val_loss:.4f}"
-                        if run.best_val_loss is not None
-                        else "N/A"
-                    ).ljust(stats["max_best_val_loss_len"] + 2)
-                )
-            row_parts.append(run.config_path.ljust(stats["max_config_path_len"] + 2))
-            if has_error and isinstance(run, SummarisedError):
-                row_parts.append(run.error if run.error is not None else "N/A")
-
-            if exc is not None:
-                row_parts = [
-                    r
-                    for r, h in zip(row_parts, header_parts)
-                    if h.strip().lower() not in exc
-                ]
-            print(" | ".join(row_parts))
+        return self.summarise(self.list_runs(loc, **kwargs))
 
     @classmethod
     def print_runs(cls, runs: List[Sumarised], exc: Optional[List[str]] = None) -> None:
@@ -743,185 +910,37 @@ class Que:
                 ]
             print(" | ".join(row_parts))
 
+    def disp_runs(
+        self,
+        loc: QueLocation,
+        exc: Optional[List[str]] = None,
+        **kwargs: Unpack[ListManipulationKwargs],
+    ) -> None:
+        self.print_runs(self.summarise_runs(loc, **kwargs), exc=exc)
+
     def disp_run(self, loc: QueLocation, idx: int) -> None:
         from configs import print_config
 
         print_config(self.peak_run(loc, idx))
 
-    def recover_run(
-        self,
-        to_loc: QueLocation = TO_RUN,
-        from_loc: QueLocation = CUR_RUN,
-        index: int = 0,
-        clean_slate: bool = False,
-        enum_chck: bool = False,
-    ) -> None:
-        self.logger.debug(f"clean_slate is set to: {clean_slate}")
-        with log_and_raise(self.logger, "recover"):
-            run = self.peak_run(from_loc, index)
-
-            if clean_slate:
-                self.logger.debug("running _clean_slate")
-                run = self._clean_slate(run, enum_chck)
-            else:
-                self.logger.debug("setting recover to True")
-                # model_copy preserves the concrete subtype for the nested admin model
-                run = run.model_copy(
-                    update={"admin": run.admin.model_copy(update={"recover": True})}
-                )
-
-            if from_loc == FAIL_RUNS:
-                # Strip the error field — re-validate as plain ExpInfo
-                run = ExpInfo.model_validate(
-                    {k: v for k, v in run.model_dump().items() if k != "error"}
-                )
-            elif not clean_slate and run.wandb.run_id is None:
-                raise QueException("Run set to recover but no run_id present")
-
-            _ = self._pop_run(from_loc, index)
-            self._set_run(to_loc, 0, run)
-
-        self.logger.info(
-            f"Recovered Run: {self.run_str(to_loc, 0)} idx {index} from {from_loc} → {to_loc}"
-        )
-
-    def clear_runs(self, loc: QueLocation) -> None:
-        to_clear = self._fetch_state(loc)
-        with log_and_raise(self.logger, f"clear {loc}"):
-            if len(to_clear) > 0:
-                to_clear.clear()
-            else:
-                raise QueEmpty(loc)
-
-    def create_run(
-        self,
-        arg_dict: AdminInfo,
-        wandb_dict: WandbInfo,
-        add_duplicates: bool = False,
-    ) -> None:
-        from configs import load_config
-
-        with log_and_raise(self.logger, "create"):
-            config: RunInfo = load_config(arg_dict)
-            if self._is_dup_exp(config) and not add_duplicates:
-                raise QueDupExp
-            exp_info = ExpInfo.model_validate(
-                {
-                    **config.model_dump(),
-                    "wandb": wandb_dict.model_dump(),
-                }
-            )
-            self.to_run.append(exp_info)
-
-    def add_run(
-        self,
-        arg_dict: AdminInfo,
-        wandb_dict: WandbInfo,
-        add_duplicates: bool = False,
-    ) -> None:
-        """Add a fully-tested completed run directly into old_runs."""
-        from testing import full_test, load_comp_res
-        from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
-
-        with log_and_raise(self.logger, "add"):
-            config: RunInfo = load_config(arg_dict)
-            if self._is_dup_exp(config) and not add_duplicates:
-                raise QueDupExp
-
-            self.logger.debug(arg_dict.save_path[-ZFILL:])
-            checknum = (
-                int(arg_dict.save_path[-ZFILL:])
-                if arg_dict.save_path[-1].isdigit()
-                else None
-            )
-            res_dir = get_model_results_dir(
-                get_model_exp_dir(
-                    split=arg_dict.split,
-                    model=arg_dict.model,
-                    exp_no=int(arg_dict.exp_no),
-                ),
-                checkpoint_num=checknum,
-            )
-
-            try:
-                results = load_comp_res(res_dir / "best_val_loss.json")
-                self.logger.info("Successfully loaded results")
-            except FileNotFoundError:
-                results = full_test(admin=config.admin, data=config.data)
-                self.logger.info("Results not found on disk — ran full_test")
-
-            comp_run = CompExpInfo.model_validate(
-                {
-                    **config.model_dump(),
-                    "wandb": wandb_dict.model_dump(),
-                    "results": results
-                    if isinstance(results, dict)
-                    else results.model_dump(),
-                }
-            )
-            self.old_runs.insert(0, comp_run)
-
-    def remove_run(self, loc: QueLocation, idx: int) -> None:
-        with log_and_raise(self.logger, "remove"):
-            _ = self._pop_run(loc, idx)
-
-    def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
-        with log_and_raise(self.logger, "shuffle"):
-            self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
-
-    def _move(self, o_loc: QueLocation, n_loc: QueLocation, oi_idx: int) -> None:
-        run = self.peak_run(o_loc, oi_idx)
-        self._set_run(n_loc, 0, run)
-        _ = self._pop_run(o_loc, oi_idx)
-
-    def move(
+    def copy_runs(
         self,
         o_loc: QueLocation,
+        o_indexes: List[int],
         n_loc: QueLocation,
-        oi_idx: int,
-        of_idx: Optional[int] = None,
+        n_idx: int = 0,
+        clean_slate: bool = False,
+        enum_chck: bool = True,
+        **kwargs: Unpack[ListManipulationKwargs],
     ) -> None:
-        with log_and_raise(self.logger, "move"):
-            if of_idx is None:
-                self._move(o_loc, n_loc, oi_idx)
-            else:
-                old_location = self._fetch_state(o_loc)
-                if oi_idx > of_idx:
-                    oi_idx, of_idx = of_idx, oi_idx
-                if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
-                    raise QueIdxOORR(o_loc, oi_idx, of_idx, len(old_location))
-                for _ in range(oi_idx, of_idx + 1):
-                    self._move(o_loc, n_loc, oi_idx)
+        with log_and_raise(self.logger, "copy"):
+            runs = self.select_runs(o_loc, o_indexes, **kwargs)
+            if clean_slate:
+                runs = [self._clean_slate(run, enum_chck) for run in runs]
 
-    def edit_run(
-        self,
-        loc: QueLocation,
-        idx: int,
-        keys: List[str],
-        value: Any,
-        do_eval: bool = False,
-    ) -> None:
-        """Edit a single field (by key path) in a queued run.
+            self.place_runs(n_loc, runs, index=n_idx)
 
-        The run is dumped to a plain dict, mutated, then re-validated back to
-        the appropriate pydantic model — so all field validators still run.
-        """
-        with log_and_raise(self.logger, "edit"):
-            run = self.peak_run(loc, idx)
-            val = ast.literal_eval(value) if do_eval else value
-
-            run_dict = run.model_dump()
-            run_dict = self.set_nested(run_dict, keys, val)
-
-            if loc == FAIL_RUNS:
-                new_run: GenExp = FailedExp.model_validate(run_dict)
-            elif loc == OLD_RUNS:
-                new_run = CompExpInfo.model_validate(run_dict)
-            else:
-                new_run = ExpInfo.model_validate(run_dict)
-
-            _ = self._pop_run(loc, idx)
-            self._set_run(loc, idx, new_run)
+    # Meta features
 
     def find_runs(
         self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
@@ -965,42 +984,12 @@ class Que:
                     )
                     run_list[idx] = model_cls.model_validate(run_dict)  # type: ignore[index]
 
-    def copy_runs(
-        self,
-        o_loc: QueLocation,
-        o_indexes: List[int],
-        n_loc: QueLocation,
-        n_idx: int = 0,
-        clean_slate: bool = False,
-        enum_chck: bool = True,
-        keys: List[str] = [],
-        reverse: bool = False,
-    ) -> None:
-        with log_and_raise(self.logger, "copy"):
-            runs = self.select_runs(o_loc, o_indexes, keys, reverse)
-            for run in runs[::-1]:
-                run = self._clean_slate(run, enum_chck) if clean_slate else run  # type: ignore[arg-type]
-                self._set_run(n_loc, n_idx, run)
-
 
 # ---------------------------------------------------------------------------
-# Server state models (already pydantic — minimal changes)
+# Server state models
 # ---------------------------------------------------------------------------
 
 Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
-
-
-# class WorkerState(BaseModel):
-#     task: Worker_tasks
-#     current_run_id: Optional[str]
-#     working_pid: Optional[int]
-#     exception: Optional[str]
-
-
-# class DaemonState(BaseModel):
-#     awake: bool
-#     stop_on_fail: bool
-#     supervisor_pid: Optional[int]
 
 
 class WorkerStateDict(TypedDict):
@@ -1020,9 +1009,6 @@ class ServerState(BaseModel):
     server_pid: Optional[int]
     daemon_state: DaemonStateDict
     worker_state: WorkerStateDict
-
-
-# Type guards now just delegate to pydantic's own validation.
 
 
 def is_worker_state(obj: Any) -> TypeGuard[WorkerStateDict]:
