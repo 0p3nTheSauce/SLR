@@ -2,9 +2,7 @@
 """que
 ---
 A lightweight in-memory queue manager for experiment configurations with
-simple JSON-backed persistence.  See the original module docstring for the
-full public-API description.  This version uses pydantic BaseModel objects
-throughout instead of TypedDicts / plain dicts.
+simple JSON-backed persistence.  
 """
 
 from typing import (

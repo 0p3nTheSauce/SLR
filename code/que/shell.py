@@ -635,14 +635,6 @@ class QueShell(cmdLib.Cmd):
                         
                         info = Que.get_nested(run, key_set)
 
-                        # f = lambda x: any([i.type == 'focal_normal' for i in x])
-                        # print(f(info))
-
-
-
-                        # if isinstance(info, BaseModel):
-                        #     info = info.model_dump()
-
                         disp_components = Que.set_nested(
                             disp_components, key_set, info 
                         )
@@ -650,10 +642,6 @@ class QueShell(cmdLib.Cmd):
                     run = disp_components
 
                 # Format as JSON-like syntax
-                # if isinstance(run, dict):
-                #     run_json = json.dumps(run, indent=2, default=_json_default)
-                # else:
-                #     run_json = json.dumps(run.model_dump(), indent=2, default=_json_default)
                 run_json = json.dumps(run, indent=2, default=_json_default)
                     
                 syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
@@ -687,6 +675,9 @@ class QueShell(cmdLib.Cmd):
                 filter_keys=parsed_args.filter_keys,
                 criterions=[parse_criterion(crit) for crit in parsed_args.criterion],
             )
+
+            if parsed_args.clean_slate:
+                runs = [Que._clean_slate(run, enum_chck=True) for run in runs]
 
             self.que.place_runs(
                 parsed_args.n_location,
