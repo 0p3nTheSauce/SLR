@@ -605,13 +605,46 @@ def update_runs7():
 		json.dump(all_runs, f, indent=4)
 
 def update_runs8():
-	# just a test to see if we can load the fixed runs without validation errors
-	with open("/home/luke/Code/SLR/code/que/Runs_fixed.json", "r") as f:
+	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
+
+	for loc in KEYS:
+		que_list = all_runs[loc]
+		new_quelist = []
+		for run in que_list:
+			
+			data = run["data"]
+			keys = ["test_augs", "train_augs"]
+			for key in keys:
+				# keys2 = [ 'spatial_aug']
+				# for k2 in keys2:
+				k2 = 'temporal_aug'
+				for i, aug in enumerate(data[key][k2]):
+					
+					if aug['type'] == 'shuffle':
+						data[key][k2].pop(i)
+
+			run['data'] = data
+
+			if loc in KEYS[:2]:
+				run = ExpInfo.model_validate(run).model_dump()
+			elif loc == KEYS[2]:
+				run = CompExpInfo.model_validate(run).model_dump()
+			else:
+				run = FailedExp.model_validate(run).model_dump()
+			
+     
+     
+			new_quelist.append(run)
+
+		all_runs[loc] = new_quelist
+
+	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
 
 
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
-	validate_runs()
-	# update_runs7()
+	# validate_runs()
+	update_runs8()
