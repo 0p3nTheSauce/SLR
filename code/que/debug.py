@@ -604,6 +604,10 @@ def update_runs7():
 	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
+def update_runs8():
+	# just a test to see if we can load the fixed runs without validation errors
+	with open("/home/luke/Code/SLR/code/que/Runs_fixed.json", "r") as f:
+		all_runs = json.load(f)
 
 
 if __name__ == "__main__":

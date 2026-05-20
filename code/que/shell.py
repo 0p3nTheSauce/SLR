@@ -76,6 +76,17 @@ def parse_criterion(expr: str) -> Callable[[Any], bool]:
         raise ValueError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
 
+# --------------------------------------------------------------------------
+# json serialisation
+# --------------------------------------------------------------------------
+
+def _json_default(obj):
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    if isinstance(obj, Path):
+        return str(obj)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -531,6 +542,7 @@ class QueShell(cmdLib.Cmd):
             if parsed_args is None:
                 return
 
+            runs = None
             with self.unwrap_exception("", "Failed to list runs"):
                 runs = list(
                     Que.list_manipulation(
@@ -545,6 +557,9 @@ class QueShell(cmdLib.Cmd):
                         ],
                     )
                 )
+
+            if runs is None:
+                return
 
             runs = self.que.summarise(runs)
 
@@ -619,20 +634,28 @@ class QueShell(cmdLib.Cmd):
                     for key_set in parsed_args.display_keys:
                         
                         info = Que.get_nested(run, key_set)
-                        if isinstance(info, BaseModel):
-                            info = info.model_dump()
-                        
+
+                        # f = lambda x: any([i.type == 'focal_normal' for i in x])
+                        # print(f(info))
+
+
+
+                        # if isinstance(info, BaseModel):
+                        #     info = info.model_dump()
+
                         disp_components = Que.set_nested(
                             disp_components, key_set, info 
                         )
-                        
+                    
                     run = disp_components
-                
+
                 # Format as JSON-like syntax
-                if isinstance(run, dict):
-                    run_json = json.dumps(run, indent=2)
-                else:
-                    run_json = json.dumps(run.model_dump(), indent=2)
+                # if isinstance(run, dict):
+                #     run_json = json.dumps(run, indent=2, default=_json_default)
+                # else:
+                #     run_json = json.dumps(run.model_dump(), indent=2, default=_json_default)
+                run_json = json.dumps(run, indent=2, default=_json_default)
+                    
                 syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
                 self.console.print(

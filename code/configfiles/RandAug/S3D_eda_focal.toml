@@ -74,3 +74,6 @@ patience = 15
 min_delta = 0.01
 
 
+# same as eda, but with focal normal sampler instead of chunked sampler
+# and wobble set to 0
+# performed slightly worse than eda

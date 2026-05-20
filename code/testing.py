@@ -334,7 +334,11 @@ def setup_data(
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     test_info = get_wlasl_info(split, set_name=set_name)
 
-    aug_info = data_info.train_augs if set_name == "train" else data_info.test_augs
+    #make copy to hand off to get_data_set to avoid shuffle injection in final config
+    data_info_cp = data_info.model_copy()
+
+
+    aug_info = data_info_cp.train_augs if set_name == "train" else data_info_cp.test_augs
     if aug_info is None:
         raise ValueError(
             "Augmentation info must be provided in data_info for both train and test sets."
@@ -349,10 +353,9 @@ def setup_data(
             raise ValueError('At least one frame sampler has to be present to extract video length')
         
         aug_info.temporal_aug.insert(i+1, ShuffleT(num_frames=video_length))
-        # print(aug_info.model_dump())
 
     test_dataset, perm, shanon_entropy = get_data_set(
-        set_info=test_info, data_info=data_info
+        set_info=test_info, data_info=data_info_cp
     )
     test_loader = DataLoader(
         test_dataset,

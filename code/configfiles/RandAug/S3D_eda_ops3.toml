@@ -69,3 +69,5 @@ patience = 15
 min_delta = 0.01
 
 
+# same as eda, but with num_ops 3 instead of 2
+# performed slighlyly better than eda

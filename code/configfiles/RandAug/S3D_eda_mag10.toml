@@ -68,4 +68,5 @@ mode = 'min'
 patience = 15
 min_delta = 0.01
 
-
+# same as eda, but with magnitude 10 instead of 7
+# performed slightly worse than eda
