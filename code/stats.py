@@ -44,8 +44,11 @@ INSTANCE_KEYS: TypeAlias = Literal['bbox', 'frame_end', 'frame_start', 'instance
 FRAME_WIDTH: int = 256
 FRAME_HEIGHT: int = 256
 
-def get_n(distribution: dict, n: int, key = lambda x: x[1], start_index: int = 0) -> dict:
-    return {k : v for k, v in list(sorted(distribution.items(), key=key))[start_index:start_index+n]}
+def sort_distribution(distribution: dict, key = lambda x: x[1]) -> dict:
+	return {k : v for k, v in sorted(distribution.items(), key=key)}
+
+def get_n(distribution: dict, n: int, key = lambda x: x[1], start_index: int = 0, step: int = 1) -> dict:
+    return {k : v for k, v in list(sorted(distribution.items(), key=key))[start_index:start_index+n:step]}
     
 
 class HistoGram(Dict[Any, int]):
@@ -146,6 +149,20 @@ def reverse_preproc_format(
 
 	return lst_ppcd
 
+def _ident(_):
+	return True
+
+def to_preproc_format(
+    gloss_seperated_instances: List[preproc_class_dict],
+    criterion: Callable[[Instance], bool] = _ident
+) -> List[Instance]:
+    """Undo reverse_preproc_format, converting from class seperated format to flat preprocessed format"""
+    preproc_instances = []
+    for class_dict in gloss_seperated_instances:
+        preproc_instances.extend(
+			inst for inst in class_dict["instances"] if criterion(inst)
+		)
+    return preproc_instances
 
 def get_set(
 	instances: List[RawInstance], set_name: AVAIL_SETS
