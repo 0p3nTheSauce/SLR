@@ -44,6 +44,10 @@ INSTANCE_KEYS: TypeAlias = Literal['bbox', 'frame_end', 'frame_start', 'instance
 FRAME_WIDTH: int = 256
 FRAME_HEIGHT: int = 256
 
+def get_n(distribution: dict, n: int, key = lambda x: x[1], start_index: int = 0) -> dict:
+    return {k : v for k, v in list(sorted(distribution.items(), key=key))[start_index:start_index+n]}
+    
+
 class HistoGram(Dict[Any, int]):
 	"""Represents a histogram with value : count"""
 

@@ -43,6 +43,8 @@ class DataSetInfo(TypedDict):
 LOAD_DATA_POLICY: TypeAlias = Literal["strict", "accepting"]
 
 
+# Utility functions
+
 def load_data_from_json(
     json_path: Union[str, Path], policy: LOAD_DATA_POLICY
 ) -> List[Instance]:
@@ -132,7 +134,24 @@ def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -
     
     return label_file
     
-
+def get_example_videos(
+    instances: List[Instance],
+    video_dir: Path = Path(WLASL_ROOT) / RAW_DIR,
+    limit: Optional[int] = None,
+    strict: bool = True
+) -> List[Path]:
+    """Get example video paths for a given label number"""
+    example_paths = []
+    lim = limit if limit is not None else float('inf')
+    for inst in instances:
+        video_path = get_video_path(inst.video_id, video_dir)
+        if video_path.exists():
+            example_paths.append(video_path)
+        elif strict:
+            raise ValueError(f'Video path not found: {video_path}')
+        if len(example_paths) >= lim:  # Limit to specified number of examples
+            break
+    return example_paths
 
 ############################ Dataset Classes ############################
 
