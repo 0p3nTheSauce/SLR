@@ -154,14 +154,13 @@ def _ident(_):
 
 def to_preproc_format(
     gloss_seperated_instances: List[preproc_class_dict],
-    criterion: Callable[[Instance], bool] = _ident
+    criterion: Callable[[preproc_class_dict], bool] = _ident
 ) -> List[Instance]:
     """Undo reverse_preproc_format, converting from class seperated format to flat preprocessed format"""
     preproc_instances = []
-    for class_dict in gloss_seperated_instances:
-        preproc_instances.extend(
-			inst for inst in class_dict["instances"] if criterion(inst)
-		)
+    for gloss in gloss_seperated_instances:
+        if criterion(gloss):
+            preproc_instances.extend(gloss['instances'])
     return preproc_instances
 
 def get_set(
