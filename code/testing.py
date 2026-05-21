@@ -335,7 +335,7 @@ def setup_data(
     test_info = get_wlasl_info(split, set_name=set_name)
 
     #make copy to hand off to get_data_set to avoid shuffle injection in final config
-    data_info_cp = data_info.model_copy()
+    data_info_cp = data_info.model_copy(deep=True)
 
 
     aug_info = data_info_cp.train_augs if set_name == "train" else data_info_cp.test_augs
@@ -349,7 +349,7 @@ def setup_data(
         try:
             i, s = get_last_sampler(aug_info.temporal_aug)
             video_length = s.target_length
-        except IndentationError:
+        except IndexError:
             raise ValueError('At least one frame sampler has to be present to extract video length')
         
         aug_info.temporal_aug.insert(i+1, ShuffleT(num_frames=video_length))
