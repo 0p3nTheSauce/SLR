@@ -38,9 +38,8 @@ import numpy as np
 # locals
 from configs import WLASL_ROOT, SPLIT_DIR, CLASSES_PATH
 from preprocess import RawInstance, WLASLClass, Instance
+from run_types import AVAIL_SETS, AVAIL_SPLITS
 
-AVAIL_SETS: TypeAlias = Literal["train", "val", "test"]
-AVAIL_SPLITS: TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
 INSTANCE_KEYS: TypeAlias = Literal['bbox', 'frame_end', 'frame_start', 'instance_id', 'signer_id', 'source', 'split', 'url', 'variation_id', 'video_id', 'label_num', 'label_name']
 FRAME_WIDTH: int = 256
 FRAME_HEIGHT: int = 256
@@ -121,6 +120,7 @@ class preproc_class_dict(TypedDict):
 def reverse_preproc_format(
 	preproc_instances: List[Instance], classes:Optional[List[str]] = None,
 ) -> List[preproc_class_dict]:
+	"""Convert from flat preprocessed format to original class seperated format"""
 	num_classes = len(set([inst.label_num for inst in preproc_instances]))
 	lst_ppcd = [preproc_class_dict(gloss="empty", instances=[])] * num_classes
 	for pp_inst in preproc_instances:

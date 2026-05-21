@@ -13,12 +13,19 @@ from typing import (
 from pydantic import BaseModel, Field, model_validator, computed_field, field_validator
 
 
+### for model normalisation
+
 class NormDict(BaseModel):
     mean: Tuple[float, float, float]
     std: Tuple[float, float, float]
 
 
 ####################### Data loading and augmentation #############################
+
+AVAIL_SETS = Literal["train", "val", "test"]
+AVAIL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
+
+
 
 ### Samplers
 
@@ -305,7 +312,7 @@ class StopperState(BaseModel):
 class MinInfo(BaseModel):
     model: str
     dataset: str
-    split: str
+    split: AVAIL_SPLITS
     save_path: str
 
 

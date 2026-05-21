@@ -23,14 +23,12 @@ from pathlib import Path
 # local imports
 from utils import load_rgb_frames_from_video
 from configs import WLASL_ROOT, SPLIT_DIR, RAW_DIR, LABELS_PATH
+from run_types import AVAIL_SETS, AVAIL_SPLITS
+
 
 """Naming convention:
 - set: one of train, test and val
 - split: one of asl100, asl300, asl1000, asl2000"""
-
-AVAIL_SETS = Literal["train", "val", "test"]
-AVAIL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
-
 
 class RawInstance(BaseModel):
     """Represents a single raw instance of a gloss in the dataset."""

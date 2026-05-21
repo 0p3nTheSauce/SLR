@@ -23,7 +23,7 @@ from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import get_model
 from configs import set_seed, _make_aug_info
 
-from video_dataset import VideoDataset, get_data_set, get_wlasl_info
+from video_dataset import VideoDataset, get_data_set, get_wlasl_info, AVAIL_SETS, AVAIL_SPLITS
 from models import avail_models
 from run_types import BaseSampler, DataInfo, ShuffleT, TemporalAugs
 from configs import (
@@ -326,8 +326,8 @@ def get_last_sampler(conf_list: List[TemporalAugs]):
     return samplers[-1]
 
 def setup_data(
-    set_name: Literal["train", "test", "val"],
-    split: str,
+    set_name: AVAIL_SETS,
+    split: AVAIL_SPLITS,
     data_info: DataInfo,
     shuffle: bool = False,  # override for shuffle test
     # video_length: Optional[int] = None
@@ -387,7 +387,7 @@ def checkpoint_dir_to_result_dir(checkpoint_dir: Path) -> Path:
 def test_run(
     admin: MinInfo,
     data: DataInfo,
-    set_name: Literal["test", "val", "train"],
+    set_name: AVAIL_SETS,
     shuffle: bool = False,
     check: str = "best.pth",
     br_graph: bool = False,

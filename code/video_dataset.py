@@ -26,7 +26,7 @@ from video_transforms import (
 )
 from run_types import DataInfo
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
-from preprocess import Instance, AVAIL_SETS
+from preprocess import Instance, AVAIL_SETS, AVAIL_SPLITS
 
 ############################# Dictionaries and Types #############################
 
@@ -66,7 +66,7 @@ def load_data_from_json(
 
 
 def get_wlasl_info(
-    split: str, set_name: Literal["train", "test", "val"]
+    split: AVAIL_SPLITS, set_name: AVAIL_SETS
 ) -> DataSetInfo:
     """Get wlasl dataset loading information in a tpyed dict
 
@@ -92,6 +92,46 @@ def get_wlasl_info(
         "label_suff": LABEL_SUFFIX,
         "set_name": set_name,
     }
+
+def get_video_path(video_id: str, video_dir: Path) -> Path:
+    """Get the path to a video given its ID and the root video directory
+
+    Args:
+        video_id (str): Unique identifier for the video (without extension)
+        video_dir (Path): Root directory containing videos
+
+    Returns:
+        Path: The path to the video file
+    """
+    video_path = video_dir / f"{video_id}.mp4"
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video file {video_path} does not exist.")
+    return video_path
+
+def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -> Path:
+    """Get the path to the split / set labels file
+
+    Args:
+        set_name (AVAIL_SETS): One of 'train', 'test' or 'val'
+        labels_dir (Path, optional): Path to labels directory. Defaults to Path(LABELS_PATH).
+        label_suffix (str, optional): Suffix for label files. Defaults to LABEL_SUFFIX.
+
+    Raises:
+        FileNotFoundError: If the labels directory, split directory or label file does not exist.
+
+    Returns:
+        Path: Path to the labels file for the specified split and set
+    """
+    if not labels_dir.exists():
+        raise FileNotFoundError(f"Labels directory {labels_dir} does not exist.")
+    
+    #TODO hardcoded _instances_ in label file name, should be more flexible
+    label_file = labels_dir / f"{set_name}_instances_{label_suffix}"
+    if not label_file.exists():
+        raise FileNotFoundError(f"Label file {label_file} does not exist in labels directory.")
+    
+    return label_file
+    
 
 
 ############################ Dataset Classes ############################
@@ -129,11 +169,12 @@ class VideoDataset(Dataset):
         self.transforms = transforms
         self.include_meta = include_meta
         self.item_transforms = item_transforms
-        instances_path = (
-            set_info["labels"]
-            / f"{set_info['set_name']}_instances_{set_info['label_suff']}"
+        
+        self.data = load_data_from_json(
+            get_labels_path(set_info["set_name"], set_info["labels"], set_info["label_suff"]),
+            policy=load_policy
         )
-        self.data = load_data_from_json(instances_path, load_policy)
+        
         if load_policy == "accepting":
             self.data = cast(List[Dict[str, Any]], self.data)
         elif load_policy == "strict":
@@ -143,12 +184,8 @@ class VideoDataset(Dataset):
         self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
-        video_path = self.root / cast(str, item["video_id"] + ".mp4")
-        if video_path.exists() is False:
-            raise FileNotFoundError(f"Video file {video_path} does not exist.")
-
         return load_rgb_frames_from_video(
-            video_path=video_path,
+            video_path=get_video_path(item["video_id"], self.root),
             start=item["frame_start"],
             end=item["frame_end"],
         ).to(torch.uint8)
