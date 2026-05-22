@@ -816,6 +816,8 @@ def get_transform(
 	norm_dict: Optional[NormDict] = None,
 	temporal_aug: List[TemporalAugs] = [],
 	spatial_aug: List[SpatialAugs] = [],
+	normalise_to_float: bool = True,
+	permute_time_channel: bool = True
 ) -> Tuple[Callable[[Tensor], Tensor], Optional[List[int]], Optional[float]]:
 	"""Prepare a transform for a video to prepare it for a video model.
 	- Shape must be specified with at least one sampler (temporal), and one crop (spatial)
@@ -824,9 +826,11 @@ def get_transform(
 	(uint8 T, C, H, W) -> (float C, T, H, W)
 
 	Args:
-			norm_dict (Optional[NormDict], optional): If provided, the mean and standard deviation are applied as the final transform. Defaults to None.
-			temporal_aug (List[TemporalAugs], optional): A list of temporal augmentations to be applied in order. Recommend using 1 sampler to set the number of frames. Defaults to [].
-			spatial_aug (List[SpatialAugs], optional): A list of spatial augmentations to be applied in order. Recommend using 1 crop to set the frame dimensions. Defaults to [].
+		norm_dict (Optional[NormDict], optional): If provided, the mean and standard deviation are applied as the final transform. Defaults to None.
+		temporal_aug (List[TemporalAugs], optional): A list of temporal augmentations to be applied in order. Recommend using 1 sampler to set the number of frames. Defaults to [].
+		spatial_aug (List[SpatialAugs], optional): A list of spatial augmentations to be applied in order. Recommend using 1 crop to set the frame dimensions. Defaults to [].
+		normalise_to_float (bool, optional): Normalise uint8 to float. Defaults to True.
+		permute_time_channel (bool, optional): Permute tensor from (T, C, H, W) to (C, T, H, W). Defaults to True.
 	Returns:
 			Tuple[Callable[[Tensor], Tensor], Optional[List[int]], Optional[float]]: The transform + a tupler. If Shuffle is used:
 			- the permutation
@@ -849,12 +853,14 @@ def get_transform(
 	for aug in spatial_aug:
 		transforms_list.append(get_spatial_augs(aug))
 
-	transforms_list.append(v2.Lambda(_normalize_to_float))
+	if normalise_to_float:
+		transforms_list.append(v2.Lambda(_normalize_to_float))
 
 	if norm_dict is not None:
 		transforms_list.append(v2.Normalize(mean=norm_dict.mean, std=norm_dict.std))
 
-	transforms_list.append(v2.Lambda(_permute_time_channel))
+	if permute_time_channel:
+		transforms_list.append(v2.Lambda(_permute_time_channel))
 
 	return v2.Compose(transforms_list), perm, sh_e
 
