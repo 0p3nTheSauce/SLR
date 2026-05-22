@@ -24,9 +24,9 @@ from video_transforms import (
     # correct_num_frames,
     get_transform,
 )
-from run_types import DataInfo
+from run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS
 from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
-from preprocess import Instance, AVAIL_SETS, AVAIL_SPLITS
+from preprocess import Instance
 
 ############################# Dictionaries and Types #############################
 
