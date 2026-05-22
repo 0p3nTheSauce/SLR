@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, model_validator, computed_field, field_va
 
 ### for model normalisation
 
+
 class NormDict(BaseModel):
     mean: Tuple[float, float, float]
     std: Tuple[float, float, float]
@@ -23,9 +24,8 @@ class NormDict(BaseModel):
 ####################### Data loading and augmentation #############################
 
 AVAIL_SETS = Literal["train", "val", "test"]
-AVAIL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
-
-
+ORIGINAL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
+AVAIL_SPLITS = Union[Literal["asl100_bottom"], ORIGINAL_SPLITS]
 
 ### Samplers
 
@@ -33,26 +33,31 @@ AVAIL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
 class BaseSampler(BaseModel):
     """required target frames"""
 
-    #f(Tensor, num_frames) -> Tensor
+    # f(Tensor, num_frames) -> Tensor
     target_length: int
-    max_wobble: int = 0 #NOTE: this is probably redundant
+    max_wobble: int = 0  # NOTE: this is probably redundant
 
 
 class OG_Sampler(BaseSampler):
     """Directs to correct_num_frames"""
+
     type: Literal["og"] = "og"
     randomise: bool = False
+
 
 class PadFramesT(BaseSampler):
     type: Literal["pad"] = "pad"
 
+
 class UniformSampler(BaseSampler):
     """Uniformly sampled"""
+
     type: Literal["uniform"] = "uniform"
 
 
 class ChunkedSampler(BaseSampler):
     """Random frames in chunks"""
+
     type: Literal["chunked"] = "chunked"
 
 
@@ -91,8 +96,6 @@ class SpeedSampler(BaseSampler):
         return self
 
 
-
-
 SamplerConfig = Annotated[
     Union[
         UniformSampler,
@@ -108,22 +111,20 @@ SamplerConfig = Annotated[
     Field(discriminator="type"),
 ]
 
-### Temporal augs 
+### Temporal augs
 
 
 class ShuffleT(BaseModel):
     type: Literal["shuffle"] = "shuffle"
     num_frames: Optional[int] = None
 
+
 class ReverseT(BaseModel):
     type: Literal["reverse"] = "reverse"
     probability: float = 0.5
 
 
-
-TemporalTransforms = Annotated[
-    Union[ShuffleT, ReverseT], Field(discriminator="type")
-]
+TemporalTransforms = Annotated[Union[ShuffleT, ReverseT], Field(discriminator="type")]
 
 TemporalAugs = Annotated[
     Union[TemporalTransforms, SamplerConfig], Field(discriminator="type")
@@ -228,56 +229,55 @@ class AugInfo(BaseModel):
     strict_size: bool = True
     target_length: Optional[int] = None
     frame_size: Optional[int] = None
-    
-    
+
     @model_validator(mode="after")
     def _validate_augs(self) -> "AugInfo":
-        if not self.strict_size :
+        if not self.strict_size:
             return self
-        
+
         samplers = [augT for augT in self.temporal_aug if isinstance(augT, BaseSampler)]
         if len(samplers) == 0:
             raise ValueError("At least one temporal aug must be a sampler")
         last_sampler = samplers[-1]
         self.target_length = last_sampler.target_length
-        
+
         crops = [augS for augS in self.spatial_aug if isinstance(augS, CropConfig)]
         if len(crops) == 0:
             raise ValueError("At least one spatial aug must be a crop")
         last_crop = crops[-1]
         self.frame_size = last_crop.frame_size
-   
+
         return self
 
 
 class DataInfo(BaseModel):
     train_augs: Optional[AugInfo] = None
     test_augs: Optional[AugInfo] = None
-    strict_size: bool = True    # from config
+    strict_size: bool = True  # from config
     target_length: Optional[int] = None
     frame_size: Optional[int] = None
 
     @model_validator(mode="after")
     def check_frame_strat(self) -> "DataInfo":
-        if not self.strict_size :
+        if not self.strict_size:
             return self
-        
+
         if self.train_augs is None or self.test_augs is None:
             raise ValueError("Aug info cannot be None if strict_size enabled")
-        
+
         self.target_length = self.train_augs.target_length
         self.frame_size = self.train_augs.frame_size
-    
+
         assert self.train_augs.target_length == self.test_augs.target_length, (
             f"Train/test target_length mismatch: "
             f"{self.train_augs.target_length} vs {self.test_augs.target_length}"
         )
-        
+
         assert self.train_augs.frame_size == self.test_augs.frame_size, (
             f"Train/test target_length mismatch: "
             f"{self.train_augs.frame_size} vs {self.test_augs.frame_size}"
         )
-        
+
         return self
 
 
@@ -342,16 +342,16 @@ class OptimizerInfo(BaseModel):
     classifier_weight_decay: float
 
 
-TRAIN_TYPE : TypeAlias = Literal['supervised', 'unsupervised']
-
+TRAIN_TYPE: TypeAlias = Literal["supervised", "unsupervised"]
 
 
 class SupervisedInfo(BaseModel):
     drop_p: Optional[float] = None
-    type: Literal['supervised'] = 'supervised'
+    type: Literal["supervised"] = "supervised"
+
 
 class MVirTedInfo(BaseModel):
-    type: Literal['mvir_ted'] = 'mvir_ted'
+    type: Literal["mvir_ted"] = "mvir_ted"
     drop_p: Optional[float] = None
     embed_dim: int = 512
     num_heads: int = 8
@@ -359,18 +359,21 @@ class MVirTedInfo(BaseModel):
     max_frames: int = 64
     mvit_out_dim: int = 768
 
+
 class UnsupervisedInfo(BaseModel):
-    type: Literal['unsupervised'] = 'unsupervised'
+    type: Literal["unsupervised"] = "unsupervised"
+
 
 class MVirTedMaeInfo(BaseModel):
-    type: Literal['mvir_ted_mae'] = 'mvir_ted_mae'
+    type: Literal["mvir_ted_mae"] = "mvir_ted_mae"
     encoder_info: MVirTedInfo = MVirTedInfo()
     mask_ratio: float = 0.5
     embed_dim: int = 512
 
+
 ModelInfo = Annotated[
     Union[SupervisedInfo, MVirTedInfo, UnsupervisedInfo, MVirTedMaeInfo],
-    Field(discriminator='type')
+    Field(discriminator="type"),
 ]
 
 
@@ -484,7 +487,6 @@ class RunInfo(BaseModel):
     data: DataInfo
     scheduler: Optional[SchedInfo] = None
     early_stopping: Optional[StopperOn] = None
-
 
     @field_validator("model_params", mode="before")
     @classmethod

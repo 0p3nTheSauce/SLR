@@ -18,14 +18,15 @@ from typing import (
     Any,
 )
 from typing_extensions import TypedDict, Unpack
+
 # local imports
 from utils import load_rgb_frames_from_video
 from video_transforms import (
     # correct_num_frames,
     get_transform,
 )
-from run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS
-from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits
+from run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS, ORIGINAL_SPLITS
+from configs import WLASL_ROOT, RAW_DIR, LABELS_PATH, LABEL_SUFFIX, get_avail_splits, NUM_INSTANCES_SUFFIX
 from preprocess import Instance
 
 ############################# Dictionaries and Types #############################
@@ -44,6 +45,7 @@ LOAD_DATA_POLICY: TypeAlias = Literal["strict", "accepting"]
 
 
 # Utility functions
+
 
 def load_data_from_json(
     json_path: Union[str, Path], policy: LOAD_DATA_POLICY
@@ -75,13 +77,17 @@ def get_wlasl_info(
     Args:
         split (str): One of avail_splits, E.g. asl100
         set_name (Literal['train', 'test', 'val']): Set to use
-
     Raises:
         ValueError: If split is not available
 
     Returns:
         DataSetInfo: For get_dataloader
     """
+    if split == 'asl100_bottom':
+        label_suffix = NUM_INSTANCES_SUFFIX
+    else:
+        label_suffix = LABEL_SUFFIX
+    
     avail_sp = get_avail_splits()
     if split not in avail_sp:
         raise ValueError(
@@ -91,9 +97,10 @@ def get_wlasl_info(
     return {
         "root": Path(WLASL_ROOT) / RAW_DIR,
         "labels": Path(LABELS_PATH) / split,
-        "label_suff": LABEL_SUFFIX,
+        "label_suff": label_suffix,
         "set_name": set_name,
     }
+
 
 def get_video_path(video_id: str, video_dir: Path) -> Path:
     """Get the path to a video given its ID and the root video directory
@@ -109,6 +116,7 @@ def get_video_path(video_id: str, video_dir: Path) -> Path:
     if not video_path.exists():
         raise FileNotFoundError(f"Video file {video_path} does not exist.")
     return video_path
+
 
 def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -> Path:
     """Get the path to the split / set labels file
@@ -126,32 +134,35 @@ def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -
     """
     if not labels_dir.exists():
         raise FileNotFoundError(f"Labels directory {labels_dir} does not exist.")
-    
-    #TODO hardcoded _instances_ in label file name, should be more flexible
-    label_file = labels_dir / f"{set_name}_instances_{label_suffix}"
+
+    label_file = labels_dir / f"{set_name}_{label_suffix}"
     if not label_file.exists():
-        raise FileNotFoundError(f"Label file {label_file} does not exist in labels directory.")
-    
+        raise FileNotFoundError(
+            f"Label file {label_file} does not exist in labels directory."
+        )
+
     return label_file
-    
+
+
 def get_example_videos(
     instances: List[Instance],
     video_dir: Path = Path(WLASL_ROOT) / RAW_DIR,
     limit: Optional[int] = None,
-    strict: bool = True
+    strict: bool = True,
 ) -> List[Path]:
     """Get example video paths for a given label number"""
     example_paths = []
-    lim = limit if limit is not None else float('inf')
+    lim = limit if limit is not None else float("inf")
     for inst in instances:
         video_path = get_video_path(inst.video_id, video_dir)
         if video_path.exists():
             example_paths.append(video_path)
         elif strict:
-            raise ValueError(f'Video path not found: {video_path}')
+            raise ValueError(f"Video path not found: {video_path}")
         if len(example_paths) >= lim:  # Limit to specified number of examples
             break
     return example_paths
+
 
 ############################ Dataset Classes ############################
 
@@ -188,12 +199,14 @@ class VideoDataset(Dataset):
         self.transforms = transforms
         self.include_meta = include_meta
         self.item_transforms = item_transforms
-        
+
         self.data = load_data_from_json(
-            get_labels_path(set_info["set_name"], set_info["labels"], set_info["label_suff"]),
-            policy=load_policy
+            get_labels_path(
+                set_info["set_name"], set_info["labels"], set_info["label_suff"]
+            ),
+            policy=load_policy,
         )
-        
+
         if load_policy == "accepting":
             self.data = cast(List[Dict[str, Any]], self.data)
         elif load_policy == "strict":
@@ -232,15 +245,15 @@ class VideoDataset(Dataset):
 
 ################################## Helper functions #######################################
 
+
 class VideoDatasetKwargs(TypedDict, total=False):
     item_transforms: Optional[Callable[[torch.Tensor, Instance], torch.Tensor]]
     include_meta: bool
     load_policy: LOAD_DATA_POLICY
-    
+
+
 def get_data_set(
-    set_info: DataSetInfo,
-    data_info: DataInfo,
-    **kwargs: Unpack[VideoDatasetKwargs]
+    set_info: DataSetInfo, data_info: DataInfo, **kwargs: Unpack[VideoDatasetKwargs]
 ) -> Tuple[VideoDataset, Optional[List[int]], Optional[float]]:
     """
     Get the training, val or test set. Optionally, load frames unchanged.
@@ -276,18 +289,15 @@ def get_data_set(
         )
     # transform(frames) -> frames
     transform, perm, sh_e = get_transform(
-        norm_dict=aug_info.norm_dict,  
+        norm_dict=aug_info.norm_dict,
         temporal_aug=aug_info.temporal_aug,
         spatial_aug=aug_info.spatial_aug,
     )
 
-    dataset = VideoDataset(
-        set_info,
-        transforms=transform,
-        **kwargs
-    )
+    dataset = VideoDataset(set_info, transforms=transform, **kwargs)
 
     return dataset, perm, sh_e
+
 
 if __name__ == "__main__":
     # test_crop()

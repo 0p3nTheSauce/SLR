@@ -14,29 +14,46 @@ classifier_weight_decay = 1e-3
 drop_p = 0.5
 
 
-[data]
-num_frames = 32
-frame_size = 224
+#Train augs
 
 [data.train_augs]
-frame_size_strategy = 'Random_crop'
 normalise = true
 
-[data.train_augs.frame_sampler]
-method = 'og'
-wobble = 0
+#Temporal augs
+#Sampler
+[[data.train_augs.temporal_aug]]
+type = 'og'
+max_wobble = 0
+target_length = 32
+
+#Spatial augs
+#Crop
+[[data.train_augs.spatial_aug]]
+type = 'Random_crop'
+frame_size = 224
 
 [[data.train_augs.spatial_aug]]
 type = "HORIZONTAL_FLIP"
 p = 0.5
 
+#Test augs
+
 [data.test_augs]
-frame_size_strategy = 'Centre_crop'
 normalise = true
 
-[data.test_augs.frame_sampler]
-method = 'og'
-wobble = 0
+#Temporal augs
+#Sampler
+[[data.test_augs.temporal_aug]]
+type = 'og'
+max_wobble = 0
+target_length = 32
+
+#Spatial augs
+#Crop
+[[data.test_augs.spatial_aug]]
+type = "Centre_crop"
+frame_size = 224
+
 
 [scheduler]
 type = "CosineAnnealingWarmRestarts"
@@ -53,3 +70,5 @@ min_delta = 0.01
 #Same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_S/exp011.ini
 # but with MViTv2_B32x3 and updated augmentations
 # and patience = 15
+
+#updated the augs

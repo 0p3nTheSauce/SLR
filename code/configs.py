@@ -24,7 +24,8 @@ from run_types import (
 # constants
 ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT_BASE = "WLASL"
-LABEL_SUFFIX = "fixed_frange_bboxes_len.json"
+LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+NUM_INSTANCES_SUFFIX = "num_instances.json"
 # LABEL_INSTANCES_SUFFIX = "instances_fixed_frange_bboxes_len.json"
 CLASSES_PATH = "./info/wlasl_class_list.json"
 WLASL_ROOT = "../data/WLASL"

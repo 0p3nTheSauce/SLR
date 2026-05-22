@@ -551,7 +551,14 @@ def load_comp_res(save_path: Path) -> CompRes:
         data = json.load(f)
     return CompRes.model_validate(data)
 
-
+def get_res_path(save_path: Path) -> Path:
+    out_dir = checkpoint_dir_to_result_dir(save_path)
+    res_path = (
+        out_dir / "best_val_loss.json"
+    )  # TODO: add other types of saves?
+    return res_path
+    
+    
 # TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
 def full_test(
     admin: MinInfo,
@@ -581,10 +588,8 @@ def full_test(
     save_path = Path(admin.save_path)
 
     # output
-    out_dir = checkpoint_dir_to_result_dir(save_path)
-    res_path = (
-        out_dir / "best_val_loss.json"
-    )  # TODO: hard coding the file path, not very good
+    res_path = get_res_path(save_path)
+
 
     # dont retest if exists
     if res_path.exists() and not re_test:
