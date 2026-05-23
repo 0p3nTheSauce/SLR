@@ -13,7 +13,22 @@ from typing import (
 from pydantic import BaseModel, Field, model_validator, computed_field, field_validator
 
 
-
+# constants
+ENTITY = "ljgoodall2001-rhodes-university"
+PROJECT_BASE = "WLASL"
+LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+NUM_INSTANCES_SUFFIX = "num_instances.json"
+# LABEL_INSTANCES_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+CLASSES_PATH = "./info/wlasl_class_list.json"
+WLASL_ROOT = "../data/WLASL"
+LABELS_PATH = WLASL_ROOT + "/preprocessed/labels"
+RAW_DIR = "WLASL2000"
+SPLIT_DIR = "splits"
+RUNS_PATH = "./runs"
+CONFIGS_PATH = "./configfiles"
+ZFILL = 3
+CONFIG_FILETYPE = '.toml'
+SEED = 42
 
 
 ### for model normalisation
@@ -317,7 +332,7 @@ class MinInfo(BaseModel):
     dataset: str
     split: AVAIL_SPLITS
     save_path: str
-    
+    seed: int = SEED
 
 
 class AdminInfo(MinInfo):

@@ -26,7 +26,6 @@ from run_types import (
     CONFIGS_PATH,
     ZFILL,
     CONFIG_FILETYPE,
-    SEED,   
 )
 
 
@@ -48,7 +47,7 @@ def ask_nicely(
 ####################### Utility functions ##############################
 
 
-def set_seed(seed: int = SEED):
+def set_seed(seed: int):
     """Set the random seed across multiple environments."""
     import torch
     import numpy as np

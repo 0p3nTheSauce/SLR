@@ -21,7 +21,6 @@ from configs import (
     get_train_parser,
     take_args,
     set_seed,
-    SEED,
     RunInfo,
     WandbInfo,
 )
@@ -662,7 +661,6 @@ def train_loop(
     load: Optional[StrPath] = None,
     save_every: int = 5,
     recover: bool = False,
-    seed: Optional[int] = SEED,
     event: Optional[EventClass] = None,
 ) -> Optional[Dict[str, float]]:
     """Train loop for video classification model.
@@ -680,8 +678,8 @@ def train_loop(
         Optional[Dict[str, float]]: Dictionary with keys: best_val_acc and best_val_loss
     """
 
-    if seed is not None:
-        set_seed(seed)
+    
+    set_seed(config.admin.seed)
 
     dataloaders, num_classes = setup_data(config)
 
@@ -968,7 +966,6 @@ def pretrain_loop(
     load: Optional[StrPath] = None,
     save_every: int = 5,
     recover: bool = False,
-    seed: Optional[int] = SEED,
     event: Optional[EventClass] = None,
 ) -> Optional[Dict[str, float]]:
     """Pretrain loop for MAE-style self-supervised pretraining.
@@ -986,8 +983,7 @@ def pretrain_loop(
         Optional[Dict[str, float]]: Dictionary with keys: best_val_loss
     """
 
-    if seed is not None:
-        set_seed(seed)
+    set_seed(config.admin.seed)
 
     dataloaders, _ = setup_data(config)  # no num_classes needed
 
@@ -1113,7 +1109,6 @@ def train_model(
     load: Optional[StrPath] = None,
     save_every: int = 5,
     recover: bool = False,
-    seed: Optional[int] = SEED,
     event: Optional[EventClass] = None,
 ) -> Optional[Dict[str, float]]:
     if isinstance(config.model_params, SupervisedInfo):
@@ -1124,7 +1119,6 @@ def train_model(
             load=load,
             save_every=save_every,
             recover=recover,
-            seed=seed,
             event=event,
         )
     elif isinstance(config.model_params, MVirTedMaeInfo):
@@ -1135,7 +1129,6 @@ def train_model(
             load=load,
             save_every=save_every,
             recover=recover,
-            seed=seed,
             event=event,
         )
     else:

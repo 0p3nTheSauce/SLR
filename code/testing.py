@@ -418,7 +418,7 @@ def test_run(
     if save_img is None:
         save_img = save
 
-    set_seed()
+    set_seed(admin.seed)
 
     model_name = admin.model
 
