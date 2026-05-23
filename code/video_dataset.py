@@ -25,7 +25,7 @@ from video_transforms import (
     # correct_num_frames,
     get_transform,
 )
-from run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS, WLASL_ROOT, RAW_DIR, NUM_INSTANCES_SUFFIX, LABEL_SUFFIX
+from run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS, WLASL_ROOT, RAW_DIR, NUM_INSTANCES_SUFFIX, LABEL_SUFFIX, WORST_INSTANCES_SUFFIX
 from configs import  LABELS_PATH, get_avail_splits
 from preprocess import Instance
 
@@ -85,6 +85,8 @@ def get_wlasl_info(
     """
     if split == 'asl100_bottom':
         label_suffix = NUM_INSTANCES_SUFFIX
+    elif split == 'asl100_worst':
+        label_suffix = WORST_INSTANCES_SUFFIX
     else:
         label_suffix = LABEL_SUFFIX
     

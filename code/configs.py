@@ -6,8 +6,9 @@ from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
 from pathlib import Path
 
 import json
+
 try:
-    import tomllib #type: ignore
+    import tomllib  # type: ignore
 except ImportError:
     import tomli as tomllib
 # locals
@@ -21,16 +22,14 @@ from run_types import (
     ENTITY,
     PROJECT_BASE,
     CLASSES_PATH,
-    LABELS_PATH, 
+    LABELS_PATH,
     RUNS_PATH,
     CONFIGS_PATH,
     ZFILL,
     CONFIG_FILETYPE,
     SEED,
+    strict_validate,
 )
-
-
-
 
 
 def ask_nicely(
@@ -53,6 +52,7 @@ def set_seed(seed: int):
     import torch
     import numpy as np
     import random
+
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
@@ -122,6 +122,7 @@ def _make_aug_info(
     mode: Literal["train", "test", "val"],
 ) -> AugInfo:
     from models import norm_vals
+
     """Build an AugInfo model, filling in defaults when aug_conf is None.
 
     Validation of strategy values is handled by AugInfo's Literal type annotations —
@@ -132,10 +133,14 @@ def _make_aug_info(
         if mode == "train":
             aug_conf["spatial_aug"] = ["Horizontal_flip"]
             aug_conf["frame_size_strategy"] = "Random_crop"
-            aug_conf['frame_sampler'] = OG_Sampler(target_length=aug_conf['target_length'])
+            aug_conf["frame_sampler"] = OG_Sampler(
+                target_length=aug_conf["target_length"]
+            )
         else:
             aug_conf["frame_size_strategy"] = "Centre_crop"
-            aug_conf['frame_sampler'] = OG_Sampler(target_length=aug_conf['target_length'])
+            aug_conf["frame_sampler"] = OG_Sampler(
+                target_length=aug_conf["target_length"]
+            )
 
     # Resolve the "on" shorthand for norm_dict
     if aug_conf.get("norm_dict") == "on":
@@ -145,7 +150,7 @@ def _make_aug_info(
 
 
 def load_config_retro(admin: AdminInfo) -> RunInfo:
-    """ Old config loader for backward compatibility
+    """Old config loader for backward compatibility
     Load config from .ini file and merge with AdminInfo from CLI.
 
     Args:
@@ -166,8 +171,12 @@ def load_config_retro(admin: AdminInfo) -> RunInfo:
 
     # Resolve augmentations before handing off to pydantic
     data_conf = raw.get("data", {})
-    data_conf["train_augs"] = _make_aug_info(raw.pop("train_augs", None), admin.model, "train")
-    data_conf["test_augs"] = _make_aug_info(raw.pop("test_augs", None), admin.model, "test")
+    data_conf["train_augs"] = _make_aug_info(
+        raw.pop("train_augs", None), admin.model, "train"
+    )
+    data_conf["test_augs"] = _make_aug_info(
+        raw.pop("test_augs", None), admin.model, "test"
+    )
     raw["data"] = data_conf
 
     # Nest warmup into the scheduler subdict so pydantic sees the right shape
@@ -182,6 +191,7 @@ def load_config_retro(admin: AdminInfo) -> RunInfo:
     # pydantic handles: type coercion, required field checks, discriminated union
     # dispatch, WarmUpSched factor validation, EarlyStopper metric checks, defaults
     return RunInfo.model_validate({"admin": admin.model_dump(), **raw})
+
 
 def load_config(admin: AdminInfo) -> RunInfo:
     """Load config from .toml file and merge with AdminInfo from CLI.
@@ -200,15 +210,14 @@ def load_config(admin: AdminInfo) -> RunInfo:
     conf_path = Path(admin.config_path)
     if not conf_path.exists():
         raise FileNotFoundError(f"{conf_path} not found")
-    
-    if conf_path.name.endswith('.ini'):
+
+    if conf_path.name.endswith(".ini"):
         return load_config_retro(admin)
-    
-    with open(conf_path, 'rb') as f:
+
+    with open(conf_path, "rb") as f:
         raw = tomllib.load(f)
-        
-    return RunInfo.model_validate({"admin": admin.model_dump(), **raw})
-    
+
+    return strict_validate(RunInfo, {"admin": admin.model_dump(), **raw})
 
 
 ###################### Path utilities ###############################
@@ -256,7 +265,7 @@ def get_config_path(
     exp_no: int = 0,
     configs_dir: str = CONFIGS_PATH,
     zd: int = ZFILL,
-    file_type: str = CONFIG_FILETYPE
+    file_type: str = CONFIG_FILETYPE,
 ) -> Path:
     return Path(configs_dir) / f"{split}/{model}/exp{str(exp_no).zfill(zd)}{file_type}"
 
@@ -265,7 +274,10 @@ def get_config_path(
 
 
 def get_train_parser(
-    prog: Optional[str] = None, desc: str = "Train a model", model_opts: Optional[List[str]] = None, split_opts: Optional[List[str]] = None
+    prog: Optional[str] = None,
+    desc: str = "Train a model",
+    model_opts: Optional[List[str]] = None,
+    split_opts: Optional[List[str]] = None,
 ) -> argparse.ArgumentParser:
     """Get parser for a training configuration
 
@@ -278,10 +290,11 @@ def get_train_parser(
     """
     if model_opts is None:
         from models import avail_models
+
         models_available = avail_models()
     else:
         models_available = model_opts
-        
+
     if split_opts is None:
         splits_available = get_avail_splits()
     else:
@@ -289,8 +302,15 @@ def get_train_parser(
 
     parser = argparse.ArgumentParser(description=desc, prog=prog)
 
-    parser.add_argument("model", type=str, choices=models_available, help="Model name from one of the implemented model")
-    parser.add_argument("split", type=str, choices=splits_available, help="The class split")
+    parser.add_argument(
+        "model",
+        type=str,
+        choices=models_available,
+        help="Model name from one of the implemented model",
+    )
+    parser.add_argument(
+        "split", type=str, choices=splits_available, help="The class split"
+    )
 
     # experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
     # experiment_gen_type.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
@@ -299,19 +319,65 @@ def get_train_parser(
     # experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
     parser.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument("-c", "--config_path", help="Path to config file")
-    parser.add_argument("-s", "--seed", type=int, default=SEED, help="Random seed for reproducibility")
+    parser.add_argument(
+        "-s", "--seed", type=int, default=SEED, help="Random seed for reproducibility"
+    )
 
-    parser.add_argument("-ds", "--dataset", type=str, choices=["WLASL"], default="WLASL", help="Not implemented yet")
-    parser.add_argument("-r", "--recover", action="store_true", help="Recover from last checkpoint")
-    parser.add_argument("-ri", "--run_id", type=str, default=None, help="The run id to use (especially when also using recover)")
-    parser.add_argument("-p", "--project", type=str, help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)")
-    parser.add_argument("-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}")
-    parser.add_argument("-t", "--tags", nargs="+", type=str, help="Additional wandb tags")
-    parser.add_argument("-w", "--weights_path", type=str, help="Path to model pretrained weights")
-    parser.add_argument("-b", "--force_weight", action="store_true", help="Use weights_path even if it does not exist")
-    parser.add_argument("-na", "--no_ask", action="store_true", help="Don't ask for confirmation")
-    parser.add_argument("-nec", "--no_enum_chck", action="store_true", help="Do not enumerate the checkpoint dir num (for output)")
-    parser.add_argument("-f", "--config_filetype", type=str, default=CONFIG_FILETYPE, help=f'Config file type, defaults to: {CONFIG_FILETYPE}')
+    parser.add_argument(
+        "-ds",
+        "--dataset",
+        type=str,
+        choices=["WLASL"],
+        default="WLASL",
+        help="Not implemented yet",
+    )
+    parser.add_argument(
+        "-r", "--recover", action="store_true", help="Recover from last checkpoint"
+    )
+    parser.add_argument(
+        "-ri",
+        "--run_id",
+        type=str,
+        default=None,
+        help="The run id to use (especially when also using recover)",
+    )
+    parser.add_argument(
+        "-p",
+        "--project",
+        type=str,
+        help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)",
+    )
+    parser.add_argument(
+        "-et", "--entity", type=str, default=ENTITY, help=f"Entity if not {ENTITY}"
+    )
+    parser.add_argument(
+        "-t", "--tags", nargs="+", type=str, help="Additional wandb tags"
+    )
+    parser.add_argument(
+        "-w", "--weights_path", type=str, help="Path to model pretrained weights"
+    )
+    parser.add_argument(
+        "-b",
+        "--force_weight",
+        action="store_true",
+        help="Use weights_path even if it does not exist",
+    )
+    parser.add_argument(
+        "-na", "--no_ask", action="store_true", help="Don't ask for confirmation"
+    )
+    parser.add_argument(
+        "-nec",
+        "--no_enum_chck",
+        action="store_true",
+        help="Do not enumerate the checkpoint dir num (for output)",
+    )
+    parser.add_argument(
+        "-f",
+        "--config_filetype",
+        type=str,
+        default=CONFIG_FILETYPE,
+        help=f"Config file type, defaults to: {CONFIG_FILETYPE}",
+    )
     return parser
 
 
@@ -322,6 +388,7 @@ def take_args(
     """Retrieve and validate arguments for a new training run."""
     from models import avail_models
     from utils import enum_dir
+
     models_available = avail_models()
     splits_available = get_avail_splits()
 
@@ -334,15 +401,21 @@ def take_args(
         args = parser.parse_args()
 
     if args.split not in splits_available:
-        raise ValueError(f"{args.split} not processed yet. Available: {splits_available}")
+        raise ValueError(
+            f"{args.split} not processed yet. Available: {splits_available}"
+        )
     if args.model not in models_available:
-        raise ValueError(f"{args.model} not implemented yet. Available: {models_available}")
+        raise ValueError(
+            f"{args.model} not implemented yet. Available: {models_available}"
+        )
 
     if args.project is None:
         args.project = f"{PROJECT_BASE}-{args.split[3:]}"
 
     if args.exp_no is None and args.config_path is None:
-        parser.error("Either --exp_no or --config_path must be provided to identify the experiment configuration.")
+        parser.error(
+            "Either --exp_no or --config_path must be provided to identify the experiment configuration."
+        )
 
     if args.exp_no is None:
         exp_no = get_next_expno(args.split, args.model)
@@ -353,10 +426,15 @@ def take_args(
 
     if args.config_path is None:
         assert not enum_exp, "Enumerating the experiment is not valid in this case"
-        args.config_path = str(get_config_path(args.split, args.model, exp_no, file_type=args.config_filetype))
+        args.config_path = str(
+            get_config_path(
+                args.split, args.model, exp_no, file_type=args.config_filetype
+            )
+        )
 
     output = get_model_exp_dir(split=args.split, model=args.model, exp_no=exp_no)
 
+    enum_exp = False if args.recover else enum_exp
     if enum_exp:
         output = enum_dir(output, decimals=ZFILL)
         exp_no = int(output.name[-3:])
@@ -367,7 +445,9 @@ def take_args(
         save_path = enum_dir(save_path, decimals=ZFILL)
     elif args.recover:
         if not save_path.exists() or not save_path.is_dir():
-            raise ValueError(f"Cannot recover: {save_path} does not exist or is not a directory")
+            raise ValueError(
+                f"Cannot recover: {save_path} does not exist or is not a directory"
+            )
         if len([f for f in save_path.iterdir() if f.is_file()]) == 0:
             raise ValueError(f"Cannot recover: {save_path} is empty")
 
@@ -400,7 +480,7 @@ def take_args(
         config_path=args.config_path,
         save_path=str(save_path),
         weight_path=weights_path,
-        seed=args.seed
+        seed=args.seed,
     )
 
     return admin_info, wandb_info

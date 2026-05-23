@@ -43,6 +43,7 @@ from run_types import (
     SummarisedError,
     SummarisedRes,
     FailedExp,  # now defined in run_types
+    strict_validate
 )
 
 # from configs import print_config, load_config, ZFILL, get_model_exp_dir, get_model_results_dir
@@ -785,11 +786,13 @@ class Que:
             run_dict = self.set_nested(run_dict, keys, val)
 
             if loc == FAIL_RUNS:
-                new_run: GenExp = FailedExp.model_validate(run_dict)
+                run_type = FailedExp
             elif loc == OLD_RUNS:
-                new_run = CompExpInfo.model_validate(run_dict)
+                run_type = CompExpInfo
             else:
-                new_run = ExpInfo.model_validate(run_dict)
+                run_type = ExpInfo
+                
+            new_run = strict_validate(run_type, run_dict)
 
             _ = self._pop_run(loc, idx)
             self._set_run(loc, idx, new_run)

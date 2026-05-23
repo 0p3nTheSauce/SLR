@@ -9,15 +9,26 @@ from typing import (
     Any,
     Dict,
     TypeAlias,
+    TypeVar,
+    Type,
+    get_origin,
+    get_args,
 )
-from pydantic import BaseModel, Field, model_validator, computed_field, field_validator
-
-
+from pydantic import (
+    BaseModel,
+    Field,
+    model_validator,
+    computed_field,
+    field_validator,
+    ConfigDict,
+)
+from pydantic_core import PydanticUndefined
 # constants
 ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT_BASE = "WLASL"
 LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
 NUM_INSTANCES_SUFFIX = "num_instances.json"
+WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
 # LABEL_INSTANCES_SUFFIX = "instances_fixed_frange_bboxes_len.json"
 CLASSES_PATH = "./info/wlasl_class_list.json"
 WLASL_ROOT = "../data/WLASL"
@@ -27,7 +38,7 @@ SPLIT_DIR = "splits"
 RUNS_PATH = "./runs"
 CONFIGS_PATH = "./configfiles"
 ZFILL = 3
-CONFIG_FILETYPE = '.toml'
+CONFIG_FILETYPE = ".toml"
 SEED = 42
 
 
@@ -43,7 +54,7 @@ class NormDict(BaseModel):
 
 AVAIL_SETS = Literal["train", "val", "test"]
 ORIGINAL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
-AVAIL_SPLITS = Union[Literal["asl100_bottom"], ORIGINAL_SPLITS]
+AVAIL_SPLITS = Union[Literal["asl100_bottom", "asl100_worst"], ORIGINAL_SPLITS]
 
 ### Samplers
 
@@ -526,6 +537,7 @@ class RunInfo(BaseModel):
 
 
 class ExpInfo(RunInfo):
+    model_config = ConfigDict(extra="forbid")
     wandb: WandbInfo
 
 
@@ -641,3 +653,81 @@ class CleverDict(Dict):
                 yield from self._iter_leaves(val, path + [key])
         else:
             yield path, d
+
+
+# not ignoring extra keys overrides: Claudes baby
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def _replace_in_annotation(annotation, old_cls, new_cls):
+    """Replace old_cls with new_cls inside an annotation, preserving Optional/Union wrappers."""
+    if annotation is old_cls:
+        return new_cls
+    origin = get_origin(annotation)
+    if origin is Union:
+        new_args = tuple(
+            _replace_in_annotation(arg, old_cls, new_cls)
+            for arg in get_args(annotation)
+        )
+        return Union[new_args]
+    return annotation
+
+
+def make_strict(model_cls: Type[BaseModel]) -> Type[BaseModel]:
+    namespace: dict = {"model_config": ConfigDict(extra="forbid")}
+    annotations = {}
+
+    for name, field_info in model_cls.model_fields.items():
+        annotation = field_info.annotation
+        inner = _unwrap_annotation(annotation)
+        if inner is not None and issubclass(inner, BaseModel):
+            strict_inner = make_strict(inner)
+            # Preserve Optional[...] wrapper rather than just using the raw strict class
+            annotations[name] = _replace_in_annotation(annotation, inner, strict_inner)
+            # Preserve default so Optional fields don't become required
+            if field_info.default is not PydanticUndefined:
+                namespace[name] = field_info.default
+            elif field_info.default_factory is not None:
+                namespace[name] = Field(default_factory=field_info.default_factory)
+
+    if annotations:
+        namespace["__annotations__"] = annotations
+
+    return type(model_cls.__name__, (model_cls,), namespace)
+
+def _unwrap_annotation(annotation) -> Type | None:
+    origin = get_origin(annotation)
+    if origin is Union:
+        for arg in get_args(annotation):
+            result = _unwrap_annotation(arg)
+            if result is not None:
+                return result
+    elif isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+    return None
+
+
+def _strip_computed(model_cls: Type[BaseModel], data: dict) -> dict:
+    """Recursively remove computed field keys from a data dict before strict validation."""
+    computed_keys = set(model_cls.model_computed_fields.keys())
+    result = {}
+
+    for k, v in data.items():
+        if k in computed_keys:
+            continue
+        field_info = model_cls.model_fields.get(k)
+        if field_info and isinstance(v, dict):
+            inner = _unwrap_annotation(field_info.annotation)
+            if inner is not None and issubclass(inner, BaseModel):
+                v = _strip_computed(inner, v)
+        result[k] = v
+
+    return result
+
+
+def strict_validate(model_cls: Type[T], data: dict) -> T:
+    strict_cls = make_strict(model_cls)
+    strict_cls.model_validate(_strip_computed(model_cls, data))
+    return model_cls.model_validate(data)
