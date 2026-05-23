@@ -26,6 +26,7 @@ from run_types import (
     CONFIGS_PATH,
     ZFILL,
     CONFIG_FILETYPE,
+    SEED,
 )
 
 
@@ -298,7 +299,7 @@ def get_train_parser(
     # experiment_gen_type = parser.add_mutually_exclusive_group(required=True)
     parser.add_argument("-en", "--exp_no", type=int, help="Experiment number (e.g. 10)")
     parser.add_argument("-c", "--config_path", help="Path to config file")
-
+    parser.add_argument("-s", "--seed", type=int, default=SEED, help="Random seed for reproducibility")
 
     parser.add_argument("-ds", "--dataset", type=str, choices=["WLASL"], default="WLASL", help="Not implemented yet")
     parser.add_argument("-r", "--recover", action="store_true", help="Recover from last checkpoint")
@@ -399,6 +400,7 @@ def take_args(
         config_path=args.config_path,
         save_path=str(save_path),
         weight_path=weights_path,
+        seed=args.seed
     )
 
     return admin_info, wandb_info

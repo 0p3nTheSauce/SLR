@@ -396,7 +396,12 @@ class QueShell(cmdLib.Cmd):
 
         args = shlex.split(arg)
         parser = self._get_add_parser()
-        parsed_args = parser.parse_args(args)
+        try:
+            parsed_args = parser.parse_args(args)
+        except (SystemExit, ValueError):
+            self.console.print("[yellow]add cancelled[/yellow]")
+            return None
+
         parsed_args.no_enum_chck = True  # bypass enum check
         # print(parsed_args.checkpoint_num)
         try:
@@ -1375,7 +1380,7 @@ class QueShell(cmdLib.Cmd):
         )
 
         # Clear memory
-        subparsers.add_parser("cleanup", help="Clear CUDA memory")
+        subparsers.add_parser("clear_mem", help="Clear CUDA memory")
 
         return parser
 
