@@ -6,7 +6,6 @@ import seaborn as sns
 import numpy as np
 from typing import Dict, Optional, Callable, List, Union
 from pathlib import Path
-import cv2
 #locals
 from configs import CLASSES_PATH
 # Set style for better-looking plots

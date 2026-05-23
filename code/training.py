@@ -1,4 +1,4 @@
-from typing import Optional, Union, cast, Dict, Any, Tuple, Callable
+from typing import Optional, Dict, Any, Tuple, Callable
 import torch  # type: ignore
 import torch.nn as nn
 import torch.optim as optim

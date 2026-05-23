@@ -1,5 +1,5 @@
-from typing import Dict, List, Any, Optional, Union
-from que.core import Que, QueEmpty, connect_manager, _get_basic_logger, GenExp
+from typing import Optional, Union
+from que.core import Que, QueEmpty, connect_manager, _get_basic_logger
 import json
 import subprocess
 import sys

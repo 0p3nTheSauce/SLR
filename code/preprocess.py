@@ -22,8 +22,8 @@ from pathlib import Path
 
 # local imports
 from utils import load_rgb_frames_from_video
-from configs import WLASL_ROOT, SPLIT_DIR, RAW_DIR, LABELS_PATH
-from run_types import AVAIL_SETS, AVAIL_SPLITS
+from configs import LABELS_PATH
+from run_types import AVAIL_SETS, WLASL_ROOT, SPLIT_DIR, RAW_DIR
 
 
 """Naming convention:

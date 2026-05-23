@@ -17,26 +17,20 @@ from run_types import (
     RunInfo,
     AdminInfo,
     AugInfo,
-    OG_Sampler
+    OG_Sampler,
+    ENTITY,
+    PROJECT_BASE,
+    CLASSES_PATH,
+    LABELS_PATH, 
+    RUNS_PATH,
+    CONFIGS_PATH,
+    ZFILL,
+    CONFIG_FILETYPE,
+    SEED,   
 )
 
 
-# constants
-ENTITY = "ljgoodall2001-rhodes-university"
-PROJECT_BASE = "WLASL"
-LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
-NUM_INSTANCES_SUFFIX = "num_instances.json"
-# LABEL_INSTANCES_SUFFIX = "instances_fixed_frange_bboxes_len.json"
-CLASSES_PATH = "./info/wlasl_class_list.json"
-WLASL_ROOT = "../data/WLASL"
-LABELS_PATH = WLASL_ROOT + "/preprocessed/labels"
-RAW_DIR = "WLASL2000"
-SPLIT_DIR = "splits"
-RUNS_PATH = "./runs"
-CONFIGS_PATH = "./configfiles"
-ZFILL = 3
-CONFIG_FILETYPE = '.toml'
-SEED = 42
+
 
 
 def ask_nicely(

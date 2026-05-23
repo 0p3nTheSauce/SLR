@@ -4,7 +4,6 @@ from typing import (
     Tuple,
     Dict,
     List,
-    Literal,
     cast,
 )
 from argparse import ArgumentParser
@@ -21,7 +20,7 @@ import re
 # locals
 from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
 from models import get_model
-from configs import set_seed, _make_aug_info
+from configs import set_seed
 
 from video_dataset import VideoDataset, get_data_set, get_wlasl_info, AVAIL_SETS, AVAIL_SPLITS
 from models import avail_models

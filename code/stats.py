@@ -36,7 +36,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 # locals
-from configs import WLASL_ROOT, SPLIT_DIR, CLASSES_PATH
 from preprocess import RawInstance, WLASLClass, Instance
 from run_types import AVAIL_SETS, AVAIL_SPLITS
 
