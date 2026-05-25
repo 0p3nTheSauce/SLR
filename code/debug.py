@@ -401,7 +401,7 @@ def test_filter_runs():
     q = Que(_get_basic_logger())
     _ = q.summarise_runs('old_runs')
     
-    
+
 
 
 if __name__ == '__main__':

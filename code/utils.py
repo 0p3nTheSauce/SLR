@@ -14,7 +14,8 @@ import subprocess
 from typing import Optional
 from multiprocessing.synchronize import Event as EventClass
 import math
-
+#locals
+from run_types import CONFIGS_PATH
 
 ################ GPU ###################
 
@@ -598,6 +599,9 @@ def plot_from_lists(
 ##################### Misc ###################################
 
 
+def to_mark_down(configs_path: Path = Path(CONFIGS_PATH)):
+    pass
+
 def extract_num(fname):
     num_substrs = re.findall(r"\d+", fname)
     if len(num_substrs) > 1:
@@ -832,6 +836,8 @@ def main():
         rem_empty=args.remove_empty,
         rem_files=args.remove_files,
     )
+
+
 
 
 if __name__ == "__main__":

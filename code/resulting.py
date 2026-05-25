@@ -1,4 +1,5 @@
-from typing import Dict, Any, List, Optional, cast
+from typing import Dict, Any, List, Optional, cast, Union, Callable
+import copy
 
 try:
     import tomllib  # type: ignore
@@ -13,12 +14,27 @@ import logging
 # locals
 from que.core import Que, ExpQue, GenExp
 from run_types import GenInfo, RunRes, CompExpInfo, CleverDict
-from results.saicair.saicair import additional_modifications
+# from results.saicair.saicair import additional_modifications
 
 
-RESULTS_DIR = Path("results/saicair")
+RESULTS_DIR = Path("results/")
 CONFIG_PATH = RESULTS_DIR / "config.toml"
 basic_logger = logging.getLogger(__name__)
+basic_logger.addHandler(logging.StreamHandler())  # add this
+
+def drop_max_wobble(temporal_aug: list) -> list:
+    for item in temporal_aug:
+        item.pop('max_wobble', None)
+        item.pop('wobble', None)
+    return temporal_aug
+
+ignore_keys = {
+    'data': {
+        'train_augs': {'temporal_aug': drop_max_wobble},
+        'test_augs':  {'temporal_aug': drop_max_wobble},
+    }
+}
+
 
 def load_config(config_path: str, validate: bool = True) -> GenInfo:
     """Load config from .toml file and merge with AdminInfo from CLI.
@@ -46,36 +62,81 @@ def load_config(config_path: str, validate: bool = True) -> GenInfo:
     #     return GenInfo.model_validate(raw)
     # else:
     #     return GenInfo.model_validate(raw, strict=False)
+    
+    
 
-
-def snap(search: Dict[str, Any], spec: Dict[str, Any], logger: logging.Logger) -> bool:
-    for key, value in spec.items():
-        if key not in search:
-            
-            logger.debug(f"key: {key} not found in search")
-            if key == "wobble":
-                print(f"search keys: {search.keys()}")
+def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
+    
+    if isinstance(spec, dict):
+        if not isinstance(search, dict):
+            logger.debug(f"type mismatch: search is {type(search)}, spec is dict")
             return False
-
-        if isinstance(value, Dict):
-            # we only want to check the specified values are present,
-            # not that the dictionaries match exctly
+        
+        for key, value in spec.items():
+            if key not in search:
+                logger.debug(f"key '{key}' not found in search")
+                return False
             if not snap(search[key], value, logger):
-                # if debug:
-                #     print(f'key: {key} does not match')
                 return False
 
-        elif search[key] != value:
-            logger.debug(f"key: {key} search value: {search[key]} spec value: {value}")
-            # print(type(value))
+    elif isinstance(spec, list):
+        if not isinstance(search, list):
+            logger.debug(f"type mismatch: search is {type(search)}, spec is list")
+            return False
+        
+        # every item in spec must match at least one item in search
+        for spec_item in spec:
+            if not any(snap(search_item, spec_item, logger) for search_item in search):
+                logger.debug(f"no match found in search for spec item: {spec_item}")
+                return False
+
+    else:
+        # leaf value — must match exactly
+        if search != spec:
+            logger.debug(f"value mismatch: search={search}, spec={spec}")
             return False
 
     return True
 
 
-def find_runs(runs: ExpQue, spec: GenInfo, logger: logging.Logger) -> List[GenExp]:
+
+def modify(
+    search: Dict, spec: Dict, logger: logging.Logger, 
+) -> Dict[str, Any]:
+    
+    for key, value in spec.items():
+        
+        if isinstance(value, dict):
+            
+            if key in search:
+                search[key] = modify(search[key], value, logger)
+            else:
+                logger.info(f'skipping key: {key} not in search: {search.keys()}')
+                continue
+            
+        elif isinstance(search, dict) and key in search:
+            nv = value(search[key]) 
+            # logger.debug(f'Mapping search[key] : {search[key]} to {nv}')
+            search[key] = nv
+        else:
+            logger.warning(f'unexpected mismatch between types: search: {type(search)} criterion: {type(value)}')
+
+
+    return search
+    
+    
+
+
+def find_runs(
+    runs: ExpQue, spec: GenInfo, logger: logging.Logger, ignore: Dict[str, Any] = {}
+) -> List[GenExp]:
     # return [run for run in runs if snap(run.model_dump(), spec.model_dump())]
-    return [run for run in runs if snap(run.model_dump(), spec,logger)]
+
+    return [
+        run
+        for run in runs
+        if snap(run.model_dump(), modify(spec, ignore, logger), logger)
+    ]
 
 
 def print_json(obj: Any) -> None:
@@ -117,22 +178,24 @@ def build_GenInfo(
     return res_set
 
 
-
 def load_config_and_find_runs(
     conf_path: Path,
     exclude: List[List[str]] = [],
     extra_mods: Dict[str, Any] = {},
+    ignore: Dict[str, Any] = {},
     logger: logging.Logger = basic_logger,
     logging_level=logging.INFO,
 ) -> Optional[GenInfo]:
     gen_info = load_config(str(conf_path), validate=False)
-    print_json(gen_info)
+    
     # find_que_runs(args.out_path)
     logger.setLevel(logging_level)  # or WARNING, INFO, ERROR, CRITICAL
+    logger.debug(json.dumps(gen_info, indent=4))
+    
     q = Que(logger)
     runs = q.list_runs(loc="old_runs")
 
-    found_runs = find_runs(runs, gen_info, logger)
+    found_runs = find_runs(runs, gen_info, logger, ignore)
     logger.info(f"Found {len(found_runs)}/{len(runs)} runs matching the spec")
 
     if len(found_runs) == 0:
@@ -186,9 +249,7 @@ def main():
         action="store_true",
         help=f"Use {RESULTS_DIR}/saicair.py extra modifications",
     )
-    # parser.add_argument(
-    #     "--debug", "-g", help="Enable debug mode for snap function", action="store_true"
-    # )
+    parser.add_argument("--debug", "-g", help="Enable debug mode", action="store_true")
 
     args = parser.parse_args()
 
@@ -208,13 +269,26 @@ def main():
             out_path = config_path.with_suffix(".json")
         exclude = args.exclude_keys if args.exclude_keys is not None else []
         print(f"Excluding keys: {exclude}")
-        extra_mods = additional_modifications if args.extra_mods else {}
+        # extra_mods = additional_modifications if args.extra_mods else {}
+        extra_mods = {}
+        logging_level = logging.DEBUG if args.debug else logging.INFO
+        basic_logger.setLevel(logging_level)
+        # ignore_keys = {}
         output = load_config_and_find_runs(
-            config_path, exclude, extra_mods=extra_mods
+            config_path,
+            exclude,
+            extra_mods=extra_mods,
+            logger=basic_logger,
+            logging_level=logging_level,
+            ignore=ignore_keys
         )
-        assert output is not None, (
-            "No runs found matching the spec, cannot output results"
-        )
+
+        basic_logger.info("logger working")
+        basic_logger.debug("debug mode")
+
+        if output is None:
+            print("No runs found matching the spec, cannot output results")
+            return
         output_results(output, out_path)
         assert out_path.exists(), f"Output file not found at {out_path}"
         print(f"Output path: {out_path}")
