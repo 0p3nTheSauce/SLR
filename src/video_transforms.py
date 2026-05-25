@@ -6,17 +6,18 @@ import torchvision.transforms.v2 as v2
 from functools import partial
 from typing import Callable, List, Tuple, Optional, cast
 import random
-import utils
+
 import time
 import gc
 import statistics
 import numpy as np
 
 # locals
-from src.models import NormDict
+import src.utils as utils
 from src.preprocess import Instance
 from src.run_types import (
 	SpatialAugs,
+	NormDict,
 	TemporalAugs,
 	BaseSampler,
 	CropConfig,

@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 # locals
 
-from run_types import NormDict
+from src.run_types import NormDict
 #pytorch lib models
 from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
 from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
