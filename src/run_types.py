@@ -23,20 +23,24 @@ from pydantic import (
     ConfigDict,
 )
 from pydantic_core import PydanticUndefined
+from pathlib import Path
 # constants
+
 ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT_BASE = "WLASL"
 LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
 NUM_INSTANCES_SUFFIX = "num_instances.json"
 WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
 # LABEL_INSTANCES_SUFFIX = "instances_fixed_frange_bboxes_len.json"
-CLASSES_PATH = "./info/wlasl_class_list.json"
-WLASL_ROOT = "../data/WLASL"
-LABELS_PATH = WLASL_ROOT + "/preprocessed/labels"
+SLR_ROOT = Path.home() / "Code/SLR"
+SRC_ROOT = SLR_ROOT / "src"
+CLASSES_PATH = SRC_ROOT / "info/wlasl_class_list.json"
+WLASL_ROOT = SLR_ROOT / "data/WLASL"
+LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
 RAW_DIR = "WLASL2000"
 SPLIT_DIR = "splits"
-RUNS_PATH = "./runs"
-CONFIGS_PATH = "./configfiles"
+RUNS_PATH = "runs"
+CONFIGS_PATH = "configfiles"
 ZFILL = 3
 CONFIG_FILETYPE = ".toml"
 SEED = 42

@@ -307,7 +307,7 @@ def update_runs2():
 		},
 	}
 
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	# for key in KEYS:
@@ -349,7 +349,7 @@ def update_runs2():
 		new_quelist.append(run)
 	all_runs[OLD_RUNS] = new_quelist
 
-	with open("/home/luke/Code/SLR/code/que/Runs_fixed.json", "w") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
 		json.dump(all_runs, f, indent=4)
 
 
@@ -400,7 +400,7 @@ def update_runs3():
 
 	replace_dict = {"Horizontal_flip": HorizontalFlipConfig().model_dump()}
 
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	# for key in KEYS:
@@ -439,11 +439,11 @@ def update_runs3():
 		new_quelist.append(run)
 	all_runs[OLD_RUNS] = new_quelist
 
-	with open("/home/luke/Code/SLR/code/que/Runs_fixed.json", "w") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
 		json.dump(all_runs, f, indent=4)
 
 
-def validate_runs(runs_path="/home/luke/Code/SLR/code/que/Runs.json"):
+def validate_runs(runs_path="/home/luke/Code/SLR/src/que/Runs.json"):
 	q = Que(_get_basic_logger(), runs_path=runs_path)
 	# q.update_runs("to_run", [0], {"status": "updated"})
 	keys: list[QueLocation] = ["to_run", "cur_run", "fail_runs", "old_runs"]
@@ -457,7 +457,7 @@ def validate_runs(runs_path="/home/luke/Code/SLR/code/que/Runs.json"):
 
 def update_runs4():
 
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	# for key in KEYS:
@@ -473,7 +473,7 @@ def update_runs4():
 		new_quelist.append(run)
 	all_runs[OLD_RUNS] = new_quelist
 
-	with open("/home/luke/Code/SLR/code/que/Runs_fixed.json", "w") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
 		json.dump(all_runs, f, indent=4)
 
 
@@ -486,7 +486,7 @@ def update_runs5():
 			"Scale_and_pad": ScaleAndPadConfig(size=sz).model_dump(), #type: ignore
 		}[fss]
 
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	# for key in KEYS:
@@ -523,14 +523,14 @@ def update_runs5():
 		all_runs[loc] = new_quelist
 	
 
-	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+	with open('/home/luke/Code/SLR/src/que/Runs_fixed.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
 
 
 def update_runs6():
 
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	# for key in KEYS:
@@ -565,14 +565,14 @@ def update_runs6():
 		all_runs[loc] = new_quelist
 	
 
-	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+	with open('/home/luke/Code/SLR/src/que/Runs_fixed.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
 
 def update_runs7():
 	from run_types import SupervisedInfo
 	
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	# for key in KEYS:
@@ -601,11 +601,11 @@ def update_runs7():
 		all_runs[loc] = new_quelist
 	
 
-	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+	with open('/home/luke/Code/SLR/src/que/Runs_fixed.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
 def update_runs8():
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	for loc in KEYS:
@@ -639,11 +639,11 @@ def update_runs8():
 
 		all_runs[loc] = new_quelist
 
-	with open('/home/luke/Code/SLR/code/que/Runs_fixed.json', 'w') as f:
+	with open('/home/luke/Code/SLR/src/que/Runs_fixed.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
 def update_runs9():
-	with open("/home/luke/Code/SLR/code/que/Runs.json", "r") as f:
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
 		all_runs = json.load(f)
 
 	for loc in KEYS:
@@ -662,7 +662,7 @@ def update_runs9():
 
 		all_runs[loc] = new_quelist
 
-	with open('/home/luke/Code/SLR/code/que/Runs.json', 'w') as f:
+	with open('/home/luke/Code/SLR/src/que/Runs.json', 'w') as f:
 		json.dump(all_runs, f, indent=4)
 
 def test_set_inplace():
@@ -692,145 +692,178 @@ def test_set_inplace():
 	print(json.dumps(dicty3, indent=4))
  
 def test_edit_run():
-    from run_types import strict_validate
-    
-    demo = {
+	from run_types import strict_validate
+	
+	demo = {
 		"admin": {
-                "model": "MViTv2_S",
-                "dataset": "WLASL",
-                "split": "asl100_bottom",
-                "save_path": "runs/asl100_bottom/MViTv2_S/exp000/checkpoints",
-                "seed": 42,
-                "exp_no": "000",
-                "recover": True,
-                "config_path": "configfiles/asl100/MViTv2_S/exp016.toml",
-                "weight_path": None
-            },
-            "training": {
-                "batch_size": 4,
-                "update_per_step": 2,
-                "max_epoch": 200,
-                "batch_size_equivalent": 8
-            },
-            "optimizer": {
-                "eps": 1e-05,
-                "backbone_init_lr": 0.0001,
-                "backbone_weight_decay": 0.001,
-                "classifier_init_lr": 0.001,
-                "classifier_weight_decay": 0.001
-            },
-            "model_params": {
-                "drop_p": 0.5,
-                "type": "supervised"
-            },
-            "data": {
-                "train_augs": {
-                    "normalise": True,
-                    "norm_dict": {
-                        "mean": [
-                            0.45,
-                            0.45,
-                            0.45
-                        ],
-                        "std": [
-                            0.225,
-                            0.225,
-                            0.225
-                        ]
-                    },
-                    "temporal_aug": [
-                        {
-                            "target_length": 16,
-                            "max_wobble": 4,
-                            "type": "chunked"
-                        }
-                    ],
-                    "spatial_aug": [
-                        {
-                            "type": "HORIZONTAL_FLIP",
-                            "p": 0.5
-                        },
-                        {
-                            "frame_size": 224,
-                            "type": "Centre_crop"
-                        },
-                        {
-                            "type": "RANDAUGMENT",
-                            "num_ops": 3,
-                            "magnitude": 7,
-                            "num_magnitude_bins": 31,
-                            "interpolation": "bilinear"
-                        }
-                    ],
-                    "strict_size": True,
-                    "target_length": 16,
-                    "frame_size": 224
-                },
-                "test_augs": {
-                    "normalise": True,
-                    "norm_dict": {
-                        "mean": [
-                            0.45,
-                            0.45,
-                            0.45
-                        ],
-                        "std": [
-                            0.225,
-                            0.225,
-                            0.225
-                        ]
-                    },
-                    "temporal_aug": [
-                        {
-                            "target_length": 16,
-                            "max_wobble": 0,
-                            "type": "uniform"
-                        }
-                    ],
-                    "spatial_aug": [
-                        {
-                            "frame_size": 224,
-                            "type": "Centre_crop"
-                        }
-                    ],
-                    "strict_size": True,
-                    "target_length": 16,
-                    "frame_size": 224
-                },
-                "strict_size": True,
-                "target_length": 16,
-                "frame_size": 224
-            },
-            "scheduler": {
-                "warm_up": None,
-                "type": "CosineAnnealingWarmRestarts",
-                "t0": 20,
-                "tmult": 1,
-                "eta_min": 0.0
-            },
-            "early_stopping": {
-                "metric": [
-                    "val",
-                    "loss"
-                ],
-                "mode": "min",
-                "patience": 15,
-                "min_delta": 0.01
-            },
-            "wandb": {
-                "entity": "ljgoodall2001-rhodes-university",
-                "project": "WLASL-100_bottom",
-                "tags": [
-                    "Recovered"
-                ],
-                "run_id": None
-            }
+				"model": "MViTv2_S",
+				"dataset": "WLASL",
+				"split": "asl100_bottom",
+				"save_path": "runs/asl100_bottom/MViTv2_S/exp000/checkpoints",
+				"seed": 42,
+				"exp_no": "000",
+				"recover": True,
+				"config_path": "configfiles/asl100/MViTv2_S/exp016.toml",
+				"weight_path": None
+			},
+			"training": {
+				"batch_size": 4,
+				"update_per_step": 2,
+				"max_epoch": 200,
+				"batch_size_equivalent": 8
+			},
+			"optimizer": {
+				"eps": 1e-05,
+				"backbone_init_lr": 0.0001,
+				"backbone_weight_decay": 0.001,
+				"classifier_init_lr": 0.001,
+				"classifier_weight_decay": 0.001
+			},
+			"model_params": {
+				"drop_p": 0.5,
+				"type": "supervised"
+			},
+			"data": {
+				"train_augs": {
+					"normalise": True,
+					"norm_dict": {
+						"mean": [
+							0.45,
+							0.45,
+							0.45
+						],
+						"std": [
+							0.225,
+							0.225,
+							0.225
+						]
+					},
+					"temporal_aug": [
+						{
+							"target_length": 16,
+							"max_wobble": 4,
+							"type": "chunked"
+						}
+					],
+					"spatial_aug": [
+						{
+							"type": "HORIZONTAL_FLIP",
+							"p": 0.5
+						},
+						{
+							"frame_size": 224,
+							"type": "Centre_crop"
+						},
+						{
+							"type": "RANDAUGMENT",
+							"num_ops": 3,
+							"magnitude": 7,
+							"num_magnitude_bins": 31,
+							"interpolation": "bilinear"
+						}
+					],
+					"strict_size": True,
+					"target_length": 16,
+					"frame_size": 224
+				},
+				"test_augs": {
+					"normalise": True,
+					"norm_dict": {
+						"mean": [
+							0.45,
+							0.45,
+							0.45
+						],
+						"std": [
+							0.225,
+							0.225,
+							0.225
+						]
+					},
+					"temporal_aug": [
+						{
+							"target_length": 16,
+							"max_wobble": 0,
+							"type": "uniform"
+						}
+					],
+					"spatial_aug": [
+						{
+							"frame_size": 224,
+							"type": "Centre_crop"
+						}
+					],
+					"strict_size": True,
+					"target_length": 16,
+					"frame_size": 224
+				},
+				"strict_size": True,
+				"target_length": 16,
+				"frame_size": 224
+			},
+			"scheduler": {
+				"warm_up": None,
+				"type": "CosineAnnealingWarmRestarts",
+				"t0": 20,
+				"tmult": 1,
+				"eta_min": 0.0
+			},
+			"early_stopping": {
+				"metric": [
+					"val",
+					"loss"
+				],
+				"mode": "min",
+				"patience": 15,
+				"min_delta": 0.01
+			},
+			"wandb": {
+				"entity": "ljgoodall2001-rhodes-university",
+				"project": "WLASL-100_bottom",
+				"tags": [
+					"Recovered"
+				],
+				"run_id": None
+			}
 	}
-    
-    
-    # demo = Que.set_nested(demo, ['admin', 'wandb', 'run_id'], 'abcd')
-    valid = strict_validate(ExpInfo, demo)
-    # valid = ExpInfo.model_validate(demo)
+	
+	
+	# demo = Que.set_nested(demo, ['admin', 'wandb', 'run_id'], 'abcd')
+	valid = strict_validate(ExpInfo, demo)
+	# valid = ExpInfo.model_validate(demo)
+
+
+
+
+
+
+
+def update_runs10():
+	from configs import correct_paths
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	for loc in KEYS:
+		que_list = all_runs[loc]
+		new_quelist = []
+		for run in que_list:
+
+			run['admin'] = correct_paths(run['admin'])
+			
+			if loc in KEYS[:2]:
+				run = ExpInfo.model_validate(run).model_dump()
+			elif loc == KEYS[2]:
+				run = CompExpInfo.model_validate(run).model_dump()
+			else:
+				run = FailedExp.model_validate(run).model_dump()
+			
+			new_quelist.append(run)
+
+		all_runs[loc] = new_quelist
+
+	with open('/home/luke/Code/SLR/src/que/Runs_fixed.json', 'w') as f:
+		json.dump(all_runs, f, indent=4)
+
 
 if __name__ == "__main__":
 	# test_copy()
@@ -838,4 +871,5 @@ if __name__ == "__main__":
 	# validate_runs()
 	# update_runs9()
 	# test_set_inplace()
-	test_edit_run()
+	# test_edit_run()
+	update_runs10()

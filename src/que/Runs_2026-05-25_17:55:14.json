@@ -7,7 +7,2090 @@
                 "model": "MViTv2_B_32x3",
                 "dataset": "WLASL",
                 "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp011/checkpoints000",
+                "seed": 1,
+                "exp_no": "011",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp011.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 2,
+                            "type": "focal_normal",
+                            "mean": 0.5,
+                            "std": 0.3
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "focal_normal",
+                            "mean": 0.5,
+                            "std": 0.3
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "RANDAUG",
+                    "CHUNKED",
+                    "comp2exp10"
+                ],
+                "run_id": "an1fi8o2"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 81.95266272189349,
+                "best_val_loss": 0.7179266964615167,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.81,
+                        "top5": 0.945,
+                        "top10": 0.9633333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.810077519379845,
+                        "top5": 0.9418604651162791,
+                        "top10": 0.9612403100775194
+                    },
+                    "average_loss": 0.8777129249265977
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8033333333333332,
+                        "top5": 0.95,
+                        "top10": 0.9666666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7958579881656804,
+                        "top5": 0.9497041420118343,
+                        "top10": 0.9674556213017751
+                    },
+                    "average_loss": 0.7734344913466868
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5405,
+                        "top5": 0.8233333333333333,
+                        "top10": 0.9033333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5348837209302325,
+                        "top5": 0.8217054263565892,
+                        "top10": 0.8992248062015504
+                    },
+                    "average_loss": 2.0627625804050878,
+                    "perm": [
+                        5,
+                        26,
+                        1,
+                        10,
+                        7,
+                        24,
+                        13,
+                        23,
+                        31,
+                        19,
+                        30,
+                        17,
+                        28,
+                        8,
+                        27,
+                        29,
+                        22,
+                        4,
+                        16,
+                        21,
+                        2,
+                        15,
+                        12,
+                        3,
+                        14,
+                        11,
+                        25,
+                        9,
+                        0,
+                        20,
+                        18,
+                        6
+                    ],
+                    "shannon_entropy": 4.179229259490967
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp082/checkpoints000",
+                "seed": 8,
+                "exp_no": "082",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp082.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "RANDAUG",
+                    "CHUNKED",
+                    "compto82"
+                ],
+                "run_id": "o3lbbb2o"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 72.48520710059172,
+                "best_val_loss": 1.1371913308895394,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6896666666666667,
+                        "top5": 0.8933333333333333,
+                        "top10": 0.9533333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.689922480620155,
+                        "top5": 0.8914728682170543,
+                        "top10": 0.9534883720930233
+                    },
+                    "average_loss": 1.3177023326737194
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7101666666666668,
+                        "top5": 0.9225,
+                        "top10": 0.96
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7011834319526628,
+                        "top5": 0.9230769230769231,
+                        "top10": 0.9615384615384616
+                    },
+                    "average_loss": 1.1371913308895394
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.26049999999999995,
+                        "top5": 0.5516666666666666,
+                        "top10": 0.6591666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.26356589147286824,
+                        "top5": 0.5503875968992248,
+                        "top10": 0.6589147286821705
+                    },
+                    "average_loss": 3.821276043772342,
+                    "perm": [
+                        3,
+                        24,
+                        23,
+                        8,
+                        17,
+                        9,
+                        14,
+                        22,
+                        16,
+                        6,
+                        18,
+                        25,
+                        11,
+                        2,
+                        19,
+                        26,
+                        15,
+                        30,
+                        10,
+                        31,
+                        29,
+                        0,
+                        20,
+                        27,
+                        21,
+                        28,
+                        4,
+                        5,
+                        1,
+                        13,
+                        12,
+                        7
+                    ],
+                    "shannon_entropy": 4.14031982421875
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp082/checkpoints000",
+                "seed": 5,
+                "exp_no": "082",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp082.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "RANDAUG",
+                    "CHUNKED",
+                    "compto82"
+                ],
+                "run_id": "c22coedw"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 70.71005917159763,
+                "best_val_loss": 1.186649759732063,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6763333333333332,
+                        "top5": 0.883,
+                        "top10": 0.93
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6744186046511628,
+                        "top5": 0.8837209302325582,
+                        "top10": 0.9341085271317829
+                    },
+                    "average_loss": 1.430766213391881
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7038333333333334,
+                        "top5": 0.92,
+                        "top10": 0.9625
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7011834319526628,
+                        "top5": 0.9201183431952663,
+                        "top10": 0.9615384615384616
+                    },
+                    "average_loss": 1.186649759732063
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2855,
+                        "top5": 0.6283333333333333,
+                        "top10": 0.7233333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.27906976744186046,
+                        "top5": 0.6201550387596899,
+                        "top10": 0.7209302325581395
+                    },
+                    "average_loss": 4.133371722794154,
+                    "perm": [
+                        3,
+                        17,
+                        9,
+                        10,
+                        0,
+                        12,
+                        24,
+                        15,
+                        8,
+                        11,
+                        1,
+                        4,
+                        23,
+                        31,
+                        14,
+                        29,
+                        5,
+                        2,
+                        13,
+                        28,
+                        7,
+                        19,
+                        6,
+                        16,
+                        21,
+                        25,
+                        27,
+                        18,
+                        26,
+                        20,
+                        30,
+                        22
+                    ],
+                    "shannon_entropy": 4.116729259490967
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp082/checkpoints000",
+                "seed": 3,
+                "exp_no": "082",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp082.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "RANDAUG",
+                    "CHUNKED",
+                    "compto82"
+                ],
+                "run_id": "nxzibwnb"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.93491124260355,
+                "best_val_loss": 1.1395330222118836,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6996666666666665,
+                        "top5": 0.9116666666666666,
+                        "top10": 0.9266666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6976744186046512,
+                        "top5": 0.9147286821705426,
+                        "top10": 0.9302325581395349
+                    },
+                    "average_loss": 1.3323336323946104
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7331666666666667,
+                        "top5": 0.9158333333333333,
+                        "top10": 0.9558333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.727810650887574,
+                        "top5": 0.9142011834319527,
+                        "top10": 0.9556213017751479
+                    },
+                    "average_loss": 1.100786217598213
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.2421666666666667,
+                        "top5": 0.5458333333333334,
+                        "top10": 0.65
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.24031007751937986,
+                        "top5": 0.5426356589147286,
+                        "top10": 0.6472868217054264
+                    },
+                    "average_loss": 4.194702555311701,
+                    "perm": [
+                        10,
+                        16,
+                        9,
+                        12,
+                        4,
+                        17,
+                        24,
+                        7,
+                        21,
+                        13,
+                        18,
+                        5,
+                        11,
+                        3,
+                        14,
+                        23,
+                        15,
+                        26,
+                        6,
+                        29,
+                        20,
+                        28,
+                        1,
+                        0,
+                        22,
+                        27,
+                        31,
+                        2,
+                        30,
+                        25,
+                        8,
+                        19
+                    ],
+                    "shannon_entropy": 4.116729259490967
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp082/checkpoints000",
+                "seed": 2,
+                "exp_no": "082",
+                "recover": false,
+                "config_path": "configfiles/asl100/S3D/exp082.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "RANDAUG",
+                    "CHUNKED",
+                    "compto82"
+                ],
+                "run_id": "7c5xvldn"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 68.93491124260355,
+                "best_val_loss": 1.1395330222118836,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6523333333333334,
+                        "top5": 0.8946666666666667,
+                        "top10": 0.9466666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6434108527131783,
+                        "top5": 0.8914728682170543,
+                        "top10": 0.9457364341085271
+                    },
+                    "average_loss": 1.4479718008630906
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6896666666666669,
+                        "top5": 0.9241666666666667,
+                        "top10": 0.9441666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6863905325443787,
+                        "top5": 0.9260355029585798,
+                        "top10": 0.9467455621301775
+                    },
+                    "average_loss": 1.1395330222118836
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.20716666666666664,
+                        "top5": 0.5025,
+                        "top10": 0.6333333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.20930232558139536,
+                        "top5": 0.5,
+                        "top10": 0.6317829457364341
+                    },
+                    "average_loss": 5.233865919258183,
+                    "perm": [
+                        8,
+                        20,
+                        13,
+                        1,
+                        22,
+                        17,
+                        10,
+                        4,
+                        16,
+                        23,
+                        6,
+                        21,
+                        31,
+                        15,
+                        5,
+                        11,
+                        12,
+                        19,
+                        7,
+                        14,
+                        24,
+                        9,
+                        25,
+                        18,
+                        27,
+                        29,
+                        30,
+                        0,
+                        3,
+                        26,
+                        28,
+                        2
+                    ],
+                    "shannon_entropy": 4.030639171600342
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S",
+                "dataset": "WLASL",
+                "split": "asl100_worst",
+                "save_path": "runs/asl100_worst/MViTv2_S/exp000/checkpoints",
+                "seed": 42,
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_S/exp016.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 16,
+                            "max_wobble": 4,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 16,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 16,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 16,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100_worst",
+                "tags": [],
+                "run_id": "v5hi3fz0"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 61.1764705882353,
+                "best_val_loss": 1.395684665708127,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5591666666666666,
+                        "top5": 0.8358333333333333,
+                        "top10": 0.9025
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5566037735849056,
+                        "top5": 0.8349056603773585,
+                        "top10": 0.9009433962264151
+                    },
+                    "average_loss": 1.823003733574571
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.615,
+                        "top5": 0.8958333333333333,
+                        "top10": 0.9666666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6039215686274509,
+                        "top5": 0.8862745098039215,
+                        "top10": 0.9647058823529412
+                    },
+                    "average_loss": 1.395684665708127
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.35916666666666663,
+                        "top5": 0.6766666666666665,
+                        "top10": 0.8275
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.35377358490566035,
+                        "top5": 0.6745283018867925,
+                        "top10": 0.8254716981132075
+                    },
+                    "average_loss": 2.7754944896672518,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp082/checkpoints000",
+                "seed": 1,
+                "exp_no": "082",
+                "recover": true,
+                "config_path": "configfiles/asl100/S3D/exp082.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "RANDAUG",
+                    "CHUNKED",
+                    "compto82"
+                ],
+                "run_id": "zqwrg53k"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 71.00591715976331,
+                "best_val_loss": 1.2621058204002995,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6643333333333332,
+                        "top5": 0.878,
+                        "top10": 0.9258333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6511627906976745,
+                        "top5": 0.875968992248062,
+                        "top10": 0.9263565891472868
+                    },
+                    "average_loss": 1.5563339079147935
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7126666666666668,
+                        "top5": 0.9171666666666667,
+                        "top10": 0.9466666666666665
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7071005917159763,
+                        "top5": 0.9142011834319527,
+                        "top10": 0.9467455621301775
+                    },
+                    "average_loss": 1.2621058204002995
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.25849999999999995,
+                        "top5": 0.5475,
+                        "top10": 0.6983333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.24806201550387597,
+                        "top5": 0.5465116279069767,
+                        "top10": 0.7015503875968992
+                    },
+                    "average_loss": 4.212361100386895,
+                    "perm": [
+                        5,
+                        26,
+                        1,
+                        10,
+                        7,
+                        24,
+                        13,
+                        23,
+                        31,
+                        19,
+                        30,
+                        17,
+                        28,
+                        8,
+                        27,
+                        29,
+                        22,
+                        4,
+                        16,
+                        21,
+                        2,
+                        15,
+                        12,
+                        3,
+                        14,
+                        11,
+                        25,
+                        9,
+                        0,
+                        20,
+                        18,
+                        6
+                    ],
+                    "shannon_entropy": 4.179229259490967
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S",
+                "dataset": "WLASL",
+                "split": "asl100_bottom",
+                "save_path": "runs/asl100_bottom/MViTv2_S/exp000/checkpoints",
+                "seed": 42,
+                "exp_no": "000",
+                "recover": true,
+                "config_path": "configfiles/asl100/MViTv2_S/exp016.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 16,
+                            "max_wobble": 4,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 16,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 16,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 16,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 20,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100_bottom",
+                "tags": [
+                    "Recovered"
+                ],
+                "run_id": "pm13a2mq"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 58.08080808080808,
+                "best_val_loss": 1.6762734858479087,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6,
+                        "top5": 0.86,
+                        "top10": 0.92
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6,
+                        "top5": 0.86,
+                        "top10": 0.92
+                    },
+                    "average_loss": 1.4941333872498945
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.56,
+                        "top5": 0.84,
+                        "top10": 0.93
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5656565656565656,
+                        "top5": 0.8484848484848485,
+                        "top10": 0.9343434343434344
+                    },
+                    "average_loss": 1.6762734858479087
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.24,
+                        "top5": 0.61,
+                        "top10": 0.75
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.24,
+                        "top5": 0.61,
+                        "top10": 0.75
+                    },
+                    "average_loss": 3.2387642580457032,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp011/checkpoints",
+                "seed": 42,
+                "exp_no": "011",
+                "recover": true,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp011.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 1,
+                "update_per_step": 8,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 2,
+                            "type": "focal_normal",
+                            "mean": 0.5,
+                            "std": 0.3
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "focal_normal",
+                            "mean": 0.5,
+                            "std": 0.3
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "Recovered"
+                ],
+                "run_id": "tya1jbww"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 82.24852071005917,
+                "best_val_loss": 0.705428313799503,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7596666666666667,
+                        "top5": 0.9316666666666665,
+                        "top10": 0.9683333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.751937984496124,
+                        "top5": 0.9302325581395349,
+                        "top10": 0.9689922480620154
+                    },
+                    "average_loss": 1.042774461971155
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8151666666666667,
+                        "top5": 0.9591666666666666,
+                        "top10": 0.9758333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.8076923076923077,
+                        "top5": 0.9585798816568047,
+                        "top10": 0.9763313609467456
+                    },
+                    "average_loss": 0.757055407414022
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5308333333333334,
+                        "top5": 0.8141666666666666,
+                        "top10": 0.93
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5232558139534884,
+                        "top5": 0.813953488372093,
+                        "top10": 0.9302325581395349
+                    },
+                    "average_loss": 2.1910013826816637,
+                    "perm": [
+                        6,
+                        13,
+                        18,
+                        24,
+                        22,
+                        7,
+                        28,
+                        31,
+                        30,
+                        21,
+                        4,
+                        8,
+                        10,
+                        16,
+                        23,
+                        2,
+                        19,
+                        27,
+                        17,
+                        25,
+                        9,
+                        29,
+                        1,
+                        0,
+                        15,
+                        11,
+                        5,
+                        26,
+                        3,
+                        12,
+                        20,
+                        14
+                    ],
+                    "shannon_entropy": 4.288909912109375
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_S/exp018/checkpoints",
+                "seed": 42,
+                "exp_no": "018",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_S/exp018.toml",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 4,
+                "update_per_step": 2,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 1e-05,
+                "backbone_init_lr": 0.0001,
+                "backbone_weight_decay": 0.001,
+                "classifier_init_lr": 0.001,
+                "classifier_weight_decay": 0.001
+            },
+            "model_params": {
+                "drop_p": 0.5,
+                "type": "supervised"
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 16,
+                            "max_wobble": 2,
+                            "type": "focal_normal",
+                            "mean": 0.5,
+                            "std": 0.3
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.5
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 7,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 16,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 16,
+                            "max_wobble": 0,
+                            "type": "focal_normal",
+                            "mean": 0.5,
+                            "std": 0.3
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 16,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 16,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": null,
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 10,
+                "tmult": 2,
+                "eta_min": 0.0
+            },
+            "early_stopping": {
+                "metric": [
+                    "val",
+                    "loss"
+                ],
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [],
+                "run_id": "d6j8tory"
+            },
+            "results": {
+                "check_name": "best_val",
+                "best_val_acc": 76.92307692307692,
+                "best_val_loss": 0.8890733807771141,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7696666666666667,
+                        "top5": 0.9096666666666667,
+                        "top10": 0.9383333333333332
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7674418604651163,
+                        "top5": 0.9069767441860465,
+                        "top10": 0.937984496124031
+                    },
+                    "average_loss": 1.0957520012961486
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7563333333333334,
+                        "top5": 0.9258333333333333,
+                        "top10": 0.975
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7514792899408284,
+                        "top5": 0.9260355029585798,
+                        "top10": 0.9763313609467456
+                    },
+                    "average_loss": 0.9634099117598485
+                },
+                "test_shuff": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6076666666666667,
+                        "top5": 0.8776666666666667,
+                        "top10": 0.9225
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5968992248062015,
+                        "top5": 0.8682170542635659,
+                        "top10": 0.9186046511627907
+                    },
+                    "average_loss": 1.6528944555391845,
+                    "perm": [
+                        6,
+                        3,
+                        0,
+                        7,
+                        10,
+                        15,
+                        2,
+                        12,
+                        14,
+                        9,
+                        8,
+                        5,
+                        4,
+                        13,
+                        11,
+                        1
+                    ],
+                    "shannon_entropy": 3.327819585800171
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp010/checkpoints",
+                "seed": 42,
                 "exp_no": "010",
                 "recover": false,
                 "config_path": "configfiles/RandAug/MViT_B_32x3_eda_ops3_no_wobble.toml",
@@ -220,6 +2303,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp009/checkpoints",
+                "seed": 42,
                 "exp_no": "009",
                 "recover": false,
                 "config_path": "configfiles/RandAug/MViT_B_32x3_eda_ops3.toml",
@@ -432,6 +2516,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp016/checkpoints",
+                "seed": 42,
                 "exp_no": "016",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S/exp016.toml",
@@ -629,6 +2714,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp017/checkpoints",
+                "seed": 42,
                 "exp_no": "017",
                 "recover": false,
                 "config_path": "./configfiles/RandAug/MViTv2_S_eda_ops3.toml",
@@ -825,6 +2911,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp085/checkpoints",
+                "seed": 42,
                 "exp_no": "085",
                 "recover": false,
                 "config_path": "configfiles/RandAug/S3D_eda_ops3_wobble4.toml",
@@ -1037,6 +3124,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp084/checkpoints",
+                "seed": 42,
                 "exp_no": "084",
                 "recover": false,
                 "config_path": "./configfiles/RandAug/S3D_eda_ops3.toml",
@@ -1245,6 +3333,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp052/checkpoints002",
+                "seed": 42,
                 "exp_no": "052",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/tmult2.ini",
@@ -1452,6 +3541,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp052/checkpoints001",
+                "seed": 42,
                 "exp_no": "052",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/tmult2.ini",
@@ -1659,6 +3749,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp052/checkpoints000",
+                "seed": 42,
                 "exp_no": "052",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/tmult2.ini",
@@ -1866,6 +3957,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp083/checkpoints",
+                "seed": 42,
                 "exp_no": "083",
                 "recover": false,
                 "config_path": "./configfiles/RandAug/S3D_eda_focal.toml",
@@ -2081,6 +4173,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp082/checkpoints",
+                "seed": 42,
                 "exp_no": "082",
                 "recover": false,
                 "config_path": "./configfiles/RandAug/S3D_eda_ops3.toml",
@@ -2292,6 +4385,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp081/checkpoints",
+                "seed": 42,
                 "exp_no": "081",
                 "recover": true,
                 "config_path": "./configfiles/RandAug/S3D_eda_mag10.toml",
@@ -2503,6 +4597,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp080/checkpoints",
+                "seed": 42,
                 "exp_no": "080",
                 "recover": true,
                 "config_path": "./configfiles/RandAug/S3D_eda.toml",
@@ -2714,10 +4809,11 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_B_32x3/exp004/checkpoints",
+                "seed": 42,
                 "exp_no": "004",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp004.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/MViTv2_B_32x3/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_B_32x3/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -2921,10 +5017,11 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/MViTv2_B_32x3/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": true,
                 "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp001.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/MViTv2_B_32x3/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_B_32x3/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -3128,10 +5225,11 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/MViTv2_B_32x3/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": true,
                 "config_path": "configfiles/asl300/MViTv2_B_32x3/exp001.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/MViTv2_B_32x3/exp008/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_B_32x3/exp008/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -3335,9 +5433,10 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp079/checkpoints",
+                "seed": 42,
                 "exp_no": "079",
                 "recover": true,
-                "config_path": "/home/luke/Code/SLR/code/configfiles/debug/test_sc.toml",
+                "config_path": "configfiles/debug/test_sc.toml",
                 "weight_path": null
             },
             "training": {
@@ -3540,6 +5639,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp008/checkpoints",
+                "seed": 42,
                 "exp_no": "008",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp008.toml",
@@ -3745,6 +5845,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_S_16x4/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_S_16x4/exp001.toml",
@@ -3929,6 +6030,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/Swin3D_S/exp008/checkpoints",
+                "seed": 42,
                 "exp_no": "008",
                 "recover": true,
                 "config_path": "configfiles/asl100/Swin3D_S/exp008.toml",
@@ -4134,10 +6236,11 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_B_32x3/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp002.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_018.pth"
+                "weight_path": "runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_018.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -4333,10 +6436,11 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/S3D/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl2000/S3D/exp002.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/S3D/exp002/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/S3D/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -4533,10 +6637,11 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/S3D/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl1000/S3D/exp002.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/S3D/exp004/checkpoints/best.pth"
+                "weight_path": "runs/asl300/S3D/exp004/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -4733,10 +6838,11 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/S3D/exp004/checkpoints",
+                "seed": 42,
                 "exp_no": "004",
                 "recover": false,
                 "config_path": "configfiles/asl300/S3D/exp004.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/S3D/exp076/checkpoints/best.pth"
+                "weight_path": "runs/asl100/S3D/exp076/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -4933,6 +7039,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp076/checkpoints",
+                "seed": 42,
                 "exp_no": "076",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp076.toml",
@@ -5132,10 +7239,11 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/S3D/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl2000/S3D/exp001.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/S3D/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/S3D/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -5316,10 +7424,11 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/S3D/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl1000/S3D/exp001.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/S3D/exp003/checkpoints/best.pth"
+                "weight_path": "runs/asl300/S3D/exp003/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -5500,10 +7609,11 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/S3D/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl300/S3D/exp003.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/S3D/exp075/checkpoints/best.pth"
+                "weight_path": "runs/asl100/S3D/exp075/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -5684,6 +7794,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp075/checkpoints",
+                "seed": 42,
                 "exp_no": "075",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp075.toml",
@@ -5867,10 +7978,11 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_S_16x4/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/MViTv2_S_16x4/exp000.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/MViTv2_S_16x4/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_S_16x4/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -6051,10 +8163,11 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/MViTv2_S_16x4/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_S_16x4/exp000.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/MViTv2_S_16x4/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_S_16x4/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -6235,10 +8348,11 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/MViTv2_S_16x4/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_S_16x4/exp000.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/MViTv2_S_16x4/exp003/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_S_16x4/exp003/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -6419,6 +8533,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S_16x4/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S_16x4/exp003.toml",
@@ -6602,6 +8717,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_B_32x3/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": true,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp001.toml",
@@ -6801,6 +8917,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp073/checkpoints",
+                "seed": 42,
                 "exp_no": "073",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp073.toml",
@@ -7006,6 +9123,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp072/checkpoints",
+                "seed": 42,
                 "exp_no": "072",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp072.toml",
@@ -7210,10 +9328,11 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_B_32x3/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp000.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl1000/MViTv2_B_32x3/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_B_32x3/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -7409,10 +9528,11 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/MViTv2_B_32x3/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp000.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl300/MViTv2_B_32x3/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_B_32x3/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -7608,10 +9728,11 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/MViTv2_B_32x3/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_B_32x3/exp000.toml",
-                "weight_path": "/home/luke/Code/SLR/code/runs/asl100/MViTv2_B_32x3/exp007/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_B_32x3/exp007/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -7807,6 +9928,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp007/checkpoints",
+                "seed": 42,
                 "exp_no": "007",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp007.toml",
@@ -8004,6 +10126,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp006/checkpoints",
+                "seed": 42,
                 "exp_no": "006",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp006.toml",
@@ -8212,6 +10335,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp005/checkpoints",
+                "seed": 42,
                 "exp_no": "005",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp005.toml",
@@ -8417,6 +10541,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp004/checkpoints",
+                "seed": 42,
                 "exp_no": "004",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp004.toml",
@@ -8620,6 +10745,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp071/checkpoints",
+                "seed": 42,
                 "exp_no": "071",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp071.toml",
@@ -8826,6 +10952,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp070/checkpoints",
+                "seed": 42,
                 "exp_no": "070",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp070.toml",
@@ -9034,6 +11161,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp069/checkpoints",
+                "seed": 42,
                 "exp_no": "069",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp069.toml",
@@ -9242,6 +11370,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp068/checkpoints",
+                "seed": 42,
                 "exp_no": "068",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp068.toml",
@@ -9447,6 +11576,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp067/checkpoints",
+                "seed": 42,
                 "exp_no": "067",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp067.toml",
@@ -9652,6 +11782,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp066/checkpoints",
+                "seed": 42,
                 "exp_no": "066",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp066.toml",
@@ -9853,6 +11984,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp065/checkpoints",
+                "seed": 42,
                 "exp_no": "065",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp065.toml",
@@ -10054,6 +12186,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp064/checkpoints",
+                "seed": 42,
                 "exp_no": "064",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp064.toml",
@@ -10255,6 +12388,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp063/checkpoints",
+                "seed": 42,
                 "exp_no": "063",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp063.toml",
@@ -10459,6 +12593,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp061/checkpoints",
+                "seed": 42,
                 "exp_no": "061",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp061.toml",
@@ -10661,6 +12796,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp062/checkpoints",
+                "seed": 42,
                 "exp_no": "062",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp062.toml",
@@ -10864,6 +13000,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp059/checkpoints",
+                "seed": 42,
                 "exp_no": "059",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp059.ini",
@@ -11070,6 +13207,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp058/checkpoints001",
+                "seed": 42,
                 "exp_no": "058",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp058.ini",
@@ -11273,6 +13411,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp003.ini",
@@ -11470,6 +13609,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp002.ini",
@@ -11673,6 +13813,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_B_32x3/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_B_32x3/exp001.ini",
@@ -11870,6 +14011,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S_16x4/exp002/checkpoints000",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S_16x4/exp002.ini",
@@ -12051,6 +14193,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S_16x4/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S_16x4/exp001.ini",
@@ -12237,6 +14380,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S_16x4/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S_16x4/exp000.ini",
@@ -12423,6 +14567,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S_e/exp000/checkpoints000",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S_e/exp000.ini",
@@ -12624,6 +14769,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S_e/exp000/checkpoints000",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S_e/exp000.ini",
@@ -12825,6 +14971,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp014/checkpoints",
+                "seed": 42,
                 "exp_no": "014",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S/exp014.ini",
@@ -13011,6 +15158,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp057/checkpoints",
+                "seed": 42,
                 "exp_no": "057",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp057.ini",
@@ -13218,6 +15366,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp048/checkpoints000",
+                "seed": 42,
                 "exp_no": "048",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp048.ini",
@@ -13425,6 +15574,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp056/checkpoints",
+                "seed": 42,
                 "exp_no": "056",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp056.ini",
@@ -13627,6 +15777,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp055/checkpoints",
+                "seed": 42,
                 "exp_no": "055",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp055.ini",
@@ -13829,6 +15980,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_S/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_S/exp001.ini",
@@ -14014,6 +16166,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/MViTv2_S/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_S/exp001.ini",
@@ -14199,6 +16352,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/MViTv2_S/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_S/exp002.ini",
@@ -14384,6 +16538,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/Swin3D_T/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/Swin3D_T/exp000.ini",
@@ -14575,6 +16730,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp051/checkpoints",
+                "seed": 42,
                 "exp_no": "051",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp046.ini",
@@ -14766,6 +16922,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/Swin3D_S/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/Swin3D_S/exp000.ini",
@@ -14957,6 +17114,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/R3D_18/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/R3D_18/exp000.ini",
@@ -15148,6 +17306,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/Swin3D_B/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/Swin3D_B/exp000.ini",
@@ -15339,6 +17498,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp011/checkpoints",
+                "seed": 42,
                 "exp_no": "011",
                 "recover": true,
                 "config_path": "configfiles/asl100/MViTv2_S/exp011.ini",
@@ -15524,6 +17684,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp054/checkpoints",
+                "seed": 42,
                 "exp_no": "054",
                 "recover": true,
                 "config_path": "configfiles/asl100/S3D/exp054.ini",
@@ -15725,6 +17886,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/S3D/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl2000/S3D/exp000.ini",
@@ -15916,6 +18078,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/R(2+1)D_18/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/R(2+1)D_18/exp000.ini",
@@ -16107,6 +18270,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv2_S/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_S/exp000.ini",
@@ -16298,6 +18462,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/MViTv1_B/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv1_B/exp000.ini",
@@ -16489,6 +18654,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/R(2+1)D_18/exp006/checkpoints",
+                "seed": 42,
                 "exp_no": "006",
                 "recover": false,
                 "config_path": "configfiles/asl100/R(2+1)D_18/exp006.ini",
@@ -16680,6 +18846,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp012/checkpoints",
+                "seed": 42,
                 "exp_no": "012",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S/exp012.ini",
@@ -16865,6 +19032,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/Swin3D_T/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl1000/Swin3D_T/exp000.ini",
@@ -17056,6 +19224,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/Swin3D_S/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl1000/Swin3D_S/exp000.ini",
@@ -17247,6 +19416,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/Swin3D_B/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl1000/Swin3D_B/exp000.ini",
@@ -17438,6 +19608,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/R3D_18/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/R3D_18/exp000.ini",
@@ -17629,6 +19800,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/R(2+1)D_18/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl1000/R(2+1)D_18/exp000.ini",
@@ -17820,6 +19992,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/MViTv2_S/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_S/exp000.ini",
@@ -18011,6 +20184,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/MViTv1_B/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv1_B/exp000.ini",
@@ -18202,6 +20376,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/S3D/exp000/checkpoints",
+                "seed": 42,
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/S3D/exp000.ini",
@@ -18393,6 +20568,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/Swin3D_T/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/Swin3D_T/exp002.ini",
@@ -18584,6 +20760,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/Swin3D_S/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/Swin3D_S/exp002.ini",
@@ -18775,6 +20952,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/Swin3D_B/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/Swin3D_B/exp002.ini",
@@ -18966,6 +21144,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/MViTv2_S/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_S/exp001.ini",
@@ -19157,6 +21336,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/MViTv1_B/exp001/checkpoints",
+                "seed": 42,
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv1_B/exp001.ini",
@@ -19348,6 +21528,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/R(2+1)D_18/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/R(2+1)D_18/exp002.ini",
@@ -19539,6 +21720,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp053/checkpoints",
+                "seed": 42,
                 "exp_no": "053",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_hbs_RedOnPlat/base.ini",
@@ -19740,6 +21922,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/R3D_18/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/R3D_18/exp002.ini",
@@ -19931,6 +22114,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/S3D/exp002/checkpoints",
+                "seed": 42,
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/S3D/exp002.ini",
@@ -20122,6 +22306,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv1_B/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv1_B/exp003.ini",
@@ -20313,6 +22498,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/Swin3D_B/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl100/Swin3D_B/exp003.ini",
@@ -20504,6 +22690,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/Swin3D_S/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl100/Swin3D_S/exp003.ini",
@@ -20695,6 +22882,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/Swin3D_T/exp003/checkpoints",
+                "seed": 42,
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl100/Swin3D_T/exp003.ini",
@@ -20886,6 +23074,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp046/checkpoints",
+                "seed": 42,
                 "exp_no": "046",
                 "recover": false,
                 "config_path": "configfiles/asl100/S3D/exp046.ini",
@@ -21077,6 +23266,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/R(2+1)D_18/exp007/checkpoints",
+                "seed": 42,
                 "exp_no": "007",
                 "recover": false,
                 "config_path": "configfiles/asl100/R(2+1)D_18/exp007.ini",
@@ -21268,6 +23458,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp047/checkpoints",
+                "seed": 42,
                 "exp_no": "047",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/t0_20.ini",
@@ -21475,6 +23666,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp048/checkpoints",
+                "seed": 42,
                 "exp_no": "048",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/t0_30.ini",
@@ -21682,6 +23874,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp049/checkpoints",
+                "seed": 42,
                 "exp_no": "049",
                 "recover": true,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/t0_40.ini",
@@ -21889,6 +24082,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp050/checkpoints",
+                "seed": 42,
                 "exp_no": "050",
                 "recover": false,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/t0_50.ini",
@@ -22096,6 +24290,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp052/checkpoints",
+                "seed": 42,
                 "exp_no": "052",
                 "recover": true,
                 "config_path": "./configfiles/generic2/hframe_hwd_warmrestarts_hbs/tmult2.ini",
@@ -22303,6 +24498,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/R3D_18/exp006/checkpoints",
+                "seed": 42,
                 "exp_no": "006",
                 "recover": false,
                 "config_path": "configfiles/asl100/R3D_18/exp006.ini",
@@ -22494,6 +24690,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp010/checkpoints",
+                "seed": 42,
                 "exp_no": "010",
                 "recover": false,
                 "config_path": "configfiles/asl100/MViTv2_S/exp010.ini",
@@ -22685,6 +24882,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp009/checkpoints",
+                "seed": 42,
                 "exp_no": "009",
                 "recover": false,
                 "config_path": "./configfiles/generic/wups_restarts_eps4_lframe.ini",
@@ -22880,6 +25078,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp008/checkpoints",
+                "seed": 42,
                 "exp_no": "008",
                 "recover": false,
                 "config_path": "./configfiles/generic/mode2_lf_lb.ini",
@@ -23071,6 +25270,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp007/checkpoints",
+                "seed": 42,
                 "exp_no": "007",
                 "recover": false,
                 "config_path": "./configfiles/generic/lframe_hwd_warmrestarts.ini",
@@ -23262,6 +25462,7 @@
                 "dataset": "WLASL",
                 "split": "asl2000",
                 "save_path": "runs/asl2000/S3D/exp048/checkpoints",
+                "seed": 42,
                 "exp_no": "048",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_warmrestarts.ini",
@@ -23469,6 +25670,7 @@
                 "dataset": "WLASL",
                 "split": "asl1000",
                 "save_path": "runs/asl1000/S3D/exp047/checkpoints",
+                "seed": 42,
                 "exp_no": "047",
                 "recover": true,
                 "config_path": "./configfiles/generic/hframe_hwd_warmrestarts.ini",
@@ -23676,6 +25878,7 @@
                 "dataset": "WLASL",
                 "split": "asl300",
                 "save_path": "runs/asl300/S3D/exp046/checkpoints",
+                "seed": 42,
                 "exp_no": "046",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_warmrestarts.ini",
@@ -23883,6 +26086,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp045/checkpoints",
+                "seed": 42,
                 "exp_no": "045",
                 "recover": false,
                 "config_path": "./configfiles/generic/mode2b.ini",
@@ -24090,6 +26294,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp044/checkpoints",
+                "seed": 42,
                 "exp_no": "044",
                 "recover": false,
                 "config_path": "./configfiles/generic/mode2a.ini",
@@ -24297,6 +26502,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp043/checkpoints",
+                "seed": 42,
                 "exp_no": "043",
                 "recover": false,
                 "config_path": "./configfiles/generic/mode2.ini",
@@ -24504,6 +26710,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp042/checkpoints",
+                "seed": 42,
                 "exp_no": "042",
                 "recover": false,
                 "config_path": "./configfiles/generic/mode1.ini",
@@ -24714,6 +26921,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp041/checkpoints",
+                "seed": 42,
                 "exp_no": "041",
                 "recover": false,
                 "config_path": "./configfiles/generic/mode.ini",
@@ -24920,6 +27128,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp040/checkpoints",
+                "seed": 42,
                 "exp_no": "040",
                 "recover": true,
                 "config_path": "./configfiles/generic/hf_hwd_eps_hbs2.ini",
@@ -25126,9 +27335,10 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp039/checkpoints",
+                "seed": 42,
                 "exp_no": "039",
                 "recover": false,
-                "config_path": "/home/luke/Code/SLR/code/configfiles/generic/hframe_hwd_leps4_t200.ini",
+                "config_path": "configfiles/generic/hframe_hwd_leps4_t200.ini",
                 "weight_path": null
             },
             "training": {
@@ -25332,6 +27542,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp038/checkpoints",
+                "seed": 42,
                 "exp_no": "038",
                 "recover": false,
                 "config_path": "./configfiles/generic/wups_restarts_et0_eps2.ini",
@@ -25543,6 +27754,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp037/checkpoints",
+                "seed": 42,
                 "exp_no": "037",
                 "recover": true,
                 "config_path": "./configfiles/generic/wups_restarts_eps4.ini",
@@ -25754,6 +27966,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp036/checkpoints",
+                "seed": 42,
                 "exp_no": "036",
                 "recover": true,
                 "config_path": "./configfiles/generic/wups_restarts_eps2.ini",
@@ -25965,6 +28178,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp035/checkpoints",
+                "seed": 42,
                 "exp_no": "035",
                 "recover": false,
                 "config_path": "./configfiles/generic/wups_restarts_et0.ini",
@@ -26176,6 +28390,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp034/checkpoints",
+                "seed": 42,
                 "exp_no": "034",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_hbs.ini",
@@ -26382,6 +28597,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp033/checkpoints",
+                "seed": 42,
                 "exp_no": "033",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_dp07.ini",
@@ -26588,6 +28804,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp032/checkpoints",
+                "seed": 42,
                 "exp_no": "032",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_dp06.ini",
@@ -26794,6 +29011,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp031/checkpoints",
+                "seed": 42,
                 "exp_no": "031",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_dp04.ini",
@@ -27000,6 +29218,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp030/checkpoints",
+                "seed": 42,
                 "exp_no": "030",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_dp03.ini",
@@ -27206,6 +29425,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp029/checkpoints",
+                "seed": 42,
                 "exp_no": "029",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_dp02.ini",
@@ -27412,6 +29632,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp028/checkpoints",
+                "seed": 42,
                 "exp_no": "028",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_wups_restarts.ini",
@@ -27623,6 +29844,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp027/checkpoints",
+                "seed": 42,
                 "exp_no": "027",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_warmrestarts2.ini",
@@ -27830,6 +30052,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp026/checkpoints",
+                "seed": 42,
                 "exp_no": "026",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps7.ini",
@@ -28036,6 +30259,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp025/checkpoints",
+                "seed": 42,
                 "exp_no": "025",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps6.ini",
@@ -28242,6 +30466,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp006/checkpoints",
+                "seed": 42,
                 "exp_no": "006",
                 "recover": false,
                 "config_path": "./configfiles/generic/leps_wd_lb.ini",
@@ -28432,6 +30657,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp024/checkpoints",
+                "seed": 42,
                 "exp_no": "024",
                 "recover": false,
                 "config_path": "./configfiles/generic/hf_hwd_eps_dp01_.ini",
@@ -28638,6 +30864,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp023/checkpoints",
+                "seed": 42,
                 "exp_no": "023",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_warmrestarts.ini",
@@ -28845,6 +31072,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp022/checkpoints",
+                "seed": 42,
                 "exp_no": "022",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_warmups.ini",
@@ -29051,6 +31279,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/MViTv2_S/exp005/checkpoints",
+                "seed": 42,
                 "exp_no": "005",
                 "recover": false,
                 "config_path": "./configfiles/generic/lframe_lbs_hwd_epsm5.ini",
@@ -29241,6 +31470,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp021/checkpoints",
+                "seed": 42,
                 "exp_no": "021",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps5.ini",
@@ -29447,6 +31677,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp020/checkpoints",
+                "seed": 42,
                 "exp_no": "020",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps4.ini",
@@ -29653,6 +31884,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp019/checkpoints",
+                "seed": 42,
                 "exp_no": "019",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps3.ini",
@@ -29859,6 +32091,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp018/checkpoints",
+                "seed": 42,
                 "exp_no": "018",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps2.ini",
@@ -30065,6 +32298,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp017/checkpoints",
+                "seed": 42,
                 "exp_no": "017",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd_leps.ini",
@@ -30271,6 +32505,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp016/checkpoints",
+                "seed": 42,
                 "exp_no": "016",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_mwd.ini",
@@ -30477,6 +32712,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp015/checkpoints",
+                "seed": 42,
                 "exp_no": "015",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd1_nosched.ini",
@@ -30678,6 +32914,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp014/checkpoints",
+                "seed": 42,
                 "exp_no": "014",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd1.ini",
@@ -30884,6 +33121,7 @@
                 "dataset": "WLASL",
                 "split": "asl100",
                 "save_path": "runs/asl100/S3D/exp013/checkpoints",
+                "seed": 42,
                 "exp_no": "013",
                 "recover": false,
                 "config_path": "./configfiles/generic/hframe_hwd.ini",

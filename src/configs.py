@@ -3,7 +3,7 @@ import argparse
 import ast
 from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import json
 
@@ -29,8 +29,30 @@ from run_types import (
     CONFIG_FILETYPE,
     SEED,
     strict_validate,
+    SRC_ROOT
 )
 
+
+def correct_paths(admin: dict) -> dict:
+    PATH_KEYS = {"save_path", "config_path", "weight_path"}
+    
+    corrected = dict(admin)
+    for key in PATH_KEYS:
+        if key not in admin or admin[key] is None:
+            continue
+        
+        path_str = admin[key].replace("/code/", "/src/")
+        path = Path(path_str)
+        
+        if path.is_absolute():
+            try:
+                path_str = str(path.relative_to(SRC_ROOT))
+            except ValueError:
+                pass  # absolute but not under SRC_ROOT, leave it
+        
+        corrected[key] = path_str
+    
+    return corrected
 
 def ask_nicely(
     message: str, requirment: Optional[Callable] = None, error: Optional[str] = None
@@ -61,7 +83,7 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def get_avail_splits(pre_proc_dir: str = LABELS_PATH) -> List[str]:
+def get_avail_splits(pre_proc_dir: Union[str, Path] = LABELS_PATH) -> List[str]:
     """Get the available splits from preprocessed labels directory."""
     ppd = Path(pre_proc_dir)
     if not ppd.exists() or not ppd.is_dir():
