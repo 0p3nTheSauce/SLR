@@ -13,9 +13,9 @@ import statistics
 import numpy as np
 
 # locals
-from models import NormDict
-from preprocess import Instance
-from run_types import (
+from src.models import NormDict
+from src.preprocess import Instance
+from src.run_types import (
 	SpatialAugs,
 	TemporalAugs,
 	BaseSampler,

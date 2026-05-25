@@ -15,7 +15,7 @@ from typing import Optional
 from multiprocessing.synchronize import Event as EventClass
 import math
 #locals
-from run_types import CONFIGS_PATH
+from src.run_types import CONFIGS_PATH
 
 ################ GPU ###################
 

@@ -12,8 +12,8 @@ import json
 import logging
 
 # locals
-from que.core import Que, ExpQue, GenExp
-from run_types import GenInfo, RunRes, CompExpInfo, CleverDict
+from src.que.core import Que, ExpQue, GenExp
+from src.run_types import GenInfo, RunRes, CompExpInfo, CleverDict
 # from results.saicair.saicair import additional_modifications
 
 

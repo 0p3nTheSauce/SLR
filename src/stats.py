@@ -36,8 +36,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 # locals
-from preprocess import RawInstance, WLASLClass, Instance
-from run_types import AVAIL_SETS, AVAIL_SPLITS
+from src.preprocess import RawInstance, WLASLClass, Instance
+from src.run_types import AVAIL_SETS, AVAIL_SPLITS
 
 INSTANCE_KEYS: TypeAlias = Literal['bbox', 'frame_end', 'frame_start', 'instance_id', 'signer_id', 'source', 'split', 'url', 'variation_id', 'video_id', 'label_num', 'label_name']
 FRAME_WIDTH: int = 256

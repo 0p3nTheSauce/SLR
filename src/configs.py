@@ -13,7 +13,7 @@ except ImportError:
     import tomli as tomllib
 # locals
 # from models import avail_models, norm_vals
-from run_types import (
+from src.run_types import (
     WandbInfo,
     RunInfo,
     AdminInfo,

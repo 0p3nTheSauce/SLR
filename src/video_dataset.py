@@ -1,5 +1,4 @@
 from torch.utils.data import Dataset
-
 # import os
 import json
 import torch
@@ -20,14 +19,14 @@ from typing import (
 from typing_extensions import TypedDict, Unpack
 
 # local imports
-from utils import load_rgb_frames_from_video
-from video_transforms import (
+from src.utils import load_rgb_frames_from_video
+from src.video_transforms import (
     # correct_num_frames,
     get_transform,
 )
-from run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS, WLASL_ROOT, RAW_DIR, NUM_INSTANCES_SUFFIX, LABEL_SUFFIX, WORST_INSTANCES_SUFFIX
-from configs import  LABELS_PATH, get_avail_splits
-from preprocess import Instance
+from src.run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS, WLASL_ROOT, RAW_DIR, NUM_INSTANCES_SUFFIX, LABEL_SUFFIX, WORST_INSTANCES_SUFFIX
+from src.configs import  LABELS_PATH, get_avail_splits
+from src.preprocess import Instance
 
 ############################# Dictionaries and Types #############################
 

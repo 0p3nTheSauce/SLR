@@ -10,12 +10,12 @@ import wandb
 from wandb.sdk.wandb_run import Run
 from multiprocessing.synchronize import Event as EventClass
 from os import PathLike
-
-# local imports
 import numpy as np
 import random
-from video_dataset import VideoDataset, get_wlasl_info, get_data_set
-from configs import (
+
+# local imports
+from src.video_dataset import VideoDataset, get_wlasl_info, get_data_set
+from src.configs import (
     load_config,
     print_config,
     get_train_parser,
@@ -24,11 +24,11 @@ from configs import (
     RunInfo,
     WandbInfo,
 )
-from run_types import SchedInfo, OptimizerInfo, MVirTedMaeInfo, SupervisedInfo
-from stopping import EarlyStopper, StopperOn
-from models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
-from utils import wandb_manager
-from testing import save_test_sizes
+from src.run_types import SchedInfo, OptimizerInfo, MVirTedMaeInfo, SupervisedInfo
+from src.stopping import EarlyStopper, StopperOn
+from src.models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
+from src.utils import wandb_manager
+from src.testing import save_test_sizes
 
 
 StrPath = str | PathLike[str]

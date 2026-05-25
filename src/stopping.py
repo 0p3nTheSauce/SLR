@@ -1,7 +1,9 @@
 from typing import List, Tuple, Union, Optional
 from wandb.sdk.wandb_run import Run
-from run_types import StopperOn, StopperState
 from multiprocessing.synchronize import Event as EventClass
+#local
+from src.run_types import StopperOn, StopperState
+
 
     
 class EarlyStopper:

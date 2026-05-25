@@ -18,25 +18,32 @@ import gc
 import re
 
 # locals
-from visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
-from models import get_model
-from configs import set_seed
-
-from video_dataset import VideoDataset, get_data_set, get_wlasl_info, AVAIL_SETS, AVAIL_SPLITS
-from models import avail_models
-from run_types import BaseSampler, DataInfo, ShuffleT, TemporalAugs
-from configs import (
+from src.visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
+from src.models import get_model, avail_models
+from src.video_dataset import (
+    VideoDataset,
+    get_data_set,
+    get_wlasl_info,
+    AVAIL_SETS,
+    AVAIL_SPLITS,
+)
+from src.configs import (
+    set_seed,
     get_avail_splits,
     get_model_results_dir,
     get_model_exp_dir,
     get_model_checkpoint_dir,
 )
-from run_types import (
+from src.run_types import (
     CompRes,
     MinInfo,
     BaseRes,
     ShuffRes,
     TopKRes,
+    BaseSampler,
+    DataInfo,
+    ShuffleT,
+    TemporalAugs,
 )
 
 # constants
@@ -320,9 +327,11 @@ def load_info(dirp: Path, checkname: str):
             resd[fn.name.replace(".json", "")] = json.load(f)
     return resd
 
+
 def get_last_sampler(conf_list: List[TemporalAugs]):
     samplers = [(i, c) for i, c in enumerate(conf_list) if isinstance(c, BaseSampler)]
     return samplers[-1]
+
 
 def setup_data(
     set_name: AVAIL_SETS,
@@ -333,25 +342,27 @@ def setup_data(
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     test_info = get_wlasl_info(split, set_name=set_name)
 
-    #make copy to hand off to get_data_set to avoid shuffle injection in final config
+    # make copy to hand off to get_data_set to avoid shuffle injection in final config
     data_info_cp = data_info.model_copy(deep=True)
 
-
-    aug_info = data_info_cp.train_augs if set_name == "train" else data_info_cp.test_augs
+    aug_info = (
+        data_info_cp.train_augs if set_name == "train" else data_info_cp.test_augs
+    )
     if aug_info is None:
         raise ValueError(
             "Augmentation info must be provided in data_info for both train and test sets."
         )
 
     if shuffle:
-        
         try:
             i, s = get_last_sampler(aug_info.temporal_aug)
             video_length = s.target_length
         except IndexError:
-            raise ValueError('At least one frame sampler has to be present to extract video length')
-        
-        aug_info.temporal_aug.insert(i+1, ShuffleT(num_frames=video_length))
+            raise ValueError(
+                "At least one frame sampler has to be present to extract video length"
+            )
+
+        aug_info.temporal_aug.insert(i + 1, ShuffleT(num_frames=video_length))
 
     test_dataset, perm, shanon_entropy = get_data_set(
         set_info=test_info, data_info=data_info_cp
@@ -550,14 +561,13 @@ def load_comp_res(save_path: Path) -> CompRes:
         data = json.load(f)
     return CompRes.model_validate(data)
 
+
 def get_res_path(save_path: Path) -> Path:
     out_dir = checkpoint_dir_to_result_dir(save_path)
-    res_path = (
-        out_dir / "best_val_loss.json"
-    )  # TODO: add other types of saves?
+    res_path = out_dir / "best_val_loss.json"  # TODO: add other types of saves?
     return res_path
-    
-    
+
+
 # TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
 def full_test(
     admin: MinInfo,
@@ -588,7 +598,6 @@ def full_test(
 
     # output
     res_path = get_res_path(save_path)
-
 
     # dont retest if exists
     if res_path.exists() and not re_test:
@@ -856,7 +865,7 @@ def main():
         # )
         raise Warning("This feature is currently not fixed")
     else:
-        # Try to load from data_info.json 
+        # Try to load from data_info.json
         try:
             data = load_test_sizes(output)
             print(f"Loaded data info from {data_info_path}")

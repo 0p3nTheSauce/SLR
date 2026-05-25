@@ -33,7 +33,7 @@ from datetime import datetime
 from contextlib import contextmanager
 
 # locals
-from run_types import (
+from src.run_types import (
     ExpInfo,
     CompExpInfo,
     AdminInfo,
