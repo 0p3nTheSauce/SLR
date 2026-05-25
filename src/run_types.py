@@ -25,24 +25,27 @@ from pydantic import (
 from pydantic_core import PydanticUndefined
 from pathlib import Path
 # constants
-
+#wandb
 ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT_BASE = "WLASL"
+
+#Files
 LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
 NUM_INSTANCES_SUFFIX = "num_instances.json"
 WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
-# LABEL_INSTANCES_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+ZFILL = 3
+CONFIG_FILETYPE = ".toml"
+#Directories
 SLR_ROOT = Path.home() / "Code/SLR"
 SRC_ROOT = SLR_ROOT / "src"
 CLASSES_PATH = SRC_ROOT / "info/wlasl_class_list.json"
+RUNS_PATH = SRC_ROOT / "runs"
+CONFIGS_PATH = SRC_ROOT / "configfiles"
 WLASL_ROOT = SLR_ROOT / "data/WLASL"
 LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
-RAW_DIR = "WLASL2000"
-SPLIT_DIR = "splits"
-RUNS_PATH = "runs"
-CONFIGS_PATH = "configfiles"
-ZFILL = 3
-CONFIG_FILETYPE = ".toml"
+RAW_DIR = WLASL_ROOT / "WLASL2000"
+SPLIT_DIR = WLASL_ROOT / "splits"
+# Misc
 SEED = 42
 
 
@@ -56,9 +59,9 @@ class NormDict(BaseModel):
 
 ####################### Data loading and augmentation #############################
 
-AVAIL_SETS = Literal["train", "val", "test"]
-ORIGINAL_SPLITS = Literal["asl100", "asl300", "asl1000", "asl2000"]
-AVAIL_SPLITS = Union[Literal["asl100_bottom", "asl100_worst"], ORIGINAL_SPLITS]
+AVAIL_SETS : TypeAlias = Literal["train", "val", "test"]
+ORIGINAL_SPLITS : TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
+AVAIL_SPLITS : TypeAlias = Union[Literal["asl100_bottom", "asl100_worst"], ORIGINAL_SPLITS]
 
 ### Samplers
 
@@ -532,7 +535,7 @@ class RunInfo(BaseModel):
     @model_validator(mode="after")
     def _resolve_norms(self) -> "RunInfo":
         """Substitute norm_dict based on model name when norm=True."""
-        from models import norm_vals
+        from src.models import norm_vals
 
         for aug_info in (self.data.train_augs, self.data.test_augs):
             if aug_info is not None and aug_info.normalise:

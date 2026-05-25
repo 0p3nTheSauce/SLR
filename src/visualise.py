@@ -44,7 +44,7 @@ class printv:
 
 def get_all_sets(
     split_name: AVAIL_SPLITS,
-    set_options: List[AVAIL_SETS] = ["train", "test", "val"],
+    set_options: List[AVAIL_SETS] = ["train", "test", "val"], #type: ignore
     classes: List[str] = get_class_list(),
     verbosity: int = VERBOSITY,
 ) -> dict:

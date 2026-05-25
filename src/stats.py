@@ -413,7 +413,15 @@ def latex_instance_stats_table(
 # =============================================================================
 
 
-# 1/2 cluade, 1/2 me
+PALETTE = {
+    'train': '#4C72B0',
+    'val':   '#55A868',
+    'test':  '#DD8452',
+    'default_cmap': 'viridis',
+    'categorical_cmap': 'tab20',
+}
+
+
 def plot_distribution(
 	histogram: HistoGram,
 	set_name: AVAIL_SETS,
@@ -425,53 +433,54 @@ def plot_distribution(
 	hist_or_bar: Literal['hist', 'bar'] = 'hist',
 	bins: Optional[int] = None,
 	figsize: Tuple[int, int] = (12, 4),
-	show_nums_on_bars:bool=True,
+	show_nums_on_bars: bool = True,
 	no_statsy_lines: bool = False,
 	out_path: str = '',
 ) -> None:
 
-	# sorted_items = sorted(
-	# 	histogram.items(), key=lambda x: str(x[0]) if categorical else x[0]
-	# )
-	sorted_items = sorted(histogram.items(), key=lambda x: x[0]) #sort by keys
-	values, counts = zip(*sorted_items)  # seperate tuples
+	sorted_items = sorted(histogram.items(), key=lambda x: x[0])
+	values, counts = zip(*sorted_items)
 	expanded_values = [
 		value for value, count in sorted_items for _ in range(count)
-	]  # un-do binning
+	]
 
 	plt.figure(figsize=figsize)
 
 	if categorical:
-		
+		cmap = plt.get_cmap(PALETTE['categorical_cmap'])
 		x_pos = range(len(values))
-		plt.bar(
-			x_pos, counts, width=0.8
-		)  # gapless for quantitative, gaps for categorical
+		bar_colors = [cmap(i / max(len(values) - 1, 1)) for i in range(len(values))]
+		plt.bar(x_pos, counts, width=0.8, color=bar_colors)
 		if show_nums_on_bars:
 			for x, y in zip(x_pos, counts):
 				plt.text(x, y, str(y), ha='center', va='bottom')
 		plt.xticks(x_pos, values, rotation=45, ha="right")
+
 	elif hist_or_bar == 'hist':
-		# plt.hist(expanded_values, bins = bins)
-		n, bins_out, patches = plt.hist(expanded_values, bins=bins)
+		cmap = plt.get_cmap(PALETTE['default_cmap'])
+		n, bins_out, patches_list = plt.hist(expanded_values, bins=bins)
+		norm = plt.Normalize(n.min(), n.max())
+		for patch, count in zip(patches_list, n):
+			patch.set_facecolor(cmap(norm(count)))
 		if show_nums_on_bars:
-			for patch, count in zip(patches, n): #type: ignore 	
+			for patch, count in zip(patches_list, n):
 				x = patch.get_x() + patch.get_width() / 2
-				if count == 0:
-					plt.text(x, count, '', ha='center', va='bottom')
-				else:
+				if count > 0:
 					plt.text(x, count, str(int(count)), ha='center', va='bottom')
+
 	else:
-		plt.bar(values, counts, width=2)
+		cmap = plt.get_cmap(PALETTE['default_cmap'])
+		norm = plt.Normalize(min(counts), max(counts))
+		bar_colors = [cmap(norm(c)) for c in counts]
+		plt.bar(values, counts, width=2, color=bar_colors)
 		if show_nums_on_bars:
 			for x, y in zip(values, counts):
 				plt.text(x, y, str(y), ha='center', va='bottom')
 
 		if not no_statsy_lines:
-
 			statsy_listy = [
-				("mean", lambda x: np.mean(x), "red"),
-				("median", lambda x: np.median(x), "blue"),
+				("mean",           lambda x: np.mean(x),           "red"),
+				("median",         lambda x: np.median(x),         "blue"),
 				("lower quartile", lambda x: np.percentile(x, 25), "brown"),
 				("upper quartile", lambda x: np.percentile(x, 75), "brown"),
 			]
@@ -485,23 +494,125 @@ def plot_distribution(
 				)
 
 	plt.legend()
-
-	xlabel = f"{metric}{' (' + unit + ')' if unit else ''}"
-	plt.xlabel(xlabel)
+	plt.xlabel(f"{metric}{' (' + unit + ')' if unit else ''}")
 	plt.ylabel("Count")
-
 	title = f'{metric.capitalize()} Distribution: {split_name} / {set_name}'
 	if gloss:
 		title += f' / "{gloss}"'
-
-	plt.title(
-		title
-	)
+	plt.title(title)
 	plt.tight_layout()
- 
 	if out_path:
 		plt.savefig(out_path)
- 
+	plt.show()
+
+
+def plot_dimension_distributions(
+		instances: List[Instance],
+		figsize: Tuple[int, int] = (12, 4),
+) -> None:
+	"""Histograms of bbox width and height across all instances."""
+	widths  = [inst.bbox[2] - inst.bbox[0] for inst in instances]
+	heights = [inst.bbox[3] - inst.bbox[1] for inst in instances]
+
+	cmap = plt.get_cmap('coolwarm')
+	fig, axes = plt.subplots(1, 2, figsize=figsize)
+	for ax, data, label, colour in zip(
+		axes,
+		[widths, heights],
+		["Width (px)", "Height (px)"],
+		[cmap(0.2), cmap(0.8)],
+	):
+		ax.hist(data, bins=30, color=colour, edgecolor="white")
+		statsy_listy = [
+			("mean",           lambda x: np.mean(x),           "red"),
+			("median",         lambda x: np.median(x),         "blue"),
+			("lower quartile", lambda x: np.percentile(x, 25), "brown"),
+			("upper quartile", lambda x: np.percentile(x, 75), "brown"),
+		]
+		for metric_name, stat_func, line_colour in statsy_listy:
+			metric_val = stat_func(data)
+			ax.axvline(
+				metric_val,
+				color=line_colour,
+				linestyle="--",
+				label=f"{metric_name}: {metric_val:.1f} (px)",
+			)
+		ax.set_xlabel(label)
+		ax.set_ylabel("Count")
+		ax.legend()
+
+	plt.suptitle("BBox Dimension Distributions")
+	plt.tight_layout()
+	plt.show()
+
+
+def barplot_metric(
+	per_class: Dict[str, instance_stats],
+	metric: str,
+	top_n: Optional[int] = None,
+	title: Optional[str] = None,
+	figsize: tuple = (12, 6),
+) -> None:
+	if metric not in {"num_instances", "num_signers", "num_variations"}:
+		raise ValueError(f"Invalid metric: {metric}")
+
+	items = [(g, stats[metric]) for g, stats in per_class.items()]
+	items.sort(key=lambda x: x[1], reverse=True)
+	if top_n:
+		items = items[:top_n]
+
+	glosses, values = zip(*items)
+	cmap = plt.get_cmap(PALETTE['default_cmap'])
+	colors = [cmap(i / max(len(values) - 1, 1)) for i in range(len(values))]
+
+	plt.figure(figsize=figsize)
+	plt.bar(glosses, values, color=colors)
+	plt.xticks(rotation=90)
+	plt.ylabel(metric.replace("_", " ").title())
+	if title:
+		plt.title(title)
+	plt.tight_layout()
+	plt.show()
+
+
+def histogram_metric(
+	per_class: Dict[str, instance_stats],
+	metric: str,
+	bins: int = 20,
+	title: Optional[str] = None,
+	figsize: tuple = (8, 5),
+) -> None:
+	if metric not in {"num_instances", "num_signers", "num_variations"}:
+		raise ValueError(f"Invalid metric: {metric}")
+
+	values = [stats[metric] for stats in per_class.values()]
+
+	plt.figure(figsize=figsize)
+	plt.hist(values, bins=bins, color=PALETTE['default_cmap'], edgecolor='white')
+	plt.xlabel(metric.replace("_", " ").title())
+	plt.ylabel("Frequency")
+	if title:
+		plt.title(title)
+	plt.tight_layout()
+	plt.show()
+
+
+def scatter_instances_vs_signers(
+	per_class: Dict[str, instance_stats],
+	figsize: tuple = (6, 5),
+	title: Optional[str] = None,
+) -> None:
+	x = [c["num_instances"] for c in per_class.values()]
+	y = [len(c["signers_distribution"]) for c in per_class.values()]
+
+	plt.figure(figsize=figsize)
+	scatter = plt.scatter(x, y, alpha=0.7, c=x, cmap=PALETTE['default_cmap'])
+	plt.colorbar(scatter, label='Num Instances')
+	plt.xlabel("Number of Instances")
+	plt.ylabel("Number of Signers")
+	if title:
+		plt.title(title)
+	plt.tight_layout()
 	plt.show()
 
 
@@ -577,160 +688,6 @@ def plot_bboxes_on_canvas(
  
 	if out_path:
 		plt.savefig(out_path)
-	plt.show()
-
-
-#claude/me
-def plot_dimension_distributions(
-		instances: List[Instance],
-		figsize: Tuple[int, int] = (12, 4),
-		) -> None:
-	"""Histograms of bbox width and height across all instances."""
-	widths  = [inst.bbox[2] - inst.bbox[0] for inst in instances]
-	heights = [inst.bbox[3] - inst.bbox[1] for inst in instances]
-
-	fig, axes = plt.subplots(1, 2, figsize=figsize)
-	for ax, data, label in zip(axes, [widths, heights], ["Width (px)", "Height (px)"]):
-		ax.hist(data, bins=30, color="steelblue", edgecolor="white")
-		statsy_listy = [
-			("mean", lambda x: np.mean(x), "red"),
-			("median", lambda x: np.median(x), "blue"),
-			("lower quartile", lambda x: np.percentile(x, 25), "brown"),
-			("upper quartile", lambda x: np.percentile(x, 75), "brown"),
-		]
-		for metric_name, stat_func, colour in statsy_listy:
-			metric_val = stat_func(data)
-			ax.axvline(
-				metric_val,
-				color=colour,
-				linestyle="--",
-				label=f"{metric_name}: {metric_val:.1f} (px)",
-			)
-		ax.set_xlabel(label)
-		ax.set_ylabel("Count")
-		ax.legend()
-
-	plt.suptitle("BBox Dimension Distributions")
-	plt.tight_layout()
-	plt.show()
-
-
-
-
-
-# copilot
-def barplot_metric(
-	per_class: Dict[str, instance_stats],
-	metric: str,
-	top_n: Optional[int] = None,
-	title: Optional[str] = None,
-	figsize: tuple = (12, 6),
-) -> None:
-	"""
-	Create a bar plot for a chosen metric across glosses.
-
-	Parameters
-	----------
-	per_class : dict
-			Mapping gloss → instance_stats.
-	metric : str
-			One of {"num_instances", "num_signers", "num_variations"}.
-	top_n : int, optional
-			If provided, only plot the top-N glosses for the chosen metric.
-	title : str, optional
-			Plot title.
-	figsize : tuple
-			Matplotlib figure size.
-	"""
-	if metric not in {"num_instances", "num_signers", "num_variations"}:
-		raise ValueError(f"Invalid metric: {metric}")
-
-	# Extract metric values per gloss
-	items = [(g, stats[metric]) for g, stats in per_class.items()]
-	items.sort(key=lambda x: x[1], reverse=True)
-
-	if top_n:
-		items = items[:top_n]
-
-	glosses, values = zip(*items)
-
-	plt.figure(figsize=figsize)
-	plt.bar(glosses, values)
-	plt.xticks(rotation=90)
-	plt.ylabel(metric.replace("_", " ").title())
-	if title:
-		plt.title(title)
-	plt.tight_layout()
-	plt.show()
-
-
-# copilot
-def histogram_metric(
-	per_class: Dict[str, instance_stats],
-	metric: str,
-	bins: int = 20,
-	title: Optional[str] = None,
-	figsize: tuple = (8, 5),
-) -> None:
-	"""
-	Plot a histogram of a chosen metric across glosses.
-
-	Parameters
-	----------
-	per_class : dict
-			Mapping gloss → instance_stats.
-	metric : str
-			One of {"num_instances", "num_signers", "num_variations"}.
-	bins : int
-			Number of histogram bins.
-	title : str, optional
-			Plot title.
-	figsize : tuple
-			Matplotlib figure size.
-	"""
-	if metric not in {"num_instances", "num_signers", "num_variations"}:
-		raise ValueError(f"Invalid metric: {metric}")
-
-	values = [stats[metric] for stats in per_class.values()]
-
-	plt.figure(figsize=figsize)
-	plt.hist(values, bins=bins)
-	plt.xlabel(metric.replace("_", " ").title())
-	plt.ylabel("Frequency")
-	if title:
-		plt.title(title)
-	plt.tight_layout()
-	plt.show()
-
-
-# copilot
-def scatter_instances_vs_signers(
-	per_class: Dict[str, instance_stats],
-	figsize: tuple = (6, 5),
-	title: Optional[str] = None,
-) -> None:
-	"""
-	Scatter plot of num_instances vs num_signers for each gloss.
-
-	Parameters
-	----------
-	per_class : dict
-			Mapping gloss → instance_stats.
-	figsize : tuple
-			Figure size.
-	title : str, optional
-			Plot title.
-	"""
-	x = [c["num_instances"] for c in per_class.values()]
-	y = [len(c["signers_distribution"]) for c in per_class.values()]
-
-	plt.figure(figsize=figsize)
-	plt.scatter(x, y, alpha=0.7)
-	plt.xlabel("Number of Instances")
-	plt.ylabel("Number of Signers")
-	if title:
-		plt.title(title)
-	plt.tight_layout()
 	plt.show()
 
 

@@ -245,7 +245,7 @@ def load_config(admin: AdminInfo) -> RunInfo:
 ###################### Path utilities ###############################
 
 
-def get_next_expno(split: str, model: str, runs_path: str = RUNS_PATH) -> int:
+def get_next_expno(split: str, model: str, runs_path: Union[str, Path] = RUNS_PATH) -> int:
     model_dir = Path(runs_path) / split / model
     if not (model_dir.exists() and model_dir.is_dir()):
         return 0
@@ -257,7 +257,7 @@ def get_model_exp_dir(
     split: str,
     model: str,
     exp_no: int = 0,
-    runs_path: str = RUNS_PATH,
+    runs_path: Union[str, Path] = RUNS_PATH,
     zd: int = ZFILL,
 ) -> Path:
     return Path(f"{runs_path}/{split}/{model}/exp{str(exp_no).zfill(zd)}")
@@ -285,7 +285,7 @@ def get_config_path(
     split: str,
     model: str,
     exp_no: int = 0,
-    configs_dir: str = CONFIGS_PATH,
+    configs_dir: Union[str, Path] = CONFIGS_PATH,
     zd: int = ZFILL,
     file_type: str = CONFIG_FILETYPE,
 ) -> Path:
