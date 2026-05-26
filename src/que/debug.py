@@ -15,7 +15,7 @@ import time
 from .shell import QueShell
 
 # from que.shell import QueShell
-from .core import (
+from src.que.core import (
 	Que,
 	connect_manager,
 	_get_basic_logger,
@@ -25,8 +25,8 @@ from .core import (
 	FAIL_RUNS,
 	QueLocation,
 )
-from .tmux import tmux_manager
-from run_types import (
+from src.que.tmux import tmux_manager
+from src.run_types import (
 	CentreCropConfig,
 	RandomCropConfig,
 	ScaleAndPadConfig,

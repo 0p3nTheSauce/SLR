@@ -437,6 +437,7 @@ def plot_distribution(
 	show_nums_on_bars: bool = True,
 	no_statsy_lines: bool = False,
 	out_path: str = '',
+	x_label_step: Optional[int] = 1,  # None = no labels, N = show every Nth label
 ) -> None:
 
 	sorted_items = sorted(histogram.items(), key=lambda x: x[0])
@@ -455,7 +456,12 @@ def plot_distribution(
 		if show_nums_on_bars:
 			for x, y in zip(x_pos, counts):
 				plt.text(x, y, str(y), ha='center', va='bottom')
-		plt.xticks(x_pos, values, rotation=45, ha="right")
+		if x_label_step is None:
+			plt.xticks([])
+		else:
+			visible_pos   = [x for x in x_pos if x % x_label_step == 0]
+			visible_labels = [values[x] for x in visible_pos]
+			plt.xticks(visible_pos, visible_labels, rotation=45, ha="right")
 
 	elif hist_or_bar == 'hist':
 		cmap = plt.get_cmap(PALETTE['default_cmap'])
@@ -474,6 +480,11 @@ def plot_distribution(
 		norm = plt.Normalize(min(counts), max(counts))
 		bar_colors = [cmap(norm(c)) for c in counts]
 		plt.bar(values, counts, width=2, color=bar_colors)
+		if x_label_step is None:
+			plt.xticks([])
+		elif x_label_step > 1:
+			visible = [v for i, v in enumerate(values) if i % x_label_step == 0]
+			plt.xticks(visible, rotation=45, ha="right")
 		if show_nums_on_bars:
 			for x, y in zip(values, counts):
 				plt.text(x, y, str(y), ha='center', va='bottom')

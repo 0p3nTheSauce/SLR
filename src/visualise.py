@@ -6,7 +6,8 @@ import seaborn as sns
 import numpy as np
 from typing import Dict, Optional, Callable, List, Union, Any
 from pathlib import Path
-
+import logging
+from logging import Logger
 # locals
 from src.run_types import CentreCropConfig, OG_Sampler
 from src.configs import get_class_list, CLASSES_PATH
@@ -33,23 +34,16 @@ sns.set_palette("husl")
 VERBOSITY = 0
 
 
-class printv:
-    def __init__(self, verbosity: int = VERBOSITY) -> None:
-        self.verbosity = verbosity
-
-    def __call__(self, *args, level=1, **kwargs):
-        if level <= self.verbosity:
-            print(*args, **kwargs)
+visualise_logger = logging.getLogger(__name__)
 
 
 def get_all_sets(
     split_name: AVAIL_SPLITS,
     set_options: List[AVAIL_SETS] = ["train", "test", "val"], #type: ignore
     classes: List[str] = get_class_list(),
-    verbosity: int = VERBOSITY,
+    logger: Logger = visualise_logger
 ) -> dict:
     all_sets = {}
-    pv = printv(verbosity)
     for set_name in set_options:
         set_path_info = get_wlasl_info(split_name, set_name)
         set_path = get_labels_path(
@@ -58,7 +52,7 @@ def get_all_sets(
         all_sets[set_name] = reverse_preproc_format(
             load_data_from_json(set_path, policy="strict"), classes
         )
-        pv(f"Num classes of {set_name}: {len(all_sets[set_name])}", level=2)
+        logger.debug(f"Num classes of {set_name}: {len(all_sets[set_name])}")
 
     return all_sets
 
@@ -73,9 +67,9 @@ class FrameVisualiser:
         classes: List[str] = get_class_list(),
         target_length: int = 16,
         frame_size: int = 224,
-        verbosity: int = VERBOSITY,
+        logger: Logger = visualise_logger
     ):
-        self.printv = printv(verbosity)
+        self.logger = logger
         self.cls_idx = cls_idx
         self.all_sets = all_sets
         self.set_name = set_name
@@ -105,14 +99,14 @@ class FrameVisualiser:
 
         if restart:
             self.idx = 0
-        self.printv(f"From: {self.split_name}S/{self.set_name}")
-        self.printv(f'Example videos for class: "{self.classes[self.cls_idx]}"')
-        self.printv(f"Instance: {self.idx + 1}/{self.tot_samples}")
+        self.logger.info(f"From: {self.split_name}S/{self.set_name}")
+        self.logger.info(f'Example videos for class: "{self.classes[self.cls_idx]}"')
+        self.logger.info(f"Instance: {self.idx + 1}/{self.tot_samples}")
         if self.idx < self.tot_samples:
             next_example = Instance.model_validate(next(self.exampler_iterator))
             ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
 
-            self.printv(f"Next example video path: {ex_path}")
+            self.logger.info(f"Next example video path: {ex_path}")
 
             plt_display_grid(
                 self.basic_transform(
