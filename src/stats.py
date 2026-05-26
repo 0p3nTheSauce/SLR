@@ -418,7 +418,8 @@ PALETTE = {
     'val':   '#55A868',
     'test':  '#DD8452',
     'default_cmap': 'viridis',
-    'categorical_cmap': 'tab20',
+    'categorical_short': 'Dark2',
+    'categorical_cmap': 'tab20'
 }
 
 
