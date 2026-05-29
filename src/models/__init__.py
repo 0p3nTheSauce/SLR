@@ -8,16 +8,16 @@ from pydantic import BaseModel
 
 from src.run_types import NormDict
 #pytorch lib models
-from .pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
-from .pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
-from .pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
-from .pytorch_s3d import S3D_basic
+from src.models.pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
+from src.models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
+from src.models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
+from src.models.pytorch_s3d import S3D_basic
 # slowfast mvit
-from .og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
+from src.models.og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
 #custem seperable mvit
-from .sep_mvit_bert import MVirTed_t_basic, MVirTed
-from .mvirted_mae import SepMViTBERTMAE
-from .detectron_mvit import MViT_2D_t
+from src.models.sep_mvit_bert import MVirTed_t_basic, MVirTed
+from src.models.mvirted_mae import SepMViTBERTMAE
+from src.models.detectron_mvit import MViT_2D_t
 
 
 S3D = "S3D"

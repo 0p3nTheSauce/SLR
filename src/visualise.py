@@ -8,6 +8,8 @@ from typing import Dict, Optional, Callable, List, Union, Any
 from pathlib import Path
 import logging
 from logging import Logger
+from torch.utils.data import DataLoader, Dataset
+from typing_extensions import TypedDict, Unpack
 # locals
 from src.run_types import CentreCropConfig, OG_Sampler
 from src.configs import get_class_list, CLASSES_PATH
@@ -17,6 +19,7 @@ from src.video_dataset import (
     load_data_from_json,
     get_video_path,
     get_transform,
+    
 )
 from src.utils import plt_display_grid, load_rgb_frames_from_video
 from src.preprocess import Instance
@@ -57,7 +60,20 @@ def get_all_sets(
     return all_sets
 
 
-class FrameVisualiser:
+class MiniSetKwargsRequired(TypedDict):
+    cls_idx: int
+    all_sets: dict[str, Any]
+    set_name: AVAIL_SETS
+    split_name: AVAIL_SPLITS
+
+class MiniSetKwargs(MiniSetKwargsRequired, total=False):
+    classes: List[str]
+    target_length: int
+    frame_size: int
+    logger: Logger
+
+
+class MiniSet(Dataset):
     def __init__(
         self,
         cls_idx: int,
@@ -68,10 +84,10 @@ class FrameVisualiser:
         target_length: int = 16,
         frame_size: int = 224,
         logger: Logger = visualise_logger
-    ):
+    ) -> None:
+
         self.logger = logger
         self.cls_idx = cls_idx
-        self.all_sets = all_sets
         self.set_name = set_name
         self.split_name = split_name
         self.classes = classes
@@ -85,42 +101,57 @@ class FrameVisualiser:
             permute_time_channel=False,
         )
 
-        self.tot_samples = len(all_sets[set_name][cls_idx]["instances"])
         self.set_path_info = get_wlasl_info(split_name, set_name)
-        self._set_accumulators()
+        self.data = all_sets[self.set_name][self.cls_idx]["instances"]
+        self.tot_samples = len(self.data)
 
-    def _set_accumulators(self):
-        self.idx = 0
-        self.exampler_iterator = iter(
-            self.all_sets[self.set_name][self.cls_idx]["instances"]
-        )
 
-    def __call__(self, restart: bool = False):
-
-        if restart:
-            self.idx = 0
+    def __getitem__(self, idx):
         self.logger.info(f"From: {self.split_name}S/{self.set_name}")
         self.logger.info(f'Example videos for class: "{self.classes[self.cls_idx]}"')
-        self.logger.info(f"Instance: {self.idx + 1}/{self.tot_samples}")
-        if self.idx < self.tot_samples:
-            next_example = Instance.model_validate(next(self.exampler_iterator))
-            ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
+        self.logger.info(f"Instance: {idx + 1}/{self.tot_samples}")
+        
+        next_example = Instance.model_validate(self.data[idx])
+        ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
 
-            self.logger.info(f"Next example video path: {ex_path}")
+        self.logger.info(f"Next example video path: {ex_path}")
 
-            plt_display_grid(
-                self.basic_transform(
-                    load_rgb_frames_from_video(
-                        ex_path, next_example.frame_start, next_example.frame_end
-                    )
-                ),
-                self.target_length,
+
+        return self.basic_transform(
+            load_rgb_frames_from_video(
+                ex_path, next_example.frame_start, next_example.frame_end
             )
-        else:
-            print("No more samples")
+        )
+            
+    def __len__(self):
+        return self.tot_samples
 
-        self.idx += 1
-        return
+
+class FrameVisualiser:
+    def __init__(
+        self,
+        **kwargs: Unpack[MiniSetKwargs]
+    ):
+        if 'target_length' in kwargs:
+            self.target_frames = kwargs['target_length']
+        else:
+            self.target_frames = 16
+        self.iter_loader = iter(DataLoader(
+            MiniSet(**kwargs), 
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=False
+        ))
+        
+    def __call__(self):
+        frames = next(self.iter_loader)[0]
+        if len(frames.shape) == 5:
+            frames = frames.squeeze(dim=0)
+        if frames.shape[1] != 3: 
+            frames = frames.permute(1, 0, 2, 3) #swap T and C
+        plt_display_grid(frames, self.target_frames)
+        
 
 
 # results

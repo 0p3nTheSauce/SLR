@@ -5,13 +5,13 @@ from multiprocessing.synchronize import Event as EventClass
 from logging import Logger
 import os
 import time
-from .core import (
+from src.que.core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
     connect_manager,
     DaemonStateDict,
 )
-from .worker import Worker
+from src.que.worker import Worker
 
 
 

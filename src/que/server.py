@@ -12,7 +12,7 @@ import sys
 from typing import Optional, Union, Tuple
 from pathlib import Path
 
-from .core import (
+from src.que.core import (
     timestamp_path,
     Que,
     QueManager,
@@ -29,8 +29,8 @@ from .core import (
     read_server_state,
     # Process_states
 )
-from .daemon import Daemon
-from .worker import Worker
+from src.que.daemon import Daemon
+from src.que.worker import Worker
 
 
 class ServerContext:

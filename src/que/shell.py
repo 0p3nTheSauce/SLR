@@ -25,7 +25,7 @@ import atexit
 
 # locals
 # import configs
-from .core import (
+from src.que.core import (
     TO_RUN,
     GenExp,
     CUR_RUN,
@@ -45,8 +45,8 @@ from .core import (
 )
 
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
-from .tmux import tmux_manager
-from configs import get_train_parser
+from src.que.tmux import tmux_manager
+from src.configs import get_train_parser
 
 # ---------------------------------------------------------------------------
 # Criterion parsing

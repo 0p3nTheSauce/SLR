@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import (
+    TypeGuard,
     Literal,
     Optional,
     Union,
@@ -131,6 +132,9 @@ class SpeedSampler(BaseSampler):
             raise ValueError("speed_min cannot be > speed_max")
         return self
 
+SAMPLER_TYPES = {"og", "pad", "uniform", "chunked", "wobbled", "focal_normal", "focal_laplace", "focal_beta", "speed"}
+def is_sampler_config(config: TemporalAugs) -> TypeGuard[SamplerConfig]:
+    return config.type in SAMPLER_TYPES
 
 SamplerConfig = Annotated[
     Union[
@@ -162,9 +166,16 @@ class ReverseT(BaseModel):
 
 TemporalTransforms = Annotated[Union[ShuffleT, ReverseT], Field(discriminator="type")]
 
+TEMPORAL_TYPES = {"shuffle", "reverse"}
+def is_temporal_config(config: TemporalAugs) -> TypeGuard[TemporalTransforms]:
+    return config.type in TEMPORAL_TYPES
+
 TemporalAugs = Annotated[
     Union[TemporalTransforms, SamplerConfig], Field(discriminator="type")
 ]
+
+
+
 ### Spatial augs
 
 
@@ -194,6 +205,9 @@ CropTransforms = Annotated[
     Field(discriminator="type"),
 ]
 
+CROP_TYPES = {"Centre_crop", "Random_crop", "Scale_and_pad", "Random_Resized_crop"}
+def is_crop_config(config: SpatialAugs) -> TypeGuard[CropTransforms]:
+    return config.type in CROP_TYPES
 
 class HorizontalFlipConfig(BaseModel):
     type: Literal["HORIZONTAL_FLIP"] = "HORIZONTAL_FLIP"
@@ -235,11 +249,16 @@ SpatialTransforms = Annotated[
         RandAugConfig,
         HorizontalFlipConfig,
         RandomGrayscaleConfig,
-        GaussianBlurConfig,
+        GaussianBlurConfig
+        
     ],
     Field(discriminator="type"),
 ]
 
+SPATIAL_TYPES = {"HORIZONTAL_FLIP", "RANDOM_GRAYSCALE", "GAUSSIAN_BLUR", "IMAGENET", "CIFAR10", "SVHN", "RANDAUGMENT"}
+
+def is_spatial_transform_config(config: SpatialAugs) -> TypeGuard[SpatialTransforms]:
+    return config.type in SPATIAL_TYPES
 
 SpatialAugs = Annotated[
     Union[CropTransforms, SpatialTransforms],
@@ -271,13 +290,14 @@ class AugInfo(BaseModel):
         if not self.strict_size:
             return self
 
-        samplers = [augT for augT in self.temporal_aug if isinstance(augT, BaseSampler)]
+        samplers = [augT for augT in self.temporal_aug if is_sampler_config(augT)]
+        crops = [augS for augS in self.spatial_aug if is_crop_config(augS)]
+        
         if len(samplers) == 0:
             raise ValueError("At least one temporal aug must be a sampler")
         last_sampler = samplers[-1]
         self.target_length = last_sampler.target_length
 
-        crops = [augS for augS in self.spatial_aug if isinstance(augS, CropConfig)]
         if len(crops) == 0:
             raise ValueError("At least one spatial aug must be a crop")
         last_crop = crops[-1]
@@ -407,9 +427,17 @@ class MVirTedMaeInfo(BaseModel):
     mask_ratio: float = 0.5
     embed_dim: int = 512
 
+SUPERVISED_TYPES = {"supervised"}
+PRETRAIN_TYPES = {"mvir_ted_mae"}
+
+def is_supervised_config(config: ModelInfo) -> TypeGuard[SupervisedInfo]:
+    return config.type in SUPERVISED_TYPES
+
+def is_pretrain_config(config: ModelInfo) -> TypeGuard[MVirTedMaeInfo]:
+    return config.type in PRETRAIN_TYPES
 
 ModelInfo = Annotated[
-    Union[SupervisedInfo, MVirTedInfo, UnsupervisedInfo, MVirTedMaeInfo],
+    Union[SupervisedInfo, MVirTedInfo, MVirTedMaeInfo],
     Field(discriminator="type"),
 ]
 

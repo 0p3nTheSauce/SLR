@@ -13,8 +13,8 @@ from multiprocessing.synchronize import Event as EventClass
 from run_types import RunInfo
 
 # locals
-from testing import full_test
-from .core import (
+from src.testing import full_test
+from src.que.core import (
     connect_manager,
     TRAINING_LOG_PATH,
     WORKER_NAME,
@@ -26,8 +26,8 @@ from .core import (
     Que,
 )
 
-from utils import gpu_manager
-from training import train_loop, _setup_wandb
+from src.utils import gpu_manager
+from src.training import train_loop, _setup_wandb
 
 
 class LoggerWriter(io.TextIOBase):

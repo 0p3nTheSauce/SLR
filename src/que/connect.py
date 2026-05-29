@@ -1,9 +1,9 @@
 from multiprocessing.managers import BaseManager
 from typing import Protocol
-from .core import Que
-from .daemon import Daemon
-from .worker import Worker
-from .server import ServerContext
+from src.que.core import Que
+from src.que.daemon import Daemon
+from src.que.worker import Worker
+from src.que.server import ServerContext
 import time
 
 class QueManagerProtocol(Protocol):

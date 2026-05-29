@@ -40,10 +40,10 @@ from src.run_types import (
     BaseRes,
     ShuffRes,
     TopKRes,
-    BaseSampler,
     DataInfo,
     ShuffleT,
     TemporalAugs,
+    is_sampler_config
 )
 
 # constants
@@ -329,7 +329,7 @@ def load_info(dirp: Path, checkname: str):
 
 
 def get_last_sampler(conf_list: List[TemporalAugs]):
-    samplers = [(i, c) for i, c in enumerate(conf_list) if isinstance(c, BaseSampler)]
+    samplers = [(i, c) for i, c in enumerate(conf_list) if is_sampler_config(c)]
     return samplers[-1]
 
 

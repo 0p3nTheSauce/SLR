@@ -408,8 +408,8 @@ def take_args(
     parsed_args: Optional[argparse.Namespace] = None,
 ) -> Optional[Tuple[AdminInfo, WandbInfo]]:
     """Retrieve and validate arguments for a new training run."""
-    from models import avail_models
-    from utils import enum_dir
+    from src.models import avail_models
+    from src.utils import enum_dir
 
     models_available = avail_models()
     splits_available = get_avail_splits()

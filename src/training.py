@@ -24,7 +24,7 @@ from src.configs import (
     RunInfo,
     WandbInfo,
 )
-from src.run_types import SchedInfo, OptimizerInfo, MVirTedMaeInfo, SupervisedInfo
+from src.run_types import SchedInfo, OptimizerInfo, MVirTedMaeInfo, SupervisedInfo, is_supervised_config, is_pretrain_config
 from src.stopping import EarlyStopper, StopperOn
 from src.models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
 from src.utils import wandb_manager
@@ -685,7 +685,7 @@ def train_loop(
 
     # setup model
     
-    assert isinstance(config.model_params, SupervisedInfo), 'This is a supervised training loop, but model_params is not SupervisedInfo'
+    assert is_supervised_config(config.model_params), 'This is a supervised training loop, but model_params is not SupervisedInfo'
     
     drop_p = config.model_params.drop_p
 
@@ -989,7 +989,7 @@ def pretrain_loop(
 
     #TODO: generalise model loading
     
-    assert isinstance(config.model_params, MVirTedMaeInfo), 'not implemented'    
+    assert is_pretrain_config(config.model_params), 'not implemented'    
     encoder_info = config.model_params.encoder_info
     
     encoder = MVirTed(
@@ -1111,7 +1111,7 @@ def train_model(
     recover: bool = False,
     event: Optional[EventClass] = None,
 ) -> Optional[Dict[str, float]]:
-    if isinstance(config.model_params, SupervisedInfo):
+    if is_supervised_config(config.model_params):
         return train_loop(
             model_name=model_name,
             config=config,
@@ -1121,7 +1121,7 @@ def train_model(
             recover=recover,
             event=event,
         )
-    elif isinstance(config.model_params, MVirTedMaeInfo):
+    elif is_pretrain_config(config.model_params):
         return pretrain_loop(
             model_name=model_name,
             config=config,

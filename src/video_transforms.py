@@ -19,8 +19,6 @@ from src.run_types import (
 	SpatialAugs,
 	NormDict,
 	TemporalAugs,
-	BaseSampler,
-	CropConfig,
 	ScaleAndPadConfig,
 	CentreCropConfig,
 	RandomCropConfig,
@@ -34,17 +32,11 @@ from src.run_types import (
 	GaussianBlurConfig,
 	AutoAugmentConfig,
 	RandAugConfig,
-	ShuffleT,
-	ReverseT,
-	PadFramesT,
-	OG_Sampler,
-	UniformSampler,
-	ChunkedSampler,
-	WobbledSampler,
-	FocalNormalSampler,
-	FocalLaplaceSampler,
-	FocalBetaSampler,
-	SpeedSampler,
+	is_sampler_config,
+	is_temporal_config,
+	is_crop_config,
+	is_spatial_transform_config
+
 )
 
 
@@ -451,57 +443,79 @@ def _call_sampler(
 	return fn(frames, target_length)
 
 
+class PadFrames(Transform):
+	"""Given a video sequence of TxCxHxW, pad the temporal sequence to the desired frame length.
+	If the video is already longer than this number, it is returned as is.
+	Is not required for samplers, they already extend frames
+	"""
+
+	def __init__(self, num_frames: int):
+		super().__init__()
+		self.num_frames = num_frames
+
+	def _transform(self, inpt: Tensor, params: dict) -> Tensor:
+		t = inpt.shape[0]
+		pad_len = self.num_frames - t
+		# Repeat the last frame to pad
+		last_frame = inpt[-1:].expand(pad_len, *inpt.shape[1:])
+		return torch.cat([inpt, last_frame], dim=0)
+
+
+
 def get_sampler(sampler_config: SamplerConfig) -> Transform:
 	"""Wrapper to match configs to their corresponding transforms"""
-	match sampler_config:
-		case OG_Sampler():
+	match sampler_config.type:
+		case "og":
 			sampler = partial(
 				correct_num_frames,
 				randomise=sampler_config.randomise,
 			)
 
-		case UniformSampler():
+		case "uniform":
 			sampler = partial(
 				sample_uniform,
 			)
 
-		case ChunkedSampler():
-			# Note: target_length is required for chunked in your Pydantic model
+		case 'chunked':
 			sampler = partial(
 				sample_chunked,
 			)
 
-		case WobbledSampler():
+		case 'wobbled':
 			sampler = partial(
 				sample_wobbled,
 				max_wobble=sampler_config.max_wobble,
 			)
 
-		case FocalNormalSampler():
+		case "focal_normal":
 			sampler = partial(
 				sample_focal_normal,
 				mean=sampler_config.mean,
 				std=sampler_config.std,
 			)
 
-		case FocalLaplaceSampler():
+		case "focal_laplace":
 			sampler = partial(
 				sample_focal_laplace,
 				mean=sampler_config.mean,
 				diversity=sampler_config.diversity,
 			)
 
-		case FocalBetaSampler():
+		case "focal_beta":
 			sampler = partial(
 				sample_focal_beta,
 				alpha=sampler_config.alpha,
 				beta=sampler_config.beta,
 			)
 
-		case SpeedSampler():
+		case "speed":
 			sampler = partial(
 				sample_speed_perturbed,
 				speed_range=(sampler_config.speed_min, sampler_config.speed_max),
+			)
+		case "pad":
+			sampler = partial(
+				pad_frames
 			)
 
 		case _:
@@ -598,30 +612,13 @@ class ReverseFrames(Transform):
 		return inpt
 
 
-class PadFrames(Transform):
-	"""Given a video sequence of TxCxHxW, pad the temporal sequence to the desired frame length.
-	If the video is already longer than this number, it is returned as is
-	"""
-
-	def __init__(self, num_frames: int):
-		super().__init__()
-		self.num_frames = num_frames
-
-	def _transform(self, inpt: Tensor, params: dict) -> Tensor:
-		t = inpt.shape[0]
-		pad_len = self.num_frames - t
-		# Repeat the last frame to pad
-		last_frame = inpt[-1:].expand(pad_len, *inpt.shape[1:])
-		return torch.cat([inpt, last_frame], dim=0)
-
-
 # currently not used
 def get_temporal_transform(
 	transform_config: TemporalTransforms,
 ) -> Tuple[Transform, Optional[Tuple]]:
 	"""Wrapper to match configs to their corresponding transforms"""
-	match transform_config:
-		case ShuffleT():
+	match transform_config.type:
+		case "shuffle":
 			shuffle_t = Shuffle(transform_config.num_frames)
 			perm_tensor = shuffle_t.permutation
 			if perm_tensor is not None:
@@ -630,18 +627,23 @@ def get_temporal_transform(
 				return shuffle_t, (perm, sh_e)
 			else:
 				return shuffle_t, None
-		case ReverseT():
+		case "reverse":
 			return ReverseFrames(transform_config.probability), None
-		case PadFramesT():
-			return PadFrames(transform_config.num_frames), None
+		case _:
+			raise ValueError(f'Unknown temporal transform: {transform_config.type}')
+
 
 
 def get_temporal_augs(config: TemporalAugs) -> Tuple[Transform, Optional[Tuple]]:
 	"""Wrapper to match configs to their corresponding transforms"""
-	if isinstance(config, BaseSampler):
+	if is_sampler_config(config):
+		# print(f'got sampler: {config.model_dump()}')
 		return get_sampler(config), None
-	else:
+	elif is_temporal_config(config):
+		# print(f'got temporal: {config.model_dump()}')
 		return get_temporal_transform(config)
+	else:
+		raise ValueError(f'Unknown Temporal AUG: {config.model_dump()}')
 
 
 # --- Frame cropping and resizing ---
@@ -750,48 +752,54 @@ def _interp_sets() -> dict[str, v2.AutoAugmentPolicy]:
 
 def get_spatial_transform(config: SpatialTransforms) -> v2.Transform:
 	"""Wrapper to match configs to their corresponding transforms"""
-	match config:
-		case HorizontalFlipConfig():
+	match config.type:
+		case 'HORIZONTAL_FLIP':
 			return v2.RandomHorizontalFlip(p=config.p)
-		case RandomGrayscaleConfig():
+		case 'RANDOM_GRAYSCALE':
 			return v2.RandomGrayscale(p=config.p)
-		case GaussianBlurConfig():
+		case 'GAUSSIAN_BLUR':
 			return v2.GaussianBlur(kernel_size=config.kernel_size, sigma=config.sigma)
-		case AutoAugmentConfig():
+		case 'CIFAR10' | "IMAGENET" | "SVHN":
 			return v2.AutoAugment(
 				_interp_sets()[config.type],
 				interpolation=v2.InterpolationMode(config.interpolation),
 			)
-		case RandAugConfig():
+		case 'RANDAUGMENT':
 			return v2.RandAugment(
 				num_ops=config.num_ops,
 				magnitude=config.magnitude,
 				num_magnitude_bins=config.num_magnitude_bins,
 				interpolation=v2.InterpolationMode(config.interpolation),
 			)
+		case _:
+			raise ValueError(f'Unknown spatial transform: {config.type}')
+
 
 
 def get_crop_transform(config: CropTransforms) -> v2.Transform:
 	"""Wrapper to match configs to their corresponding transforms"""
-	match config:
-		case CentreCropConfig():
+	match config.type:
+		case 'Centre_crop':
 			return v2.CenterCrop(config.frame_size)
-		case RandomCropConfig():
+		case 'Random_crop':
 			return v2.RandomCrop(config.frame_size)
-		case ScaleAndPadConfig():
+		case 'Scale_and_pad':
 			return ScaleAndPad(config.frame_size)
-		case RandomResizedConfig():
+		case 'Random_Resized_crop':
 			return v2.RandomResizedCrop(config.frame_size)
+		case _:
+			raise ValueError(f'Unknown crop: {config.type}')
 
 
 def get_spatial_augs(config: SpatialAugs) -> v2.Transform:
-	"""Wrapper to match configs to their corresponding transforms"""
-	if isinstance(config, CropConfig):
-		return get_crop_transform(config)
-	else:
-		return get_spatial_transform(config)
-
-
+    """Wrapper to match configs to their corresponding transforms"""
+    if is_crop_config(config):
+        return get_crop_transform(config)
+    elif is_spatial_transform_config(config):
+        return get_spatial_transform(config)
+    else:
+        raise ValueError(f"Unknown spatial aug: {config.model_dump()}")    
+    
 # --- Misc Named transforms and helper functions ---
 
 
@@ -844,7 +852,11 @@ def get_transform(
 
 	# --- 1. Temporal Augmentations (Operates on uint8 T, C, H, W) ---
 	for aug in temporal_aug:
-		t, possible_tup = get_temporal_augs(aug)
+		x = get_temporal_augs(aug)
+		if x is None:
+			raise Exception(f'produced None temporal aug: {aug.model_dump()}')
+		else:
+			t, possible_tup = x
 		if possible_tup is not None:
 			perm, sh_e = possible_tup
 
@@ -852,8 +864,13 @@ def get_transform(
 
 	# --- 4. Spatial Augment ---
 	for aug in spatial_aug:
-		transforms_list.append(get_spatial_augs(aug))
+		x = get_spatial_augs(aug)
+		if x is None:
+			raise Exception(f'Produced None spatial aug: {aug.model_dump()}')
+		transforms_list.append(x)
 
+
+	# Final prep for models
 	if normalise_to_float:
 		transforms_list.append(v2.Lambda(_normalize_to_float))
 
