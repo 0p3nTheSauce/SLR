@@ -37,6 +37,7 @@ from src.configs import (
 )
 from src.run_types import (
     CompRes,
+    ClassReport,
     MinInfo,
     BaseRes,
     ShuffRes,
@@ -648,29 +649,27 @@ def test_run(
     heatmap: bool = False,
     disp: bool = False,
     save: bool = True,
-    save_img: Optional[bool] = None,
-) -> Union[BaseRes, ShuffRes]:
+    save_img: bool = False,
+) -> Tuple[Union[BaseRes, ShuffRes], Dict[str, Dict[str, float]], List[int], List[int]]:
     """Perform testing of a model according to the provided configuration.
 
     Args:
-                    config (Dict[str, Any]): Run config file.
-                    perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
-                    test_val (bool, optional): Test on the val set. Defaults to False.
-                    test_test (bool, optional): Test on the test set. Defaults to True.
-                    check (str, optional): Checkpoint name. Defaults to "best.pth".
-                    br_graph (bool, optional): Create bar graph. Defaults to False.
-                    cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
-                    heatmap (bool, optional): Create heatmap. Defaults to False.
-                    disp (bool, optional): Display plots. Defaults to False.
-                    save (bool, optional): Save results and plots. Defaults to True.
-                    re_test (bool, optional): Test even if results already saved. Defaults to False.
+        config (Dict[str, Any]): Run config file.
+        perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
+        test_val (bool, optional): Test on the val set. Defaults to False.
+        test_test (bool, optional): Test on the test set. Defaults to True.
+        check (str, optional): Checkpoint name. Defaults to "best.pth".
+        br_graph (bool, optional): Create bar graph. Defaults to False.
+        cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
+        heatmap (bool, optional): Create heatmap. Defaults to False.
+        disp (bool, optional): Display plots. Defaults to False.
+        save (bool, optional): Save results. Defaults to True.
+        save_img (bool, optional): Save plots. Defaults to False. 
+        re_test (bool, optional): Test even if results already saved. Defaults to False.
 
     Returns:
-                                                                    Optional[Dict[str, Any]]: Results if correct parameters.
+        Optional[Dict[str, Any]]: Results if correct parameters.
     """
-
-    if save_img is None:
-        save_img = save
 
     set_seed(admin.seed)
 
@@ -734,6 +733,7 @@ def test_run(
     if save:
         with open(save2, "w") as f:
             json.dump(results, f, indent=4)
+        
 
     if heatmap:
         fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
@@ -766,7 +766,7 @@ def test_run(
             disp=disp,
         )
 
-    return results
+    return results, cls_report, all_targets, all_preds
 
 
 def save_test_sizes(data_specs: DataInfo, save_dir: Path):
@@ -810,6 +810,11 @@ def get_res_path(save_path: Path) -> Path:
     res_path = out_dir / "best_val_loss.json"  # TODO: add other types of saves?
     return res_path
 
+def get_cls_rep_path(save_path: Path) -> Path:
+    out_dir = checkpoint_dir_to_result_dir(save_path)
+    res_path = out_dir / "cls_rep_all_targets_preds.json"  
+    return res_path
+
 
 # TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
 def full_test(
@@ -818,13 +823,12 @@ def full_test(
     save: bool = True,
     re_test: bool = False,
 ) -> CompRes:
+    # - The shuffled results additionally contain the permutation used, and it's shannon entropy
     """Complete test, which includes:
     - The best validation loss, and accuracy for the whole training run
     - The test, val and 'shuffled test' results.
     - The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
-    - The shuffled results additionally contain the permutation used, and it's shannon entropy
-
-
+    
     Args:
         admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
         data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
@@ -835,12 +839,13 @@ def full_test(
         Exception: If there is an error loading data from data_info.json
 
     Returns:
-        CompRes: A results dictionary (as described above).
+        CompRes: A results object (as described above).
     """
     save_path = Path(admin.save_path)
 
     # output
     res_path = get_res_path(save_path)
+    cls_rep_path = get_cls_rep_path(save_path)
 
     # dont retest if exists
     if res_path.exists() and not re_test:
@@ -865,7 +870,7 @@ def full_test(
     best_val_loss = last_check["best_val_loss"]
 
     # test set
-    test = test_run(
+    test, cls_report, all_targets, all_preds= test_run(
         admin,
         data,
         "test",
@@ -876,9 +881,9 @@ def full_test(
         save=False,
     )
     # validation set
-    val = test_run(admin, data, "val", save=False)
+    val, _, _, _ = test_run(admin, data, "val", save=False)
     # shuffled frames test set
-    test_shuff = test_run(admin, data, "test", shuffle=True, save=False)
+    # test_shuff = test_run(admin, data, "test", shuffle=True, save=False)
 
     results = CompRes(
         check_name="best_val",
@@ -886,12 +891,21 @@ def full_test(
         best_val_loss=best_val_loss,
         test=test,
         val=val,
-        test_shuff=cast(ShuffRes, test_shuff),
+        # test_shuff=cast(ShuffRes, test_shuff),
+    )
+
+    class_report = ClassReport(
+        cls_report=cls_report,
+        all_targets=all_targets,
+        all_preds=all_preds
     )
 
     if save:
         with open(res_path, "w") as f:
             json.dump(results.model_dump(), f, indent=4)
+        with open(cls_rep_path, 'w') as f:
+            json.dump(class_report.model_dump(), f, indent=4)
+        
 
     return results
 
@@ -1144,7 +1158,7 @@ def main():
     elif args.command == "partial":
         # Run partial test with specified parameters
         print(f"Running partial test on {args.set_name} set...")
-        results = test_run(
+        results, _, _, _ = test_run(
             admin=admin,
             data=data,
             set_name=args.set_name,

@@ -523,13 +523,27 @@ class ShuffRes(BaseRes):
     shannon_entropy: float
 
 
+class ClassReport(BaseModel):
+    cls_report: Dict[str, Dict[str, float]]
+    all_targets: List[int]
+    all_preds: List[int]
+
 class CompRes(BaseModel):
     check_name: str
     best_val_acc: float
     best_val_loss: float
     test: BaseRes
     val: BaseRes
+    # test_shuff: ShuffRes
+
+class VerboseRes(BaseModel):
+    check_name: str
+    best_val_acc: float
+    best_val_loss: float
+    test: BaseRes
+    val: BaseRes
     test_shuff: ShuffRes
+
 
 
 class SumRes(BaseModel):
