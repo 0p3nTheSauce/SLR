@@ -466,18 +466,18 @@ def plot_distribution(
 	elif hist_or_bar == 'hist':
 		cmap = plt.get_cmap(PALETTE['default_cmap'])
 		n, bins_out, patches_list = plt.hist(expanded_values, bins=bins)
-		norm = plt.Normalize(n.min(), n.max())
-		for patch, count in zip(patches_list, n):
+		norm = plt.Normalize(n.min(), n.max()) #type: ignore
+		for patch, count in zip(patches_list, n): #type: ignore
 			patch.set_facecolor(cmap(norm(count)))
 		if show_nums_on_bars:
-			for patch, count in zip(patches_list, n):
+			for patch, count in zip(patches_list, n): #type: ignore
 				x = patch.get_x() + patch.get_width() / 2
 				if count > 0:
 					plt.text(x, count, str(int(count)), ha='center', va='bottom')
 
 	else:
 		cmap = plt.get_cmap(PALETTE['default_cmap'])
-		norm = plt.Normalize(min(counts), max(counts))
+		norm = plt.Normalize(min(counts), max(counts)) #type: ignore
 		bar_colors = [cmap(norm(c)) for c in counts]
 		plt.bar(values, counts, width=2, color=bar_colors)
 		if x_label_step is None:

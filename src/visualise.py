@@ -41,6 +41,12 @@ VERBOSITY = 0
 visualise_logger = logging.getLogger(__name__)
 
 
+def set_font_size(size: int = 14) -> None:
+    """Set the font size for all matplotlib plots."""
+    plt.rcParams.update({"font.size": size})
+
+
+
 def get_all_sets(
     split_name: AVAIL_SPLITS,
     set_options: List[AVAIL_SETS] = ["train", "test", "val"], #type: ignore
