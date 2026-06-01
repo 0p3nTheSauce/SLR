@@ -144,6 +144,13 @@ def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -
 
     return label_file
 
+def load_split_set(split: AVAIL_SPLITS, set_name: AVAIL_SETS, policy: LOAD_DATA_POLICY) -> Union[List[Instance], List[Dict[str, Any]]]:
+    split_set = get_wlasl_info(split, set_name)
+    return load_data_from_json(
+        get_labels_path(set_name, split_set["labels"], split_set['label_suff']),
+        policy
+    )
+
 
 def get_example_videos(
     instances: List[Instance],

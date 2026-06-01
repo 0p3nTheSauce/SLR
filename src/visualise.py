@@ -10,6 +10,7 @@ import logging
 from logging import Logger
 from torch.utils.data import DataLoader, Dataset
 from typing_extensions import TypedDict, Unpack
+from torch import Tensor
 # locals
 from src.run_types import CentreCropConfig, OG_Sampler
 from src.configs import get_class_list, CLASSES_PATH
@@ -83,7 +84,8 @@ class MiniSet(Dataset):
         classes: List[str] = get_class_list(),
         target_length: int = 16,
         frame_size: int = 224,
-        logger: Logger = visualise_logger
+        logger: Logger = visualise_logger,
+        transform: Optional[Callable[[Tensor], Tensor]] = None
     ) -> None:
 
         self.logger = logger
@@ -94,13 +96,18 @@ class MiniSet(Dataset):
         self.target_length = target_length
         self.frame_size = frame_size
 
-        self.basic_transform, _, _ = get_transform(
-            temporal_aug=[OG_Sampler(target_length=target_length)],
-            spatial_aug=[CentreCropConfig(frame_size=frame_size)],
-            normalise_to_float=False,
-            permute_time_channel=False,
-        )
+        if transform is None:
+            self.transform, _, _ = get_transform(
+                temporal_aug=[OG_Sampler(target_length=target_length)],
+                spatial_aug=[CentreCropConfig(frame_size=frame_size)],
+                normalise_to_float=False,
+                permute_time_channel=False,
+            )
+        else:
+            self.transform = transform
 
+        
+        
         self.set_path_info = get_wlasl_info(split_name, set_name)
         self.data = all_sets[self.set_name][self.cls_idx]["instances"]
         self.tot_samples = len(self.data)
@@ -117,7 +124,7 @@ class MiniSet(Dataset):
         self.logger.info(f"Next example video path: {ex_path}")
 
 
-        return self.basic_transform(
+        return self.transform(
             load_rgb_frames_from_video(
                 ex_path, next_example.frame_start, next_example.frame_end
             )

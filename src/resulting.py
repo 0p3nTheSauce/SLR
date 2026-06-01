@@ -36,19 +36,8 @@ ignore_keys = {
 }
 
 
-def load_config(config_path: str, validate: bool = True) -> GenInfo:
-    """Load config from .toml file and merge with AdminInfo from CLI.
-    Supports backward compatibility with .ini files, using old loading mechanism.
-
-    Args:
-        admin: Parsed admin info from command line arguments.
-
-    Returns:
-        RunInfo: Fully validated config model for the run.
-
-    Raises:
-        FileNotFoundError: If config file doesn't exist.
-        pydantic.ValidationError: If config values fail validation.
+def load_config(config_path: str) -> Dict[str, Any]:
+    """load config file as dictionary
     """
     conf_path = Path(config_path)
     if not conf_path.exists():
@@ -58,10 +47,7 @@ def load_config(config_path: str, validate: bool = True) -> GenInfo:
         raw = tomllib.load(f)
     return raw
 
-    # if validate:
-    #     return GenInfo.model_validate(raw)
-    # else:
-    #     return GenInfo.model_validate(raw, strict=False)
+    
     
     
 
@@ -186,7 +172,7 @@ def load_config_and_find_runs(
     logger: logging.Logger = basic_logger,
     logging_level=logging.INFO,
 ) -> Optional[GenInfo]:
-    gen_info = load_config(str(conf_path), validate=False)
+    gen_info = load_config(str(conf_path))
     
     # find_que_runs(args.out_path)
     logger.setLevel(logging_level)  # or WARNING, INFO, ERROR, CRITICAL
