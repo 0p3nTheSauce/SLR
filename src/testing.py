@@ -893,17 +893,25 @@ def full_test(
         # test_shuff=cast(ShuffRes, test_shuff),
     )
 
-    class_report = ClassReport(
-        cls_report=cls_report,
-        all_targets=all_targets,
-        all_preds=all_preds
-    )
+    # class_report = ClassReport(
+    #     cls_report=cls_report,
+    #     all_targets=all_targets,
+    #     all_preds=all_preds
+    # )
+    
+    class_report = {
+        'cls_report': cls_report,
+        'all_targets': [int(i) for i in all_targets],
+        'all_preds': [int(i) for i in all_preds]
+    }
+        
 
     if save:
         with open(res_path, "w") as f:
             json.dump(results.model_dump(), f, indent=4)
         with open(cls_rep_path, 'w') as f:
-            json.dump(class_report.model_dump(), f, indent=4)
+            # json.dump(class_report.model_dump(), f, indent=4)
+            json.dump(class_report, f, indent=4)
         
 
     return results
