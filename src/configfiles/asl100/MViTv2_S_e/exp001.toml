@@ -1,6 +1,6 @@
 [training]
-batch_size = 1
-update_per_step = 8
+batch_size = 4
+update_per_step = 2
 max_epoch = 200
 
 [optimizer]
@@ -15,29 +15,32 @@ drop_p = 0.5
 
 [scheduler] 
 type = 'CosineAnnealingWarmRestarts'
-t0 = 20
-tmult = 1
+t0 = 10
+tmult = 2
 eta_min = 0
-
 
 #Train augs
 
 [data.train_augs]
 normalise = true
 
+#Temporal augs
 #Sampler
 [[data.train_augs.temporal_aug]]
-type = 'chunked'
-max_wobble = 0
+type = 'focal_normal'
+max_wobble = 2
+mean = 0.5
+std = 0.3
 target_length = 32
 
+#Spatial augs
 [[data.train_augs.spatial_aug]]
 type = "HORIZONTAL_FLIP"
 p = 0.5
 
 #Crop
 [[data.train_augs.spatial_aug]]
-type = "Random_Resized_crop"
+type = "Centre_crop"
 frame_size = 224
 
 [[data.train_augs.spatial_aug]]
@@ -47,16 +50,21 @@ magnitude = 7
 num_magnitude_bins = 31
 interpolation = "bilinear"
 
+
 #Test augs
 
 [data.test_augs]
 normalise = true
 
+#Temporal augs
 #Sampler
 [[data.test_augs.temporal_aug]]
-type = "uniform"
+type = 'focal_normal'
+mean = 0.5
+std = 0.3
 target_length = 32
 
+#Spatial augs
 #Crop
 [[data.test_augs.spatial_aug]]
 type = "Centre_crop"
@@ -68,6 +76,5 @@ mode = 'min'
 patience = 15
 min_delta = 0.01
 
-
-# same as /configfiles/RandAug/MViT_B_32x3_eda_ops3_no_wobble.toml
-# but with random resize crop instead of centre crop during training
+#Same as exp006
+# with randaug

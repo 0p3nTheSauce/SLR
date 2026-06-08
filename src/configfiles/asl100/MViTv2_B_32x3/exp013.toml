@@ -18,6 +18,9 @@ type = 'CosineAnnealingWarmRestarts'
 t0 = 20
 tmult = 1
 eta_min = 0
+start_factor = 0.1
+end_factor = 1.0
+warmup_epochs = 5
 
 
 #Train augs
@@ -37,7 +40,7 @@ p = 0.5
 
 #Crop
 [[data.train_augs.spatial_aug]]
-type = "Random_Resized_crop"
+type = "Centre_crop"
 frame_size = 224
 
 [[data.train_augs.spatial_aug]]
@@ -70,4 +73,4 @@ min_delta = 0.01
 
 
 # same as /configfiles/RandAug/MViT_B_32x3_eda_ops3_no_wobble.toml
-# but with random resize crop instead of centre crop during training
+# but with warm up

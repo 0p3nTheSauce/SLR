@@ -562,6 +562,15 @@ class Que:
     def get_config(cls, next_run: RunInfo) -> str:
         return next_run.admin.config_path
 
+
+    @classmethod
+    def get_nested_or_none(cls, d: Any, ks: List[Any]) -> Any:
+        """Attempt to read a value at arbitrary depth from a plain dict or pydantic model. Return None if any key is not found."""
+        try:
+            return cls.get_nested(d, ks)
+        except (KeyError, AttributeError, TypeError):
+            return None
+
     @classmethod
     def list_manipulation(
         cls,
@@ -594,7 +603,7 @@ class Que:
                     break
 
                 runs = [
-                    run for run in runs if crit(Que.get_nested(run, filter_key_set))
+                    run for run in runs if crit(Que.get_nested_or_none(run, filter_key_set))
                 ]
 
         if len(sort_keys) > 0:
