@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 import shlex
 import configs
 import json
@@ -16,6 +16,7 @@ from .shell import QueShell
 
 # from que.shell import QueShell
 from src.que.core import (
+	GenExp,
 	Que,
 	connect_manager,
 	_get_basic_logger,
@@ -832,12 +833,6 @@ def test_edit_run():
 	valid = strict_validate(ExpInfo, demo)
 	# valid = ExpInfo.model_validate(demo)
 
-
-
-
-
-
-
 def update_runs10():
 	from configs import correct_paths
 	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
@@ -865,6 +860,261 @@ def update_runs10():
 		json.dump(all_runs, f, indent=4)
 
 
+def _make_section( base_model: dict, name: str) -> str:
+	"""Generates a piece of the toml file, a single block, e.g. the contents of [training] including the name.
+
+	Args:
+		base_model (dict): Named parameters in dict format (i.e. from model_dump)
+		name (str): The name of the section, will become [name] in the config file
+
+	Returns:
+		str: The string content of the section ready for concatenation into the full config file
+	"""
+	return f"[{name}]\n" + "\n".join(f"{k} = {v!r}" for k, v in base_model.items()) + "\n\n"
+
+
+def _make_list_section(base_list: list[dict], name: str) -> str:
+	"""Generates a piece of the toml file, a section which is a list of dicts, e.g. the data/train_augs section.
+
+	Args:
+		base_list (list[dict]): List of named parameters in dict format (i.e. from model_dump)
+		name (str): The name of the section, will become [[name]] in the config file
+
+	Returns:
+		str: The string content of the section ready for concatenation into the full config file
+	"""
+	return "\n".join(f"[[{name}]]\n" + "\n".join(f"{k} = {v!r}" for k, v in item.items()) for item in base_list)
+
+
+def _handle_dict(d: Optional[dict], name: str = '') -> str:
+	"""Given a nested dictionary structure (specific to config setup), returns the str representation
+	to be used in the config file. Recurses into nested dicts and lists.
+
+	Args:
+		d (dict): Possibly nested dict to be converted into a config section
+		name (str, optional): The name of the section. Defaults to ''.
+
+	Returns:
+		str: The string content of the section ready for concatenation into the full config file
+	"""
+
+
+	if d is None or len(d) == 0:
+		return ''
+	
+	section = f'\n[{name}]'
+
+	subsecs = []
+
+	for k, v in d.items():
+		if isinstance(v, dict):
+			subsecs.append(_handle_dict(v, f'{name}.{k}'))
+		elif isinstance(v, list):
+			subsecs.append(_handle_list(v, f'{name}.{k}'))
+		else:
+			section += f"\n{k} = {v!r}"
+
+	return section + '\n' + '\n'.join(subsecs)
+	
+
+def _handle_list(l: list, name: str = '') -> str:
+	"""Specifically handles lists within nested dictionary structure
+
+	Args:
+		l (list): List of elements or list of flat dicts (e.g. list of aug configs)
+		name (str, optional): The name of the section. Defaults to ''.
+
+	Returns:
+		str: The string content of the section ready for concatenation into the full config file
+	"""
+	if len(l) == 0:
+		return ''
+	
+	item_0 = l[0]
+
+	if isinstance(item_0, dict):
+		return '\n' + _make_list_section(l, name)
+	else:
+		return f"{name.split('.')[-1]} = {l!r}" 
+
+
+def run_to_config( run: GenExp | dict, comments: list[str] = []) -> str:
+	"""Specifically turn a general run to str representation for the config file system.
+	This includes skipping certain sections, and adding comment lines. 
+
+	Args:
+		run (GenExp | dict): Experiment from que 
+
+	Returns:
+		str: String representation of the config file content for this run, to be written to a .toml file
+	"""
+	ignore_sections = ['admin', 'wandb', 'results']
+	if isinstance(run, GenExp):
+		run_info = run.model_dump()
+	else:
+		run_info = run
+
+	config_str = ''
+
+	for section_name, section_content in run_info.items():
+		if section_name in ignore_sections:
+			continue
+		
+		# config_str += f"\n# --- {section_name.upper()} ---\n"
+		config_str += _handle_dict(section_content, section_name)
+
+	if len(comments) > 0:
+		config_str += '\n'
+
+	for comment in comments:
+		config_str += f"\n# {comment}"
+
+	return config_str
+	
+
+
+
+
+
+
+def test_make_section():
+	
+
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs[OLD_RUNS]
+
+	old_0 = old_runs[0]
+
+	sec_name = 'data'
+
+	dummy_section = old_0[sec_name]
+	
+	section = _make_section(dummy_section, sec_name)
+	print(section)
+
+def test_make_list_section():
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs[OLD_RUNS]
+
+	old_0 = old_runs[0]
+
+
+	sec_name = 'data'
+	subsec_name = 'train_augs'
+	subsubsec_name = 'spatial_aug'
+
+	dummy_section = old_0[sec_name][subsec_name][subsubsec_name]
+	
+	section = _make_list_section(dummy_section, f"{sec_name}.{subsec_name}.{subsubsec_name}")
+	print(section)
+
+def test_make_nested_section():
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs[OLD_RUNS]
+
+	old_0 = old_runs[0]
+
+
+	sec_name = 'data'
+	# subsec_name = 'train_augs'
+	# subsubsec_name = 'spatial_aug'
+
+	dummy_section = old_0[sec_name]
+	
+	section = _handle_dict(dummy_section, sec_name)
+	print(section)
+
+def test_make_full_config():
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs[OLD_RUNS]
+
+	old_0 = old_runs[0]
+	
+	config_str = run_to_config(old_0, comments=["This is a comment", "Another comment"])
+	print(config_str)
+
+def get_old_comments(contents: str) -> list[str]:
+	"""Given the contents of a config file as a string, extracts the comment lines (starting with #) and returns them as a list of strings.
+
+	Args:
+		contents (str): The full string content of a config file
+	"""
+	lines = contents.splitlines()
+	comments = [line.replace('#', '').replace(';', '').strip() for line in lines if line.strip().startswith('#') or line.strip().startswith(';')]
+	return comments
+
+def get_save_name(save_path: str, mode: Literal['overwrite', 'duplicate'] = 'duplicate') -> str:
+	"""Generate a save name based on the save path and mode.
+
+	Args:
+		save_path (str): The path where the file will be saved.
+		mode (Literal['overwrite', 'duplicate'], optional): The mode for saving. Defaults to 'duplicate'.
+
+	Returns:
+		str: The generated save name.
+	"""
+
+	if mode == 'duplicate':
+		return f"{save_path}".replace('.toml', '_updated.toml').replace('.ini', '.toml')
+	else:
+		return f"{save_path}".replace('.ini', '.toml')
+
+def update_config_file(dry_run: bool = True, retro_support: bool = False):
+	from src.configs import load_config
+	from src.run_types import AdminInfo
+
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs[OLD_RUNS]
+
+	old_0 = old_runs[75]
+
+	conf_path = Path(old_0['admin']['config_path'])
+	print(f"Updating config file: {conf_path}")
+
+
+	if conf_path.exists():
+		with open(conf_path, 'r') as f:
+			old_contents = f.read()
+		old_comments = get_old_comments(old_contents)
+
+		try:
+			_ = load_config(AdminInfo.model_validate(old_0['admin']), retro_support=retro_support)
+			print(f'Valid config found at {conf_path}, skipping overwrite mode.')
+			return 
+		except Exception as e:
+			print(f"Validation failed for existing config: {e}")
+			
+			mode: Literal['overwrite', 'duplicate'] = 'duplicate'
+			print(f"Proceeding with {mode} mode.")
+
+	else:
+		old_comments = []
+		mode: Literal['overwrite', 'duplicate'] = 'overwrite'
+
+	config_str = run_to_config(old_0, comments=old_comments + ['updated by script'])
+
+	save_name = get_save_name(conf_path.as_posix(), mode=mode)
+
+	if dry_run:
+		print(config_str)
+		print(f"Would save to: {save_name}")
+	else:
+		parent_dir = Path(save_name).parent
+		parent_dir.mkdir(parents=True, exist_ok=True)
+		with open(save_name, 'w') as f:
+			f.write(config_str)
+		print(f"Saved config to: {save_name}")
+
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
@@ -872,4 +1122,9 @@ if __name__ == "__main__":
 	# update_runs9()
 	# test_set_inplace()
 	# test_edit_run()
-	update_runs10()
+	# update_runs10()
+	# test_make_section()
+	# test_make_list_section()
+	# test_make_nested_section()
+	# test_make_full_config()
+	update_config_file(dry_run=True, retro_support=False)

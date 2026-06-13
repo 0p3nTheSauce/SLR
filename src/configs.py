@@ -215,26 +215,33 @@ def load_config_retro(admin: AdminInfo) -> RunInfo:
     return RunInfo.model_validate({"admin": admin.model_dump(), **raw})
 
 
-def load_config(admin: AdminInfo) -> RunInfo:
+def load_config(admin: AdminInfo, retro_support: bool = False) -> RunInfo:
     """Load config from .toml file and merge with AdminInfo from CLI.
-    Supports backward compatibility with .ini files, using old loading mechanism.
+    Supports backward compatibility with .ini files, using old loading mechanism, if retro_support 
+    flag is on.
 
     Args:
-        admin: Parsed admin info from command line arguments.
-
-    Returns:
-        RunInfo: Fully validated config model for the run.
+        admin (AdminInfo): Parsed admin info from command line arguments.
+        retro_support (bool, optional): Try to handle old config format. Defaults to False.
 
     Raises:
         FileNotFoundError: If config file doesn't exist.
         pydantic.ValidationError: If config values fail validation.
+        ValueError: If .ini file found, but retro_support is False. 
+
+    Returns:
+        RunInfo: Fully validated config model for the run.
     """
+
     conf_path = Path(admin.config_path)
     if not conf_path.exists():
         raise FileNotFoundError(f"{conf_path} not found")
 
     if conf_path.name.endswith(".ini"):
-        return load_config_retro(admin)
+        if retro_support:
+            return load_config_retro(admin)
+        else:
+            raise ValueError(".ini file found, but retro_support is off")
 
     with open(conf_path, "rb") as f:
         raw = tomllib.load(f)
