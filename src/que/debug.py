@@ -970,12 +970,6 @@ def run_to_config( run: GenExp | dict, comments: list[str] = []) -> str:
 		config_str += f"\n# {comment}"
 
 	return config_str
-	
-
-
-
-
-
 
 def test_make_section():
 	
@@ -985,11 +979,11 @@ def test_make_section():
 
 	old_runs = all_runs[OLD_RUNS]
 
-	old_0 = old_runs[0]
+	run_info = old_runs[0]
 
 	sec_name = 'data'
 
-	dummy_section = old_0[sec_name]
+	dummy_section = run_info[sec_name]
 	
 	section = _make_section(dummy_section, sec_name)
 	print(section)
@@ -1000,14 +994,14 @@ def test_make_list_section():
 
 	old_runs = all_runs[OLD_RUNS]
 
-	old_0 = old_runs[0]
+	run_info = old_runs[0]
 
 
 	sec_name = 'data'
 	subsec_name = 'train_augs'
 	subsubsec_name = 'spatial_aug'
 
-	dummy_section = old_0[sec_name][subsec_name][subsubsec_name]
+	dummy_section = run_info[sec_name][subsec_name][subsubsec_name]
 	
 	section = _make_list_section(dummy_section, f"{sec_name}.{subsec_name}.{subsubsec_name}")
 	print(section)
@@ -1018,14 +1012,14 @@ def test_make_nested_section():
 
 	old_runs = all_runs[OLD_RUNS]
 
-	old_0 = old_runs[0]
+	run_info = old_runs[0]
 
 
 	sec_name = 'data'
 	# subsec_name = 'train_augs'
 	# subsubsec_name = 'spatial_aug'
 
-	dummy_section = old_0[sec_name]
+	dummy_section = run_info[sec_name]
 	
 	section = _handle_dict(dummy_section, sec_name)
 	print(section)
@@ -1036,9 +1030,9 @@ def test_make_full_config():
 
 	old_runs = all_runs[OLD_RUNS]
 
-	old_0 = old_runs[0]
+	run_info = old_runs[0]
 	
-	config_str = run_to_config(old_0, comments=["This is a comment", "Another comment"])
+	config_str = run_to_config(run_info, comments=["This is a comment", "Another comment"])
 	print(config_str)
 
 def get_old_comments(contents: str) -> list[str]:
@@ -1067,20 +1061,18 @@ def get_save_name(save_path: str, mode: Literal['overwrite', 'duplicate'] = 'dup
 	else:
 		return f"{save_path}".replace('.ini', '.toml')
 
-def update_config_file(dry_run: bool = True, retro_support: bool = False):
+
+def update_config_file(run: GenExp | dict, default_mode: Literal['overwrite', 'duplicate'] = 'overwrite', dry_run: bool = True, retro_support: bool = False):
 	from src.configs import load_config
 	from src.run_types import AdminInfo
 
-	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-		all_runs = json.load(f)
+	if isinstance(run, GenExp):
+		run_info = run.model_dump()
+	else:
+		run_info = run
 
-	old_runs = all_runs[OLD_RUNS]
-
-	old_0 = old_runs[75]
-
-	conf_path = Path(old_0['admin']['config_path'])
+	conf_path = Path(run_info['admin']['config_path'])
 	print(f"Updating config file: {conf_path}")
-
 
 	if conf_path.exists():
 		with open(conf_path, 'r') as f:
@@ -1088,20 +1080,20 @@ def update_config_file(dry_run: bool = True, retro_support: bool = False):
 		old_comments = get_old_comments(old_contents)
 
 		try:
-			_ = load_config(AdminInfo.model_validate(old_0['admin']), retro_support=retro_support)
+			_ = load_config(AdminInfo.model_validate(run_info['admin']), retro_support=retro_support)
 			print(f'Valid config found at {conf_path}, skipping overwrite mode.')
 			return 
 		except Exception as e:
 			print(f"Validation failed for existing config: {e}")
 			
-			mode: Literal['overwrite', 'duplicate'] = 'duplicate'
+			mode: Literal['overwrite', 'duplicate'] = default_mode
 			print(f"Proceeding with {mode} mode.")
 
 	else:
 		old_comments = []
 		mode: Literal['overwrite', 'duplicate'] = 'overwrite'
 
-	config_str = run_to_config(old_0, comments=old_comments + ['updated by script'])
+	config_str = run_to_config(run_info, comments=old_comments + ['updated by script'])
 
 	save_name = get_save_name(conf_path.as_posix(), mode=mode)
 
@@ -1115,6 +1107,31 @@ def update_config_file(dry_run: bool = True, retro_support: bool = False):
 			f.write(config_str)
 		print(f"Saved config to: {save_name}")
 
+
+
+def test_update_config_file(default_mode: Literal['overwrite', 'duplicate'] = 'overwrite', dry_run: bool = True, retro_support: bool = False):
+
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	old_runs = all_runs[OLD_RUNS]
+
+	run_info = old_runs[75]
+
+	update_config_file(run_info, default_mode, dry_run, retro_support)
+
+
+def test_update_all_files(default_mode: Literal['overwrite', 'duplicate'] = 'overwrite', dry_run: bool = True, retro_support: bool = False):
+	with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+		all_runs = json.load(f)
+
+	flat_all_runs = 
+
+	for run_info in flat_all_runs:
+		update_config_file(run_info, default_mode, dry_run, retro_support)
+
+
+
 if __name__ == "__main__":
 	# test_copy()
 	# update_runs3()
@@ -1127,4 +1144,4 @@ if __name__ == "__main__":
 	# test_make_list_section()
 	# test_make_nested_section()
 	# test_make_full_config()
-	update_config_file(dry_run=True, retro_support=False)
+	test_update_all_files(dry_run=True, retro_support=False)
