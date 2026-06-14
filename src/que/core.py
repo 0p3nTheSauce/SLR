@@ -121,6 +121,18 @@ class SortInfo(BaseModel):
 
 NO_SORT = SortInfo(key_set=[], reverse=False)
 
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+
+def _get_basic_logger() -> Logger:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        filename=SERVER_LOG_PATH,
+    )
+    return logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -240,7 +252,7 @@ def timestamp_path(path: Union[str, Path]) -> str:
 class Que:
     def __init__(
         self,
-        logger: Logger,
+        logger: Logger = _get_basic_logger(),
         runs_path: str | Path = RUN_PATH,
         auto_save: bool = False,
     ) -> None:
@@ -1137,15 +1149,6 @@ def connect_manager(
             time.sleep(retry_delay)
 
     raise RuntimeError("Cannot connect to Queue server.")
-
-
-def _get_basic_logger() -> Logger:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        filename=SERVER_LOG_PATH,
-    )
-    return logging.getLogger(__name__)
 
 
 def main():
