@@ -778,13 +778,13 @@ def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
     """Enumerate until the next available directory name
 
     Args:
-                    path (str | Path): Directory path
-                    make (bool, optional): Make the new directory. Defaults to False.
-                    decimals (int, optional): Number of digits to zfill by. Defaults to 3.
+        path (str | Path): Directory path
+        make (bool, optional): Make the new directory. Defaults to False.
+        decimals (int, optional): Number of digits to zfill by. Defaults to 3.
 
     Returns:
-                    Path: A unique path. If the path provided doesn't exist, it returns unchanged.
-                                    Otherwise, it returns with zfilled number appended
+        Path: A unique path. If the path provided doesn't exist, it returns unchanged.
+        Otherwise, it returns with zfilled number appended
     Example:
     >>> unique_dir_name = 'new_dir'
     >>> print(enum_dir(unique_dir_name, make=True))

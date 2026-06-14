@@ -3,7 +3,7 @@ import argparse
 import ast
 from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
 
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import json
 
