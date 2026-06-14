@@ -1,49 +1,86 @@
 [training]
 batch_size = 8
 update_per_step = 1
-# batch_size_equivalent = 8
 max_epoch = 200
+batch_size_equivalent = 8
 
 [optimizer]
-eps = 1e-5
-backbone_init_lr = 1e-4
-backbone_weight_decay = 1e-3
-classifier_init_lr = 1e-3
-classifier_weight_decay = 1e-3
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
 
 [model_params]
 drop_p = 0.5
-
+type = "supervised"
 
 [data]
-num_frames = 16
+strict_size = true
+target_length = 16
 frame_size = 224
 
 [data.train_augs]
-frame_size_strategy = 'Random_crop'
 normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+strict_size = true
+target_length = 16
+frame_size = 224
 
-[data.train_augs.frame_sampler]
-method = 'og'
-# wobble = 0
-
-[[data.train_augs.spatial_aug]]
-type = "HORIZONTAL_FLIP"
-p = 0.5
+[data.train_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
 
 [data.test_augs]
-frame_size_strategy = 'Centre_crop'
 normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 16
+frame_size = 224
 
-[data.test_augs.frame_sampler]
-method = 'og'
-# wobble = 0
-
+[data.test_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
 
 [early_stopping]
-metric = ['val', 'loss']
-mode = 'min'
-min_delta = 0.01
+metric = [
+    "val",
+    "loss",
+]
+mode = "min"
 patience = 15
+min_delta = 0.01
 
-#Saicair config
+
+# batch_size_equivalent = 8
+# wobble = 0
+# wobble = 0
+# Saicair config
+# updated by script

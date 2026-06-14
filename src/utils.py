@@ -15,7 +15,7 @@ from typing import Optional
 from multiprocessing.synchronize import Event as EventClass
 import math
 #locals
-from src.run_types import CONFIGS_PATH
+from src.run_types import CONFIGS_PATH, ZFILL
 
 ################ GPU ###################
 
@@ -26,15 +26,15 @@ class gpu_manager:
         """Get GPU usage across all processes
 
         Args:
-                                        gpu_id (int, optional): ID of GPU. Defaults to 0.
+            gpu_id (int, optional): ID of GPU. Defaults to 0.
 
         Raises:
-                                        RuntimeError: nvidia-smi failed with subprocess
-                                        ValueError: Unexpected nvidia-smi output
-                                        ValueError: Failed to parse GPU memory usage:
+            RuntimeError: nvidia-smi failed with subprocess
+            ValueError: Unexpected nvidia-smi output
+            ValueError: Failed to parse GPU memory usage:
 
         Returns:
-                                        Tuple[float, float]: used, total in GiB
+            Tuple[float, float]: used, total in GiB
         """
 
         result = subprocess.run(
@@ -629,151 +629,6 @@ def extract_num(fname):
         return num_substrs[0]
 
 
-def is_removable(f: Path, rem_files: list[str]) -> bool:
-    if not f.is_file():
-        return False
-    for r in rem_files:
-        if f.name.endswith(r):
-            return True
-    return False
-
-
-def is_empty(path):
-    return not any(Path(path).iterdir())
-
-
-def clean_checkpoint_dirs(
-    path: Path,
-    ask: bool = False,
-    add_zfill: bool = True,
-    decimals: int = 3,
-    rem_empty: bool = False,
-    rem_files: List = [str],
-    key_word: str = "checkpoint",
-) -> None:
-
-    remove = rem_empty
-    path_obj = Path(path)
-    # print(path_obj.name)
-    # Find checkpoint directories
-    check_point_dirs = [
-        item.name
-        for item in path_obj.iterdir()
-        if item.is_dir() and key_word in item.name
-    ]
-    # print(f'Length of check_point_dirs for path: {path}')
-    # print(len(check_point_dirs))
-    if rem_files:
-        to_rem = [p for p in path_obj.iterdir() if is_removable(p, rem_files)]
-        for f in to_rem:
-            remove = True
-            if ask:
-                ans = "none"
-                print(f"{f} is set to be removed")
-                while ans not in ("y", "", "n"):
-                    ans = input("Delete [y]/n: ")
-                remove = ans != "n"
-            if remove:
-                print(f"Deleting {f}")
-                f.unlink()
-            else:
-                print(f"Skipping {f}")
-
-    if len(check_point_dirs) == 0 or all(
-        [is_empty(path_obj / d) for d in check_point_dirs]
-    ):
-        if ask and rem_empty:
-            print(f"No checkpoints found in {path}")
-            ans = "none"
-            while ans not in ("y", "", "n"):
-                ans = input("Delete [y]/n: ")
-
-            if ans == "n":
-                remove = False
-        else:
-            print(f"Warning, no checkpoints found in {path}")
-
-        if rem_empty:
-            try:
-                shutil.rmtree(path)
-                print(f"Removed directory and all contents: {path}")
-            except OSError as e:
-                print(f"Error removing {path}: {e}")
-        else:
-            print(f"Warning, no checkpoints found in {path}")
-        # continue
-        return
-    # else:
-    # print("not emtpy")
-    # print(path_obj.name)
-
-    for check in check_point_dirs:
-        to_empty = path_obj / check
-
-        dirty = sorted([item.name for item in to_empty.iterdir() if item.is_file()])
-        files = [file for file in dirty if file.endswith(".pth") and "best" not in file]
-
-        if add_zfill:
-            for i, f in enumerate(files):
-                num = extract_num(f)
-                if num is None:
-                    continue
-                files[i] = f.replace(num, num.zfill(decimals))
-
-        if len(files) <= 2:
-            continue
-
-        # leave best.pth and the last checkpoint
-        if files[-1] == "psuedo_checkpoint.pth":
-            print("Ignoring psuedo_checkpoint")
-            files = files[:-1]
-        to_remove = files[:-1]  # not great safety wise, assumes files sort correctly
-        if ask:
-            ans = "none"
-            while ans != "y" and ans != "" and ans != "n":
-                print(
-                    f"Only keep checkpoint {files[-1]} in {to_empty} (excluding best.pth and non pth files)?"
-                )
-                ans = input(f"Delete up to {files[-2]}[y]/n: ")
-
-            if ans == "n":
-                continue
-
-        for file in to_remove:
-            file_path = to_empty / file
-            file_path.unlink()
-            print(f"removed {file} in {to_empty}")
-
-
-def recursive_cleaner(
-    path: str | Path,
-    ask: bool = False,
-    rem_empty: bool = False,
-    rem_files: List = [str],
-    stopping_keyword="checkpoints",
-):
-    path_obj = Path(path)
-
-    if not path_obj.exists():
-        raise FileNotFoundError(f"Runs directory: {path} was not found")
-
-    sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
-
-    check_pnt_dirs = [poss_c for poss_c in sub_paths if stopping_keyword in poss_c.name]
-
-    if len(check_pnt_dirs) > 0:
-        clean_checkpoint_dirs(
-            path_obj,
-            ask=ask,
-            rem_empty=rem_empty,
-            rem_files=rem_files,
-            key_word=stopping_keyword,
-        )
-    elif len(sub_paths) > 0:
-        for p in sub_paths:
-            recursive_cleaner(p, ask, rem_empty, rem_files, stopping_keyword)
-
-
 def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
     """Enumerate until the next available directory name
 
@@ -807,6 +662,167 @@ def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
     if make:
         path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def is_removable(f: Path, rem_files: list[str]) -> bool:
+    if not f.is_file():
+        return False
+    for r in rem_files:
+        if f.name.endswith(r):
+            return True
+    return False
+
+def is_empty(path):
+    return not any(Path(path).iterdir())
+
+def clean_checkpoint_dirs(
+    path: Path,
+    ask: bool = False,
+    add_zfill: bool = True,
+    decimals: int = ZFILL,
+    rem_empty: bool = False,
+    rem_files: List[str] = [],
+    key_word: str = "checkpoint",
+    ignore_keywords: List[str] = ["best"],
+) -> None:
+    """Clean run checkpoint directories in an experiment folder, keeping only the last checkpoint and any with ignore_keywords in the name. Optionally remove empty directories and files with specified suffixes.
+
+    Args:
+        path (Path): Experiment directory containing checkpoint subdirectories
+        ask (bool, optional): Whether to ask for confirmation before removing files. Defaults to False.
+        add_zfill (bool, optional): Whether to zfill the checkpoint numbers. Defaults to True.
+        decimals (int, optional): Number of digits to zfill by. Defaults to 3.
+        rem_empty (bool, optional): Whether to remove empty directories. Defaults to False.
+        rem_files (List[str], optional): List of file suffixes to remove. Defaults to [str].
+        key_word (str, optional): Keyword to identify checkpoint directories. Defaults to "checkpoint".
+        ignore_keywords (List[str], optional): List of keywords to ignore when selecting checkpoint directories. Defaults to ["best"].
+    """
+
+    remove = rem_empty
+    path_obj = Path(path)
+    check_point_dirs = [
+        item.name
+        for item in path_obj.iterdir()
+        if item.is_dir() and key_word in item.name
+    ]
+    
+    #Remove files with specified suffixes in rem_files 
+    if rem_files:
+        to_rem = [p for p in path_obj.iterdir() if is_removable(p, rem_files)]
+        for f in to_rem:
+            remove = True
+            if ask:
+                ans = "none"
+                print(f"{f} is set to be removed")
+                while ans not in ("y", "", "n"):
+                    ans = input("Delete [y]/n: ")
+                remove = ans != "n"
+            if remove:
+                print(f"Deleting {f}")
+                f.unlink()
+            else:
+                print(f"Skipping {f}")
+
+    #Removing empty directories
+    if len(check_point_dirs) == 0 or all(
+        [is_empty(path_obj / d) for d in check_point_dirs]
+    ):
+        if ask and rem_empty:
+            print(f"No checkpoints found in {path}")
+            ans = "none"
+            while ans not in ("y", "", "n"):
+                ans = input("Delete [y]/n: ")
+
+            if ans == "n":
+                remove = False
+        else:
+            print(f"Warning, no checkpoints found in {path}")
+
+        if rem_empty:
+            try:
+                shutil.rmtree(path)
+                print(f"Removed directory and all contents: {path}")
+            except OSError as e:
+                print(f"Error removing {path}: {e}")
+        else:
+            print(f"Warning, no checkpoints found in {path}")
+        return
+
+    # Remove checkpoint files, keeping only the last one and any with ignore_keywords in the name
+    for check in check_point_dirs:
+        to_empty = path_obj / check
+
+        dirty = sorted([item.name for item in to_empty.iterdir() if item.is_file()])
+        files = [file for file in dirty if file.endswith(".pth") and not any(keyword in file for keyword in ignore_keywords)]
+
+        if add_zfill:
+            for i, f in enumerate(files):
+                num = extract_num(f)
+                if num is None:
+                    continue
+                files[i] = f.replace(num, num.zfill(decimals))
+
+        if len(files) <= 2:
+            continue
+
+        # leave best.pth and the last checkpoint
+        to_remove = files[:-1]  
+        if ask:
+            ans = "none"
+            while ans != "y" and ans != "" and ans != "n":
+                print(
+                    f"Only keep checkpoint {files[-1]} in {to_empty} (excluding best.pth and non pth files)?"
+                )
+                ans = input(f"Delete up to {files[-2]}[y]/n: ")
+
+            if ans == "n":
+                continue
+
+        for file in to_remove:
+            file_path = to_empty / file
+            file_path.unlink()
+            print(f"removed {file} in {to_empty}")
+
+
+def recursive_cleaner(
+    path: str | Path,
+    ask: bool = False,
+    rem_empty: bool = False,
+    rem_files: List[str] = [],
+    stopping_keyword="checkpoints",
+):
+    """Recursively clean runs checkpoints and miscilaneaous files 
+
+    Args:
+        path (str | Path): Base runs directory to clean
+        ask (bool, optional): Whether to ask for confirmation before removing files. Defaults to False.
+        rem_empty (bool, optional): Whether to remove empty directories. Defaults to False.
+        rem_files (List[str], optional): List of file suffixes to remove. Defaults to [].
+        stopping_keyword (str, optional): Keyword to identify checkpoint directories. Defaults to "checkpoints".
+
+    Raises:
+        FileNotFoundError: If the provided path does not exist
+    """
+    path_obj = Path(path)
+
+    if not path_obj.exists():
+        raise FileNotFoundError(f"Runs directory: {path} was not found")
+
+    sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
+
+    check_pnt_dirs = [poss_c for poss_c in sub_paths if stopping_keyword in poss_c.name]
+
+    if len(check_pnt_dirs) > 0:
+        clean_checkpoint_dirs(
+            path_obj,
+            ask=ask,
+            rem_empty=rem_empty,
+            rem_files=rem_files,
+            key_word=stopping_keyword,
+        )
+    elif len(sub_paths) > 0:
+        for p in sub_paths:
+            recursive_cleaner(p, ask, rem_empty, rem_files, stopping_keyword)
 
 
 def main():

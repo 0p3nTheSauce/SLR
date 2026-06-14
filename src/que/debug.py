@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any, Literal
+from typing import Optional, Literal
 import shlex
 import configs
 import json
@@ -16,7 +16,6 @@ from .shell import QueShell
 
 # from que.shell import QueShell
 from src.que.core import (
-    GenExp,
     Que,
     connect_manager,
     _get_basic_logger,
@@ -28,16 +27,9 @@ from src.que.core import (
 )
 from src.que.tmux import tmux_manager
 from src.run_types import (
-    CentreCropConfig,
-    RandomCropConfig,
-    ScaleAndPadConfig,
-    RunInfo,
     FailedExp,
     CompExpInfo,
     ExpInfo,
-    HorizontalFlipConfig,
-    AugInfo,
-    CONFIG_FILETYPE
 )
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
@@ -279,171 +271,6 @@ def test_copy():
     q.disp_run("to_run", 0)
 
 
-def update_runs():
-    q = Que(_get_basic_logger())
-    # q.update_runs("to_run", [0], {"status": "updated"})
-    q.disp_run("old_runs", 0)
-
-    # q.disp_run("to_run", 0)
-
-
-def update_runs2():
-
-    data_default_dict = {
-        "train_augs": {
-            "normalise": True,
-            "norm_dict": None,
-            "frame_size_strategy": "Random_crop",
-            "frame_sampler": {"max_wobble": 0, "method": "og", "randomise": False},
-            "temporal_aug": [],
-            "spatial_aug": ["Horizontal_flip"],
-        },
-        "test_augs": {
-            "normalise": True,
-            "norm_dict": None,
-            "frame_size_strategy": "Centre_crop",
-            "frame_sampler": {"max_wobble": 0, "method": "og", "randomise": False},
-            "temporal_aug": [],
-            "spatial_aug": [],
-        },
-    }
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    # for key in KEYS:
-    que_list = all_runs[TO_RUN] + all_runs[CUR_RUN]
-    new_quelist = []
-    for run in que_list:
-        for key in data_default_dict.keys():
-            if key not in run["data"]:
-                run["data"][key] = data_default_dict[key]
-        ExpInfo.model_validate(run)
-        new_quelist.append(run)
-
-    all_runs[TO_RUN] = new_quelist
-    all_runs[CUR_RUN] = []
-
-    que_list = all_runs[FAIL_RUNS]
-    new_quelist = []
-    for run in que_list:
-        for key in data_default_dict.keys():
-            if key not in run["data"]:
-                run["data"][key] = data_default_dict[key]
-        try:
-            FailedExp.model_validate(run)
-        except Exception as e:
-            print(e)
-            continue
-        new_quelist.append(run)
-    all_runs[FAIL_RUNS] = new_quelist
-
-    que_list = all_runs[OLD_RUNS]
-    new_quelist = []
-    for run in que_list:
-        for key in data_default_dict.keys():
-            if key not in run["data"]:
-                run["data"][key] = data_default_dict[key]
-        if isinstance(run["admin"]["exp_no"], int):
-            run["admin"]["exp_no"] = str(run["admin"]["exp_no"]).zfill(3)
-        CompExpInfo.model_validate(run)
-        new_quelist.append(run)
-    all_runs[OLD_RUNS] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
-def fix_spatial(set_augs: Dict[str, Any]) -> Dict[str, Any]:
-
-    replace_dict = {"Horizontal_flip": HorizontalFlipConfig().model_dump()}
-
-    new_spatial = []
-    for spatial in set_augs["spatial_aug"]:
-        if isinstance(spatial, str):
-            if spatial in replace_dict:
-                new_spatial.append(replace_dict[spatial])
-            else:
-                print(f"{spatial} not in replace_dict")
-        else:
-            print(f"Type: {spatial} not string")
-    set_augs["spatial_aug"] = new_spatial
-
-    return set_augs
-
-
-def fix_temporal(set_augs: Dict[str, Any]) -> Dict[str, Any]:
-
-    not_allowed_keys = [
-        "Shuffle"  # not sure how this snuck into some configs
-    ]
-    aug_key = "temporal_aug"
-    new_temporal = []
-    for temporal in set_augs[aug_key]:
-        if isinstance(temporal, str):
-            if temporal in not_allowed_keys:
-                print(f"Skipping: {temporal}")
-            else:
-                print(f"keeping: {temporal}")
-                new_temporal.append(temporal)
-        else:
-            print(f"Type: {temporal} not string")
-    set_augs[aug_key] = new_temporal
-
-    return set_augs
-
-
-def fix_all(set_augs: Dict[str, Any]) -> Dict[str, Any]:
-    return fix_temporal(fix_spatial(set_augs))
-
-
-def update_runs3():
-
-    replace_dict = {"Horizontal_flip": HorizontalFlipConfig().model_dump()}
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    # for key in KEYS:
-    que_list = all_runs[TO_RUN] + all_runs[CUR_RUN]
-    new_quelist = []
-    for run in que_list:
-        ExpInfo.model_validate(run)
-        new_quelist.append(run)
-
-    que_list = all_runs[FAIL_RUNS]
-    new_quelist = []
-    for run in que_list:
-        train_augs = run["data"]["train_augs"]
-        test_augs = run["data"]["test_augs"]
-
-        train_augs = fix_all(train_augs)
-        test_augs = fix_all(test_augs)
-
-        try:
-            FailedExp.model_validate(run)
-        except Exception as e:
-            print(e)
-            continue
-        new_quelist.append(run)
-    all_runs[FAIL_RUNS] = new_quelist
-
-    que_list = all_runs[OLD_RUNS]
-    new_quelist = []
-    for run in que_list:
-        train_augs = run["data"]["train_augs"]
-        test_augs = run["data"]["test_augs"]
-
-        train_augs = fix_all(train_augs)
-        test_augs = fix_all(test_augs)
-        CompExpInfo.model_validate(run)
-        new_quelist.append(run)
-    all_runs[OLD_RUNS] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
 def validate_runs(runs_path="/home/luke/Code/SLR/src/que/Runs.json"):
     q = Que(_get_basic_logger(), runs_path=runs_path)
     # q.update_runs("to_run", [0], {"status": "updated"})
@@ -454,207 +281,6 @@ def validate_runs(runs_path="/home/luke/Code/SLR/src/que/Runs.json"):
         print("\n", "-" * 20, "\n")
 
     # q.disp_run("to_run", 0)
-
-
-def update_runs4():
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    # for key in KEYS:
-
-    que_list = all_runs[OLD_RUNS]
-    new_quelist = []
-    for run in que_list:
-        train_augs = run["data"]["train_augs"]
-        test_augs = run["data"]["test_augs"]
-        AugInfo.model_validate(train_augs)
-        AugInfo.model_validate(test_augs)
-        CompExpInfo.model_validate(run)
-        new_quelist.append(run)
-    all_runs[OLD_RUNS] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
-def update_runs5():
-
-    def map_frame_size_strat_to_crop_config(fss, sz):
-        return {
-            "Centre_crop": CentreCropConfig(size=sz).model_dump(),  # type: ignore
-            "Random_crop": RandomCropConfig(size=sz).model_dump(),  # type: ignore
-            "Scale_and_pad": ScaleAndPadConfig(size=sz).model_dump(),  # type: ignore
-        }[fss]
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    # for key in KEYS:
-
-    # loc = KEYS[0]
-    for loc in KEYS:
-        que_list = all_runs[loc]
-        new_quelist = []
-        for run in que_list:
-            data = run["data"]
-            nf = data.pop("num_frames")
-            fs = data.pop("frame_size")
-            keys = ["test_augs", "train_augs"]
-            for key in keys:
-                fss = data[key].pop("frame_size_strategy")
-                k = "spatial_aug"
-                data[key][k] = [map_frame_size_strat_to_crop_config(fss, fs)] + data[
-                    key
-                ][k]
-                k = "temporal_aug"
-                if len(data[key][k]) > 0 and data[key][k][0] == "Shuffle":
-                    data[key][k].pop(0)
-                s = data[key].pop("frame_sampler")
-                s["type"] = s.pop("method")
-                s["target_length"] = nf
-                data[key][k] = [s] + data[key][k]
-
-            if loc in KEYS[:2]:
-                ExpInfo.model_validate(run)
-            elif loc == KEYS[2]:
-                CompExpInfo.model_validate(run)
-            else:
-                FailedExp.model_validate(run)
-            new_quelist.append(run)
-
-        all_runs[loc] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
-def update_runs6():
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    # for key in KEYS:
-
-    # loc = KEYS[0]
-    for loc in KEYS:
-        que_list = all_runs[loc]
-        new_quelist = []
-        for run in que_list:
-            data = run["data"]
-            # nf = data.pop("num_frames")
-            # fs = data.pop("frame_size")
-            keys = ["test_augs", "train_augs"]
-            for key in keys:
-                keys2 = ["spatial_aug"]
-                for k2 in keys2:
-                    for i, aug in enumerate(data[key][k2]):
-                        if "size" in aug:
-                            frame_size = aug.pop("size")
-                            data[key][k2][i]["frame_size"] = frame_size
-
-            if loc in KEYS[:2]:
-                run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
-                run = CompExpInfo.model_validate(run).model_dump()
-            else:
-                run = FailedExp.model_validate(run).model_dump()
-            new_quelist.append(run)
-
-        all_runs[loc] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
-def update_runs7():
-    from run_types import SupervisedInfo
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    # for key in KEYS:
-
-    for loc in KEYS:
-        que_list = all_runs[loc]
-        new_quelist = []
-        for run in que_list:
-            model_params = run["model_params"]
-            modp = SupervisedInfo.model_validate(model_params)
-            run["model_params"] = modp.model_dump()
-
-            if loc in KEYS[:2]:
-                run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
-                run = CompExpInfo.model_validate(run).model_dump()
-            else:
-                run = FailedExp.model_validate(run).model_dump()
-
-            new_quelist.append(run)
-
-        all_runs[loc] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
-def update_runs8():
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    for loc in KEYS:
-        que_list = all_runs[loc]
-        new_quelist = []
-        for run in que_list:
-            data = run["data"]
-            keys = ["test_augs", "train_augs"]
-            for key in keys:
-                # keys2 = [ 'spatial_aug']
-                # for k2 in keys2:
-                k2 = "temporal_aug"
-                for i, aug in enumerate(data[key][k2]):
-                    if aug["type"] == "shuffle":
-                        data[key][k2].pop(i)
-
-            run["data"] = data
-
-            if loc in KEYS[:2]:
-                run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
-                run = CompExpInfo.model_validate(run).model_dump()
-            else:
-                run = FailedExp.model_validate(run).model_dump()
-
-            new_quelist.append(run)
-
-        all_runs[loc] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
-
-def update_runs9():
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    for loc in KEYS:
-        que_list = all_runs[loc]
-        new_quelist = []
-        for run in que_list:
-            if loc in KEYS[:2]:
-                run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
-                run = CompExpInfo.model_validate(run).model_dump()
-            else:
-                run = FailedExp.model_validate(run).model_dump()
-
-            new_quelist.append(run)
-
-        all_runs[loc] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
-
 
 def test_set_inplace():
     from .core import Que
@@ -767,7 +393,8 @@ def test_edit_run():
     }
 
     # demo = Que.set_nested(demo, ['admin', 'wandb', 'run_id'], 'abcd')
-    valid = strict_validate(ExpInfo, demo)
+    _ = strict_validate(ExpInfo, demo)
+    # valid = strict_validate(ExpInfo, demo)
     # valid = ExpInfo.model_validate(demo)
 
 
@@ -797,63 +424,6 @@ def update_runs10():
     with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
         json.dump(all_runs, f, indent=4)
 
-
-def test_make_list_section():
-    from src.que.runs_to_configs import _make_list_section
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    old_runs = all_runs[OLD_RUNS]
-
-    run_info = old_runs[0]
-
-    sec_name = "data"
-    subsec_name = "train_augs"
-    subsubsec_name = "spatial_aug"
-
-    dummy_section = run_info[sec_name][subsec_name][subsubsec_name]
-
-    section = _make_list_section(
-        dummy_section, f"{sec_name}.{subsec_name}.{subsubsec_name}"
-    )
-    print(section)
-
-
-def test_make_nested_section():
-    from src.que.runs_to_configs import _handle_dict
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    old_runs = all_runs[OLD_RUNS]
-
-    run_info = old_runs[0]
-
-    sec_name = "data"
-    # subsec_name = 'train_augs'
-    # subsubsec_name = 'spatial_aug'
-
-    dummy_section = run_info[sec_name]
-
-    section = _handle_dict(dummy_section, sec_name)
-    print(section)
-
-
-def test_make_full_config():
-    from src.que.runs_to_configs import run_to_config
-
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    old_runs = all_runs[OLD_RUNS]
-
-    run_info = old_runs[0]
-
-    config_str = run_to_config(
-        run_info, comments=["This is a comment", "Another comment"]
-    )
-    print(config_str)
 
 
 def test_update_config_file(
@@ -888,7 +458,7 @@ def test_update_all_files(
     for key in KEYS:
         flat_all_runs.extend(all_runs[key])
 
-    for run_info in flat_all_runs[-2:-1]:
+    for run_info in flat_all_runs:
         update_config_file(run_info, default_mode, dry_run, retro_support, output = output)
 
     print(len(flat_all_runs))
@@ -912,9 +482,9 @@ if __name__ == "__main__":
     
     
     test_update_all_files(
-        dry_run=True,
+        dry_run=False,
         retro_support=False,
-        output=debug_path
+        # output=debug_path
         )
     
     
