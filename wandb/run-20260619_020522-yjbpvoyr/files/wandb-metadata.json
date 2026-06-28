@@ -1,0 +1,46 @@
+{
+  "os": "Linux-6.17.0-35-generic-x86_64-with-glibc2.39",
+  "python": "CPython 3.10.18",
+  "startedAt": "2026-06-19T00:05:22.561767Z",
+  "args": [
+    "MViTv2_B_32x3",
+    "asl100",
+    "--base_config",
+    "/home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml"
+  ],
+  "program": "/home/luke/Code/SLR/src/sweeping.py",
+  "codePath": "src/sweeping.py",
+  "codePathLocal": "src/sweeping.py",
+  "git": {
+    "remote": "git@github.com:0p3nTheSauce/SLR.git",
+    "commit": "29d3660575800e032b8d76dce6480a762050e5e8"
+  },
+  "email": "ljgoodall2001@gmail.com",
+  "root": "/home/luke/Code/SLR",
+  "host": "luke-PPB660M-C",
+  "executable": "/home/luke/miniconda3/envs/wlasl/bin/python",
+  "cpu_count": 6,
+  "cpu_count_logical": 12,
+  "gpu": "NVIDIA GeForce RTX 3060",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "982820896768",
+      "used": "384028979200"
+    }
+  },
+  "memory": {
+    "total": "16497381376"
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 3060",
+      "memoryTotal": "12884901888",
+      "cudaCores": 3584,
+      "architecture": "Ampere",
+      "uuid": "GPU-2303bb76-deee-9079-dc7c-c1ebfe2cee24"
+    }
+  ],
+  "cudaVersion": "13.2",
+  "writerId": "eolk15umxeullc3qrj86piubn9fv6opy"
+}

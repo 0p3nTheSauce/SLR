@@ -1,0 +1,179 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        e:
+            o75d8ey8x4xzc543p0g9r1dkz19eaw0t:
+                args:
+                    - MViTv2_B_32x3
+                    - asl100
+                    - --base_config
+                    - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml
+                codePath: src/sweeping.py
+                codePathLocal: src/sweeping.py
+                cpu_count: 6
+                cpu_count_logical: 12
+                cudaVersion: "13.2"
+                disk:
+                    /:
+                        total: "982820896768"
+                        used: "409388126208"
+                email: ljgoodall2001@gmail.com
+                executable: /home/luke/miniconda3/envs/wlasl/bin/python
+                git:
+                    commit: 29d3660575800e032b8d76dce6480a762050e5e8
+                    remote: git@github.com:0p3nTheSauce/SLR.git
+                gpu: NVIDIA GeForce RTX 3060
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 3584
+                      memoryTotal: "12884901888"
+                      name: NVIDIA GeForce RTX 3060
+                      uuid: GPU-2303bb76-deee-9079-dc7c-c1ebfe2cee24
+                host: luke-PPB660M-C
+                memory:
+                    total: "16497381376"
+                os: Linux-6.17.0-35-generic-x86_64-with-glibc2.39
+                program: /home/luke/Code/SLR/src/sweeping.py
+                python: CPython 3.10.18
+                root: /home/luke/Code/SLR
+                startedAt: "2026-06-24T01:12:12.672834Z"
+                writerId: o75d8ey8x4xzc543p0g9r1dkz19eaw0t
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 5
+                - 29
+                - 41
+                - 43
+                - 53
+            "2":
+                - 1
+                - 5
+                - 29
+                - 41
+                - 43
+                - 53
+            "3":
+                - 2
+                - 14
+                - 17
+            "4": 3.10.18
+            "5": 0.23.0
+            "12": 0.23.0
+            "13": linux-x86_64
+admin:
+    value:
+        config_path: /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml
+        dataset: WLASL
+        exp_no: 5w4o6y6h
+        model: MViTv2_B_32x3
+        recover: false
+        save_path: /home/luke/Code/SLR/src/runs/asl100/MViTv2_B_32x3/sweep_9vhjo3au/5w4o6y6h/checkpoints
+        seed: 42
+        split: asl100
+        weight_path: null
+data:
+    value:
+        frame_size: 224
+        strict_size: true
+        target_length: 32
+        test_augs:
+            frame_size: 224
+            norm_dict:
+                mean:
+                    - 0.45
+                    - 0.45
+                    - 0.45
+                std:
+                    - 0.225
+                    - 0.225
+                    - 0.225
+            normalise: true
+            spatial_aug:
+                - frame_size: 224
+                  type: Centre_crop
+            strict_size: true
+            target_length: 32
+            temporal_aug:
+                - max_wobble: 0
+                  target_length: 32
+                  type: uniform
+        train_augs:
+            frame_size: 224
+            norm_dict:
+                mean:
+                    - 0.45
+                    - 0.45
+                    - 0.45
+                std:
+                    - 0.225
+                    - 0.225
+                    - 0.225
+            normalise: true
+            spatial_aug:
+                - p: 0.5
+                  type: HORIZONTAL_FLIP
+                - frame_size: 224
+                  type: Centre_crop
+                - interpolation: bilinear
+                  magnitude: 12
+                  num_magnitude_bins: 31
+                  num_ops: 3
+                  type: RANDAUGMENT
+            strict_size: true
+            target_length: 32
+            temporal_aug:
+                - max_wobble: 2
+                  target_length: 32
+                  type: chunked
+data.train_augs.spatial_aug.2.magnitude:
+    value: 12
+data.train_augs.temporal_aug.0.max_wobble:
+    value: 2
+early_stopping:
+    value:
+        metric:
+            - val
+            - loss
+        min_delta: 0.01
+        mode: min
+        patience: 20
+model_params:
+    value:
+        drop_p: 0.3
+        type: supervised
+model_params.drop_p:
+    value: 0.3
+optimizer:
+    value:
+        backbone_init_lr: 0.0001549529710867987
+        backbone_weight_decay: 0.0004996263794802689
+        classifier_init_lr: 0.0004065524120340433
+        classifier_weight_decay: 0.001814098085178176
+        eps: 1e-05
+optimizer.backbone_init_lr:
+    value: 0.0001549529710867987
+optimizer.backbone_weight_decay:
+    value: 0.0004996263794802689
+optimizer.classifier_init_lr:
+    value: 0.0004065524120340433
+optimizer.classifier_weight_decay:
+    value: 0.001814098085178176
+scheduler:
+    value:
+        eta_min: 0
+        t0: 20
+        tmult: 1
+        type: CosineAnnealingWarmRestarts
+        warm_up: null
+scheduler.t0:
+    value: 20
+training:
+    value:
+        batch_size: 1
+        batch_size_equivalent: 8
+        max_epoch: 200
+        update_per_step: 8

@@ -1,0 +1,18 @@
+wandb_version: 1
+
+data.train_augs.spatial_aug.2.magnitude:
+  value: 9
+data.train_augs.temporal_aug.0.max_wobble:
+  value: 2
+model_params.drop_p:
+  value: 0.5
+optimizer.backbone_init_lr:
+  value: 0.00034218243895276494
+optimizer.backbone_weight_decay:
+  value: 0.0009324088350844076
+optimizer.classifier_init_lr:
+  value: 0.00023918393131089856
+optimizer.classifier_weight_decay:
+  value: 0.00016221250939494705
+scheduler.t0:
+  value: 10
