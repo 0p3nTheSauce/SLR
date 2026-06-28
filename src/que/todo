@@ -1,6 +1,3 @@
-GUI: 
-- trash the vibe coded gui.html + api.py and build from scratch
-
 
 Que:
 - add flag to check if changes were made before saving 
@@ -10,10 +7,17 @@ Shell:
 - add a flag to turn into debugging mode. Check debugging mode in unwrap_exception
 - fix argument parsing short flags
 
-Daemon
+Daemon:
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
     that the process started successfully)
+
+
+Worker: 
+- add sweeping functionality
+- if GPU is busy on startup, gets stuck, needs server process to be restarted
 
 Server:
 - redirect wandb output to log file
 - redirect testing output to log file
+
+
