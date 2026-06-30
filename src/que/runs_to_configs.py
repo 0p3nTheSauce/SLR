@@ -128,10 +128,12 @@ def update_config_file(
     print(f"Updating config file: {conf_path}")
 
     if conf_path.exists():
+        # get old comments
         with open(conf_path, "r") as f:
             old_contents = f.read()
         old_comments = _get_old_comments(old_contents)
 
+        #skip file if it is already valid
         try:
             _ = load_config(
                 AdminInfo.model_validate(run_info["admin"]), retro_support=retro_support
@@ -148,8 +150,9 @@ def update_config_file(
         old_comments = []
         mode: Literal["overwrite", "duplicate"] = "overwrite"
 
+    #generate new config file
     config_str = _run_to_config(run_info, comments=old_comments + ["updated by script"])
-
+    #get save path
     save_name = _get_save_name(conf_path.as_posix(), mode=mode)
 
     if dry_run:
@@ -158,6 +161,7 @@ def update_config_file(
     else:
         parent_dir = Path(save_name).parent
         parent_dir.mkdir(parents=True, exist_ok=True)
+        #write file
         with open(save_name, "w") as f:
             f.write(config_str)
         print(f"Saved config to: {save_name}")
@@ -252,33 +256,15 @@ if __name__ == '__main__':
     chosen_command = args.command if args.command else "all"
 
     if chosen_command == "single":
-        try:
-            if Path(args.run_data).exists():
-                with open(args.run_data, "r") as f:
-                    db = json.load(f)
-                
-                # If it's a structural run database dictionary matching your framework
-                if isinstance(db, dict) and args.key in db:
-                    target_section = db[args.key]
-                    
-                    if isinstance(target_section, list):
-                        if 0 <= args.index < len(target_section):
-                            run_payload = target_section[args.index]
-                        else:
-                            parser.error(f"Index {args.index} is out of bounds for section '{args.key}' (length: {len(target_section)}).")
-                    else:
-                        # Fallback if the section isn't a list
-                        run_payload = target_section
-                else:
-                    run_payload = db
-            else:
-                run_payload = json.loads(args.run_data)
-                
-        except Exception as e:
-            parser.error(f"Failed to process --run-data: {e}")
 
+        p = Path(args.run_data)
+        assert p.exists()
+        
+        with open(args.run_data, 'r') as f:
+            all_runs = json.load(f)
+    
         update_config_file(
-            run=run_payload,
+            run=all_runs[args.key][args.index],
             default_mode=args.mode,
             dry_run=args.dry_run,
             retro_support=args.retro_support,

@@ -342,11 +342,14 @@ StoppingMetrics: TypeAlias = Literal["loss", "acc"]
 StoppingPhases: TypeAlias = Literal['val', 'train']
 StoppingModes: TypeAlias = Literal["min", "max"]
 
-
 class StopperInfo(BaseModel):
+    type: Literal["stopper"] = "stopper"
     max_epoch: int
 
-class StopperOn(StopperInfo):
+
+class EarlyStopperInfo(BaseModel):
+    type: Literal["early_stopper"] = "early_stopper"
+    max_epoch: int
     metric: StoppingMetrics
     phase: StoppingPhases
     mode: StoppingModes
@@ -354,7 +357,7 @@ class StopperOn(StopperInfo):
     min_delta: float
 
     @model_validator(mode="after")
-    def _config_precheck(self) -> "StopperOn":
+    def _config_precheck(self) -> "EarlyStopperInfo":
         if self.patience <= 0:
             raise ValueError(
                 f"Patience must be a positive integer, got {self.patience}"
@@ -363,8 +366,13 @@ class StopperOn(StopperInfo):
             raise ValueError(
                 f"Min delta must be non-negative, got {self.min_delta}"
             )
-            
         return self
+
+
+StopperConfig = Annotated[
+    Union[StopperInfo, EarlyStopperInfo],
+    Field(discriminator="type"),
+]
     
     
 class StopperState(BaseModel):
@@ -585,7 +593,7 @@ class RunInfo(BaseModel):
     model_params: ModelInfo = Field(default_factory=SupervisedInfo)
     data: DataInfo
     scheduler: Optional[SchedInfo] = None
-    stopping: StopperInfo
+    stopping: StopperConfig
 
     @field_validator("model_params", mode="before")
     @classmethod

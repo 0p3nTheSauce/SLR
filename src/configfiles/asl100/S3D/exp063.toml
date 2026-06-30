@@ -1,7 +1,6 @@
 [training]
 batch_size = 8
 update_per_step = 1
-max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -75,11 +74,11 @@ t0 = 10
 tmult = 2
 eta_min = 0.0
 
-[early_stopping]
-metric = [
-    "val",
-    "loss",
-]
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
 mode = "min"
 patience = 50
 min_delta = 0.01
@@ -87,4 +86,5 @@ min_delta = 0.01
 
 # Same as exp052.ini
 # but with uniform sampler, should be the same
+# updated by script
 # updated by script

@@ -1040,7 +1040,7 @@ class Que:
 
 Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 
-
+#Maintained TypedDict for dictproxy in basemanager
 class WorkerStateDict(TypedDict):
     task: Worker_tasks
     current_run_id: Optional[str]
@@ -1055,51 +1055,52 @@ class DaemonStateDict(TypedDict):
     sweep_id: Optional[str]
 
 
-class ServerState(BaseModel):
-    server_pid: Optional[int]
-    daemon_state: DaemonStateDict
-    worker_state: WorkerStateDict
 
 
-def is_worker_state(obj: Any) -> TypeGuard[WorkerStateDict]:
+def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
-        task: Worker_tasks
-        current_run_id: Optional[str]
-        working_pid: Optional[int]
-        exception: Optional[str]
+        task: Worker_tasks = 'inactive'
+        current_run_id: Optional[str] = None
+        working_pid: Optional[int] = None
+        exception: Optional[str] = None
+        sweep_id: Optional[str] = None
+        
+    d = WorkerState.model_validate(obj)
+    return {
+        'task': d.task,
+        'current_run_id': d.current_run_id,
+        'exception': d.exception,
+        'sweep_id':d.sweep_id,
+        'working_pid':d.working_pid
+    } 
 
-    try:
-        WorkerState.model_validate(obj)
-        return True
-    except Exception:
-        return False
-
-
-def is_daemon_state(obj: Any) -> TypeGuard[DaemonStateDict]:
+def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):
-        awake: bool
-        stop_on_fail: bool
-        supervisor_pid: Optional[int]
+        awake: bool = False
+        stop_on_fail: bool = True
+        supervisor_pid: Optional[int] = None
+        sweep_id: Optional[str] = None
+    
+    d = DaemonState.model_validate(obj)
+    return {
+        'awake':d.awake,
+        'stop_on_fail':d.stop_on_fail,
+        'supervisor_pid':d.supervisor_pid,
+        'sweep_id':d.sweep_id,
+    }
 
-    try:
-        DaemonState.model_validate(obj)
-        return True
-    except Exception:
-        return False
-
-
-def is_server_state(obj: Any) -> TypeGuard[ServerState]:
-    try:
-        ServerState.model_validate(obj)
-        return True
-    except Exception:
-        return False
+class ServerState(BaseModel):
+    server_pid: Optional[int] = None
+    daemon_state: DaemonStateDict = daemon_state_validate({})
+    worker_state: WorkerStateDict = worker_state_validate({})
 
 
 def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
     """Load and validate ServerState from JSON.  Raises ValidationError if invalid."""
     with open(state_path, "r") as f:
         data = json.load(f)
+        
+
     return ServerState.model_validate(data)
 
 

@@ -1,43 +1,72 @@
 [training]
-batch_size = 2
-update_per_step = 4
-max_epoch = 200
+batch_size = 8
+update_per_step = 1
+batch_size_equivalent = 8
 
 [optimizer]
-eps = 1e-5
-backbone_init_lr = 1e-4
-backbone_weight_decay = 1e-3
-classifier_init_lr = 1e-3
-classifier_weight_decay = 1e-3
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
 
 [model_params]
 drop_p = 0.5
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
 
 [data.train_augs]
 normalise = true
-
-[[data.train_augs.temporal_aug]]
-type = "og"
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+strict_size = true
 target_length = 32
-
-[[data.train_augs.spatial_aug]]
-type = "Random_crop"
 frame_size = 224
 
-[[data.train_augs.spatial_aug]]
-type = "HORIZONTAL_FLIP"
-p = 0.5
+[data.train_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
 
 [data.test_augs]
 normalise = true
-
-[[data.test_augs.temporal_aug]]
-type = "og"
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
 target_length = 32
-
-[[data.test_augs.spatial_aug]]
-type = "Centre_crop"
 frame_size = 224
+
+[data.test_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
 
 [scheduler]
 type = "CosineAnnealingWarmRestarts"
@@ -45,12 +74,17 @@ t0 = 10
 tmult = 1
 eta_min = 0.0
 
-[early_stopping]
-metric = ['val', 'loss']
-mode = 'min'
-patience = 50
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
 min_delta = 0.01
 
-#Same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_S/exp011.ini
+
+# Same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_S/exp011.ini
 # but with MViTv2_B32x3 and updated augmentations
 # and patience = 15
+# updated by script

@@ -1,7 +1,6 @@
 [training]
 batch_size = 2
 update_per_step = 4
-max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -74,11 +73,11 @@ type = "CosineAnnealingLR"
 tmax = 100
 eta_min = 1e-05
 
-[early_stopping]
-metric = [
-    "val",
-    "loss",
-]
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
 mode = "min"
 patience = 50
 min_delta = 0.01
@@ -89,4 +88,5 @@ min_delta = 0.01
 # also increased backbone init lr
 # low batch size
 # adjusted eps
+# updated by script
 # updated by script

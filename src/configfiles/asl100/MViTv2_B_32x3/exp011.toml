@@ -1,47 +1,52 @@
 [training]
 batch_size = 1
 update_per_step = 8
-max_epoch = 200
+batch_size_equivalent = 8
 
 [optimizer]
-eps = 1e-5
-backbone_init_lr = 1e-4
-backbone_weight_decay = 1e-3
-classifier_init_lr = 1e-3
-classifier_weight_decay = 1e-3
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
 
 [model_params]
 drop_p = 0.5
+type = "supervised"
 
-[scheduler] 
-type = 'CosineAnnealingWarmRestarts'
-t0 = 10
-tmult = 2
-eta_min = 0
-
-#Train augs
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
 
 [data.train_augs]
 normalise = true
-
-#Temporal augs
-#Sampler
-[[data.train_augs.temporal_aug]]
-type = 'focal_normal'
-max_wobble = 2
-mean = 0.5
-std = 0.3
+temporal_aug = [
+    { target_length = 32, max_wobble = 2, type = "focal_normal", mean = 0.5, std = 0.3 },
+]
+strict_size = true
 target_length = 32
+frame_size = 224
 
-#Spatial augs
+[data.train_augs.norm_dict]
+mean = [
+    0.45,
+    0.45,
+    0.45,
+]
+std = [
+    0.225,
+    0.225,
+    0.225,
+]
+
 [[data.train_augs.spatial_aug]]
 type = "HORIZONTAL_FLIP"
 p = 0.5
 
-#Crop
 [[data.train_augs.spatial_aug]]
-type = "Centre_crop"
 frame_size = 224
+type = "Centre_crop"
 
 [[data.train_augs.spatial_aug]]
 type = "RANDAUGMENT"
@@ -50,31 +55,56 @@ magnitude = 7
 num_magnitude_bins = 31
 interpolation = "bilinear"
 
-
-#Test augs
-
 [data.test_augs]
 normalise = true
-
-#Temporal augs
-#Sampler
-[[data.test_augs.temporal_aug]]
-type = 'focal_normal'
-mean = 0.5
-std = 0.3
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "focal_normal", mean = 0.5, std = 0.3 },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
 target_length = 32
-
-#Spatial augs
-#Crop
-[[data.test_augs.spatial_aug]]
-type = "Centre_crop"
 frame_size = 224
 
-[early_stopping]
-metric = ['val', 'loss']
-mode = 'min'
+[data.test_augs.norm_dict]
+mean = [
+    0.45,
+    0.45,
+    0.45,
+]
+std = [
+    0.225,
+    0.225,
+    0.225,
+]
+
+[scheduler]
+type = "CosineAnnealingWarmRestarts"
+t0 = 10
+tmult = 2
+eta_min = 0.0
+
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
+mode = "min"
 patience = 15
 min_delta = 0.01
 
-#Same as exp006
+
+# Train augs
+# Temporal augs
+# Sampler
+# Spatial augs
+# Crop
+# Test augs
+# Temporal augs
+# Sampler
+# Spatial augs
+# Crop
+# Same as exp006
 # with randaug
+# updated by script

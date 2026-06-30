@@ -83,7 +83,8 @@ class ServerContext:
             task='inactive',
             current_run_id=None,
             working_pid=None,
-            exception=None
+            exception=None,
+            sweep_id=None
         )
         )
         self.daemon = Daemon(
@@ -94,7 +95,8 @@ class ServerContext:
             state=DaemonStateDict(
             awake=awake,
             stop_on_fail=stop_on_fail,
-            supervisor_pid=None
+            supervisor_pid=None,
+            sweep_id=None
         )
         )
         self.load_state()
@@ -199,7 +201,6 @@ class ServerContext:
             return
 
         try:
-            # self.set_state(read_server_state(self.state_path))
             state = read_server_state(self.state_path)
             state.server_pid = self.server_pid #do not reset server_pid after loading
             self.set_state(state)

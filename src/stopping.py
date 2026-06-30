@@ -2,7 +2,7 @@ from typing import Optional
 from wandb.sdk.wandb_run import Run
 from multiprocessing.synchronize import Event as EventClass
 #local
-from src.run_types import StopperInfo, StopperState, StopperOn
+from src.run_types import StopperInfo, StopperState, EarlyStopperInfo, StopperConfig
 
 
     
@@ -25,21 +25,21 @@ class Stopper:
 
     def __init__(
         self,
-        arg_dict: StopperInfo,
+        arg_dict: StopperConfig,
         wandb_run: Optional[Run] = None,
         event: Optional[EventClass] = None, # if in a multiprocessing context, can pass an Event to signal stopping
     ):
         """Initialise the stopper
 
         Args:
-            arg_dict (StopperInfo): Stopping information, at least max_epoch.
+            arg_dict (StopperConfig): Stopping information, at least max_epoch.
             wandb_run (Optional[Run], optional): For logging patience. Defaults to None.
             event (Optional[EventClass], optional): Can pass an Event to signal stopping. Defaults to None.
         """
     
         self.max_epoch = arg_dict.max_epoch
         
-        if isinstance(arg_dict, StopperOn):
+        if isinstance(arg_dict, EarlyStopperInfo):
             self.on = True
             self.metric = arg_dict.metric
             self.phase = arg_dict.phase

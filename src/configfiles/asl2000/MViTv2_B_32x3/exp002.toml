@@ -1,7 +1,6 @@
 [training]
 batch_size = 1
 update_per_step = 8
-max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -69,11 +68,11 @@ std = [
     0.225,
 ]
 
-[early_stopping]
-metric = [
-    "val",
-    "loss",
-]
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
 mode = "min"
 patience = 50
 min_delta = 0.01
@@ -84,4 +83,5 @@ min_delta = 0.01
 # and patience = 15
 # same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_B_32x3/exp007.toml
 # same as exp000 and exp001. exp001 did not converge, propably patience was too low. Plan to run without weight path and with patience = 50
+# updated by script
 # updated by script

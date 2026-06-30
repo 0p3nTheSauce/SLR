@@ -1,7 +1,6 @@
 [training]
 batch_size = 4
 update_per_step = 2
-max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -80,15 +79,16 @@ start_factor = 0.1
 end_factor = 1.0
 warmup_epochs = 10
 
-[early_stopping]
-metric = [
-    "val",
-    "loss",
-]
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
 mode = "min"
 patience = 50
 min_delta = 0.01
 
 
 # Same as wups_restarts_eps4 but with low frames
+# updated by script
 # updated by script

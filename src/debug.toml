@@ -86,13 +86,7 @@ tmult = 1
 eta_min = 0.0
 
 [stopping]
-type = "early_stopper"
 max_epoch = 200
-metric = "loss"
-phase = "val"
-mode = "min"
-patience = 15
-min_delta = 0.01
 
 
 # Train augs
@@ -101,5 +95,6 @@ min_delta = 0.01
 # Test augs
 # Sampler
 # Crop
-# same as eda_ops3, but with wobble 4 which didnt' get added the first time
+# same as /configfiles/RandAug/MViT_B_32x3_eda_ops3_no_wobble.toml
+# but with warm up
 # updated by script

@@ -32,7 +32,7 @@ from src.run_types import (
     is_supervised_config,
     is_pretrain_config,
 )
-from src.stopping import Stopper, StopperOn, StopperInfo
+from src.stopping import Stopper, EarlyStopperInfo, StopperInfo, StopperConfig
 from src.models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
 from src.utils import wandb_manager
 from src.testing import save_test_sizes
@@ -140,15 +140,17 @@ def get_scheduler(
 
 
 def get_stopper(
-    arg_dict: StopperInfo,
+    arg_dict: StopperConfig,
     wandb_run: Optional[Run] = None,
     event: Optional[EventClass] = None,
 ) -> Stopper:
     
-    if isinstance(arg_dict, StopperOn):
+    if arg_dict.type == 'stopper':
         return Stopper(arg_dict=arg_dict, wandb_run=wandb_run, event=event)
-    else:
+    elif arg_dict.type == 'early_stopper':
         return Stopper(arg_dict,event=event)
+    else:
+        raise NotImplementedError(f'Unkown stopping type: {arg_dict.type}')
 
 
 def _setup_wandb(
