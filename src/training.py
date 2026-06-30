@@ -24,8 +24,15 @@ from src.configs import (
     RunInfo,
     WandbInfo,
 )
-from src.run_types import SchedInfo, OptimizerInfo, MVirTedMaeInfo, SupervisedInfo, is_supervised_config, is_pretrain_config
-from src.stopping import EarlyStopper, StopperOn
+from src.run_types import (
+    SchedInfo,
+    OptimizerInfo,
+    MVirTedMaeInfo,
+    SupervisedInfo,
+    is_supervised_config,
+    is_pretrain_config,
+)
+from src.stopping import Stopper, StopperOn, StopperInfo
 from src.models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
 from src.utils import wandb_manager
 from src.testing import save_test_sizes
@@ -133,15 +140,15 @@ def get_scheduler(
 
 
 def get_stopper(
-    arg_dict: Optional[StopperOn] = None,
+    arg_dict: StopperInfo,
     wandb_run: Optional[Run] = None,
     event: Optional[EventClass] = None,
-) -> EarlyStopper:
-    if arg_dict is None:
-        return EarlyStopper(on=False, event=event)
-
+) -> Stopper:
+    
+    if isinstance(arg_dict, StopperOn):
+        return Stopper(arg_dict=arg_dict, wandb_run=wandb_run, event=event)
     else:
-        return EarlyStopper(arg_dict=arg_dict, wandb_run=wandb_run, event=event)
+        return Stopper(arg_dict,event=event)
 
 
 def _setup_wandb(
@@ -323,12 +330,12 @@ def load_training(
     model: nn.Module,
     optimizer: optim.Optimizer,
     scheduler: optim.lr_scheduler.LRScheduler,
-    stopper: EarlyStopper,
+    stopper: Stopper,
 ) -> Tuple[
     nn.Module,
     optim.Optimizer,
     optim.lr_scheduler.LRScheduler,
-    EarlyStopper,
+    Stopper,
     int,
     int,
     float,
@@ -343,10 +350,10 @@ def load_training(
         model (nn.Module): model to load
         optimizer (optim.Optimizer): optimizer to load
         scheduler (optim.lr_scheduler.LRScheduler): scheduler to load
-        stopper (EarlyStopper): stopper to load
+        stopper (Stopper): stopper to load
 
     Returns:
-        Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler.LRScheduler, EarlyStopper, int, int, float, float]: model, optimizer, scheduler, stopper, epoch, steps, best_val_loss, best_val_acc
+        Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler.LRScheduler, Stopper, int, int, float, float]: model, optimizer, scheduler, stopper, epoch, steps, best_val_loss, best_val_acc
     """
     epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
     if load_path.name == "best.pth":
@@ -404,8 +411,7 @@ def load_training(
 def save_training(
     save_path: Path,
     save_every: int,
-    max_epoch: int,
-    stopper: EarlyStopper,
+    stopper: Stopper,
     model: nn.Module,
     optimizer: optim.Optimizer,
     scheduler: optim.lr_scheduler.LRScheduler,
@@ -417,7 +423,7 @@ def save_training(
 ) -> None:
     """Save training state checkpoint"""
 
-    if epoch % save_every == 0 or not epoch < max_epoch or stopper.stop:
+    if epoch % save_every == 0 or stopper.stop:
         checkpoint_data = {
             "epoch": epoch,
             "steps": steps,
@@ -464,7 +470,7 @@ def train_epoch(
     optimizer: optim.Optimizer,
     wandb_run: Run,
     stopping_metric: Dict[str, float],
-    stopper: EarlyStopper,
+    stopper: Stopper,
     device: torch.device,
     epoch: int,
     steps: int,
@@ -571,7 +577,7 @@ def val_epoch(
     scheduler: optim.lr_scheduler.LRScheduler,
     wandb_run: Run,
     stopping_metric: Dict[str, float],
-    stopper: EarlyStopper,
+    stopper: Stopper,
     device: torch.device,
     epoch: int,
     best_val_loss: float,
@@ -678,15 +684,16 @@ def train_loop(
         Optional[Dict[str, float]]: Dictionary with keys: best_val_acc and best_val_loss
     """
 
-    
     set_seed(config.admin.seed)
 
     dataloaders, num_classes = setup_data(config)
 
     # setup model
-    
-    assert is_supervised_config(config.model_params), 'This is a supervised training loop, but model_params is not SupervisedInfo'
-    
+
+    assert is_supervised_config(config.model_params), (
+        "This is a supervised training loop, but model_params is not SupervisedInfo"
+    )
+
     drop_p = config.model_params.drop_p
 
     if config.admin.weight_path:
@@ -708,7 +715,7 @@ def train_loop(
     loss_func = nn.CrossEntropyLoss()
 
     stopper = get_stopper(
-        arg_dict=config.early_stopping, wandb_run=wandb_run, event=event
+        arg_dict=config.stopping, wandb_run=wandb_run, event=event
     )
 
     epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
@@ -742,11 +749,9 @@ def train_loop(
         )
 
     # train it
-    while epoch < config.training.max_epoch and not stopper.stop:
-        print(f"Epoch {epoch}/{config.training.max_epoch}")
+    while not stopper.stop:
+        print(f"Epoch {stopper.curr_epoch}/{stopper.max_epoch}")
         print("-" * 10)
-
-        epoch += 1
 
         # training stage
         phase_name = "train"
@@ -785,7 +790,6 @@ def train_loop(
         save_training(
             save_path=save_path,
             save_every=save_every,
-            max_epoch=config.training.max_epoch,
             stopper=stopper,
             model=model,
             optimizer=optimizer,
@@ -807,7 +811,7 @@ def masked_pretrain_epoch(
     optimizer: optim.Optimizer,
     wandb_run: Run,
     stopping_metric: Dict[str, float],
-    stopper: EarlyStopper,
+    stopper: Stopper,
     device: torch.device,
     epoch: int,
     steps: int,
@@ -829,7 +833,7 @@ def masked_pretrain_epoch(
         total_samples += batch_size
 
         loss = mae_model(data)
-        
+
         # Accumulate metrics
         running_loss += loss.item() * batch_size
 
@@ -892,7 +896,7 @@ def masked_preval_epoch(
     scheduler: optim.lr_scheduler.LRScheduler,
     wandb_run: Run,
     stopping_metric: Dict[str, float],
-    stopper: EarlyStopper,
+    stopper: Stopper,
     device: torch.device,
     epoch: int,
     best_val_loss: float,
@@ -915,7 +919,6 @@ def masked_preval_epoch(
 
         # Accumulate metrics
         running_loss += loss.item() * batch_size
-        
 
     # calculate  epoch metrics
     epoch_loss = running_loss / total_samples
@@ -987,28 +990,28 @@ def pretrain_loop(
 
     dataloaders, _ = setup_data(config)  # no num_classes needed
 
-    #TODO: generalise model loading
-    
-    assert is_pretrain_config(config.model_params), 'not implemented'    
+    # TODO: generalise model loading
+
+    assert is_pretrain_config(config.model_params), "not implemented"
     encoder_info = config.model_params.encoder_info
-    
+
     encoder = MVirTed(
         MViT_2D_t(),
-        0, #NA
-        encoder_info.drop_p, #NA,
+        0,  # NA
+        encoder_info.drop_p,  # NA,
         embed_dim=encoder_info.embed_dim,
         num_heads=encoder_info.num_heads,
         num_layers=encoder_info.num_layers,
         max_frames=encoder_info.max_frames,
-        mvit_out_dim=encoder_info.mvit_out_dim        
-        )
-    
+        mvit_out_dim=encoder_info.mvit_out_dim,
+    )
+
     mae_model = get_mae_model(
         model_name=model_name,
         encoder=encoder,
         mask_ratio=config.model_params.mask_ratio,
-        embed_dim=config.model_params.embed_dim
-        )  # returns masked autoencoder model
+        embed_dim=config.model_params.embed_dim,
+    )  # returns masked autoencoder model
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     mae_model.to(device)
@@ -1016,7 +1019,7 @@ def pretrain_loop(
     optimizer = get_optimizer(mae_model, config.optimizer)
     scheduler = get_scheduler(optimizer, config.scheduler)
     stopper = get_stopper(
-        arg_dict=config.early_stopping, wandb_run=wandb_run, event=event
+        arg_dict=config.stopping, wandb_run=wandb_run, event=event
     )
 
     epoch, steps, best_val_loss, _, stopping_metrics = _init_accumulators()
@@ -1046,8 +1049,8 @@ def pretrain_loop(
             stopper=stopper,
         )
 
-    while epoch < config.training.max_epoch and not stopper.stop:
-        print(f"Epoch {epoch}/{config.training.max_epoch}")
+    while not stopper.stop:
+        print(f"Epoch {stopper.curr_epoch}/{stopper.max_epoch}")
         print("-" * 10)
 
         epoch += 1
@@ -1066,7 +1069,7 @@ def pretrain_loop(
             steps=steps,
             update_per_step=config.training.update_per_step,
         )
-        
+
         # validation stage
         phase_name = "val"
         best_val_loss = masked_preval_epoch(
@@ -1086,7 +1089,6 @@ def pretrain_loop(
         save_training(
             save_path=save_path,
             save_every=save_every,
-            max_epoch=config.training.max_epoch,
             stopper=stopper,
             model=mae_model,
             optimizer=optimizer,
@@ -1167,8 +1169,6 @@ def main():
     print(f"Run name: {run.name}")  # Human-readable name
     print(f"Run path: {run.path}")  # entity/project/run_id format
 
-    # train_loop(admin.model, config, run, recover=admin.recover)
-    
     train_model(admin.model, config, run, recover=admin.recover)
     run.finish()
 

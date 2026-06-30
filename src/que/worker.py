@@ -98,7 +98,7 @@ class Worker:
         self.server_logger.debug(f"GPU memory after cleanup: {used}/{total} GiB")
 
     def _train(self) -> None:
-
+        #TODO: gets stuck if the GPU was actually busy, whole server process needs to be restarted
         if not gpu_manager.wait_for_completion(
             check_interval=10,
             logger=self.server_logger,
@@ -211,7 +211,7 @@ class Worker:
             model_params=fin_run.model_params,
             data=fin_run.data,
             scheduler=fin_run.scheduler,
-            early_stopping=fin_run.early_stopping,
+            stopping=fin_run.stopping,
             wandb=fin_run.wandb,
             results=results,
         )
@@ -247,7 +247,7 @@ class Worker:
     def _reset_state(self):
         self.set_state(
             WorkerStateDict(
-                task="inactive", current_run_id=None, working_pid=None, exception=None
+                task="inactive", current_run_id=None, working_pid=None, exception=None, sweep_id=None
             )
         )
 
@@ -284,20 +284,22 @@ class Worker:
             )
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
-    def start(self):
+    def start(self, sweep_id: Optional[str] = None):
         """this is likely started in a seperate process, so que requires connecting"""
 
+        #get state handlers
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
-        # self.state.working_pid = os.getpid()
+        
+        #update state
         self.state['working_pid'] = os.getpid()
-        # self.state.exception = None
         self.state['exception'] = None
+        self.state['sweep_id'] = sweep_id
 
         self._attach_training_loggers()
         self._reattach_server_logger()
-
+        
         self.train()
 
         if self.stop_event is not None and self.stop_event.is_set():

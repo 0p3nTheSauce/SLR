@@ -31,7 +31,6 @@ class Daemon:
         self.worker_process: Optional[Process] = None
         self.supervisor_process: Optional[Process] = None
         self.logger.info("Daemon initialized")
-        
         self.set_state(state)
     
     def _reattach_server_logger(self):
@@ -56,7 +55,8 @@ class Daemon:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
             self.logger.warning("There was likely a power outage/system failure which triggered this")
             #it is likely cur_run will have a run in it, so we must recover this run
-            self.start_supervisor(recover_run=True)
+            #add the sweep id from saved file
+            self.start_supervisor(recover_run=True, sweep_id=state.get('sweep_id', None))
 
     def monitor_worker(self) -> bool:
         """
@@ -109,7 +109,7 @@ class Daemon:
             self.supervisor_process.terminate()
             self.supervisor_process.join()
 
-    def supervise(self, recover_run: bool =False) -> None:
+    def supervise(self, recover_run: bool =False, sweep_id: Optional[str] = None) -> None:
         """
         This runs inside the CHILD process. It is naturally triggered by start_supervisor
         The worker process is started and monitored here. After it completes successfully, it is restarted.
@@ -155,7 +155,7 @@ class Daemon:
         self.state['supervisor_pid'] = None
         
 
-    def start_supervisor(self, recover_run: bool = False) -> None:
+    def start_supervisor(self, recover_run: bool = False, sweep_id: Optional[str] = None) -> None:
         """
         Start the supervisor process
         
@@ -171,8 +171,7 @@ class Daemon:
         self.stop_worker_event.clear()
         self.state['awake'] = True
         
-
-        self.supervisor_process = Process(target=self.supervise, args=(recover_run,))
+        self.supervisor_process = Process(target=self.supervise, args=(recover_run,sweep_id))
         self.supervisor_process.start()
         self.state['supervisor_pid'] = self.supervisor_process.pid
         self.logger.info(

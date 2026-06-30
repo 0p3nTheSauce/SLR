@@ -95,8 +95,54 @@ def update_runs11():
     q.update_runs(key_set, _get_save_name)
     q.save_state('/home/luke/Code/SLR/src/que/Runs_no_ini.json')
 
+
+
+def update_runs12():
+    from src.stopping import StopperInfo, StopperOn
+
+    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+        all_runs = json.load(f)
+
+    for loc in KEYS:
+        que_list = all_runs[loc]
+        new_quelist = []
+        for run in que_list:
+            max_epochs = run['training']['max_epoch']
+            early_stopping = run.pop('early_stopping', None)
+            if early_stopping is None:
+                early_stopping = StopperInfo(max_epoch=max_epochs)
+            else:
+                early_stopping = StopperOn(
+                    max_epoch=max_epochs,
+                    metric=early_stopping['metric'][1],
+                    phase=early_stopping['metric'][0],
+                    mode=early_stopping['mode'],
+                    patience=early_stopping['patience'],
+                    min_delta=early_stopping['min_delta']
+                )
+            print(early_stopping.model_dump())
+            
+            run['stopping'] = early_stopping.model_dump()
+
+            if loc in KEYS[:2]:
+                run = ExpInfo.model_validate(run).model_dump()
+            elif loc == KEYS[2]:
+                run = CompExpInfo.model_validate(run).model_dump()
+            else:
+                run = FailedExp.model_validate(run).model_dump()
+
+            new_quelist.append(run)
+
+        all_runs[loc] = new_quelist
+
+    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
+        json.dump(all_runs, f, indent=4)
+        
+    
+    
+
 if __name__ == "__main__":
-    # update_runs11()
+    # update_runs12()
     pass
     
     

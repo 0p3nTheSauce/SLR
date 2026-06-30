@@ -426,6 +426,11 @@ class Que:
     # -----------------------------------------------------------------------
 
     def load_state(self, in_path: Optional[Union[str, Path]] = None):
+        """Load the queue state from a JSON file. If the file does not exist, start with an empty queue.
+
+        Args:
+            in_path (Optional[Union[str, Path]], optional): The path to the JSON file containing the queue state. Defaults to None.
+        """
         if in_path is None:
             in_path = self.runs_path
         elif not Path(in_path).exists():
@@ -461,6 +466,14 @@ class Que:
         timestamp: bool = False,
         archive: bool = True,
     ):
+        """Save the state of the Que to a json file
+
+        Args:
+            out_path (Optional[Union[str, Path]], optional): The output path. Defaults to None.
+            timestamp (bool, optional): Whether to include a timestamp in the output path. Defaults to False.
+            archive (bool, optional): Whether to archive the output file. Defaults to True.
+        """
+        
         if out_path is None:
             out_path = self.runs_path
         elif Path(out_path).exists() and not timestamp:
@@ -641,18 +654,9 @@ class Que:
 
     # Direct indexing
 
-    def create_run(
-        self,
-        arg_dict: AdminInfo,
-        wandb_dict: WandbInfo,
-        add_duplicates: bool = False,
-    ) -> None:
-        from configs import load_config
-
-        with log_and_raise(self.logger, "create"):
-            config: RunInfo = load_config(arg_dict)
-            if self._is_dup_exp(config) and not add_duplicates:
-                raise QueDupExp
+    def add_new_run(self, config: RunInfo, wandb_dict: WandbInfo) -> None:
+        """Add a new run the the Que"""
+        with log_and_raise(self.logger, "add_new_run"):
             exp_info = ExpInfo.model_validate(
                 {
                     **config.model_dump(),
@@ -660,6 +664,24 @@ class Que:
                 }
             )
             self.to_run.append(exp_info)
+
+    def create_run(
+        self,
+        arg_dict: AdminInfo,
+        wandb_dict: WandbInfo,
+        add_duplicates: bool = False,
+    ) -> None:
+        """Load and add a new run to the Que"""
+        from configs import load_config
+
+        with log_and_raise(self.logger, "create"):
+            config: RunInfo = load_config(arg_dict)
+            if self._is_dup_exp(config) and not add_duplicates:
+                raise QueDupExp
+        
+        self.add_new_run(config, wandb_dict)
+
+    
 
     def add_run(
         self,
@@ -672,7 +694,8 @@ class Que:
         from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
 
         with log_and_raise(self.logger, "add"):
-            config: RunInfo = load_config(arg_dict)
+    
+            config: RunInfo = load_config(arg_dict) 
             if self._is_dup_exp(config) and not add_duplicates:
                 raise QueDupExp
 
@@ -696,7 +719,7 @@ class Que:
                 self.logger.info("Successfully loaded results")
             except FileNotFoundError:
                 results = full_test(admin=config.admin, data=config.data)
-                self.logger.info("Results not found on disk — ran full_test")
+                self.logger.info("Results not found on disk — run full_test")
 
             comp_run = CompExpInfo.model_validate(
                 {
@@ -708,6 +731,9 @@ class Que:
                 }
             )
             self.old_runs.insert(0, comp_run)
+
+    
+            
 
     def recover_run(
         self,
@@ -1020,12 +1046,13 @@ class WorkerStateDict(TypedDict):
     current_run_id: Optional[str]
     working_pid: Optional[int]
     exception: Optional[str]
-
+    sweep_id: Optional[str]
 
 class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
     supervisor_pid: Optional[int]
+    sweep_id: Optional[str]
 
 
 class ServerState(BaseModel):

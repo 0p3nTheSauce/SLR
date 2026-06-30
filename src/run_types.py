@@ -338,17 +338,38 @@ class DataInfo(BaseModel):
 
 
 ########################## Early stopping #############################
+StoppingMetrics: TypeAlias = Literal["loss", "acc"]
+StoppingPhases: TypeAlias = Literal['val', 'train']
+StoppingModes: TypeAlias = Literal["min", "max"]
 
 
-class StopperOn(BaseModel):
-    metric: Union[Tuple[str, str], List[str]]
-    mode: str
+class StopperInfo(BaseModel):
+    max_epoch: int
+
+class StopperOn(StopperInfo):
+    metric: StoppingMetrics
+    phase: StoppingPhases
+    mode: StoppingModes
     patience: int
     min_delta: float
 
-
+    @model_validator(mode="after")
+    def _config_precheck(self) -> "StopperOn":
+        if self.patience <= 0:
+            raise ValueError(
+                f"Patience must be a positive integer, got {self.patience}"
+            )
+        if self.min_delta < 0:
+            raise ValueError(
+                f"Min delta must be non-negative, got {self.min_delta}"
+            )
+            
+        return self
+    
+    
 class StopperState(BaseModel):
     on: bool
+    max_epoch: int
     phase: str
     metric: str
     mode: str
@@ -383,7 +404,6 @@ class AdminInfo(MinInfo):
 class TrainingInfo(BaseModel):
     batch_size: int
     update_per_step: int
-    max_epoch: int
 
     @computed_field  # type: ignore[misc]
     @property
@@ -565,7 +585,7 @@ class RunInfo(BaseModel):
     model_params: ModelInfo = Field(default_factory=SupervisedInfo)
     data: DataInfo
     scheduler: Optional[SchedInfo] = None
-    early_stopping: Optional[StopperOn] = None
+    stopping: StopperInfo
 
     @field_validator("model_params", mode="before")
     @classmethod
@@ -594,13 +614,6 @@ class CompExpInfo(ExpInfo):
     results: CompRes
 
 
-# class GenInfo(BaseModel):
-#     training: Optional[TrainingInfo] = None
-#     optimizer: Optional[OptimizerInfo] = None
-#     model_params: Optional[ModelParamsInfo] = None
-#     data: Optional[DataInfo] = None
-#     scheduler: Optional[SchedInfo] = None
-#     early_stopping: Optional[StopperOn] = None
 
 GenInfo: TypeAlias = Dict[str, Any]
 

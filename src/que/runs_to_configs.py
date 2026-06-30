@@ -1,10 +1,17 @@
 from typing import Optional, Literal
 from pathlib import Path
 import tomli_w
+import json
+import argparse
 
 # from que.shell import QueShell
 from src.que.core import (
     GenExp,
+    RUN_PATH,
+    TO_RUN,
+    CUR_RUN,
+    OLD_RUNS,
+    FAIL_RUNS,
 )
 
 
@@ -159,3 +166,129 @@ def update_config_file(
         with open(output, "w") as f:
             f.write(config_str)
         print(f"Debug config saved to: {output}")
+
+def update_all_files(
+    default_mode: Literal["overwrite", "duplicate"] = "overwrite",
+    dry_run: bool = True,
+    retro_support: bool = False,
+    output: Optional[Path] = None
+):
+    
+    KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
+    with open(RUN_PATH, "r") as f:
+        all_runs = json.load(f)
+
+    flat_all_runs = []
+    for key in KEYS:
+        flat_all_runs.extend(all_runs[key])
+
+    for run_info in flat_all_runs:
+        update_config_file(run_info, default_mode, dry_run, retro_support, output = output)
+
+    print(len(flat_all_runs))
+
+
+if __name__ == '__main__':
+    
+    parser = argparse.ArgumentParser(
+        description="Utility script to update TOML configuration files from experiment run data."
+    )
+    
+    # Global arguments
+    parser.add_argument(
+        "--mode", 
+        choices=["overwrite", "duplicate"], 
+        default="overwrite",
+        help="Default saving mode if file exists (default: %(default)s)."
+    )
+    parser.add_argument(
+        "--run", 
+        action="store_false", 
+        dest="dry_run",
+        help="Actually write changes to files. If not specified, defaults to a dry run."
+    )
+    parser.add_argument(
+        "--retro-support", 
+        action="store_true",
+        help="Enable legacy/retro support configuration parsing."
+    )
+    parser.add_argument(
+        "--output", 
+        type=Path, 
+        default=None,
+        help="Optional path to write a debug copy of the generated config."
+    )
+
+    # Sub-commands (making dest="command" optional by not enforcing required=True)
+    subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
+
+    # Sub-command: single
+    single_parser = subparsers.add_parser("single", help="Update a single configuration file.")
+    single_parser.add_argument(
+        "--run-data", 
+        type=str, 
+        default=str(RUN_PATH),
+        help="JSON string or path to a JSON file. Defaults to RUN_PATH (default: %(default)s)."
+    )
+    single_parser.add_argument(
+        "--key",
+        type=str,
+        default=OLD_RUNS,
+        help="The dictionary key to extract from the run database (default: %(default)s)."
+    )
+    single_parser.add_argument(
+        "--index",
+        type=int,
+        default=0,
+        help="The list index to extract from the specified key section (default: %(default)s)."
+    )
+
+    # Sub-command: all
+    all_parser = subparsers.add_parser("all", help="Update all configuration files found in the runs database.")
+
+    args = parser.parse_args()
+
+    # Fallback: If the user didn't specify 'single' or 'all', default to 'all'
+    chosen_command = args.command if args.command else "all"
+
+    if chosen_command == "single":
+        try:
+            if Path(args.run_data).exists():
+                with open(args.run_data, "r") as f:
+                    db = json.load(f)
+                
+                # If it's a structural run database dictionary matching your framework
+                if isinstance(db, dict) and args.key in db:
+                    target_section = db[args.key]
+                    
+                    if isinstance(target_section, list):
+                        if 0 <= args.index < len(target_section):
+                            run_payload = target_section[args.index]
+                        else:
+                            parser.error(f"Index {args.index} is out of bounds for section '{args.key}' (length: {len(target_section)}).")
+                    else:
+                        # Fallback if the section isn't a list
+                        run_payload = target_section
+                else:
+                    run_payload = db
+            else:
+                run_payload = json.loads(args.run_data)
+                
+        except Exception as e:
+            parser.error(f"Failed to process --run-data: {e}")
+
+        update_config_file(
+            run=run_payload,
+            default_mode=args.mode,
+            dry_run=args.dry_run,
+            retro_support=args.retro_support,
+            output=args.output
+        )
+
+    elif chosen_command == "all":
+        update_all_files(
+            default_mode=args.mode,
+            dry_run=args.dry_run,
+            retro_support=args.retro_support,
+            output=args.output
+        )

@@ -75,6 +75,11 @@ def get_sweep_parser() -> argparse.ArgumentParser:
     parser.add_argument("-se", "--save_every", type=int, default=5)
     return parser
 
+def create_sweep_run(base_path: Path, ):
+    
+    with open(base_path, "rb") as f:
+        _ = tomllib.load(f)
+
 
 def main():
     args = get_sweep_parser().parse_args()
