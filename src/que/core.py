@@ -43,7 +43,8 @@ from src.run_types import (
     SummarisedError,
     SummarisedRes,
     FailedExp,  # now defined in run_types
-    strict_validate
+    strict_validate,
+    # ENTITY
 )
 
 # from configs import print_config, load_config, ZFILL, get_model_exp_dir, get_model_results_dir
@@ -496,8 +497,11 @@ class Que:
         self.logger.info(f"Saved que to {out_path}")
 
     # -----------------------------------------------------------------------
-    # Worker helpers
+    # Worker / Daemon helpers
     # -----------------------------------------------------------------------
+
+    def len_loc(self, loc: QueLocation) -> int:
+        return len(self._fetch_state(loc))
 
     def peak_run(self, loc: QueLocation, idx: int) -> GenExp:
         to_get = self._fetch_state(loc)
@@ -656,6 +660,7 @@ class Que:
 
     def add_new_run(self, config: RunInfo, wandb_dict: WandbInfo) -> None:
         """Add a new run the the Que"""
+        
         with log_and_raise(self.logger, "add_new_run"):
             exp_info = ExpInfo.model_validate(
                 {
@@ -664,6 +669,7 @@ class Que:
                 }
             )
             self.to_run.append(exp_info)
+            self.logger.debug(f'Added new run: {self._run_to_str(self._run_sum(exp_info))}')
 
     def create_run(
         self,
@@ -681,7 +687,6 @@ class Que:
         
         self.add_new_run(config, wandb_dict)
 
-    
 
     def add_run(
         self,
@@ -1046,16 +1051,19 @@ class WorkerStateDict(TypedDict):
     current_run_id: Optional[str]
     working_pid: Optional[int]
     exception: Optional[str]
-    sweep_id: Optional[str]
+    # sweep_id: Optional[str]
+
+
+class SweepInfo(TypedDict):
+    sweep_id: str
+    sweep_project: str
+    sweep_entity: str
 
 class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
     supervisor_pid: Optional[int]
-    sweep_id: Optional[str]
-
-
-
+    sweep: Optional[SweepInfo]
 
 def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
@@ -1070,7 +1078,7 @@ def worker_state_validate(obj: Any) -> WorkerStateDict:
         'task': d.task,
         'current_run_id': d.current_run_id,
         'exception': d.exception,
-        'sweep_id':d.sweep_id,
+        # 'sweep_id':d.sweep_id,
         'working_pid':d.working_pid
     } 
 
@@ -1079,14 +1087,14 @@ def daemon_state_validate(obj: Any) -> DaemonStateDict:
         awake: bool = False
         stop_on_fail: bool = True
         supervisor_pid: Optional[int] = None
-        sweep_id: Optional[str] = None
+        sweep: Optional[SweepInfo] = None
     
     d = DaemonState.model_validate(obj)
     return {
         'awake':d.awake,
         'stop_on_fail':d.stop_on_fail,
         'supervisor_pid':d.supervisor_pid,
-        'sweep_id':d.sweep_id,
+        'sweep': d.sweep
     }
 
 class ServerState(BaseModel):
@@ -1117,6 +1125,7 @@ class DaemonProtocol(Protocol):
     def stop_worker(
         self, timeout: Optional[float] = None, hard: bool = False
     ) -> None: ...
+    def set_sweep(self, sweep: Optional[SweepInfo]) -> None: ...
     def stop_supervisor(
         self,
         timeout: Optional[float] = None,

@@ -1,0 +1,29 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: random
+controller: 
+  type: local
+metric:
+  name: Best/Val_acc
+  goal: maximize
+entity: ljgoodall2001-rhodes-university
+project: WLASL-100
+
+early_terminate:
+  type: hyperband
+  min_iter: 15
+  eta: 3
+
+parameters:
+  backbone_init_lr:
+    values: [0.00002, 0.0001, 0.0004]
+  drop_p:
+    values: [0.3, 0.5, 0.7]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - MViTv2_B_32x3
+  - asl100
+  - --base_config
+  - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml

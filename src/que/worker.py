@@ -162,7 +162,7 @@ class Worker:
         Currently implemented to be in a process started by the Daemon.
         """
         try:
-            # self.state.task = "training"
+            self.training_logger.info("Starting training run")
             self.state['task'] = "training"
             self._train()
         except QueException as Qe:
@@ -247,7 +247,7 @@ class Worker:
     def _reset_state(self):
         self.set_state(
             WorkerStateDict(
-                task="inactive", current_run_id=None, working_pid=None, exception=None, sweep_id=None
+                task="inactive", current_run_id=None, working_pid=None, exception=None, 
             )
         )
 
@@ -284,7 +284,7 @@ class Worker:
             )
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
-    def start(self, sweep_id: Optional[str] = None):
+    def start(self):
         """this is likely started in a seperate process, so que requires connecting"""
 
         #get state handlers
@@ -295,7 +295,6 @@ class Worker:
         #update state
         self.state['working_pid'] = os.getpid()
         self.state['exception'] = None
-        self.state['sweep_id'] = sweep_id
 
         self._attach_training_loggers()
         self._reattach_server_logger()

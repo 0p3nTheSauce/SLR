@@ -1,5 +1,7 @@
 program: /home/luke/Code/SLR/src/sweeping.py
 method: bayes
+controller: 
+  type: local
 metric:
   name: Best/Val_acc
   goal: maximize
@@ -12,36 +14,25 @@ early_terminate:
   eta: 3
 
 parameters:
-  optimizer.backbone_init_lr:
+  backbone_init_lr:
     distribution: log_uniform_values
     min: 0.00002
     max: 0.0004
-
-  optimizer.classifier_init_lr:
+  classifier_init_lr:
     distribution: log_uniform_values
     min: 0.0002
     max: 0.004
-
-  optimizer.backbone_weight_decay:
+  backbone_weight_decay:
     distribution: log_uniform_values
     min: 0.0001
     max: 0.005
-
-  optimizer.classifier_weight_decay:
-    distribution: log_uniform_values
-    min: 0.0001
-    max: 0.005
-
-  model_params.drop_p:
+  drop_p:
     values: [0.3, 0.4, 0.5, 0.6, 0.7]
-
-  scheduler.t0:
+  t0:
     values: [10, 20, 40]
-
-  data.train_augs.temporal_aug.0.max_wobble:
+  max_wobble:
     values: [0, 2, 4, 6]
-
-  data.train_augs.spatial_aug.2.magnitude:
+  magnitude:
     values: [5, 7, 9, 12]
 
 command:

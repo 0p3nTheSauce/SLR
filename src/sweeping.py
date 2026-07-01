@@ -19,7 +19,7 @@ from typing import Any, Dict, List
 
 import wandb
 
-from src.run_types import RunInfo, AdminInfo, RUNS_PATH, strict_validate
+from src.run_types import RunInfo, AdminInfo, RUNS_PATH, strict_validate, AVAIL_SPLITS
 from src.configs import print_config, set_seed, get_avail_splits, get_model_checkpoint_dir
 from src.training import train_model  # adjust if train_model lives elsewhere
 
@@ -50,9 +50,19 @@ def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     _set_nested(d[key], keys[1:], value)
 
 
+SWEEP_KEY_MAP = {
+    "backbone_init_lr":       "optimizer.backbone_init_lr",
+    "classifier_init_lr":     "optimizer.classifier_init_lr",
+    "backbone_weight_decay":  "optimizer.backbone_weight_decay",
+    "drop_p":                 "model_params.drop_p",
+    "t0":                     "scheduler.t0",
+    "max_wobble":             "data.train_augs.temporal_aug.0.max_wobble",
+    "magnitude":              "data.train_augs.spatial_aug.2.magnitude",
+}
+
 def apply_sweep_overrides(raw: Dict[str, Any], wandb_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge dotted-path sweep parameters into a raw TOML config dict, in place."""
-    for dotted_key, value in wandb_config.items():
+    for key, value in wandb_config.items():
+        dotted_key = SWEEP_KEY_MAP.get(key, key)
         _set_nested(raw, dotted_key.split("."), value)
     return raw
 
@@ -75,40 +85,29 @@ def get_sweep_parser() -> argparse.ArgumentParser:
     parser.add_argument("-se", "--save_every", type=int, default=5)
     return parser
 
-def create_sweep_run(base_path: Path, ):
+def create_sweep_run(base_path: Path, split: AVAIL_SPLITS, model: str, dataset: str):
     
     with open(base_path, "rb") as f:
-        _ = tomllib.load(f)
-
-
-def main():
-    args = get_sweep_parser().parse_args()
-
-    base_path = Path(args.base_config)
-    if not base_path.exists():
-        raise FileNotFoundError(f"{base_path} not found")
-
-    with open(base_path, "rb") as f:
         raw = tomllib.load(f)
-
+        
     # wandb agent sets WANDB_SWEEP_ID / WANDB_ENTITY / WANDB_PROJECT in the env;
     # wandb.init() attaches to the sweep and populates run.config with this
     # trial's chosen hyperparameters.
     run = wandb.init()
-
+    
     sweep_overrides = dict(run.config)
     if sweep_overrides:
         raw = apply_sweep_overrides(raw, sweep_overrides)
 
     sweep_id = run.sweep_id or "manual"
-    exp_dir = get_sweep_exp_dir(args.split, args.model, sweep_id, run.id)
+    exp_dir = get_sweep_exp_dir(split, model, sweep_id, run.id)
     save_path = get_model_checkpoint_dir(exp_dir)
     save_path.mkdir(parents=True, exist_ok=True)
 
     admin = AdminInfo(
-        model=args.model,
-        dataset=args.dataset,
-        split=args.split,
+        model=model,
+        dataset=dataset,
+        split=split,
         exp_no=run.id,
         recover=False,
         config_path=str(base_path),
@@ -122,8 +121,24 @@ def main():
     run.config.update(config.model_dump(), allow_val_change=True)  # log resolved config
 
     print_config(config)
+    
+    return config, run
 
-    set_seed(config.admin.seed)
+
+def main():
+    args = get_sweep_parser().parse_args()
+
+    base_path = Path(args.base_config)
+    if not base_path.exists():
+        raise FileNotFoundError(f"{base_path} not found")
+
+    config, run = create_sweep_run(
+        base_path=base_path,
+        split=args.split,
+        model=args.model,
+        dataset=args.dataset
+    )
+
     train_model(args.model, config, run, save_every=args.save_every, recover=False)
     run.finish()
 

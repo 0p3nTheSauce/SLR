@@ -84,7 +84,6 @@ class ServerContext:
             current_run_id=None,
             working_pid=None,
             exception=None,
-            sweep_id=None
         )
         )
         self.daemon = Daemon(
@@ -96,7 +95,7 @@ class ServerContext:
             awake=awake,
             stop_on_fail=stop_on_fail,
             supervisor_pid=None,
-            sweep_id=None
+            sweep=None
         )
         )
         self.load_state()
@@ -202,7 +201,10 @@ class ServerContext:
 
         try:
             state = read_server_state(self.state_path)
-            state.server_pid = self.server_pid #do not reset server_pid after loading
+            #do not reset server_pid after loading
+            state.server_pid = self.server_pid 
+            # do not override start up stop on fail
+            state.daemon_state["stop_on_fail"] = self.daemon.state["stop_on_fail"]  
             self.set_state(state)
             self.server_logger.info(f"Loaded state from: {self.state_path}")
         except Exception as e:
@@ -284,6 +286,7 @@ def get_server_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--stop_on_fail",
+        '-f',
         action="store_true",
         help="Whether the daemon should stop itself if a run fails (default: False)",
     )

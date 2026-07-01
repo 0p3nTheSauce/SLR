@@ -42,7 +42,9 @@ from src.que.core import (
     SYSTEMD_NAME,
     QueManagerProtocol,
     QueDupExp,
+    SweepInfo,
 )
+from src.run_types import ENTITY
 
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
@@ -76,9 +78,11 @@ def parse_criterion(expr: str) -> Callable[[Any], bool]:
         raise ValueError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
 
+
 # --------------------------------------------------------------------------
 # json serialisation
 # --------------------------------------------------------------------------
+
 
 def _json_default(obj):
     if isinstance(obj, BaseModel):
@@ -368,7 +372,7 @@ class QueShell(cmdLib.Cmd):
             from configs import take_args
 
             args = shlex.split(arg)
-            
+
             # parser = self._get_parser("create")
             # parsed_args = parser.parse_args(args)
             maybe_args = take_args(sup_args=args)
@@ -382,7 +386,6 @@ class QueShell(cmdLib.Cmd):
             try:
                 self.que.create_run(admin_info, wandb_info)
             except QueDupExp:
-            
                 # ask if want to create anyway
                 if Confirm.ask(
                     "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
@@ -631,24 +634,20 @@ class QueShell(cmdLib.Cmd):
                 )[parsed_args.index]
 
                 title = f"Run {parsed_args.index} in {parsed_args.location}"
-                
+
                 if parsed_args.display_keys is not None:
-                    
                     disp_components = {}
-                    
+
                     for key_set in parsed_args.display_keys:
-                        
                         info = Que.get_nested(run, key_set)
 
-                        disp_components = Que.set_nested(
-                            disp_components, key_set, info 
-                        )
-                    
+                        disp_components = Que.set_nested(disp_components, key_set, info)
+
                     run = disp_components
 
                 # Format as JSON-like syntax
                 run_json = json.dumps(run, indent=2, default=_json_default)
-                    
+
                 syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
 
                 self.console.print(
@@ -740,6 +739,24 @@ class QueShell(cmdLib.Cmd):
                             timeout=parsed_args.timeout, hard=parsed_args.hard
                         )
 
+            elif parsed_args.command == "set_sweep":
+                with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
+                    self.daemon.set_sweep(
+                        SweepInfo(
+                            sweep_id=parsed_args.sweep_id,
+                            sweep_project=parsed_args.project,
+                            sweep_entity=parsed_args.entity,
+                        )
+                    )
+            elif parsed_args.command == "clear_sweep":
+                with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
+                    self.daemon.set_sweep(None)
+            else:
+                with self.unwrap_exception("", ""):
+                    raise NotImplementedError(
+                        f"unknown Daemon command: {parsed_args.command} "
+                    )
+
     # Server
 
     def _pretty_status(self, status: ServerState):
@@ -779,6 +796,13 @@ class QueShell(cmdLib.Cmd):
 
         if daemon_state["supervisor_pid"]:
             daemon_table.add_row("Supervisor PID:", str(daemon_state["supervisor_pid"]))
+
+        sweep_state = daemon_state["sweep"]
+        if sweep_state is not None:
+            daemon_table.add_row(
+                "Sweep:",
+                f"{sweep_state['sweep_entity']}/{sweep_state['sweep_project']}/{sweep_state['sweep_id']}",
+            )
 
         table.add_row("Daemon", daemon_table)
 
@@ -821,7 +845,11 @@ class QueShell(cmdLib.Cmd):
             ):
                 self.server_context.load_state()
         elif parsed_args.command == "status":
-            self._pretty_status(self.server_context.get_state())
+            with self.unwrap_exception('', 'fetching state failed'):
+                state = self.server_context.get_state()
+            
+            with self.unwrap_exception('', 'printing failed'):
+                self._pretty_status(state)
 
     # Misc / subprocesses
 
@@ -1081,25 +1109,6 @@ class QueShell(cmdLib.Cmd):
         )
         return parser
 
-    def _add_graceful_stop_args(
-        self, parser: argparse.ArgumentParser
-    ) -> argparse.ArgumentParser:
-        """--timeout / -to and --hard / -hd: used wherever a process is being stopped"""
-        parser.add_argument(
-            "--timeout",
-            "-to",
-            type=int,
-            default=10,
-            help="Timeout in seconds before force kill (default: 10)",
-        )
-        parser.add_argument(
-            "--hard",
-            "-hd",
-            action="store_true",
-            help="Force kill the process after timeout",
-        )
-        return parser
-
     def _add_o_location_arg(
         self, parser: argparse.ArgumentParser, default=None
     ) -> argparse.ArgumentParser:
@@ -1349,7 +1358,35 @@ class QueShell(cmdLib.Cmd):
             action="store_true",
             help="Stop the supervisor process",
         )
-        self._add_graceful_stop_args(stop_parser)
+        stop_parser.add_argument(
+            "--timeout",
+            "-to",
+            type=int,
+            default=10,
+            help="Timeout in seconds before force kill (default: 10)",
+        )
+        stop_parser.add_argument(
+            "--hard",
+            "-hd",
+            action="store_true",
+            help="Force kill the process after timeout",
+        )
+
+        # Set Sweep
+        set_sweep_parser = subparsers.add_parser(
+            "set_sweep", help="Set daemon sweep parameters"
+        )
+        set_sweep_parser.add_argument("project", type=str, help="Sweep project")
+        set_sweep_parser.add_argument("sweep_id", type=str, help="Sweep id")
+        set_sweep_parser.add_argument(
+            "--entity",
+            "-e",
+            type=str,
+            default=ENTITY,
+            help="Wandb entity, defualts to (default: %(default)s)",
+        )
+        # clear sweep
+        subparsers.add_parser("clear_sweep", help="Clear daemon sweep parameters")
 
         return parser
 

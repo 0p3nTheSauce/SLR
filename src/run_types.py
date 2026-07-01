@@ -527,9 +527,9 @@ SchedInfo = Annotated[
 class WandbInfo(BaseModel):
     entity: str
     project: str
-    tags: List[str]
+    tags: List[str] = []
     run_id: Optional[str] = None
-
+    sweep_id: Optional[str] = None
 
 # Results
 

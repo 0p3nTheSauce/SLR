@@ -67,6 +67,7 @@ frame_size = 224
 #Updated stopping
 [stopping]
 max_epoch = 200
+type = "early_stopper"
 phase = 'val'
 metric = 'loss'
 mode = 'min'

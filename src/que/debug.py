@@ -202,7 +202,7 @@ def test_read_server_state():
 
 if __name__ == "__main__":
     # update_runs14()
-    test_read_server_state()
+    # test_read_server_state()
     pass
     
     
