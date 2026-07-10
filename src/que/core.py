@@ -1122,9 +1122,6 @@ Process_states: TypeAlias = Union[WorkerStateDict, DaemonStateDict, ServerState]
 
 class DaemonProtocol(Protocol):
     def start_supervisor(self) -> None: ...
-    def stop_worker(
-        self, timeout: Optional[float] = None, hard: bool = False
-    ) -> None: ...
     def set_sweep(self, sweep: Optional[SweepInfo]) -> None: ...
     def stop_supervisor(
         self,

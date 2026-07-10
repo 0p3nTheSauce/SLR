@@ -722,23 +722,14 @@ class QueShell(cmdLib.Cmd):
                 ):
                     self.daemon.start_supervisor()
             elif parsed_args.command == "stop":
-                if parsed_args.supervisor:
-                    with self.unwrap_exception(
-                        "Supervisor process stopped", "Failed to stop supervisor"
-                    ):
-                        self.daemon.stop_supervisor(
-                            timeout=parsed_args.timeout,
-                            hard=parsed_args.hard,
-                            stop_worker=parsed_args.worker,
-                        )
-                else:
-                    with self.unwrap_exception(
-                        "Worker process stopped", "Failed to stop worker"
-                    ):
-                        self.daemon.stop_worker(
-                            timeout=parsed_args.timeout, hard=parsed_args.hard
-                        )
-
+                with self.unwrap_exception(
+                    "Supervisor process stopped", "Failed to stop supervisor"
+                ):
+                    self.daemon.stop_supervisor(
+                        timeout=parsed_args.timeout,
+                        hard=parsed_args.hard,
+                        stop_worker=parsed_args.worker,
+                    )
             elif parsed_args.command == "set_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
                     self.daemon.set_sweep(
@@ -1351,12 +1342,6 @@ class QueShell(cmdLib.Cmd):
         )
         stop_parser.add_argument(
             "--worker", "-w", action="store_true", help="Stop the worker process"
-        )
-        stop_parser.add_argument(
-            "--supervisor",
-            "-s",
-            action="store_true",
-            help="Stop the supervisor process",
         )
         stop_parser.add_argument(
             "--timeout",
