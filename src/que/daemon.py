@@ -1,6 +1,4 @@
 from typing import Optional, Literal
-from pathlib import Path
-import wandb
 import logging
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
@@ -11,35 +9,15 @@ import time
 import random
 import string
 
-try:
-    import tomllib  # type: ignore
-except ImportError:
-    import tomli as tomllib
-
 # locals
 from src.que.core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
     connect_manager,
     DaemonStateDict,
-    # Que,
-    TO_RUN,
-    # QueEmpty,
     SweepInfo,
-    RunInfo,
-    log_and_raise,
 )
 from src.que.worker import Worker
-from src.run_types import WandbInfo, AdminInfo
-from src.sweeping import (
-    get_sweep_parser,
-    apply_sweep_overrides,
-    get_sweep_exp_dir,
-    get_model_checkpoint_dir,
-    strict_validate,
-    validate_sweep_key_map,
-)
-
 
 def generate_run_id(length: int = 8) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
@@ -95,27 +73,6 @@ class Daemon:
     def set_sweep(self, sweep: Optional[SweepInfo]) -> None:
         self.state["sweep"] = sweep
 
-    def _hyper_band_monitor(self):
-
-        # Poll while worker is alive so we can deliver hyperband stop signals
-        assert isinstance(self.worker_process, Process)
-
-        run_id = self.worker.state["current_run_id"]
-
-        while self.worker_process.is_alive():
-            if self.tuner is not None and run_id is not None:
-                stopped_runs = self.tuner.stopping()
-                if run_id in stopped_runs:
-                    self.logger.info(
-                        f"Hyperband requested early stop for run {run_id}."
-                    )
-                    self.stop_worker_event.set()
-                    break
-
-            self.worker_process.join(timeout=10 * 60)  # block for 10 minutes then re-poll
-
-        self.worker_process.join()  # wait for it to finish gracefully
-
     def monitor_worker(self) -> bool:
         """
         Monitor the worker process until it exits.
@@ -124,10 +81,7 @@ class Daemon:
         indicate no restart should occur.
         """
         assert isinstance(self.worker_process, Process)
-        if self.state["sweep"] is not None:
-            self._hyper_band_monitor()
-        else:
-            self.worker_process.join()
+        self.worker_process.join()
 
         self.worker.state["working_pid"] = None
         # If worker died naturally (crash or finish)
@@ -151,99 +105,6 @@ class Daemon:
 
         return True
 
-    def _maybe_init_sweep_controller(self):
-        """Set sweep id in daemon state can connect to wandb controller"""
-        sweep = self.state["sweep"]
-
-        if sweep is not None:
-            self.tuner = wandb.controller(
-                sweep_id_or_config=sweep["sweep_id"],
-                entity=sweep["sweep_entity"],
-                project=sweep["sweep_project"],
-            )
-
-
-
-    def _maybe_inject_sweep_config(self):
-        """Inject sweep config if TO_RUN is empty and sweep_id is set in daemon state"""
-
-        sweep = self.state["sweep"]
-        len_2run = self.que.len_loc(TO_RUN)
-        tuner_done = self.tuner.done()
-        if self.state["sweep"] is None or len_2run > 0 or tuner_done:
-            # no injection
-            self.logger.debug(
-                f"No run injection occured: sweep: {sweep} length TO_RUN: {len_2run} tuner done: {tuner_done}"
-            )
-            return
-
-        # poll controller for next run
-        run_params = self.tuner.search()
-        self.tuner.schedule(run_params)
-
-        if run_params is None:
-            raise ValueError("not sure what happens here")
-
-        # override default values with sweep input
-        sweep_overrides = {k: v["value"] for k, v in run_params.config.items()}
-
-        command: list = list(self.tuner.sweep_config.get("command", []))
-        
-        remove_keys = {'python', '${env}', '${program}'}
-        command = [tok for tok in command if tok not in remove_keys]
-        
-        try:
-            args = get_sweep_parser().parse_args(command)
-        except SystemExit as e:
-            # argparse calls sys.exit() on bad args — catch it explicitly
-            self.logger.error(
-                f"Sweep command failed argparse validation (exit code {e.code}). "
-                f"command: {command}"
-            )
-            raise RuntimeError(
-                f"Sweep command args are invalid: {command}"
-            ) from e
-            
-        base_path = Path(args.base_config)
-        validate_sweep_key_map(base_path)
-        
-        with open(base_path, "rb") as f:
-            raw = tomllib.load(f)
-
-        if sweep_overrides:
-            raw = apply_sweep_overrides(raw, sweep_overrides)
-
-        sweep_id = self.state["sweep"]["sweep_id"]
-        run_id = generate_run_id()
-        exp_dir = get_sweep_exp_dir(args.split, args.model, sweep_id, run_id)
-        save_path = get_model_checkpoint_dir(exp_dir)
-        save_path.mkdir(parents=True, exist_ok=True)
-
-        admin = AdminInfo(
-            model=args.model,
-            dataset=args.dataset,
-            split=args.split,
-            exp_no=run_id,
-            recover=False,
-            config_path=str(base_path),
-            save_path=str(save_path),
-            weight_path=None,
-        )
-
-        wandb_i = WandbInfo(
-            entity=self.state["sweep"]["sweep_entity"],
-            project=self.state["sweep"]["sweep_project"],
-            run_id=run_id,
-            sweep_id=self.state["sweep"]["sweep_id"],
-            tags=["sweep"],
-        )
-
-        config = strict_validate(RunInfo, {"admin": admin.model_dump(), **raw})
-
-        self.logger.debug(f"Injecting run: {config.model_dump()}")
-
-        # inject into que for worker to pickup
-        self.que.add_new_run(config, wandb_i)
 
     def supervise(
         self,
@@ -262,14 +123,11 @@ class Daemon:
         manager = connect_manager()
         self.state = manager.get_daemon_state()
         self.worker.state = manager.get_worker_state()
-        self.que = manager.get_que()
-
+    
         # handle automatic recovery
         if recover_run:
+            self.que = manager.get_que()
             self.que.recover_run()
-
-        # connect sweep controller if applicable
-        self._maybe_init_sweep_controller()
 
         self._reattach_server_logger()
         self.logger.info(f"Supervisor loop started. PID: {os.getpid()}")
@@ -277,16 +135,10 @@ class Daemon:
         cnt = 0
         worker_pid = None
         while not self.stop_daemon_event.is_set():
-            
-            try:
-                self._maybe_inject_sweep_config()
-            except Exception as e:
-                self.logger.error(f"Error injecting sweep config: {e}", exc_info=True)
-                break
 
             try:
                 self.worker_process = Process(
-                    target=self.worker.start,
+                    target=self.worker.start,args=(self.state["sweep"],)
                 )
                 self.worker_process.start()
                 worker_pid = self.worker_process.pid

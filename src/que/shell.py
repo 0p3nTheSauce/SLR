@@ -48,7 +48,7 @@ from src.run_types import ENTITY
 
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
-from src.configs import get_train_parser
+from src.configs import get_avail_splits, get_train_parser
 
 # ---------------------------------------------------------------------------
 # Criterion parsing
@@ -737,6 +737,9 @@ class QueShell(cmdLib.Cmd):
                             sweep_id=parsed_args.sweep_id,
                             sweep_project=parsed_args.project,
                             sweep_entity=parsed_args.entity,
+                            model=parsed_args.model,
+                            dataset=parsed_args.dataset,
+                            split=parsed_args.split,
                         )
                     )
             elif parsed_args.command == "clear_sweep":
@@ -1325,6 +1328,7 @@ class QueShell(cmdLib.Cmd):
     # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
+        from models import avail_models
         parser = argparse.ArgumentParser(
             description="Interact with the worker process", prog="daemon"
         )
@@ -1363,6 +1367,24 @@ class QueShell(cmdLib.Cmd):
         )
         set_sweep_parser.add_argument("project", type=str, help="Sweep project")
         set_sweep_parser.add_argument("sweep_id", type=str, help="Sweep id")
+        parser.add_argument(
+            "model",
+            type=str,
+            choices=avail_models(),
+            help="Model name from one of the implemented model",
+        )
+        parser.add_argument(
+            "split", type=str, choices=get_avail_splits(), help="The class split"
+        )
+        parser.add_argument(
+            "-ds",
+            "--dataset",
+            type=str,
+            choices=["WLASL"],
+            default="WLASL",
+            help="Not implemented yet",
+        )
+        set_sweep_parser.add_argument("split", type=str, help="Split name")
         set_sweep_parser.add_argument(
             "--entity",
             "-e",

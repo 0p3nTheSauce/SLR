@@ -34,6 +34,7 @@ from contextlib import contextmanager
 
 # locals
 from src.run_types import (
+    AVAIL_SPLITS,
     ExpInfo,
     CompExpInfo,
     AdminInfo,
@@ -658,7 +659,7 @@ class Que:
 
     # Direct indexing
 
-    def add_new_run(self, config: RunInfo, wandb_dict: WandbInfo) -> None:
+    def add_new_run(self, config: RunInfo, wandb_dict: WandbInfo, loc: Literal['to_run', 'cur_run'] = TO_RUN) -> None:
         """Add a new run the the Que"""
         
         with log_and_raise(self.logger, "add_new_run"):
@@ -668,7 +669,13 @@ class Que:
                     "wandb": wandb_dict.model_dump(),
                 }
             )
-            self.to_run.append(exp_info)
+            if loc == TO_RUN:
+                self.to_run.append(exp_info)
+            elif loc == CUR_RUN:
+                self.cur_run.append(exp_info)
+            else:
+                raise ValueError(f"Invalid location: {loc}. Must be 'to_run' or 'cur_run'.")
+            
             self.logger.debug(f'Added new run: {self._run_to_str(self._run_sum(exp_info))}')
 
     def create_run(
@@ -1058,6 +1065,9 @@ class SweepInfo(TypedDict):
     sweep_id: str
     sweep_project: str
     sweep_entity: str
+    model: str
+    dataset: str
+    split: AVAIL_SPLITS
 
 class DaemonStateDict(TypedDict):
     awake: bool

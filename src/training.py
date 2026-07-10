@@ -27,12 +27,10 @@ from src.configs import (
 from src.run_types import (
     SchedInfo,
     OptimizerInfo,
-    MVirTedMaeInfo,
-    SupervisedInfo,
     is_supervised_config,
     is_pretrain_config,
 )
-from src.stopping import Stopper, EarlyStopperInfo, StopperInfo, StopperConfig
+from src.stopping import Stopper, StopperConfig
 from src.models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
 from src.utils import wandb_manager
 from src.testing import save_test_sizes

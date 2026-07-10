@@ -1,28 +1,72 @@
-"""Standalone entrypoint for wandb sweep agents.
+"""Helpers for running wandb sweep trials in-process under wandb.agent(function=...).
 
-Each invocation merges this trial's sweep-selected hyperparameters into a
-base TOML config, builds a fresh RunInfo, and runs training exactly as
-training.py would -- but without the interactive confirmation prompt, and
-with save_path/exp_no derived from the wandb run id rather than filesystem
-enumeration, so concurrent agents never collide.
+There is no `program`/`command` entrypoint anymore -- wandb.agent calls a Python
+function directly (see Worker._sweep_train), so this module builds a RunInfo
+from an in-memory config skeleton plus this trial's sweep-selected
+hyperparameters, rather than merging onto a base_config.toml file.
 """
 
 from __future__ import annotations
 
 import argparse
-try:
-    import tomllib  # type: ignore
-except ImportError:
-    import tomli as tomllib
 from pathlib import Path
 from typing import Any, Dict, List
 
 import wandb
 
 from src.run_types import RunInfo, AdminInfo, RUNS_PATH, strict_validate, AVAIL_SPLITS
-from src.configs import print_config, set_seed, get_avail_splits, get_model_checkpoint_dir
-from src.training import train_model  # adjust if train_model lives elsewhere
+from src.configs import get_model_checkpoint_dir, get_avail_splits
+from src.training import train_model
 
+
+class SweepConfigError(ValueError):
+    """Raised for any sweep-config problem that should fail loudly and early:
+    a SWEEP_KEY_MAP entry that doesn't resolve against the skeleton, or a
+    skeleton leaf that never got overridden by a sweep value."""
+
+
+def build_base_config() -> dict:
+    """The fixed shape every sweep trial's config takes. `None` marks a leaf
+    that MUST be supplied by SWEEP_KEY_MAP/run.config -- validate_resolved()
+    checks this after overrides are applied.
+
+    Assumes exactly one sampler and one cropper per split (train: flip + crop
+    + randaugment; test: crop only) -- this is what makes flat wandb params
+    workable instead of needing list-index paths.
+
+    Hard codes the sampler and crop method - requires seperate sweep for each sampler/cropper combination. Could be made more flexible
+
+    """
+    return {
+        "training": {"batch_size": None, "update_per_step": None},
+        "optimizer": {
+            "eps": None, "backbone_init_lr": None, "backbone_weight_decay": None,
+            "classifier_init_lr": None, "classifier_weight_decay": None,
+        },
+        "model_params": {"drop_p": None},
+        "scheduler": {"type": "CosineAnnealingWarmRestarts", "t0": None, "tmult": None, "eta_min": None},
+        "data": {
+            "train_augs": {
+                "normalise": True,
+                "temporal_aug": [{"type": "chunked", "max_wobble": None, "target_length": None}],
+                "spatial_aug": [
+                    {"type": "HORIZONTAL_FLIP", "p": None},
+                    {"type": "Centre_crop", "frame_size": None},
+                    {"type": "RANDAUGMENT", "num_ops": None, "magnitude": None,
+                     "num_magnitude_bins": None, "interpolation": "bilinear"},
+                ],
+            },
+            "test_augs": {
+                "normalise": True,
+                "temporal_aug": [{"type": "uniform", "target_length": None}],
+                "spatial_aug": [{"type": "Centre_crop", "frame_size": None}],
+            },
+        },
+        "stopping": {
+            "max_epoch": None, "type": "early_stopper", "metric": "loss",
+            "phase": "val", "mode": "min", "patience": None, "min_delta": None,
+        },
+    }
 
 
 def _resolve_list_index(lst: list, selector: str) -> int:
@@ -38,12 +82,7 @@ def _resolve_list_index(lst: list, selector: str) -> int:
 
 
 def _set_nested(d: Any, keys: List[str], value: Any) -> None:
-    """Set a value at a dotted/list-indexed path inside a nested dict/list.
-
-    Path segments that are integers index into lists (TOML arrays of tables,
-    e.g. `data.train_augs.spatial_aug.2.magnitude`); all other segments index
-    into dicts, creating intermediate dicts as needed.
-    """
+    """Set a value at a dotted/selector path inside a nested dict/list."""
     key = keys[0]
 
     if isinstance(d, list):
@@ -63,6 +102,19 @@ def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     _set_nested(d[key], keys[1:], value)
 
 
+def _find_unresolved(d: Any, path: str = "") -> List[str]:
+    """Recursively collect dotted paths of any leaf still set to None."""
+    unresolved: List[str] = []
+    if isinstance(d, dict):
+        for k, v in d.items():
+            unresolved.extend(_find_unresolved(v, f"{path}.{k}" if path else k))
+    elif isinstance(d, list):
+        for i, item in enumerate(d):
+            unresolved.extend(_find_unresolved(item, f"{path}.{i}"))
+    elif d is None:
+        unresolved.append(path)
+    return unresolved
+
 
 SWEEP_KEY_MAP = {
     # optimizer
@@ -80,39 +132,76 @@ SWEEP_KEY_MAP = {
     "tmult":                   "scheduler.tmult",
     "eta_min":                 "scheduler.eta_min",
 
-    # temporal aug — selector-based, safe against reordering
-    "max_wobble":              "data.train_augs.temporal_aug.type:chunked.max_wobble",
+    # training
+    "batch_size":              "training.batch_size",
+    "update_per_step":         "training.update_per_step",
 
-    # spatial aug
+    # temporal aug -- now maps to both train and test
+    "max_wobble":              "data.train_augs.temporal_aug.type:chunked.max_wobble",
+    "target_length": [
+        "data.train_augs.temporal_aug.type:chunked.target_length",
+        "data.test_augs.temporal_aug.type:uniform.target_length"
+    ],
+
+    # spatial aug -- now maps to both train and test
+    "hflip_p":                 "data.train_augs.spatial_aug.type:HORIZONTAL_FLIP.p",
+    "frame_size": [
+        "data.train_augs.spatial_aug.type:Centre_crop.frame_size",
+        "data.test_augs.spatial_aug.type:Centre_crop.frame_size"
+    ],
     "magnitude":               "data.train_augs.spatial_aug.type:RANDAUGMENT.magnitude",
     "num_ops":                 "data.train_augs.spatial_aug.type:RANDAUGMENT.num_ops",
     "num_magnitude_bins":      "data.train_augs.spatial_aug.type:RANDAUGMENT.num_magnitude_bins",
-    "hflip_p":                 "data.train_augs.spatial_aug.type:HORIZONTAL_FLIP.p",
 
     # early stopping
+    "max_epoch":               "stopping.max_epoch",
     "patience":                "stopping.patience",
-    "min_delta":                "stopping.min_delta",
+    "min_delta":               "stopping.min_delta",
 }
 
-def validate_sweep_key_map(base_path: Path, key_map: dict = SWEEP_KEY_MAP) -> None:
-    with open(base_path, "rb") as f:
-        raw = tomllib.load(f)
-    for name, dotted in key_map.items():
-        d = raw
-        for k in dotted.split("."):
-            try:
-                d = d[_resolve_list_index(d, k)] if isinstance(d, list) else d[k]
-            except (KeyError, IndexError) as e:
-                raise ValueError(
-                    f"SWEEP_KEY_MAP[{name!r}] -> {dotted!r} does not resolve "
-                    f"against {base_path}: {e}"
-                ) from None
 
 def apply_sweep_overrides(raw: Dict[str, Any], wandb_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Mutate `raw` in place, applying each wandb.config key via SWEEP_KEY_MAP
+    (or, if absent from the map, as a literal dotted path)."""
     for key, value in wandb_config.items():
-        dotted_key = SWEEP_KEY_MAP.get(key, key)
-        _set_nested(raw, dotted_key.split("."), value)
+        dotted_or_list = SWEEP_KEY_MAP.get(key, key)
+        dotted_keys = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
+        for dotted_key in dotted_keys:
+            _set_nested(raw, dotted_key.split("."), value)
     return raw
+
+
+def validate_sweep_key_map(key_map: dict = SWEEP_KEY_MAP) -> None:
+    """Check every SWEEP_KEY_MAP target resolves against the skeleton shape.
+    Structural check only -- doesn't require any particular run's values, so
+    it can run once at sweep-launch time, independent of wandb.init().
+    """
+    raw = build_base_config()
+    for name, dotted_or_list in key_map.items():
+        dotted_list = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
+        for dotted in dotted_list:
+            d = raw
+            for k in dotted.split("."):
+                try:
+                    d = d[_resolve_list_index(d, k)] if isinstance(d, list) else d[k]
+                except (KeyError, IndexError) as e:
+                    raise SweepConfigError(
+                        f"SWEEP_KEY_MAP[{name!r}] -> {dotted!r} does not resolve "
+                        f"against the base config skeleton: {e}"
+                    ) from None
+
+def validate_resolved(config: Dict[str, Any]) -> None:
+    """Raise if any skeleton placeholder was never overwritten by a sweep
+    value -- catches a yaml `parameters` entry that got renamed/removed
+    without updating SWEEP_KEY_MAP (or vice versa) before it silently reaches
+    Pydantic as None."""
+    unresolved = _find_unresolved(config)
+    if unresolved:
+        raise SweepConfigError(
+            "Sweep config has unresolved placeholders (no value supplied "
+            f"for): {unresolved}. Check that the sweep yaml's `parameters` "
+            "block and SWEEP_KEY_MAP are in sync."
+        )
 
 
 def get_sweep_exp_dir(split: str, model: str, sweep_id: str, run_id: str,
@@ -121,34 +210,29 @@ def get_sweep_exp_dir(split: str, model: str, sweep_id: str, run_id: str,
     return Path(runs_path) / split / model / f"sweep_{sweep_id}" / run_id
 
 
-def get_sweep_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run a single trial of a wandb sweep")
-    parser.add_argument("model", type=str)
-    parser.add_argument("split", type=str, choices=get_avail_splits())
-    parser.add_argument(
-        "-bc", "--base_config", type=str, required=True,
-        help="TOML template; sweep parameters override its values",
-    )
-    parser.add_argument("-ds", "--dataset", type=str, default="WLASL")
-    parser.add_argument("-se", "--save_every", type=int, default=5)
-    return parser
+def create_sweep_run(model: str, split: AVAIL_SPLITS, dataset: str = "WLASL"):
+    """Build a fresh RunInfo + wandb Run for one sweep trial.
 
-def create_sweep_run(base_path: Path, split: AVAIL_SPLITS, model: str, dataset: str):
-    
-    validate_sweep_key_map(base_path)
-    
-    
-    with open(base_path, "rb") as f:
-        raw = tomllib.load(f)
-        
-    # wandb agent sets WANDB_SWEEP_ID / WANDB_ENTITY / WANDB_PROJECT in the env;
-    # wandb.init() attaches to the sweep and populates run.config with this
-    # trial's chosen hyperparameters.
+    Called from inside the callback passed to wandb.agent(function=...).
+    wandb.agent sets sweep context via env vars before invoking that callback;
+    wandb.init() attaches to the sweep and populates run.config with this
+    trial's chosen hyperparameters -- do NOT pass `config=` or `id=` here,
+    that would shadow the sweep-sampled values with defaults.
+
+    `model`/`split`/`dataset` are NOT sweep parameters -- they're passed in by
+    the caller (Worker, via SweepInfo from the Daemon), since they determine
+    architecture/data plumbing rather than being tuned.
+    """
+    validate_sweep_key_map()  # structural check, fails before any wandb call
+
     run = wandb.init()
-    
+
+    raw = build_base_config()
     sweep_overrides = dict(run.config)
     if sweep_overrides:
         raw = apply_sweep_overrides(raw, sweep_overrides)
+
+    validate_resolved(raw)
 
     sweep_id = run.sweep_id or "manual"
     exp_dir = get_sweep_exp_dir(split, model, sweep_id, run.id)
@@ -161,7 +245,7 @@ def create_sweep_run(base_path: Path, split: AVAIL_SPLITS, model: str, dataset: 
         split=split,
         exp_no=run.id,
         recover=False,
-        config_path=str(base_path),
+        config_path="<in-memory:sweep>",  # no file backs this config anymore
         save_path=str(save_path),
         weight_path=None,
     )
@@ -171,24 +255,42 @@ def create_sweep_run(base_path: Path, split: AVAIL_SPLITS, model: str, dataset: 
     run.name = f"{admin.model}_{admin.split}_{run.id}"
     run.config.update(config.model_dump(), allow_val_change=True)  # log resolved config
 
-    print_config(config)
-    
     return config, run
+
+
+# --- CLI entrypoint, for running this as a subprocess under `wandb agent` ---
+#
+# Function mode (Worker._sweep_train calling create_sweep_run directly) is the
+# path used by the Que system. This entrypoint exists so the same sweep can
+# also be launched the plain way -- `wandb agent <entity>/<project>/<sweep_id>`
+# -- for quick standalone testing outside the Daemon/Worker stack. To use this
+# mode, the sweep yaml needs `program`/`command` pointing back at this script,
+# e.g.:
+#
+#   command:
+#     - ${env}
+#     - python
+#     - ${program}
+#     - MViTv2_B_32x3
+#     - asl100
+#
+# model/split/dataset/save_every are CLI args here, NOT wandb parameters --
+# they aren't tuned, so they don't belong in the sweep's `parameters` block
+# (see create_sweep_run's docstring).
+
+def get_sweep_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run a single trial of a wandb sweep")
+    parser.add_argument("model", type=str)
+    parser.add_argument("split", type=str, choices=get_avail_splits())
+    parser.add_argument("-ds", "--dataset", type=str, default="WLASL")
+    parser.add_argument("-se", "--save_every", type=int, default=5)
+    return parser
 
 
 def main():
     args = get_sweep_parser().parse_args()
 
-    base_path = Path(args.base_config)
-    if not base_path.exists():
-        raise FileNotFoundError(f"{base_path} not found")
-
-    config, run = create_sweep_run(
-        base_path=base_path,
-        split=args.split,
-        model=args.model,
-        dataset=args.dataset
-    )
+    config, run = create_sweep_run(model=args.model, split=args.split, dataset=args.dataset)
 
     train_model(args.model, config, run, save_every=args.save_every, recover=False)
     run.finish()

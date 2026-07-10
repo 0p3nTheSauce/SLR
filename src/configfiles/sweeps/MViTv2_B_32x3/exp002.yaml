@@ -27,3 +27,5 @@ command:
   - asl100
   - --base_config
   - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml
+
+# run as mkwuo5qv

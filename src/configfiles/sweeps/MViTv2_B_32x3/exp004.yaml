@@ -66,8 +66,8 @@ parameters:
   # --- fixed ---
 #   eps: {value: 0.00001}
   eta_min: {value: 0}
-  batch_size: {value: 8}
-  update_per_step: {value: 1}
+  batch_size: {value: 1}
+  update_per_step: {value: 8}
 #   hflip_p: {value: 0.5}
   frame_size: {value: 224}
   target_length: {value: 32}
@@ -84,6 +84,7 @@ command:
   - ${env}
   - python
   - ${program}
-  - S3D
+  - MViTv2_B_32x3
   - asl100
 
+  

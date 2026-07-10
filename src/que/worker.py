@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Optional, IO, cast
 import traceback
@@ -10,11 +11,14 @@ import io
 
 from multiprocessing.synchronize import Event as EventClass
 
+import wandb
+
 from run_types import RunInfo
 
 # locals
 from src.testing import full_test
 from src.que.core import (
+    CUR_RUN,
     connect_manager,
     TRAINING_LOG_PATH,
     WORKER_NAME,
@@ -24,10 +28,12 @@ from src.que.core import (
     WorkerStateDict,
     CompExpInfo,
     Que,
+    SweepInfo,  # now also carries model/split/dataset -- see note below
 )
-
+from src.run_types import WandbInfo
 from src.utils import gpu_manager
 from src.training import train_loop, _setup_wandb
+from src.sweeping import create_sweep_run
 
 
 class LoggerWriter(io.TextIOBase):
@@ -60,6 +66,7 @@ class Worker:
         self.stop_event: Optional[EventClass] = stop_event
         self.state = state
         self.do_traceback = do_traceback
+        self.sweep_info: Optional[SweepInfo] = None
         self.server_logger.info("Worker initialized")
 
 
@@ -156,6 +163,70 @@ class Worker:
 
         self.server_logger.info("_train method completed successfully")
 
+    def _inject_sweep_config(self, config: RunInfo, run_id: str) -> None:
+        """Injects the sweep config into the Que"""
+        assert self.sweep_info is not None, "_inject_sweep_config called without sweep_info set"
+        wandb_i = WandbInfo(
+            entity=self.sweep_info["sweep_entity"],
+            project=self.sweep_info["sweep_project"],
+            run_id=run_id,
+            sweep_id=self.sweep_info["sweep_id"],
+            tags=["sweep"],
+        )
+        self.server_logger.debug(f"Injecting run: {json.dumps(config.model_dump())}")
+        self.que.add_new_run(config, wandb_i, loc=CUR_RUN) # inject directly into cur_run, and skip the move from to_run -> cur_run step in _train, since the sweep controller already sampled the hyperparameters for this trial
+        self.que.save_state()
+
+    def _sweep_train(self) -> None:
+        """Callback passed to wandb.agent(function=...). Runs in-process, in
+        the thread the agent invokes it on -- NOT a separate process, so
+        there's no subprocess for the agent to kill if wandb's backend later
+        decides to early-stop this trial (hyperband caveat discussed
+        separately; not handled here yet).
+
+        Unlike _train, there's no que injection step beforehand: create_sweep_run
+        builds the RunInfo directly from this trial's sweep-sampled hyperparameters,
+        so there's nothing sitting in TO_RUN for this run.
+        """
+        assert self.sweep_info is not None, "_sweep_train called without sweep_info set"
+
+        if not gpu_manager.wait_for_completion(
+            check_interval=10,
+            logger=self.server_logger,
+            event=self.stop_event,
+        ):
+            self.server_logger.info("GPU not available, exiting")
+            return
+        else:
+            self.server_logger.info("GPU is available")
+
+        with redirect_stdout(self.log_adapter):
+            config, run = create_sweep_run(
+                model=self.sweep_info["model"],
+                split=self.sweep_info["split"],
+                dataset=self.sweep_info["dataset"],
+            )
+
+        #inject the sweep config into the Que for recovery/state tracking
+        self._inject_sweep_config(config, run.id)
+
+        self.state['current_run_id'] = run.id
+        self.server_logger.info(f"Run ID: {run.id}")
+        self.server_logger.info(f"Run name: {run.name}")
+        self.server_logger.info(f"Run path: {run.path}")
+
+        with redirect_stdout(self.log_adapter):
+            train_loop(
+                config.admin.model,
+                config,
+                run,
+                recover=False,
+                event=self.stop_event,
+            )
+            run.finish(exit_code=0)
+
+        self.server_logger.info("_sweep_train method completed successfully")
+
     def train(self) -> None:
         """
         The train method is the main entry point for training a model.
@@ -186,6 +257,45 @@ class Worker:
         finally:
             self.cleanup()
             # self.state.task = "inactive"
+            self.state['task'] = "inactive"
+
+    def sweep(self, sweep_info: SweepInfo) -> None:
+        """
+        Sweep-mode entry point -- bypasses the regular train() path entirely.
+        Runs exactly one trial (count=1) via wandb.agent, then returns control
+        to the Daemon's supervise loop, which will call start(sweep_info) again
+        for the next trial (or start() for a plain run, if the sweep's done).
+        """
+        self.sweep_info = sweep_info
+        try:
+            self.training_logger.info("Starting sweep trial")
+            self.state['task'] = "training"
+            wandb.agent(
+                sweep_info["sweep_id"],
+                entity=sweep_info["sweep_entity"],
+                project=sweep_info["sweep_project"],
+                function=self._sweep_train,
+                count=1,
+            )
+        except QueException as Qe:
+            self.server_logger.info(f"que based error, cannot continue: {Qe}")
+            self.state['exception'] = self.build_exception_info(Qe)
+            self.state['working_pid'] = None
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.state['exception'] = "KeyboardInterrupt"
+            self.state['working_pid'] = None
+            raise
+        except Exception as e:
+            self.server_logger.error(f"Sweep trial failed due to an error: {e}")
+            self.state['exception'] = self.build_exception_info(e)
+            self.state['working_pid'] = None
+            self.que.stash_failed_run(str(e))
+            self.que.save_state()
+            raise
+        finally:
+            self.cleanup()
             self.state['task'] = "inactive"
 
     def _test(self) -> None:
@@ -284,7 +394,10 @@ class Worker:
             )
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
-    def start(self):
+
+
+
+    def start(self, sweep_info: Optional[SweepInfo] = None):
         """this is likely started in a seperate process, so que requires connecting"""
 
         #get state handlers
@@ -298,8 +411,11 @@ class Worker:
 
         self._attach_training_loggers()
         self._reattach_server_logger()
-        
-        self.train()
+
+        if sweep_info is not None:
+            self.sweep(sweep_info)
+        else:
+            self.train()
 
         if self.stop_event is not None and self.stop_event.is_set():
             self.server_logger.warning("Training was interrupted by stopping event.")

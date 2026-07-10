@@ -117,6 +117,7 @@ def get_class_list(classes_path: Union[str, Path] = CLASSES_PATH) -> List[str]:
     return class_list
 
 
+
 ###################### Config generation ###############################
 
 
