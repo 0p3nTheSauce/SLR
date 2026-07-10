@@ -37,6 +37,7 @@ from src.sweeping import (
     get_sweep_exp_dir,
     get_model_checkpoint_dir,
     strict_validate,
+    validate_sweep_key_map,
 )
 
 
@@ -161,6 +162,8 @@ class Daemon:
                 project=sweep["sweep_project"],
             )
 
+
+
     def _maybe_inject_sweep_config(self):
         """Inject sweep config if TO_RUN is empty and sweep_id is set in daemon state"""
 
@@ -202,7 +205,8 @@ class Daemon:
             ) from e
             
         base_path = Path(args.base_config)
-
+        validate_sweep_key_map(base_path)
+        
         with open(base_path, "rb") as f:
             raw = tomllib.load(f)
 

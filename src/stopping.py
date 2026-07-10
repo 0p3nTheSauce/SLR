@@ -39,14 +39,15 @@ class Stopper:
     
         self.max_epoch = arg_dict.max_epoch
         
-        if isinstance(arg_dict, EarlyStopperInfo):
+        if arg_dict.type == 'early_stopper':
             self.on = True
             self.metric = arg_dict.metric
-            self.phase = arg_dict.phase
             self.mode = arg_dict.mode
             self.patience = arg_dict.patience
             self.min_delta = arg_dict.min_delta
             
+            
+        self.phase = arg_dict.phase
         self.curr_epoch = 0
         self.best_score = None
         self.best_epoch = 0

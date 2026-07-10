@@ -345,13 +345,14 @@ StoppingModes: TypeAlias = Literal["min", "max"]
 class StopperInfo(BaseModel):
     type: Literal["stopper"] = "stopper"
     max_epoch: int
+    phase: StoppingPhases = 'train'
 
 
 class EarlyStopperInfo(BaseModel):
     type: Literal["early_stopper"] = "early_stopper"
     max_epoch: int
     metric: StoppingMetrics
-    phase: StoppingPhases
+    phase: StoppingPhases = 'val'
     mode: StoppingModes
     patience: int
     min_delta: float

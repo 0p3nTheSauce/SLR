@@ -16,24 +16,40 @@ early_terminate:
 parameters:
   backbone_init_lr:
     distribution: log_uniform_values
-    min: 0.00002
-    max: 0.0004
+    min: 0.000005
+    max: 0.0008
   classifier_init_lr:
     distribution: log_uniform_values
-    min: 0.0002
-    max: 0.004
+    min: 0.00005
+    max: 0.005
   backbone_weight_decay:
     distribution: log_uniform_values
     min: 0.0001
-    max: 0.005
+    max: 0.01
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.01
   drop_p:
-    values: [0.3, 0.4, 0.5, 0.6, 0.7]
+    distribution: uniform
+    min: 0.1
+    max: 0.7
   t0:
-    values: [10, 20, 40]
+    distribution: int_uniform
+    min: 10
+    max: 40
+  tmult:
+    values: [1, 2]
   max_wobble:
-    values: [0, 2, 4, 6]
+    distribution: int_uniform
+    min: 0
+    max: 6
   magnitude:
-    values: [5, 7, 9, 12]
+    distribution: int_uniform
+    min: 3
+    max: 15
+  num_ops:
+    values: [1, 2, 3]
 
 command:
   - ${env}

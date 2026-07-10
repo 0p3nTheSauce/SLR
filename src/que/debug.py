@@ -200,9 +200,55 @@ def test_read_server_state():
     s = read_server_state()
     print(s.model_dump())
 
+def update_runs15():
+    from src.stopping import StopperInfo, EarlyStopperInfo
+
+    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+        all_runs = json.load(f)
+
+    for loc in KEYS:
+        que_list = all_runs[loc]
+        new_quelist = []
+        for run in que_list:
+            
+            stopping = run.pop('stopping', None)
+            
+            if stopping is None:
+                raise ValueError(f"Run {run['admin']['config_path']} is missing 'stopping' information.")
+            elif stopping['type'] == 'stopper':
+                stopping = StopperInfo(max_epoch=stopping['max_epoch'])
+            elif stopping['type'] == 'early_stopper':
+                stopping = EarlyStopperInfo(
+                    max_epoch=stopping['max_epoch'],
+                    metric=stopping['metric'],
+                    phase=stopping['phase'],
+                    mode=stopping['mode'],
+                    patience=stopping['patience'],
+                    min_delta=stopping['min_delta']
+                )
+            print(stopping.model_dump())
+            
+            run['stopping'] = stopping.model_dump()
+
+            if loc in KEYS[:2]:
+                run = ExpInfo.model_validate(run).model_dump()
+            elif loc == KEYS[2]:
+                run = CompExpInfo.model_validate(run).model_dump()
+            else:
+                run = FailedExp.model_validate(run).model_dump()
+
+            new_quelist.append(run)
+
+        all_runs[loc] = new_quelist
+
+    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
+        json.dump(all_runs, f, indent=4)
+
+
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
+    # update_runs15()
     pass
     
     

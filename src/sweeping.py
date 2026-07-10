@@ -24,6 +24,19 @@ from src.configs import print_config, set_seed, get_avail_splits, get_model_chec
 from src.training import train_model  # adjust if train_model lives elsewhere
 
 
+
+def _resolve_list_index(lst: list, selector: str) -> int:
+    """selector like 'type:RANDAUGMENT' -> index of the first list item whose
+    'type' field matches. Falls back to plain int index for backward compat."""
+    if ":" not in selector:
+        return int(selector)
+    field, _, val = selector.partition(":")
+    for i, item in enumerate(lst):
+        if isinstance(item, dict) and item.get(field) == val:
+            return i
+    raise KeyError(f"No item in list matches selector {selector!r}")
+
+
 def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     """Set a value at a dotted/list-indexed path inside a nested dict/list.
 
@@ -34,7 +47,7 @@ def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     key = keys[0]
 
     if isinstance(d, list):
-        idx = int(key)
+        idx = _resolve_list_index(d, key)
         if len(keys) == 1:
             d[idx] = value
         else:
@@ -50,15 +63,50 @@ def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     _set_nested(d[key], keys[1:], value)
 
 
+
 SWEEP_KEY_MAP = {
-    "backbone_init_lr":       "optimizer.backbone_init_lr",
-    "classifier_init_lr":     "optimizer.classifier_init_lr",
-    "backbone_weight_decay":  "optimizer.backbone_weight_decay",
-    "drop_p":                 "model_params.drop_p",
-    "t0":                     "scheduler.t0",
-    "max_wobble":             "data.train_augs.temporal_aug.0.max_wobble",
-    "magnitude":              "data.train_augs.spatial_aug.2.magnitude",
+    # optimizer
+    "backbone_init_lr":        "optimizer.backbone_init_lr",
+    "classifier_init_lr":      "optimizer.classifier_init_lr",
+    "backbone_weight_decay":   "optimizer.backbone_weight_decay",
+    "classifier_weight_decay": "optimizer.classifier_weight_decay",
+    "eps":                     "optimizer.eps",
+
+    # model
+    "drop_p":                  "model_params.drop_p",
+
+    # scheduler (WarmRestartInfo)
+    "t0":                      "scheduler.t0",
+    "tmult":                   "scheduler.tmult",
+    "eta_min":                 "scheduler.eta_min",
+
+    # temporal aug — selector-based, safe against reordering
+    "max_wobble":              "data.train_augs.temporal_aug.type:chunked.max_wobble",
+
+    # spatial aug
+    "magnitude":               "data.train_augs.spatial_aug.type:RANDAUGMENT.magnitude",
+    "num_ops":                 "data.train_augs.spatial_aug.type:RANDAUGMENT.num_ops",
+    "num_magnitude_bins":      "data.train_augs.spatial_aug.type:RANDAUGMENT.num_magnitude_bins",
+    "hflip_p":                 "data.train_augs.spatial_aug.type:HORIZONTAL_FLIP.p",
+
+    # early stopping
+    "patience":                "stopping.patience",
+    "min_delta":                "stopping.min_delta",
 }
+
+def validate_sweep_key_map(base_path: Path, key_map: dict = SWEEP_KEY_MAP) -> None:
+    with open(base_path, "rb") as f:
+        raw = tomllib.load(f)
+    for name, dotted in key_map.items():
+        d = raw
+        for k in dotted.split("."):
+            try:
+                d = d[_resolve_list_index(d, k)] if isinstance(d, list) else d[k]
+            except (KeyError, IndexError) as e:
+                raise ValueError(
+                    f"SWEEP_KEY_MAP[{name!r}] -> {dotted!r} does not resolve "
+                    f"against {base_path}: {e}"
+                ) from None
 
 def apply_sweep_overrides(raw: Dict[str, Any], wandb_config: Dict[str, Any]) -> Dict[str, Any]:
     for key, value in wandb_config.items():
@@ -86,6 +134,9 @@ def get_sweep_parser() -> argparse.ArgumentParser:
     return parser
 
 def create_sweep_run(base_path: Path, split: AVAIL_SPLITS, model: str, dataset: str):
+    
+    validate_sweep_key_map(base_path)
+    
     
     with open(base_path, "rb") as f:
         raw = tomllib.load(f)
