@@ -2,7 +2,7 @@
 """que
 ---
 A lightweight in-memory queue manager for experiment configurations with
-simple JSON-backed persistence.  
+simple JSON-backed persistence.
 """
 
 from typing import (
@@ -126,6 +126,7 @@ NO_SORT = SortInfo(key_set=[], reverse=False)
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
+
 
 def _get_basic_logger() -> Logger:
     logging.basicConfig(
@@ -314,9 +315,18 @@ class Que:
         return isinstance(run, CompExpInfo)
 
     @classmethod
-    def _run_sum(cls, run: GenExp) -> Sumarised:
-        """Extract a compact summary from a run model."""
+    def _run_sum(cls, run: GenExp, ndigits: Optional[int] = None) -> Sumarised:
+        """Extract a compact summary from a run model. Optionally round to ndigits"""
         run_id = run.wandb.run_id if isinstance(run, ExpInfo) and run.wandb else None
+
+        if isinstance(run, CompExpInfo):
+            acc = run.results.best_val_acc
+            loss = run.results.best_val_loss
+
+            best_val_acc = round(acc, ndigits) if ndigits else acc
+            best_val_loss = round(loss, ndigits) if ndigits else loss
+        else:
+            best_val_acc, best_val_loss = None, None
 
         base = Sumarised(
             model=run.admin.model,
@@ -325,12 +335,8 @@ class Que:
             split=run.admin.split,
             config_path=run.admin.config_path,
             run_id=run_id,
-            best_val_acc=run.results.best_val_acc
-            if isinstance(run, CompExpInfo)
-            else None,
-            best_val_loss=run.results.best_val_loss
-            if isinstance(run, CompExpInfo)
-            else None,
+            best_val_acc=best_val_acc,
+            best_val_loss=best_val_loss,
         )
 
         if cls._is_failed_exp(run):
@@ -339,8 +345,8 @@ class Que:
             test = run.results.test
             return SummarisedRes(
                 **base.model_dump(),
-                test_top1_acc=test.top_k_per_instance_acc.top1 * 100,
-                test_av_loss=test.average_loss,
+                test_top1_acc=round(test.top_k_per_instance_acc.top1 * 100, ndigits),
+                test_av_loss=round(test.average_loss, ndigits),
             )
         return base
 
@@ -475,7 +481,7 @@ class Que:
             timestamp (bool, optional): Whether to include a timestamp in the output path. Defaults to False.
             archive (bool, optional): Whether to archive the output file. Defaults to True.
         """
-        
+
         if out_path is None:
             out_path = self.runs_path
         elif Path(out_path).exists() and not timestamp:
@@ -592,7 +598,6 @@ class Que:
     def get_config(cls, next_run: RunInfo) -> str:
         return next_run.admin.config_path
 
-
     @classmethod
     def get_nested_or_none(cls, d: Any, ks: List[Any]) -> Any:
         """Attempt to read a value at arbitrary depth from a plain dict or pydantic model. Return None if any key is not found."""
@@ -633,7 +638,9 @@ class Que:
                     break
 
                 runs = [
-                    run for run in runs if crit(Que.get_nested_or_none(run, filter_key_set))
+                    run
+                    for run in runs
+                    if crit(Que.get_nested_or_none(run, filter_key_set))
                 ]
 
         if len(sort_keys) > 0:
@@ -659,9 +666,15 @@ class Que:
 
     # Direct indexing
 
-    def add_new_run(self, config: RunInfo, wandb_dict: WandbInfo, loc: Literal['to_run', 'cur_run'] = TO_RUN) -> None:
+    def add_new_run(
+        self,
+        config: RunInfo,
+        wandb_dict: WandbInfo,
+        loc: Literal["to_run", "cur_run"] = TO_RUN,
+        ndigits: Optional[int] = 2
+    ) -> None:
         """Add a new run the the Que"""
-        
+
         with log_and_raise(self.logger, "add_new_run"):
             exp_info = ExpInfo.model_validate(
                 {
@@ -674,9 +687,13 @@ class Que:
             elif loc == CUR_RUN:
                 self.cur_run.append(exp_info)
             else:
-                raise ValueError(f"Invalid location: {loc}. Must be 'to_run' or 'cur_run'.")
-            
-            self.logger.debug(f'Added new run: {self._run_to_str(self._run_sum(exp_info))}')
+                raise ValueError(
+                    f"Invalid location: {loc}. Must be 'to_run' or 'cur_run'."
+                )
+
+            self.logger.debug(
+                f"Added new run: {self._run_to_str(self._run_sum(exp_info, ndigits))}"
+            )
 
     def create_run(
         self,
@@ -691,9 +708,8 @@ class Que:
             config: RunInfo = load_config(arg_dict)
             if self._is_dup_exp(config) and not add_duplicates:
                 raise QueDupExp
-        
-        self.add_new_run(config, wandb_dict)
 
+        self.add_new_run(config, wandb_dict)
 
     def add_run(
         self,
@@ -706,8 +722,7 @@ class Que:
         from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
 
         with log_and_raise(self.logger, "add"):
-    
-            config: RunInfo = load_config(arg_dict) 
+            config: RunInfo = load_config(arg_dict)
             if self._is_dup_exp(config) and not add_duplicates:
                 raise QueDupExp
 
@@ -743,9 +758,6 @@ class Que:
                 }
             )
             self.old_runs.insert(0, comp_run)
-
-    
-            
 
     def recover_run(
         self,
@@ -850,7 +862,7 @@ class Que:
                 run_type = CompExpInfo
             else:
                 run_type = ExpInfo
-                
+
             new_run = strict_validate(run_type, run_dict)
 
             _ = self._pop_run(loc, idx)
@@ -858,8 +870,8 @@ class Que:
 
     # Indirect indexing
 
-    def run_str(self, loc: QueLocation, idx: int) -> str:
-        return self._run_to_str(self._run_sum(self.peak_run(loc, idx)))
+    def run_str(self, loc: QueLocation, idx: int, ndigits: Optional[int] = None) -> str:
+        return self._run_to_str(self._run_sum(self.peak_run(loc, idx), ndigits))
 
     def list_runs(
         self, loc: QueLocation, **kwargs: Unpack[ListManipulationKwargs]
@@ -888,13 +900,13 @@ class Que:
                 self._set_run(loc, idx + index, run)
 
     @classmethod
-    def summarise(cls, runs: ExpQue) -> List[Sumarised]:
-        return [cls._run_sum(run) for run in runs]  # type: ignore[arg-type]
+    def summarise(cls, runs: ExpQue, ndigits: Optional[int] = None) -> List[Sumarised]:
+        return [cls._run_sum(run, ndigits) for run in runs]  # type: ignore[arg-type]
 
     def summarise_runs(
-        self, loc: QueLocation, **kwargs: Unpack[ListManipulationKwargs]
+        self, loc: QueLocation, ndigits: Optional[int] = None, **kwargs: Unpack[ListManipulationKwargs]
     ) -> List[Sumarised]:
-        return self.summarise(self.list_runs(loc, **kwargs))
+        return self.summarise(self.list_runs(loc, **kwargs), ndigits=ndigits)
 
     @classmethod
     def print_runs(cls, runs: List[Sumarised], exc: Optional[List[str]] = None) -> None:
@@ -1045,14 +1057,15 @@ class Que:
                     )
                     run_list[idx] = model_cls.model_validate(run_dict)  # type: ignore[index]
 
-    
+
 # ---------------------------------------------------------------------------
 # Server state models
 # ---------------------------------------------------------------------------
 
 Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 
-#Maintained TypedDict for dictproxy in basemanager
+
+# Maintained TypedDict for dictproxy in basemanager
 class WorkerStateDict(TypedDict):
     task: Worker_tasks
     current_run_id: Optional[str]
@@ -1069,28 +1082,31 @@ class SweepInfo(TypedDict):
     dataset: str
     split: AVAIL_SPLITS
 
+
 class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
     supervisor_pid: Optional[int]
     sweep: Optional[SweepInfo]
 
+
 def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
-        task: Worker_tasks = 'inactive'
+        task: Worker_tasks = "inactive"
         current_run_id: Optional[str] = None
         working_pid: Optional[int] = None
         exception: Optional[str] = None
         sweep_id: Optional[str] = None
-        
+
     d = WorkerState.model_validate(obj)
     return {
-        'task': d.task,
-        'current_run_id': d.current_run_id,
-        'exception': d.exception,
+        "task": d.task,
+        "current_run_id": d.current_run_id,
+        "exception": d.exception,
         # 'sweep_id':d.sweep_id,
-        'working_pid':d.working_pid
-    } 
+        "working_pid": d.working_pid,
+    }
+
 
 def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):
@@ -1098,14 +1114,15 @@ def daemon_state_validate(obj: Any) -> DaemonStateDict:
         stop_on_fail: bool = True
         supervisor_pid: Optional[int] = None
         sweep: Optional[SweepInfo] = None
-    
+
     d = DaemonState.model_validate(obj)
     return {
-        'awake':d.awake,
-        'stop_on_fail':d.stop_on_fail,
-        'supervisor_pid':d.supervisor_pid,
-        'sweep': d.sweep
+        "awake": d.awake,
+        "stop_on_fail": d.stop_on_fail,
+        "supervisor_pid": d.supervisor_pid,
+        "sweep": d.sweep,
     }
+
 
 class ServerState(BaseModel):
     server_pid: Optional[int] = None
@@ -1117,7 +1134,6 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
     """Load and validate ServerState from JSON.  Raises ValidationError if invalid."""
     with open(state_path, "r") as f:
         data = json.load(f)
-        
 
     return ServerState.model_validate(data)
 

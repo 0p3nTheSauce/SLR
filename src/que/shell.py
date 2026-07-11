@@ -97,6 +97,7 @@ class QueShell(cmdLib.Cmd):
     # Define the path for the history file
     HISTORY_FILE = Path().home() / ".que_shell_history"
     HISTORY_LIMIT = 1000
+    ndigits = 2  # default number of digits for run_str
 
     def __init__(
         self,
@@ -569,7 +570,7 @@ class QueShell(cmdLib.Cmd):
             if runs is None:
                 return
 
-            runs = self.que.summarise(runs)
+            runs = self.que.summarise(runs, self.ndigits)  
 
             # retrieve top n if specified
             if parsed_args.top_n is not None:
