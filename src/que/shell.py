@@ -97,7 +97,7 @@ class QueShell(cmdLib.Cmd):
     # Define the path for the history file
     HISTORY_FILE = Path().home() / ".que_shell_history"
     HISTORY_LIMIT = 1000
-    ndigits = 2  # default number of digits for run_str
+    ndigits = 6  # default number of digits for run_str
 
     def __init__(
         self,
@@ -597,7 +597,9 @@ class QueShell(cmdLib.Cmd):
             dict_runs = list(map(lambda x: x.model_dump(), runs))
 
             table.add_column("Index", style="cyan", justify="right", width=8)
-            for header in dict_runs[0].keys():
+            for raw_header in dict_runs[0].keys():
+                
+                header = raw_header.replace("_", " ").capitalize()
                 table.add_column(header.capitalize(), style="white")
 
             # runs are a list of Summarised dicts
