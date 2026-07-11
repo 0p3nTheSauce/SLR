@@ -25,9 +25,6 @@ KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
 def rem_updated(name:str) -> str:
     return name.replace('_updated', '')
       
-def fix_file_path(path: str) -> str:
-    """Fix file path by replacing '/home/luke/Code/SLR/src/' with 'src/'"""
-    return path.replace('/home/luke/Code/SLR/src/', 'src/')
 
 def update_runs13():
     
@@ -87,12 +84,26 @@ def update_runs15():
     with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
         json.dump(all_runs, f, indent=4)
 
+def fix_file_path(path: str) -> str:
+    """Fix file path by replacing '/home/luke/Code/SLR/src/' with 'src/'"""
+    try:
+        return str(Path(path).relative_to(Path("/home/luke/Code/SLR/src/")))
+    except ValueError:
+        print(f"Path {path} is not under '/home/luke/Code/SLR/src/'. Attempting to make it relative to 'src/'...")
+        pass
+    try:
+        return str(Path(path).relative_to(Path("src/")))
+    except ValueError:
+        print(f"Path {path} is not under 'src/'. Returning original path...")
+        return path  # Return the original path if it doesn't match either condition
 def update_runs16():
     q = Que()
     
     key_set = ['admin', 'config_path']
     q.update_runs(key_set, fix_file_path)
-    q.save_state('/home/luke/Code/SLR/src/que/Runs_no_updated.json')
+    key_set2 = ['admin', 'save_path']
+    q.update_runs(key_set2, fix_file_path)
+    q.save_state('/home/luke/Code/SLR/src/que/Runs_updated.json')
 
 if __name__ == "__main__":
     # update_runs14()
