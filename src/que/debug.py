@@ -105,6 +105,15 @@ def update_runs16():
     q.update_runs(key_set2, fix_file_path)
     q.save_state('/home/luke/Code/SLR/src/que/Runs_updated.json')
 
+def update_runs17():
+    q = Que()
+    
+    key_set = ['admin', 'config_path']
+    q.update_runs(key_set, fix_file_path)
+    key_set2 = ['admin', 'save_path']
+    q.update_runs(key_set2, fix_file_path)
+    q.save_state('/home/luke/Code/SLR/src/que/Runs_updated.json')
+
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()

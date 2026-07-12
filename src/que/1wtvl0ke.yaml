@@ -1,0 +1,203 @@
+_wandb:
+    value:
+        cli_version: 0.23.0
+        e:
+            dqzz5nngzii4tuai009csem4sg5g1rge:
+                args:
+                    - S3D
+                    - asl100
+                codePath: src/sweeping.py
+                codePathLocal: sweeping.py
+                cpu_count: 6
+                cpu_count_logical: 12
+                cudaVersion: "13.2"
+                disk:
+                    /:
+                        total: "982820896768"
+                        used: "382911094784"
+                email: ljgoodall2001@gmail.com
+                executable: /home/luke/miniconda3/envs/wlasl/bin/python
+                git:
+                    commit: 035df086c1a567d1c877624c8017b0e11b2601fd
+                    remote: git@github.com:0p3nTheSauce/SLR.git
+                gpu: NVIDIA GeForce RTX 3060
+                gpu_count: 1
+                gpu_nvidia:
+                    - architecture: Ampere
+                      cudaCores: 3584
+                      memoryTotal: "12884901888"
+                      name: NVIDIA GeForce RTX 3060
+                      uuid: GPU-2303bb76-deee-9079-dc7c-c1ebfe2cee24
+                host: luke-PPB660M-C
+                memory:
+                    total: "16497381376"
+                os: Linux-6.17.0-35-generic-x86_64-with-glibc2.39
+                program: /home/luke/Code/SLR/src/sweeping.py
+                python: CPython 3.10.18
+                root: /home/luke/Code/SLR/src
+                startedAt: "2026-07-12T04:51:12.710810Z"
+                writerId: dqzz5nngzii4tuai009csem4sg5g1rge
+        m: []
+        python_version: 3.10.18
+        t:
+            "1":
+                - 1
+                - 5
+                - 29
+                - 41
+                - 43
+                - 53
+            "2":
+                - 1
+                - 5
+                - 29
+                - 41
+                - 43
+                - 53
+            "3":
+                - 2
+                - 14
+                - 17
+            "4": 3.10.18
+            "5": 0.23.0
+            "12": 0.23.0
+            "13": linux-x86_64
+admin:
+    value:
+        config_path: <in-memory:sweep>
+        dataset: WLASL
+        exp_no: 1wtvl0ke
+        model: S3D
+        recover: false
+        save_path: /home/luke/Code/SLR/src/runs/asl100/S3D/sweep_xcj43xka/1wtvl0ke/checkpoints
+        seed: 42
+        split: asl100
+        weight_path: null
+backbone_init_lr:
+    value: 0.0001405839976975953
+backbone_weight_decay:
+    value: 0.000169482964984119
+batch_size:
+    value: 8
+classifier_init_lr:
+    value: 9.932465120445466e-05
+classifier_weight_decay:
+    value: 0.0002481793038592362
+data:
+    value:
+        frame_size: 224
+        strict_size: true
+        target_length: 32
+        test_augs:
+            frame_size: 224
+            norm_dict:
+                mean:
+                    - 0.43216
+                    - 0.394666
+                    - 0.37645
+                std:
+                    - 0.22803
+                    - 0.22145
+                    - 0.216989
+            normalise: true
+            spatial_aug:
+                - frame_size: 224
+                  type: Centre_crop
+            strict_size: true
+            target_length: 32
+            temporal_aug:
+                - max_wobble: 0
+                  target_length: 32
+                  type: uniform
+        train_augs:
+            frame_size: 224
+            norm_dict:
+                mean:
+                    - 0.43216
+                    - 0.394666
+                    - 0.37645
+                std:
+                    - 0.22803
+                    - 0.22145
+                    - 0.216989
+            normalise: true
+            spatial_aug:
+                - p: 0.31925227201800976
+                  type: HORIZONTAL_FLIP
+                - frame_size: 224
+                  type: Centre_crop
+                - interpolation: bilinear
+                  magnitude: 12
+                  num_magnitude_bins: 31
+                  num_ops: 3
+                  type: RANDAUGMENT
+            strict_size: true
+            target_length: 32
+            temporal_aug:
+                - max_wobble: 1
+                  target_length: 32
+                  type: chunked
+drop_p:
+    value: 0.513718554975212
+eps:
+    value: 7.142235601565935e-06
+eta_min:
+    value: 0
+frame_size:
+    value: 224
+hflip_p:
+    value: 0.31925227201800976
+magnitude:
+    value: 12
+max_epoch:
+    value: 200
+max_wobble:
+    value: 1
+min_delta:
+    value: 0.01
+model_params:
+    value:
+        drop_p: 0.513718554975212
+        type: supervised
+num_magnitude_bins:
+    value: 31
+num_ops:
+    value: 3
+optimizer:
+    value:
+        backbone_init_lr: 0.0001405839976975953
+        backbone_weight_decay: 0.000169482964984119
+        classifier_init_lr: 9.932465120445466e-05
+        classifier_weight_decay: 0.0002481793038592362
+        eps: 7.142235601565935e-06
+patience:
+    value: 20
+scheduler:
+    value:
+        eta_min: 0
+        t0: 25
+        tmult: 1
+        type: CosineAnnealingWarmRestarts
+        warm_up: null
+stopping:
+    value:
+        max_epoch: 200
+        metric: loss
+        min_delta: 0.01
+        mode: min
+        patience: 20
+        phase: val
+        type: early_stopper
+t0:
+    value: 25
+target_length:
+    value: 32
+tmult:
+    value: 1
+training:
+    value:
+        batch_size: 8
+        batch_size_equivalent: 8
+        update_per_step: 1
+update_per_step:
+    value: 1
