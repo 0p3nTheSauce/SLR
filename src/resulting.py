@@ -1,44 +1,85 @@
-from typing import Dict, Any, List, Optional, cast, Union, Callable
-import copy
+from __future__ import annotations
+import sys
+from typing import Dict, Any, List, Optional, cast
 
 try:
     import tomllib  # type: ignore
 except ImportError:
     import tomli as tomllib
-
 from pathlib import Path
 from argparse import ArgumentParser
 import json
 import logging
+import importlib.util
+from types import ModuleType
 
 # locals
 from src.que.core import Que, ExpQue, GenExp
-from src.run_types import GenInfo, RunRes, CompExpInfo, CleverDict
+from src.run_types import GenInfo, RunRes, CompExpInfo, CleverDict, SRC_ROOT
 # from results.saicair.saicair import additional_modifications
 
 
-RESULTS_DIR = Path("results/")
-CONFIG_PATH = RESULTS_DIR / "config.toml"
-basic_logger = logging.getLogger(__name__)
-basic_logger.addHandler(logging.StreamHandler())  # add this
+RESULTS_DIR = SRC_ROOT / "results"
+FILTERS_NAME = "filters.py"
+OUTPUT_SUFFIX = ".json"
+# verbose logger for debugging - configured directly (not via basicConfig)
+# so it isn't swallowed by ipykernel/other libraries already holding the
+# root logger's handlers.
+basic_logger = logging.getLogger("resulting")
+basic_logger.setLevel(logging.DEBUG)
+basic_logger.propagate = False
+if not basic_logger.handlers:
+    _handler = logging.StreamHandler(sys.stdout)
+    _handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    basic_logger.addHandler(_handler)
 
-def drop_max_wobble(temporal_aug: list) -> list:
-    for item in temporal_aug:
-        item.pop('max_wobble', None)
-        item.pop('wobble', None)
-    return temporal_aug
 
-ignore_keys = {
-    'data': {
-        'train_augs': {'temporal_aug': drop_max_wobble},
-        'test_augs':  {'temporal_aug': drop_max_wobble},
-    }
-}
+def load_filters_module(filters_path: Path) -> ModuleType:
+    """Load an arbitrary filters.py file by path as a standalone module.
+
+    This works regardless of where filters_path lives on disk - it doesn't
+    need to be on sys.path or part of any package.
+    """
+    if not filters_path.exists():
+        raise FileNotFoundError(f"No such filters file: {filters_path}")
+
+    module_name = f"_filters_{filters_path.stem}"
+    spec = importlib.util.spec_from_file_location(module_name, filters_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load spec for {filters_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    # Registering in sys.modules first lets the module's own top-level code
+    # (e.g. dataclasses, or anything doing `import module_name`) resolve
+    # correctly, and avoids it being garbage-collected mid-exec.
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def get_filters(filters_path: Path) -> tuple[dict, list]:
+    """Load filters_path and pull out the two attributes load_find needs.
+
+    Raises AttributeError with a clear message if either is missing, rather
+    than failing later inside load_config_and_find_runs.
+    """
+    module = load_filters_module(filters_path)
+
+    missing = [
+        name
+        for name in ("additional_modifications", "exclude_keys")
+        if not hasattr(module, name)
+    ]
+    if missing:
+        raise AttributeError(
+            f"{filters_path} is missing required attribute(s): {missing}"
+        )
+
+    return module.additional_modifications, module.exclude_keys
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
-    """load config file as dictionary
-    """
+    """load config file as dictionary"""
     conf_path = Path(config_path)
     if not conf_path.exists():
         raise FileNotFoundError(f"{conf_path} not found")
@@ -47,17 +88,15 @@ def load_config(config_path: str) -> Dict[str, Any]:
         raw = tomllib.load(f)
     return raw
 
-    
-    
-    
 
-def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
-    
+def snap0(search: Any, spec: Any, logger: logging.Logger) -> bool:
+
     if isinstance(spec, dict):
+        
         if not isinstance(search, dict):
             logger.debug(f"type mismatch: search is {type(search)}, spec is dict")
             return False
-        
+
         for key, value in spec.items():
             if key not in search:
                 logger.debug(f"key '{key}' not found in search")
@@ -66,10 +105,14 @@ def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
                 return False
 
     elif isinstance(spec, list):
+        
         if not isinstance(search, list):
             logger.debug(f"type mismatch: search is {type(search)}, spec is list")
             return False
         
+        spec = sorted(spec, key=lambda x: str(x))  # sort spec for consistent comparison
+        search = sorted(search, key=lambda x: str(x))  # sort search for consistent comparison
+
         # every item in spec must match at least one item in search
         for spec_item in spec:
             if not any(snap(search_item, spec_item, logger) for search_item in search):
@@ -85,32 +128,82 @@ def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
     return True
 
 
+def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
+
+    if isinstance(spec, dict):
+        if not isinstance(search, dict):
+            logger.debug(f"type mismatch: search is {type(search)}, spec is dict")
+            return False
+
+        for key, value in spec.items():
+            if key not in search:
+                logger.debug(f"key '{key}' not found in search")
+                return False
+            if not snap(search[key], value, logger):
+                return False
+
+    elif isinstance(spec, list):
+        if not isinstance(search, list):
+            logger.debug(f"type mismatch: search is {type(search)}, spec is list")
+            return False
+
+        def _key(item: Any) -> str:
+            # Group by 'type' when present (aug configs, etc.) so we only
+            # compare like-with-like. Falls back to a stable serialization
+            # for items without a 'type' field (or non-dict items).
+            if isinstance(item, dict) and "type" in item:
+                return str(item["type"])
+            return json.dumps(item, sort_keys=True, default=str)
+
+        search_by_key: Dict[str, List[Any]] = {}
+        for item in search:
+            search_by_key.setdefault(_key(item), []).append(item)
+
+        for spec_item in sorted(spec, key=_key):
+            key = _key(spec_item)
+            candidates = search_by_key.get(key, [])
+            if not candidates:
+                logger.debug(f"no search item with key '{key}' for spec item: {spec_item}")
+                return False
+            if not any(snap(candidate, spec_item, logger) for candidate in candidates):
+                logger.debug(f"no candidate with key '{key}' matched spec item: {spec_item}")
+                return False
+
+    else:
+        # leaf value — must match exactly
+        if search != spec:
+            logger.debug(f"value mismatch: search={search}, spec={spec}")
+            return False
+
+    return True
+    
+    
+    
 
 def modify(
-    search: Dict, spec: Dict, logger: logging.Logger, 
+    search: Dict,
+    spec: Dict,
+    logger: logging.Logger,
 ) -> Dict[str, Any]:
-    
+    """Recursively apply modifications from spec to search, where spec values are callables."""
     for key, value in spec.items():
-        
         if isinstance(value, dict):
-            
             if key in search:
                 search[key] = modify(search[key], value, logger)
             else:
-                logger.info(f'skipping key: {key} not in search: {search.keys()}')
+                logger.info(f"skipping key: {key} not in search: {search.keys()}")
                 continue
-            
+
         elif isinstance(search, dict) and key in search:
-            nv = value(search[key]) 
+            nv = value(search[key])
             # logger.debug(f'Mapping search[key] : {search[key]} to {nv}')
             search[key] = nv
         else:
-            logger.warning(f'unexpected mismatch between types: search: {type(search)} criterion: {type(value)}')
-
+            logger.warning(
+                f"unexpected mismatch between types: search: {type(search)} criterion: {type(value)}"
+            )
 
     return search
-    
-    
 
 
 def find_runs(
@@ -147,7 +240,7 @@ def build_GenInfo(
     for run in runs:
         # run = cast(CompExpInfo, run)
 
-        run_res = CleverDict(RunRes(admin=run.admin, results=run.results).model_dump())
+        run_res = CleverDict(RunRes(admin=run.admin, results=run.results, wandb=run.wandb).model_dump())
         for key_chain in exclude:
             run_res.pop(key_chain)
 
@@ -173,11 +266,11 @@ def load_config_and_find_runs(
     logging_level=logging.INFO,
 ) -> Optional[GenInfo]:
     gen_info = load_config(str(conf_path))
-    
+
     # find_que_runs(args.out_path)
     logger.setLevel(logging_level)  # or WARNING, INFO, ERROR, CRITICAL
     logger.debug(json.dumps(gen_info, indent=4))
-    
+
     q = Que(logger)
     runs = q.list_runs(loc="old_runs")
 
@@ -198,86 +291,45 @@ def load_config_and_find_runs(
 
 
 def main():
-    parser = ArgumentParser()
-    parser.add_argument(
-        "--result_dir",
-        "-d",
-        help=f"Path to result directory, default is {RESULTS_DIR}",
-        type=str,
-        default=RESULTS_DIR,
+    parser = ArgumentParser(
+        description="Run load_find using filters loaded from an arbitrary "
+        "filters.py file."
     )
-    parser.add_argument(
-        "--config_path",
-        "-c",
-        help=f"Path to config file, if different from {CONFIG_PATH}",
-        type=str,
-        default=CONFIG_PATH,
-    )
-    parser.add_argument(
-        "--exclude_keys",
-        "-e",
-        help="Exclude a list of keys from the output",
-        action="append",
-        nargs="+",
-        metavar="KEY",
-    )
+    parser.add_argument("config", type=Path, help="Path to config.toml")
+    parser.add_argument("--filters", "-f", type=Path, help="Path to filters.py")
     parser.add_argument(
         "--out_path",
         "-o",
         help="Path to output file, if different from config path with .json suffix",
-        type=str,
-        default=None,
+        type=Path,
     )
-    # parser.add_argument("--num_frames", "-f", help="Number of frames to filter by, default is 16", type=int, default=frames)
-    parser.add_argument(
-        "--extra_mods",
-        "-m",
-        action="store_true",
-        help=f"Use {RESULTS_DIR}/saicair.py extra modifications",
-    )
-    parser.add_argument("--debug", "-g", help="Enable debug mode", action="store_true")
-
+    parser.add_argument("--debug", "-d", help="Enable debug mode", action="store_true")
     args = parser.parse_args()
 
-    resdir = Path(args.result_dir)
-    if not resdir.exists():
-        raise FileNotFoundError(f"{resdir} not found")
+    logging_level = logging.DEBUG if args.debug else logging.INFO
+    basic_logger.setLevel(logging_level)
 
-    output = None
-    out_path = None
+    out_path = args.out_path if args.out_path else args.config.with_suffix(OUTPUT_SUFFIX)
+    filters_path = args.filters if args.filters else args.config.parent / FILTERS_NAME
 
-    if args.out_path is not None:
-        out_path = Path(args.out_path)
+    extra_mods, exclude_keys = get_filters(filters_path)
+    output = load_config_and_find_runs(
+        args.config,
+        exclude=exclude_keys,
+        extra_mods=extra_mods,
+        logger=basic_logger,
+        logging_level=logging_level,
+    )
 
-    if args.config_path is not None:
-        config_path = Path(args.config_path)
-        if out_path is None:
-            out_path = config_path.with_suffix(".json")
-        exclude = args.exclude_keys if args.exclude_keys is not None else []
-        print(f"Excluding keys: {exclude}")
-        # extra_mods = additional_modifications if args.extra_mods else {}
-        extra_mods = {}
-        logging_level = logging.DEBUG if args.debug else logging.INFO
-        basic_logger.setLevel(logging_level)
-        # ignore_keys = {}
-        output = load_config_and_find_runs(
-            config_path,
-            exclude,
-            extra_mods=extra_mods,
-            logger=basic_logger,
-            logging_level=logging_level,
-            ignore=ignore_keys
-        )
+    basic_logger.info("logger working")
+    basic_logger.debug("debug mode")
 
-        basic_logger.info("logger working")
-        basic_logger.debug("debug mode")
-
-        if output is None:
-            print("No runs found matching the spec, cannot output results")
-            return
-        output_results(output, out_path)
-        assert out_path.exists(), f"Output file not found at {out_path}"
-        print(f"Output path: {out_path}")
+    if output is None:
+        print("No runs found matching the spec, cannot output results")
+        return
+    output_results(output, out_path)
+    assert out_path.exists(), f"Output file not found at {out_path}"
+    print(f"Output path: {out_path}")
 
 
 if __name__ == "__main__":

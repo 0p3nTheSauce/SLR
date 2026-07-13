@@ -634,6 +634,7 @@ class ResSet(BaseModel):
 
 class RunRes(BaseModel):
     admin: AdminInfo
+    wandb: WandbInfo
     results: CompRes
 
 

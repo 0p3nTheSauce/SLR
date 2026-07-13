@@ -1,0 +1,88 @@
+[training]
+batch_size = 4
+update_per_step = 2
+
+
+[optimizer]
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
+
+[model_params]
+drop_p = 0.5
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.train_augs.norm_dict]
+mean = [
+    0.45,
+    0.45,
+    0.45,
+]
+std = [
+    0.225,
+    0.225,
+    0.225,
+]
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.test_augs.norm_dict]
+mean = [
+    0.45,
+    0.45,
+    0.45,
+]
+std = [
+    0.225,
+    0.225,
+    0.225,
+]
+
+[scheduler]
+type = "CosineAnnealingWarmRestarts"
+t0 = 10
+tmult = 1
+eta_min = 0.0
+
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
+
+
+# same as configfiles/generic/lframe_hwd_warmrestarts.toml
+# but with patience = 15

@@ -1370,16 +1370,16 @@ class QueShell(cmdLib.Cmd):
         )
         set_sweep_parser.add_argument("project", type=str, help="Sweep project")
         set_sweep_parser.add_argument("sweep_id", type=str, help="Sweep id")
-        parser.add_argument(
+        set_sweep_parser.add_argument(
             "model",
             type=str,
             choices=avail_models(),
             help="Model name from one of the implemented model",
         )
-        parser.add_argument(
+        set_sweep_parser.add_argument(
             "split", type=str, choices=get_avail_splits(), help="The class split"
         )
-        parser.add_argument(
+        set_sweep_parser.add_argument(
             "-ds",
             "--dataset",
             type=str,
@@ -1387,7 +1387,7 @@ class QueShell(cmdLib.Cmd):
             default="WLASL",
             help="Not implemented yet",
         )
-        set_sweep_parser.add_argument("split", type=str, help="Split name")
+
         set_sweep_parser.add_argument(
             "--entity",
             "-e",
