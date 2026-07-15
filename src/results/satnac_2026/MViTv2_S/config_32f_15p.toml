@@ -32,18 +32,6 @@ strict_size = true
 target_length = 32
 frame_size = 224
 
-[data.train_augs.norm_dict]
-mean = [
-    0.45,
-    0.45,
-    0.45,
-]
-std = [
-    0.225,
-    0.225,
-    0.225,
-]
-
 [data.test_augs]
 normalise = true
 temporal_aug = [

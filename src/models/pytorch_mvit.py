@@ -87,50 +87,16 @@ class MViTv2S_basic(nn.Module):
 
         return x
 
-
-class MViTv2S_extended(nn.Module):
-    def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.drop_p = drop_p
-
-        mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1)
-
-        self.backbone = nn.ModuleList(
-            [  # stored in module list for parameter groups
-                mvitv2s.conv_proj,
-                mvitv2s.pos_encoding,
-                mvitv2s.blocks,
-                mvitv2s.norm,
-            ]
-        )
-
-        self.conv_proj = self.backbone[0]
-        self.pos_encoding = self.backbone[1]
-        self.blocks = self.backbone[2]
-        self.norm = self.backbone[3]
-
-        original_linear = mvitv2s.head[1]  # The Linear layer
-        in_features = original_linear.in_features
-
-        self.classifier = nn.Sequential(
-            nn.Dropout(drop_p),
-            nn.Linear(in_features, num_classes),
-        )
-
-        if weights_path:
-            checkpoint = torch.load(weights_path, map_location="cpu")
-            self.load_state_dict(checkpoint)
-            print(f"Loaded pretrained weights from {weights_path}")
-        else:
-            self._initialize_classifier()  # mvitspecific initialization
-
-        # After building the model, interpolate temporal pos embed for 32 frames
-        self._adapt_pos_encoding(num_frames=32)
+class MViTv2S_extended(MViTv2S_basic):
+    def __init__(self, num_classes=100, drop_p=0.5, weights_path=None, num_frames=32):
+        super().__init__(num_classes=num_classes, drop_p=drop_p, weights_path=weights_path)
+        # After building/loading the model, interpolate temporal pos embed
+        self._adapt_pos_encoding(num_frames=num_frames)
 
     def _adapt_pos_encoding(self, num_frames: int):
         temporal_stride = self.conv_proj.stride[0]
         new_T = num_frames // temporal_stride
+        assert new_T >= 1, f"num_frames={num_frames} too small for temporal_stride={temporal_stride}"
         new_len = 2 * new_T - 1
 
         for module in self.blocks.modules():
@@ -144,39 +110,9 @@ class MViTv2S_extended(nn.Module):
             rpt = rpt.squeeze(0).permute(1, 0)
             module.rel_pos_t = nn.Parameter(rpt)
 
-        self.pos_encoding.temporal_size = new_T  # ← fixes the thw tuple
-
-    def _initialize_classifier(self):
-        """Initialize only the classifier weights, leaving backbone untouched"""
-        for m in self.classifier.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.trunc_normal_(m.weight, std=0.02)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0.0)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Convert if necessary (B, C, H, W) -> (B, C, 1, H, W)
-        x = _unsqueeze(x, 5, 2)[0]
-        # patchify and reshape: (B, C, T, H, W) -> (B, embed_channels[0], T', H', W') -> (B, THW', embed_channels[0])
-        x = self.conv_proj(x)
-        x = x.flatten(2).transpose(1, 2)
-
-        # add positional encoding
-        x = self.pos_encoding(x)
-
-        # pass patches through the encoder
-        thw = (self.pos_encoding.temporal_size,) + self.pos_encoding.spatial_size
-        for block in self.blocks:  # type: ignore
-            x, thw = block(x, thw)
-        x = self.norm(x)
-
-        # classifier "token" as used by standard language architectures
-        x = x[:, 0]
-        x = self.classifier(x)
-
-        return x
-
-
+        self.pos_encoding.temporal_size = new_T
+        
+        
 class MViTv1B_basic(nn.Module):
     def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
         super().__init__()

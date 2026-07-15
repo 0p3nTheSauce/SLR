@@ -1,6 +1,6 @@
 [training]
-batch_size = 2
-update_per_step = 4
+batch_size = 8
+update_per_step = 1
 
 
 [optimizer]
@@ -32,18 +32,6 @@ strict_size = true
 target_length = 32
 frame_size = 224
 
-[data.train_augs.norm_dict]
-mean = [
-    0.45,
-    0.45,
-    0.45,
-]
-std = [
-    0.225,
-    0.225,
-    0.225,
-]
-
 [data.test_augs]
 normalise = true
 temporal_aug = [
@@ -55,18 +43,6 @@ spatial_aug = [
 strict_size = true
 target_length = 32
 frame_size = 224
-
-[data.test_augs.norm_dict]
-mean = [
-    0.45,
-    0.45,
-    0.45,
-]
-std = [
-    0.225,
-    0.225,
-    0.225,
-]
 
 [scheduler]
 type = "CosineAnnealingWarmRestarts"
