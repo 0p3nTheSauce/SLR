@@ -137,18 +137,7 @@ def get_scheduler(
     )
 
 
-def get_stopper(
-    arg_dict: StopperConfig,
-    wandb_run: Optional[Run] = None,
-    event: Optional[EventClass] = None,
-) -> Stopper:
-    
-    if arg_dict.type == 'stopper':
-        return Stopper(arg_dict=arg_dict, wandb_run=wandb_run, event=event)
-    elif arg_dict.type == 'early_stopper':
-        return Stopper(arg_dict,event=event)
-    else:
-        raise NotImplementedError(f'Unkown stopping type: {arg_dict.type}')
+
 
 
 def _setup_wandb(
@@ -725,9 +714,7 @@ def train_loop(
 
     loss_func = nn.CrossEntropyLoss()
 
-    stopper = get_stopper(
-        arg_dict=config.stopping, wandb_run=wandb_run, event=event
-    )
+    stopper = Stopper(arg_dict=config.stopping, wandb_run=wandb_run, event=event)
 
     epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
 
@@ -1029,9 +1016,7 @@ def pretrain_loop(
 
     optimizer = get_optimizer(mae_model, config.optimizer)
     scheduler = get_scheduler(optimizer, config.scheduler)
-    stopper = get_stopper(
-        arg_dict=config.stopping, wandb_run=wandb_run, event=event
-    )
+    stopper = Stopper(arg_dict=config.stopping, wandb_run=wandb_run, event=event)
 
     epoch, steps, best_val_loss, _, stopping_metrics = _init_accumulators()
     save_path = Path(config.admin.save_path)

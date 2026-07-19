@@ -40,11 +40,13 @@ class Stopper:
         self.max_epoch = arg_dict.max_epoch
         
         if arg_dict.type == 'early_stopper':
-            self.on = True
+            self.stopping_early = True
             self.metric = arg_dict.metric
             self.mode = arg_dict.mode
             self.patience = arg_dict.patience
             self.min_delta = arg_dict.min_delta
+        else:
+            self.stopping_early = False
             
             
         self.phase = arg_dict.phase
@@ -56,6 +58,7 @@ class Stopper:
         self.stop = False
         self.event = event
         self.stopped_by_event = False
+
 
     def step(self, score) -> None:
         """Update early stopping state based on current score.
@@ -74,7 +77,7 @@ class Stopper:
             self.stopped_by_event = True
             return
         
-        if not self.on:
+        if not self.stopping_early:
             self.curr_epoch += 1
             return 
         
@@ -107,10 +110,6 @@ class Stopper:
         if self.wandb_run:
             self.wandb_run.log({"Patience count": self.counter})
             
-            # Poll wandb for early stop signal
-            # if self.wandb_run.should_stop():
-            #     print("Hyperband requested early stop")
-            #     self.stop = True
             
             
         self.curr_epoch += 1
@@ -123,7 +122,7 @@ class Stopper:
         """
         
         return StopperState(
-            on=self.on,
+            on=self.stopping_early,
             max_epoch=self.max_epoch,
             phase=self.phase,
             metric=self.metric,
