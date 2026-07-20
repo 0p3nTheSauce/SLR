@@ -1,0 +1,714 @@
+{
+    "spec": {
+        "training": {
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 1e-05,
+            "backbone_init_lr": 0.0001,
+            "backbone_weight_decay": 0.001,
+            "classifier_init_lr": 0.001,
+            "classifier_weight_decay": 0.001
+        },
+        "model_params": {
+            "drop_p": 0.5,
+            "type": "supervised"
+        },
+        "data": {
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224,
+            "train_augs": {
+                "normalise": true,
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "og",
+                        "randomise": false
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    },
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.5
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "og",
+                        "randomise": false
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            }
+        },
+        "scheduler": {
+            "type": "CosineAnnealingWarmRestarts",
+            "t0": 10,
+            "tmult": 1,
+            "eta_min": 0.0
+        },
+        "stopping": {
+            "type": "early_stopper",
+            "max_epoch": 200,
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        }
+    },
+    "results": [
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl2000/MViTv2_S_e/exp000/checkpoints",
+                "seed": 42,
+                "exp_no": "000",
+                "recover": true,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000/MViTv2_S_e/exp000/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "i2l4ut4k",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 50.71465033180194,
+                "best_val_loss": 2.4028701851293053,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.45785833333333337,
+                        "top5": 0.7937333333333334,
+                        "top10": 0.8682333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.47968044459881903,
+                        "top5": 0.8027092740534908,
+                        "top10": 0.8707884682181313
+                    },
+                    "average_loss": 2.5394777833295077
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.47629999999999995,
+                        "top5": 0.8195666666666666,
+                        "top10": 0.8829833333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.49719244512506383,
+                        "top5": 0.8238897396630934,
+                        "top10": 0.8838693210821847
+                    },
+                    "average_loss": 2.4028701851293053
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl1000/S3D/exp049/checkpoints",
+                "seed": 42,
+                "exp_no": "049",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_32f_15p.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300/S3D/exp048/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "hbx2mrzj",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 51.142733937041825,
+                "best_val_loss": 2.6087739510921772,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.44110000000000005,
+                        "top5": 0.7481833333333333,
+                        "top10": 0.8381000000000001
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.44562899786780386,
+                        "top5": 0.7446695095948828,
+                        "top10": 0.8326226012793176
+                    },
+                    "average_loss": 2.988566131137991
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.48095,
+                        "top5": 0.7795833333333334,
+                        "top10": 0.8535
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.4885726606295817,
+                        "top5": 0.7779215178956447,
+                        "top10": 0.8516601983613626
+                    },
+                    "average_loss": 2.6087739510921772
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl1000/MViTv2_S_e/exp000/checkpoints",
+                "seed": 42,
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300/MViTv2_S_e/exp000/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "zyxr0w1x",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 65.32988357050453,
+                "best_val_loss": 1.5315312274261914,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6062666666666666,
+                        "top5": 0.8586333333333334,
+                        "top10": 0.9094666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.605543710021322,
+                        "top5": 0.8560767590618337,
+                        "top10": 0.9077825159914712
+                    },
+                    "average_loss": 1.7550309828927635
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6468166666666666,
+                        "top5": 0.8927999999999999,
+                        "top10": 0.9281666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6494178525226391,
+                        "top5": 0.890038809831824,
+                        "top10": 0.9253988788270806
+                    },
+                    "average_loss": 1.5315312274261914
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl300",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl300/S3D/exp048/checkpoints",
+                "seed": 42,
+                "exp_no": "048",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_32f_15p.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/S3D/exp088/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-300",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "oj17il78",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 60.48834628190899,
+                "best_val_loss": 1.8077175477527487,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5254444444444444,
+                        "top5": 0.8152777777777778,
+                        "top10": 0.8880555555555556
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5224550898203593,
+                        "top5": 0.8083832335329342,
+                        "top10": 0.8832335329341318
+                    },
+                    "average_loss": 2.2209562528844122
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.578111111111111,
+                        "top5": 0.855,
+                        "top10": 0.9191666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5782463928967814,
+                        "top5": 0.8523862375138734,
+                        "top10": 0.9167591564927858
+                    },
+                    "average_loss": 1.8077175477527487
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl300",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl300/MViTv2_S_e/exp000/checkpoints",
+                "seed": 42,
+                "exp_no": "000",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/MViTv2_S_e/exp002/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-300",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "upnimjvg",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 75.02774694783574,
+                "best_val_loss": 0.9872330483220434,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7135,
+                        "top5": 0.8993333333333332,
+                        "top10": 0.9305555555555555
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7080838323353293,
+                        "top5": 0.8937125748502994,
+                        "top10": 0.9251497005988024
+                    },
+                    "average_loss": 1.2612709789892413
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7543888888888889,
+                        "top5": 0.9338888888888888,
+                        "top10": 0.9588888888888889
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7491675915649278,
+                        "top5": 0.9322974472807991,
+                        "top10": 0.9578246392896781
+                    },
+                    "average_loss": 0.9872330483220434
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl100/S3D/exp088/checkpoints",
+                "seed": 42,
+                "exp_no": "088",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_32f_15p.toml",
+                "weight_path": null
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "ddi58s2p",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 65.08875739644971,
+                "best_val_loss": 1.3922030690140048,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6034999999999999,
+                        "top5": 0.8366666666666667,
+                        "top10": 0.895
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5891472868217055,
+                        "top5": 0.8333333333333334,
+                        "top10": 0.8953488372093024
+                    },
+                    "average_loss": 1.7956839639882567
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6381666666666665,
+                        "top5": 0.8766666666666667,
+                        "top10": 0.9458333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6331360946745562,
+                        "top5": 0.878698224852071,
+                        "top10": 0.9467455621301775
+                    },
+                    "average_loss": 1.3922030690140048
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl100/MViTv2_S_e/exp002/checkpoints",
+                "seed": 42,
+                "exp_no": "002",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
+                "weight_path": null
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "satnac_2026"
+                ],
+                "run_id": "7pcttgpe",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 79.28994082840237,
+                "best_val_loss": 0.8150107850991059,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7771666666666667,
+                        "top5": 0.9283333333333332,
+                        "top10": 0.9558333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7751937984496124,
+                        "top5": 0.9263565891472868,
+                        "top10": 0.9573643410852714
+                    },
+                    "average_loss": 0.9532750872734937
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7929999999999999,
+                        "top5": 0.9441666666666667,
+                        "top10": 0.9683333333333333
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7869822485207101,
+                        "top5": 0.9437869822485208,
+                        "top10": 0.9674556213017751
+                    },
+                    "average_loss": 0.8150107850991059
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl2000",
+                "save_path": "runs/asl2000/MViTv2_B_32x3/exp004/checkpoints",
+                "seed": 42,
+                "exp_no": "004",
+                "recover": false,
+                "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp004.toml",
+                "weight_path": "runs/asl1000/MViTv2_B_32x3/exp001/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-2000",
+                "tags": [
+                    "SAICAIR",
+                    "weight_path",
+                    "scheduler"
+                ],
+                "run_id": "2adb5g0g",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 51.60796324655436,
+                "best_val_loss": 2.336302202831424,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.47614999999999996,
+                        "top5": 0.8120666666666666,
+                        "top10": 0.8781083333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5008683570684266,
+                        "top5": 0.8134769017019798,
+                        "top10": 0.8763459534560611
+                    },
+                    "average_loss": 2.4889337924650503
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.49685,
+                        "top5": 0.8323833333333334,
+                        "top10": 0.8906916666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5160796324655437,
+                        "top5": 0.836906584992343,
+                        "top10": 0.8933129147524247
+                    },
+                    "average_loss": 2.336302202831424
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl1000",
+                "save_path": "runs/asl1000/MViTv2_B_32x3/exp001/checkpoints",
+                "seed": 42,
+                "exp_no": "001",
+                "recover": true,
+                "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp001.toml",
+                "weight_path": "runs/asl300/MViTv2_B_32x3/exp001/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-1000",
+                "tags": [
+                    "SAICAIR",
+                    "weight_path",
+                    "scheduler"
+                ],
+                "run_id": "drm0c9k6",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 65.76110392410521,
+                "best_val_loss": 1.4957342334777182,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6233,
+                        "top5": 0.8703,
+                        "top10": 0.9254666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6215351812366737,
+                        "top5": 0.8646055437100213,
+                        "top10": 0.9211087420042644
+                    },
+                    "average_loss": 1.6978230190911483
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6559833333333334,
+                        "top5": 0.8976,
+                        "top10": 0.9380499999999999
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6576110392410521,
+                        "top5": 0.8947822337214316,
+                        "top10": 0.9357481673134972
+                    },
+                    "average_loss": 1.4957342334777182
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl300",
+                "save_path": "runs/asl300/MViTv2_B_32x3/exp001/checkpoints",
+                "seed": 42,
+                "exp_no": "001",
+                "recover": true,
+                "config_path": "configfiles/asl300/MViTv2_B_32x3/exp001.toml",
+                "weight_path": "runs/asl100/MViTv2_B_32x3/exp008/checkpoints/best.pth"
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-300",
+                "tags": [
+                    "SAICAIR",
+                    "weight_path",
+                    "scheduler"
+                ],
+                "run_id": "8922iqmx",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 77.58046614872364,
+                "best_val_loss": 0.9286379455454706,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7196111111111111,
+                        "top5": 0.9109999999999998,
+                        "top10": 0.9443333333333331
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7125748502994012,
+                        "top5": 0.9041916167664671,
+                        "top10": 0.9401197604790419
+                    },
+                    "average_loss": 1.2424294380011354
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7767222222222222,
+                        "top5": 0.9368333333333332,
+                        "top10": 0.9633333333333334
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7746947835738068,
+                        "top5": 0.9334073251942286,
+                        "top10": 0.9622641509433962
+                    },
+                    "average_loss": 0.9286379455454706
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/S3D/exp079/checkpoints",
+                "seed": 42,
+                "exp_no": "079",
+                "recover": true,
+                "config_path": "configfiles/debug/test_sc.toml",
+                "weight_path": null
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "debug",
+                "tags": [
+                    "new_augs"
+                ],
+                "run_id": "w3zvzz9e",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 67.45562130177515,
+                "best_val_loss": 1.402935280383289,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.5773333333333333,
+                        "top5": 0.873,
+                        "top10": 0.9271666666666667
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.5736434108527132,
+                        "top5": 0.8643410852713178,
+                        "top10": 0.9224806201550387
+                    },
+                    "average_loss": 1.9740132400087582
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.6835000000000001,
+                        "top5": 0.9041666666666669,
+                        "top10": 0.9466666666666668
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.6745562130177515,
+                        "top5": 0.9023668639053254,
+                        "top10": 0.9467455621301775
+                    },
+                    "average_loss": 1.402935280383289
+                }
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_B_32x3",
+                "dataset": "WLASL",
+                "split": "asl100",
+                "save_path": "runs/asl100/MViTv2_B_32x3/exp008/checkpoints",
+                "seed": 42,
+                "exp_no": "008",
+                "recover": false,
+                "config_path": "configfiles/asl100/MViTv2_B_32x3/exp008.toml",
+                "weight_path": null
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "WLASL-100",
+                "tags": [
+                    "comp_2_mvitv2s_7"
+                ],
+                "run_id": "tmqxeypo",
+                "sweep_id": null
+            },
+            "results": {
+                "best_val_acc": 81.06508875739645,
+                "best_val_loss": 0.8023297100764746,
+                "test": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.7871666666666667,
+                        "top5": 0.915,
+                        "top10": 0.9591666666666666
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.7790697674418605,
+                        "top5": 0.9108527131782945,
+                        "top10": 0.9573643410852714
+                    },
+                    "average_loss": 0.9920115989061319
+                },
+                "val": {
+                    "top_k_average_per_class_acc": {
+                        "top1": 0.8178333333333334,
+                        "top5": 0.9475,
+                        "top10": 0.97
+                    },
+                    "top_k_per_instance_acc": {
+                        "top1": 0.8106508875739645,
+                        "top5": 0.9467455621301775,
+                        "top10": 0.9704142011834319
+                    },
+                    "average_loss": 0.8023297100764746
+                }
+            }
+        }
+    ]
+}

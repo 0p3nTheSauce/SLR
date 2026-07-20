@@ -800,6 +800,18 @@ class QueShell(cmdLib.Cmd):
                 "Sweep:",
                 f"{sweep_state['sweep_entity']}/{sweep_state['sweep_project']}/{sweep_state['sweep_id']}",
             )
+            daemon_table.add_row(
+                "Model:",
+                f"{sweep_state['model']}"
+            )
+            daemon_table.add_row(
+                "Dataset:",
+                f"{sweep_state['dataset']}"
+            )
+            daemon_table.add_row(
+                "Split:",
+                f"{sweep_state['split']}"
+            )
 
         table.add_row("Daemon", daemon_table)
 
