@@ -1,17 +1,19 @@
-from typing import Optional, Literal
-from pathlib import Path
-import tomli_w
-import json
 import argparse
+import json
+from pathlib import Path
+from typing import Literal
+
+import pydantic
+import tomli_w
 
 # from que.shell import QueShell
 from src.que.core import (
-    GenExp,
+    CUR_RUN,
+    FAIL_RUNS,
+    OLD_RUNS,
     RUN_PATH,
     TO_RUN,
-    CUR_RUN,
-    OLD_RUNS,
-    FAIL_RUNS,
+    GenExp,
 )
 
 
@@ -71,22 +73,26 @@ def _get_save_name(
 
 def _run_to_config(
     run: GenExp | dict,
-    comments: list[str] = [],
-    ignore_sections: list[str] = ["admin", "wandb", "results",],
+    comments: list[str] | None = None,
+    ignore_sections: list[str] | None = None,
 ) -> str:
     """Turn a general run into its TOML string representation for the config
     file system. Skips ignored sections, strips None values (TOML has no
     null), and appends comment lines.
 
     Args:
-        run (GenExp | dict): run (GenExp | dict): Experiment from que
-        comments (list[str], optional): Comment lines to append at the end. Defaults to [].
-        ignore_sections (list[str], optional): Sections to ignore. Defaults to ["admin", "wandb", "results"].
+        run (GenExp | dict): Experiment from que
+        comments (list[str] | None, optional): Comment lines to append at the end. Defaults to None.
+        ignore_sections (list[str] | None, optional): Sections to ignore. Defaults to None (uses ["admin", "wandb", "results"]).
 
     Returns:
         str: String representation of the config file content for this run
     """
 
+    if comments is None:
+        comments = []
+    if ignore_sections is None:
+        ignore_sections = ["admin", "wandb", "results"]
     if isinstance(run, GenExp):
         run_info = run.model_dump()
     else:
@@ -114,7 +120,7 @@ def update_config_file(
     default_mode: Literal["overwrite", "duplicate"] = "overwrite",
     dry_run: bool = True,
     retro_support: bool = False,
-    output: Optional[Path] = None,
+    output: Path | None = None,
 ):
     from src.configs import load_config
     from src.run_types import AdminInfo
@@ -133,14 +139,14 @@ def update_config_file(
             old_contents = f.read()
         old_comments = _get_old_comments(old_contents)
 
-        #skip file if it is already valid
+        # skip file if it is already valid
         try:
             _ = load_config(
                 AdminInfo.model_validate(run_info["admin"]), retro_support=retro_support
             )
             print(f"Valid config found at {conf_path}, skipping overwrite mode.")
             return
-        except Exception as e:
+        except (FileNotFoundError, pydantic.ValidationError, ValueError) as e:
             print(f"Validation failed for existing config: {e}")
 
             mode: Literal["overwrite", "duplicate"] = default_mode
@@ -150,9 +156,9 @@ def update_config_file(
         old_comments = []
         mode: Literal["overwrite", "duplicate"] = "overwrite"
 
-    #generate new config file
+    # generate new config file
     config_str = _run_to_config(run_info, comments=old_comments + ["updated by script"])
-    #get save path
+    # get save path
     save_name = _get_save_name(conf_path.as_posix(), mode=mode)
 
     if dry_run:
@@ -161,7 +167,7 @@ def update_config_file(
     else:
         parent_dir = Path(save_name).parent
         parent_dir.mkdir(parents=True, exist_ok=True)
-        #write file
+        # write file
         with open(save_name, "w") as f:
             f.write(config_str)
         print(f"Saved config to: {save_name}")
@@ -171,13 +177,14 @@ def update_config_file(
             f.write(config_str)
         print(f"Debug config saved to: {output}")
 
+
 def update_all_files(
     default_mode: Literal["overwrite", "duplicate"] = "overwrite",
     dry_run: bool = True,
     retro_support: bool = False,
-    output: Optional[Path] = None
+    output: Path | None = None,
 ):
-    
+
     KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
     with open(RUN_PATH, "r") as f:
         all_runs = json.load(f)
@@ -187,68 +194,73 @@ def update_all_files(
         flat_all_runs.extend(all_runs[key])
 
     for run_info in flat_all_runs:
-        update_config_file(run_info, default_mode, dry_run, retro_support, output = output)
+        update_config_file(
+            run_info, default_mode, dry_run, retro_support, output=output
+        )
 
     print(len(flat_all_runs))
 
 
-if __name__ == '__main__':
-    
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Utility script to update TOML configuration files from experiment run data."
     )
-    
+
     # Global arguments
     parser.add_argument(
-        "--mode", 
-        choices=["overwrite", "duplicate"], 
+        "--mode",
+        choices=["overwrite", "duplicate"],
         default="overwrite",
-        help="Default saving mode if file exists (default: %(default)s)."
+        help="Default saving mode if file exists (default: %(default)s).",
     )
     parser.add_argument(
-        "--run", 
-        action="store_false", 
+        "--run",
+        action="store_false",
         dest="dry_run",
-        help="Actually write changes to files. If not specified, defaults to a dry run."
+        help="Actually write changes to files. If not specified, defaults to a dry run.",
     )
     parser.add_argument(
-        "--retro-support", 
+        "--retro-support",
         action="store_true",
-        help="Enable legacy/retro support configuration parsing."
+        help="Enable legacy/retro support configuration parsing.",
     )
     parser.add_argument(
-        "--output", 
-        type=Path, 
+        "--output",
+        type=Path,
         default=None,
-        help="Optional path to write a debug copy of the generated config."
+        help="Optional path to write a debug copy of the generated config.",
     )
 
     # Sub-commands (making dest="command" optional by not enforcing required=True)
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
     # Sub-command: single
-    single_parser = subparsers.add_parser("single", help="Update a single configuration file.")
+    single_parser = subparsers.add_parser(
+        "single", help="Update a single configuration file."
+    )
     single_parser.add_argument(
-        "--run-data", 
-        type=str, 
+        "--run-data",
+        type=str,
         default=str(RUN_PATH),
-        help="JSON string or path to a JSON file. Defaults to RUN_PATH (default: %(default)s)."
+        help="JSON string or path to a JSON file. Defaults to RUN_PATH (default: %(default)s).",
     )
     single_parser.add_argument(
         "--key",
         type=str,
         default=OLD_RUNS,
-        help="The dictionary key to extract from the run database (default: %(default)s)."
+        help="The dictionary key to extract from the run database (default: %(default)s).",
     )
     single_parser.add_argument(
         "--index",
         type=int,
         default=0,
-        help="The list index to extract from the specified key section (default: %(default)s)."
+        help="The list index to extract from the specified key section (default: %(default)s).",
     )
 
     # Sub-command: all
-    all_parser = subparsers.add_parser("all", help="Update all configuration files found in the runs database.")
+    all_parser = subparsers.add_parser(
+        "all", help="Update all configuration files found in the runs database."
+    )
 
     args = parser.parse_args()
 
@@ -256,19 +268,18 @@ if __name__ == '__main__':
     chosen_command = args.command if args.command else "all"
 
     if chosen_command == "single":
-
         p = Path(args.run_data)
         assert p.exists()
-        
-        with open(args.run_data, 'r') as f:
+
+        with open(args.run_data, "r") as f:
             all_runs = json.load(f)
-    
+
         update_config_file(
             run=all_runs[args.key][args.index],
             default_mode=args.mode,
             dry_run=args.dry_run,
             retro_support=args.retro_support,
-            output=args.output
+            output=args.output,
         )
 
     elif chosen_command == "all":
@@ -276,5 +287,5 @@ if __name__ == '__main__':
             default_mode=args.mode,
             dry_run=args.dry_run,
             retro_support=args.retro_support,
-            output=args.output
+            output=args.output,
         )

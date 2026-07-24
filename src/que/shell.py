@@ -1,54 +1,57 @@
-import webbrowser
-import cmd as cmdLib
-import shlex
-from typing import Callable, Optional, List, Any
 import argparse
+import atexit
+import cmd as cmdLib
+import getpass
+import io
+import json
+import readline
+import shlex
+import subprocess
+import sys
 import time
+import traceback
+import webbrowser
+from collections.abc import Callable
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
+
 from pydantic import BaseModel
+from rich import box
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Confirm
-from rich.text import Text
 from rich.syntax import Syntax
-from rich import box
-import io
-import sys
-import json
-from pathlib import Path
-import subprocess
-import getpass
-import traceback
-import readline
-import atexit
+from rich.table import Table
+from rich.text import Text
+
+from src.configs import get_avail_splits, get_train_parser
 
 # locals
 # import configs
 from src.que.core import (
-    TO_RUN,
-    GenExp,
     CUR_RUN,
     QUE_LOCATIONS,
+    RUN_PATH,
+    SERVER_LOG_PATH,
     SYNONYMS,
-    Que,
-    connect_manager,
-    ServerState,
+    SYSTEMD_NAME,
+    TO_RUN,
     # WorkerState,
     # DaemonState,
     TRAINING_LOG_PATH,
-    SERVER_LOG_PATH,
-    RUN_PATH,
-    SYSTEMD_NAME,
-    QueManagerProtocol,
+    GenExp,
+    Que,
     QueDupExp,
+    QueManagerProtocol,
+    ServerState,
     SweepInfo,
+    connect_manager,
 )
-from src.run_types import ENTITY
 
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
-from src.configs import get_avail_splits, get_train_parser
+from src.run_types import ENTITY
 
 # ---------------------------------------------------------------------------
 # Criterion parsing
@@ -73,9 +76,9 @@ SAFE_GLOBALS = {
 def parse_criterion(expr: str) -> Callable[[Any], bool]:
     """Evaluate a lambda string in a restricted namespace."""
 
-    result = eval(f"lambda x: {expr}", SAFE_GLOBALS)  # noqa: S307
+    result = eval(f"lambda x: {expr}", SAFE_GLOBALS)  
     if not callable(result):
-        raise ValueError(f"Criterion must be callable, got: {type(result)}")
+        raise TypeError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
 
 
@@ -173,7 +176,7 @@ class QueShell(cmdLib.Cmd):
             yield
             if message:
                 self.console.print(f"[bold green]✓ {message} [/bold green]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             if error:
                 self.console.print(
                     f"[bold red]✗ {error} : {e} [/bold red]", style="red"
@@ -538,7 +541,7 @@ class QueShell(cmdLib.Cmd):
 
     # - indirect indexing
 
-    def _unpack_keys(self, run: GenExp, key_set: List[str]) -> Any:
+    def _unpack_keys(self, run: GenExp, key_set: list[str]) -> Any:
         unpack = run.model_dump()
         for k in key_set:
             unpack = unpack[k]
@@ -960,7 +963,7 @@ class QueShell(cmdLib.Cmd):
             )
         return parsed_args
 
-    def _parse_args_or_cancel(self, cmd: str, arg: str) -> Optional[argparse.Namespace]:
+    def _parse_args_or_cancel(self, cmd: str, arg: str) -> argparse.Namespace | None:
         """
         Parse generic arguments
 
@@ -984,7 +987,7 @@ class QueShell(cmdLib.Cmd):
             else:
                 self.console.print(f"[red]{cmd} not found[/red]")
 
-    def _get_parser(self, cmd: str) -> Optional[argparse.ArgumentParser]:
+    def _get_parser(self, cmd: str) -> argparse.ArgumentParser | None:
         """Get argument parser for a given command"""
         factory = self._parser_factories.get(cmd)
         return factory() if factory else None
@@ -994,9 +997,9 @@ class QueShell(cmdLib.Cmd):
     def _add_sort_args(
         self,
         parser: argparse.ArgumentParser,
-        help: str = "List of keys to sort the list by, e.g. -s admin model (ignores None leaves)",
+        help: str = "list of keys to sort the list by, e.g. -s admin model (ignores None leaves)",
     ) -> argparse.ArgumentParser:
-        """ "List of keys to sort the list by, e.g. -s admin model (ignores None leaves)"""
+        """ "list of keys to sort the list by, e.g. -s admin model (ignores None leaves)"""
         parser.add_argument(
             "--sort_keys",
             "-s",
@@ -1023,9 +1026,9 @@ class QueShell(cmdLib.Cmd):
     def _add_filter_args(
         self,
         parser: argparse.ArgumentParser,
-        help: str = "List of keys to filter the list by, e.g. -f results best_val_acc (requires matching --criterion / -c to to filter by, ignores None leaves)",
+        help: str = "list of keys to filter the list by, e.g. -f results best_val_acc (requires matching --criterion / -c to to filter by, ignores None leaves)",
     ) -> argparse.ArgumentParser:
-        """ "--filter_keys / -f: List of keys to filter the list by, e.g. -f results best_val_acc (requires matching --criterion / -c to to filter by, ignores None leaves)"""
+        """ "--filter_keys / -f: list of keys to filter the list by, e.g. -f results best_val_acc (requires matching --criterion / -c to to filter by, ignores None leaves)"""
         parser.add_argument(
             "--filter_keys",
             "-f",
@@ -1287,7 +1290,7 @@ class QueShell(cmdLib.Cmd):
             "-ek",
             nargs="+",
             type=str,
-            help="List of keys to edit within the run",
+            help="list of keys to edit within the run",
         )
         self._add_value_args(parser)
 
@@ -1296,7 +1299,7 @@ class QueShell(cmdLib.Cmd):
     # indirect indexing
 
     def _get_list_parser(self) -> argparse.ArgumentParser:
-        parser = argparse.ArgumentParser(description="List runs", prog="list")
+        parser = argparse.ArgumentParser(description="list runs", prog="list")
         self._add_location_arg(parser)
         self._add_list_manipulation_args(parser)
         self._add_top_n_arg(
@@ -1317,7 +1320,7 @@ class QueShell(cmdLib.Cmd):
             nargs="+",
             type=str,
             action="append",
-            help="List of keys to display within the run",
+            help="list of keys to display within the run",
         )
         self._add_list_manipulation_args(parser)
         return parser
@@ -1333,7 +1336,7 @@ class QueShell(cmdLib.Cmd):
         self._add_clean_slate_arg(parser)
 
         parser.add_argument(
-            "--o_indexes", "-i", nargs="+", type=str, help="List of indexes to copy"
+            "--o_indexes", "-i", nargs="+", type=str, help="list of indexes to copy"
         )
         parser.add_argument("-ni", "--n_index", type=int, default=0, help="New index")
 
@@ -1505,8 +1508,8 @@ class QueShell(cmdLib.Cmd):
 
 def ssh_tunnel_maker(
     host_ip: str,
-    ssh_user: Optional[str] = None,
-    ssh_key: Optional[Path] = None,
+    ssh_user: str | None = None,
+    ssh_key: Path | None = None,
     port_client: int = 50000,
     port_server: int = 50000,
 ) -> subprocess.Popen:
@@ -1550,7 +1553,7 @@ def ssh_tunnel_maker(
 
 
 @contextmanager
-def tunnel_handler(tunnel: Optional[subprocess.Popen]):
+def tunnel_handler(tunnel: subprocess.Popen | None):
     """Context manager to handle the lifecycle of an ssh tunnel subprocess. Ensures that the tunnel is properly terminated when the context is exited, even if an exception occurs.
 
     Args:
