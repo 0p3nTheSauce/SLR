@@ -42,6 +42,7 @@ t0 = 10
 tmult = 1
 eta_min = 0.0
 
+
 [stopping]
 type = "early_stopper"
 max_epoch = 200
