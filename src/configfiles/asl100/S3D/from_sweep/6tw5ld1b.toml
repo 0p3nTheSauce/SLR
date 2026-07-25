@@ -1,0 +1,98 @@
+[training]
+batch_size = 8
+update_per_step = 1
+batch_size_equivalent = 8
+
+[optimizer]
+eps = 3.183717978456048e-05
+backbone_init_lr = 0.000225694546655491
+backbone_weight_decay = 0.00010435254071509216
+classifier_init_lr = 0.0003753123367979489
+classifier_weight_decay = 0.0006233811522771531
+
+[model_params]
+drop_p = 0.6888960634095801
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 2, type = "chunked" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.081015198611393
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 4
+magnitude = 12
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.test_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
+
+[scheduler]
+type = "CosineAnnealingWarmRestarts"
+t0 = 31
+tmult = 2
+eta_min = 0.0
+
+[stopping]
+type = "early_stopper"
+max_epoch = 200
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 20
+min_delta = 0.01
+
+
+# updated by script

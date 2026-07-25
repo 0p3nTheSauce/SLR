@@ -76,7 +76,7 @@ SAFE_GLOBALS = {
 def parse_criterion(expr: str) -> Callable[[Any], bool]:
     """Evaluate a lambda string in a restricted namespace."""
 
-    result = eval(f"lambda x: {expr}", SAFE_GLOBALS)  
+    result = eval(f"lambda x: {expr}", SAFE_GLOBALS)
     if not callable(result):
         raise TypeError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
@@ -133,6 +133,7 @@ class QueShell(cmdLib.Cmd):
             "remove": self._get_remove_parser,
             "clear": self._get_clear_parser,
             "list": self._get_list_parser,
+            "to_config": self._get_to_config_parser,
             "quit": self._get_quit_parser,
             "shuffle": self._get_shuffle_parser,
             "move": self._get_move_parser,
@@ -573,7 +574,7 @@ class QueShell(cmdLib.Cmd):
             if runs is None:
                 return
 
-            runs = self.que.summarise(runs, self.ndigits)  
+            runs = self.que.summarise(runs, self.ndigits)
 
             # retrieve top n if specified
             if parsed_args.top_n is not None:
@@ -601,7 +602,6 @@ class QueShell(cmdLib.Cmd):
 
             table.add_column("Index", style="cyan", justify="right", width=8)
             for raw_header in dict_runs[0].keys():
-                
                 header = raw_header.replace("_", " ").capitalize()
                 table.add_column(header.capitalize(), style="white")
 
@@ -623,47 +623,49 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        with self.console.status("[bold green]Importing...", spinner="dots"):
-            with self.unwrap_exception("", "Display failed"):
-                run = list(
-                    Que.list_manipulation(
-                        self.que.list_runs(
-                            parsed_args.location,
-                        ),
-                        sort_keys=parsed_args.sort_keys,
-                        reverse=parsed_args.reverse,
-                        filter_keys=parsed_args.filter_keys,
-                        criterions=[
-                            parse_criterion(crit) for crit in parsed_args.criterion
-                        ],
-                    )
-                )[parsed_args.index]
-
-                title = f"Run {parsed_args.index} in {parsed_args.location}"
-
-                if parsed_args.display_keys is not None:
-                    disp_components = {}
-
-                    for key_set in parsed_args.display_keys:
-                        info = Que.get_nested(run, key_set)
-
-                        disp_components = Que.set_nested(disp_components, key_set, info)
-
-                    run = disp_components
-
-                # Format as JSON-like syntax
-                run_json = json.dumps(run, indent=2, default=_json_default)
-
-                syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
-
-                self.console.print(
-                    Panel(
-                        syntax,
-                        title=title,
-                        border_style="cyan",
-                        padding=(1, 2),
-                    )
+        with (
+            self.console.status("[bold green]Importing...", spinner="dots"),
+            self.unwrap_exception("", "Display failed"),
+        ):
+            run = list(
+                Que.list_manipulation(
+                    self.que.list_runs(
+                        parsed_args.location,
+                    ),
+                    sort_keys=parsed_args.sort_keys,
+                    reverse=parsed_args.reverse,
+                    filter_keys=parsed_args.filter_keys,
+                    criterions=[
+                        parse_criterion(crit) for crit in parsed_args.criterion
+                    ],
                 )
+            )[parsed_args.index]
+
+            title = f"Run {parsed_args.index} in {parsed_args.location}"
+
+            if parsed_args.display_keys is not None:
+                disp_components = {}
+
+                for key_set in parsed_args.display_keys:
+                    info = Que.get_nested(run, key_set)
+
+                    disp_components = Que.set_nested(disp_components, key_set, info)
+
+                run = disp_components
+
+            # Format as JSON-like syntax
+            run_json = json.dumps(run, indent=2, default=_json_default)
+
+            syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+
+            self.console.print(
+                Panel(
+                    syntax,
+                    title=title,
+                    border_style="cyan",
+                    padding=(1, 2),
+                )
+            )
 
     def do_copy(self, arg):
         """Copy a run"""
@@ -693,6 +695,40 @@ class QueShell(cmdLib.Cmd):
                 parsed_args.n_location,
                 [runs[i] for i in o_idxs],
                 index=parsed_args.n_index,
+            )
+
+    def do_to_config(self, arg):
+        """Write a run's config out to its TOML config file"""
+
+        parsed_args = self._parse_args_or_cancel("to_config", arg)
+        if parsed_args is None:
+            return
+
+        with self.console.status("[bold green]Importing...", spinner="dots"), self.unwrap_exception(
+            "Config file updated successfully", "Failed to write config"
+        ):
+            from src.que.runs_to_configs import update_config_file
+
+            run = list(
+                Que.list_manipulation(
+                    self.que.list_runs(
+                        parsed_args.location,
+                    ),
+                    sort_keys=parsed_args.sort_keys,
+                    reverse=parsed_args.reverse,
+                    filter_keys=parsed_args.filter_keys,
+                    criterions=[
+                        parse_criterion(crit) for crit in parsed_args.criterion
+                    ],
+                )
+            )[parsed_args.index]
+
+            update_config_file(
+                run,
+                default_mode=parsed_args.mode,
+                dry_run=parsed_args.dry_run,
+                retro_support=parsed_args.retro_support,
+                output=parsed_args.output,
             )
 
     #   Worker
@@ -803,18 +839,9 @@ class QueShell(cmdLib.Cmd):
                 "Sweep:",
                 f"{sweep_state['sweep_entity']}/{sweep_state['sweep_project']}/{sweep_state['sweep_id']}",
             )
-            daemon_table.add_row(
-                "Model:",
-                f"{sweep_state['model']}"
-            )
-            daemon_table.add_row(
-                "Dataset:",
-                f"{sweep_state['dataset']}"
-            )
-            daemon_table.add_row(
-                "Split:",
-                f"{sweep_state['split']}"
-            )
+            daemon_table.add_row("Model:", f"{sweep_state['model']}")
+            daemon_table.add_row("Dataset:", f"{sweep_state['dataset']}")
+            daemon_table.add_row("Split:", f"{sweep_state['split']}")
 
         table.add_row("Daemon", daemon_table)
 
@@ -857,10 +884,10 @@ class QueShell(cmdLib.Cmd):
             ):
                 self.server_context.load_state()
         elif parsed_args.command == "status":
-            with self.unwrap_exception('', 'fetching state failed'):
+            with self.unwrap_exception("", "fetching state failed"):
                 state = self.server_context.get_state()
-            
-            with self.unwrap_exception('', 'printing failed'):
+
+            with self.unwrap_exception("", "printing failed"):
                 self._pretty_status(state)
 
     # Misc / subprocesses
@@ -1325,6 +1352,42 @@ class QueShell(cmdLib.Cmd):
         self._add_list_manipulation_args(parser)
         return parser
 
+    def _get_to_config_parser(self) -> argparse.ArgumentParser:
+        parser = argparse.ArgumentParser(
+            description="Write a run's config out to its TOML config file",
+            prog="to_config",
+        )
+        self._add_location_arg(parser)
+        self._add_index_arg(parser)
+        parser.add_argument(
+            "--mode",
+            "-m",
+            choices=["overwrite", "duplicate"],
+            default="overwrite",
+            help="Save mode if a config file already exists at the target path (default: %(default)s)",
+        )
+        parser.add_argument(
+            "--dry_run",
+            "-dr",
+            action="store_true",
+            help="Print the generated config instead of writing it to disk",
+        )
+        parser.add_argument(
+            "--retro_support",
+            "-rs",
+            action="store_true",
+            help="Enable legacy/retro support when validating an existing config",
+        )
+        parser.add_argument(
+            "--output",
+            "-o",
+            type=Path,
+            default=None,
+            help="Optional path to also write a debug copy of the generated config",
+        )
+        self._add_list_manipulation_args(parser)
+        return parser
+
     def _get_copy_parser(self) -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser(description="Copy run", prog="copy")
         self._add_location_arg(
@@ -1343,10 +1406,13 @@ class QueShell(cmdLib.Cmd):
         self._add_list_manipulation_args(parser)
         return parser
 
+
+
     # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
         from models import avail_models
+
         parser = argparse.ArgumentParser(
             description="Interact with the worker process", prog="daemon"
         )

@@ -412,7 +412,7 @@ class Worker:
         self._attach_training_loggers()
         self._reattach_server_logger()
 
-        if sweep_info is not None:
+        if sweep_info is not None and self.que.len_loc('to_run') == 0: #give preference to runs on Que
             self.sweep(sweep_info)
         else:
             self.train()
