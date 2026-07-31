@@ -1,0 +1,89 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_acc
+  goal: maximize
+entity: ljgoodall2001-rhodes-university
+project: WLASL-100
+
+early_terminate:
+  type: hyperband
+  min_iter: 15
+  eta: 3
+
+parameters:
+  # --- tuned ---
+  #Optimizer params
+  eps:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.01
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.01
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 0.00005
+    max: 0.1
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.1
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.1
+  #model params
+  drop_p:
+    distribution: uniform
+    min: 0.1
+    max: 0.7
+  #Scheduler params
+  t0:
+    distribution: int_uniform
+    min: 10
+    max: 40
+  tmult:
+    values: [1, 2]
+  #Augmentation params
+  hflip_p:
+    distribution: uniform
+    min: 0
+    max: 0.5
+  max_wobble:
+    distribution: int_uniform
+    min: 0
+    max: 6
+  magnitude:
+    distribution: int_uniform
+    min: 3
+    max: 15
+  num_ops:
+    values: [1, 2, 3, 4]
+  
+
+  # --- fixed ---
+#   eps: {value: 0.00001}
+  eta_min: {value: 0}
+  batch_size: {value: 8}
+  update_per_step: {value: 1}
+#   hflip_p: {value: 0.5}
+  frame_size: {value: 224}
+  target_length: {value: 32}
+  num_magnitude_bins: {value: 31}
+  max_epoch: {value: 200}
+  patience: {value: 20}
+  min_delta: {value: 0.01}
+
+# Only consumed by CLI/subprocess-mode agents (`wandb agent <sweep_id>`).
+# Worker._sweep_train ignores program/command entirely -- it calls
+# create_sweep_run(model=..., split=..., dataset=...) directly with values
+# supplied via SweepInfo from the Daemon, not from this list.
+command:
+  - ${env}
+  - python
+  - ${program}
+  - S3D
+  - asl100
+

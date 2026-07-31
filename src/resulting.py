@@ -7,7 +7,6 @@ try:
     import tomllib  # type: ignore
 except ImportError:
     import tomli as tomllib
-import importlib.util
 import json
 import logging
 from argparse import ArgumentParser
@@ -17,6 +16,7 @@ from types import ModuleType
 # locals
 from src.que.core import ExpQue, GenExp, Que
 from src.run_types import SRC_ROOT, CleverDict, CompExpInfo, GenInfo, RunRes
+from src.utils import load_module_from_path
 
 # from results.saicair.saicair import additional_modifications
 
@@ -36,27 +36,35 @@ if not basic_logger.handlers:
     basic_logger.addHandler(_handler)
 
 
+# def load_filters_module(filters_path: Path) -> ModuleType:
+#     """Load an arbitrary filters.py file by path as a standalone module.
+
+#     This works regardless of where filters_path lives on disk - it doesn't
+#     need to be on sys.path or part of any package.
+#     """
+#     if not filters_path.exists():
+#         raise FileNotFoundError(f"No such filters file: {filters_path}")
+
+#     module_name = f"_filters_{filters_path.stem}"
+#     spec = importlib.util.spec_from_file_location(module_name, filters_path)
+#     if spec is None or spec.loader is None:
+#         raise ImportError(f"Could not load spec for {filters_path}")
+
+#     module = importlib.util.module_from_spec(spec)
+#     # Registering in sys.modules first lets the module's own top-level code
+#     # (e.g. dataclasses, or anything doing `import module_name`) resolve
+#     # correctly, and avoids it being garbage-collected mid-exec.
+#     sys.modules[module_name] = module
+#     spec.loader.exec_module(module)
+#     return module
+
+
 def load_filters_module(filters_path: Path) -> ModuleType:
-    """Load an arbitrary filters.py file by path as a standalone module.
+    """Load an arbitrary filters.py file by path as a standalone module."""
+    return load_module_from_path(filters_path, module_prefix="_filters")
 
-    This works regardless of where filters_path lives on disk - it doesn't
-    need to be on sys.path or part of any package.
-    """
-    if not filters_path.exists():
-        raise FileNotFoundError(f"No such filters file: {filters_path}")
 
-    module_name = f"_filters_{filters_path.stem}"
-    spec = importlib.util.spec_from_file_location(module_name, filters_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load spec for {filters_path}")
 
-    module = importlib.util.module_from_spec(spec)
-    # Registering in sys.modules first lets the module's own top-level code
-    # (e.g. dataclasses, or anything doing `import module_name`) resolve
-    # correctly, and avoids it being garbage-collected mid-exec.
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def get_filters(filters_path: Path) -> tuple[dict, list]:

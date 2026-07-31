@@ -9,6 +9,7 @@ hyperparameters, rather than merging onto a base_config.toml file.
 from __future__ import annotations
 
 import argparse
+import copy
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ import wandb
 from src.configs import get_avail_splits, get_model_checkpoint_dir
 from src.run_types import AVAIL_SPLITS, RUNS_PATH, AdminInfo, RunInfo, strict_validate
 from src.training import train_model
+from src.utils import load_module_from_path
 
 
 class SweepConfigError(ValueError):
@@ -24,48 +26,44 @@ class SweepConfigError(ValueError):
     skeleton leaf that never got overridden by a sweep value."""
 
 
-def build_base_config() -> dict:
-    """The fixed shape every sweep trial's config takes. `None` marks a leaf
-    that MUST be supplied by SWEEP_KEY_MAP/run.config -- validate_resolved()
-    checks this after overrides are applied.
 
-    Assumes exactly one sampler and one cropper per split (train: flip + crop
-    + randaugment; test: crop only) -- this is what makes flat wandb params
-    workable instead of needing list-index paths.
 
-    Hard codes the sampler and crop method - requires seperate sweep for each sampler/cropper combination. Could be made more flexible
 
+BASE_CONFIG_ATTR = "base_config"
+
+
+def build_base_config(config_path: Path) -> dict:
+    """The fixed shape every sweep trial's config takes, loaded from an
+    arbitrary Python file at `config_path` rather than hardcoded here.
+
+    `config_path` must define a top-level dict named `BASE_CONFIG`. `None`
+    marks a leaf that MUST be supplied by SWEEP_KEY_MAP/run.config --
+    validate_resolved() checks this after overrides are applied. The
+    skeleton typically assumes exactly one sampler and one cropper per split
+    (train: flip + crop + randaugment; test: crop only) -- this is what makes
+    flat wandb params workable instead of needing list-index paths -- and
+    hardcodes the sampler and crop method, so a different combination needs
+    its own base_config.py and sweep.
+
+    Returns a fresh deep copy each call, since apply_sweep_overrides mutates
+    its input in place and the loaded module-level dict must stay pristine
+    across repeated calls (e.g. multiple trials in the same sweep agent
+    process).
     """
-    return {
-        "training": {"batch_size": None, "update_per_step": None},
-        "optimizer": {
-            "eps": None, "backbone_init_lr": None, "backbone_weight_decay": None,
-            "classifier_init_lr": None, "classifier_weight_decay": None,
-        },
-        "model_params": {"drop_p": None},
-        "scheduler": {"type": "CosineAnnealingWarmRestarts", "t0": None, "tmult": None, "eta_min": None},
-        "data": {
-            "train_augs": {
-                "normalise": True,
-                "temporal_aug": [{"type": "chunked", "max_wobble": None, "target_length": None}],
-                "spatial_aug": [
-                    {"type": "HORIZONTAL_FLIP", "p": None},
-                    {"type": "Centre_crop", "frame_size": None},
-                    {"type": "RANDAUGMENT", "num_ops": None, "magnitude": None,
-                     "num_magnitude_bins": None, "interpolation": "bilinear"},
-                ],
-            },
-            "test_augs": {
-                "normalise": True,
-                "temporal_aug": [{"type": "uniform", "target_length": None}],
-                "spatial_aug": [{"type": "Centre_crop", "frame_size": None}],
-            },
-        },
-        "stopping": {
-            "max_epoch": None, "type": "early_stopper", "metric": "loss",
-            "phase": "val", "mode": "min", "patience": None, "min_delta": None,
-        },
-    }
+    module = load_module_from_path(config_path, module_prefix="_base_config")
+
+    if not hasattr(module, BASE_CONFIG_ATTR):
+        raise SweepConfigError(
+            f"{config_path} has no top-level `{BASE_CONFIG_ATTR}` dict for build_base_config to load."
+        )
+
+    base_config = getattr(module, BASE_CONFIG_ATTR)
+    if not isinstance(base_config, dict):
+        raise SweepConfigError(
+            f"{config_path}: `{BASE_CONFIG_ATTR}` must be a dict, got {type(base_config).__name__}."
+        )
+
+    return copy.deepcopy(base_config)
 
 
 def _resolve_list_index(lst: list, selector: str) -> int:
@@ -170,12 +168,12 @@ def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any]) -> 
     return raw
 
 
-def validate_sweep_key_map(key_map: dict = SWEEP_KEY_MAP) -> None:
+def validate_sweep_key_map(config_path: Path, key_map: dict = SWEEP_KEY_MAP) -> None:
     """Check every SWEEP_KEY_MAP target resolves against the skeleton shape.
     Structural check only -- doesn't require any particular run's values, so
     it can run once at sweep-launch time, independent of wandb.init().
     """
-    raw = build_base_config()
+    raw = build_base_config(config_path)
     for name, dotted_or_list in key_map.items():
         dotted_list = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
         for dotted in dotted_list:
@@ -209,7 +207,7 @@ def get_sweep_exp_dir(split: str, model: str, sweep_id: str, run_id: str,
     return Path(runs_path) / split / model / f"sweep_{sweep_id}" / run_id
 
 
-def create_sweep_run(model: str, split: AVAIL_SPLITS, dataset: str = "WLASL"):
+def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset: str = "WLASL"):
     """Build a fresh RunInfo + wandb Run for one sweep trial.
 
     Called from inside the callback passed to wandb.agent(function=...).
@@ -220,13 +218,15 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, dataset: str = "WLASL"):
 
     `model`/`split`/`dataset` are NOT sweep parameters -- they're passed in by
     the caller (Worker, via SweepInfo from the Daemon), since they determine
-    architecture/data plumbing rather than being tuned.
+    architecture/data plumbing rather than being tuned. `config_path` points
+    at the base_config.py defining the BASE_CONFIG skeleton for this sweep
+    (see build_base_config) and is likewise caller-supplied rather than tuned.
     """
-    validate_sweep_key_map()  # structural check, fails before any wandb call
+    validate_sweep_key_map(config_path)  # structural check, fails before any wandb call
 
     run = wandb.init()
 
-    raw = build_base_config()
+    raw = build_base_config(config_path)
     sweep_overrides = dict(run.config)
     if sweep_overrides:
         raw = apply_sweep_overrides(raw, sweep_overrides)
@@ -272,15 +272,17 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, dataset: str = "WLASL"):
 #     - ${program}
 #     - MViTv2_B_32x3
 #     - asl100
+#     - /path/to/base_config.py
 #
-# model/split/dataset/save_every are CLI args here, NOT wandb parameters --
-# they aren't tuned, so they don't belong in the sweep's `parameters` block
-# (see create_sweep_run's docstring).
+# model/split/config_path/dataset/save_every are CLI args here, NOT wandb
+# parameters -- they aren't tuned, so they don't belong in the sweep's
+# `parameters` block (see create_sweep_run's docstring).
 
 def get_sweep_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a single trial of a wandb sweep")
     parser.add_argument("model", type=str)
     parser.add_argument("split", type=str, choices=get_avail_splits())
+    parser.add_argument("config_path", type=Path, help="Path to a base_config.py defining BASE_CONFIG")
     parser.add_argument("-ds", "--dataset", type=str, default="WLASL")
     parser.add_argument("-se", "--save_every", type=int, default=5)
     return parser
@@ -289,7 +291,9 @@ def get_sweep_parser() -> argparse.ArgumentParser:
 def main():
     args = get_sweep_parser().parse_args()
 
-    config, run = create_sweep_run(model=args.model, split=args.split, dataset=args.dataset)
+    config, run = create_sweep_run(
+        model=args.model, split=args.split, config_path=args.config_path, dataset=args.dataset
+    )
 
     train_model(args.model, config, run, save_every=args.save_every, recover=False)
     run.finish()
