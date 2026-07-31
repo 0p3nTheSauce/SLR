@@ -461,8 +461,8 @@ class WarmUpSched(BaseModel):
     def _check_factors(self) -> WarmUpSched:
         if self.warmup_epochs < 0:
             raise ValueError("warmup_epochs must be non-negative")
-        if not (0 < self.start_factor < self.end_factor <= 1.0):
-            raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
+        if not (0 <= self.start_factor < self.end_factor <= 1.0):
+            raise ValueError(f"start_factor must be >= 0 and < end_factor <= 1.0, but got: start {self.start_factor} end {self.end_factor}")
         return self
 
 

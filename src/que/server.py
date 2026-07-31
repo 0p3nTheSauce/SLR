@@ -285,10 +285,10 @@ def get_server_parser() -> argparse.ArgumentParser:
         help="Authentication key for connecting to the manager (default: None, will prompt for password)",
     )
     parser.add_argument(
-        "--stop_on_fail",
+        "--no_stop_on_fail",
         '-f',
         action="store_true",
-        help="Whether the daemon should stop itself if a run fails (default: False)",
+        help="Do not stop daemon if a run fails (default: False)",
     )
 
     return parser
@@ -313,4 +313,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     
-    start_server(stop_on_fail=args.stop_on_fail, address=(args.host, args.port_server), authkey=args.authkey.encode())
+    start_server(stop_on_fail=not args.no_stop_on_fail, address=(args.host, args.port_server), authkey=args.authkey.encode())

@@ -868,7 +868,7 @@ class QueShell(cmdLib.Cmd):
                             model=parsed_args.model,
                             dataset=parsed_args.dataset,
                             split=parsed_args.split,
-                            base_config=parsed_args.base_config
+                            base_config=str(parsed_args.base_config)
                         )
                     )
             elif parsed_args.command == "clear_sweep":

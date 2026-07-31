@@ -49,7 +49,7 @@ parameters:
   warmup_epochs:
     values: [0, 2, 5, 8]
   start_factor:
-    distribution: log_uniform
+    distribution: log_uniform_values
     min: 0.01
     max: 0.5
 
