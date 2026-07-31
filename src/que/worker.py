@@ -1,39 +1,39 @@
-import json
-import os
-from typing import Optional, IO, cast
-import traceback
-import torch
 import gc
-import logging
-from logging import Logger
-from contextlib import redirect_stdout
 import io
-
+import json
+import logging
+import os
+import traceback
+from contextlib import redirect_stdout
+from logging import Logger
 from multiprocessing.synchronize import Event as EventClass
+from pathlib import Path
+from typing import IO, cast
+
+import torch
 
 import wandb
-
 from run_types import RunInfo
+from src.que.core import (
+    CUR_RUN,
+    SERVER_LOG_PATH,
+    TRAINING_LOG_PATH,
+    TRAINING_NAME,
+    WORKER_NAME,
+    CompExpInfo,
+    Que,
+    QueException,
+    SweepInfo,  # now also carries model/split/dataset -- see note below
+    WorkerStateDict,
+    connect_manager,
+)
+from src.run_types import WandbInfo
+from src.sweeping import create_sweep_run
 
 # locals
 from src.testing import full_test
-from src.que.core import (
-    CUR_RUN,
-    connect_manager,
-    TRAINING_LOG_PATH,
-    WORKER_NAME,
-    SERVER_LOG_PATH,
-    TRAINING_NAME,
-    QueException,
-    WorkerStateDict,
-    CompExpInfo,
-    Que,
-    SweepInfo,  # now also carries model/split/dataset -- see note below
-)
-from src.run_types import WandbInfo
+from src.training import _setup_wandb, train_loop
 from src.utils import gpu_manager
-from src.training import train_loop, _setup_wandb
-from src.sweeping import create_sweep_run
 
 
 class LoggerWriter(io.TextIOBase):
@@ -58,21 +58,21 @@ class Worker:
         server_logger: Logger,
         que: Que,
         state: WorkerStateDict,
-        stop_event: Optional[EventClass] = None,
+        stop_event: EventClass | None = None,
         do_traceback: bool = True
     ) -> None:
         self.server_logger = server_logger
         self.que = que
-        self.stop_event: Optional[EventClass] = stop_event
+        self.stop_event: EventClass | None = stop_event
         self.state = state
         self.do_traceback = do_traceback
-        self.sweep_info: Optional[SweepInfo] = None
+        self.sweep_info: SweepInfo | None = None
         self.server_logger.info("Worker initialized")
 
 
     def build_exception_info(self, e: Exception) -> str:
         if self.do_traceback:
-            return f"{str(e)}\n{traceback.format_exc()}"
+            return f"{e!s}\n{traceback.format_exc()}"
         else:
             return str(e)
 
@@ -204,6 +204,7 @@ class Worker:
             config, run = create_sweep_run(
                 model=self.sweep_info["model"],
                 split=self.sweep_info["split"],
+                config_path=Path(self.sweep_info['base_config']),
                 dataset=self.sweep_info["dataset"],
             )
 
@@ -397,7 +398,7 @@ class Worker:
 
 
 
-    def start(self, sweep_info: Optional[SweepInfo] = None):
+    def start(self, sweep_info: SweepInfo | None = None):
         """this is likely started in a seperate process, so que requires connecting"""
 
         #get state handlers

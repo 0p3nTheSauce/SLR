@@ -1,46 +1,46 @@
-from typing import Optional, Dict, Any, Tuple, Callable
-import torch  # type: ignore
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
-from torch import Tensor
-from pathlib import Path
-import wandb
-from wandb.sdk.wandb_run import Run
+import random
+from collections.abc import Callable
 from multiprocessing.synchronize import Event as EventClass
 from os import PathLike
-import numpy as np
-import random
+from pathlib import Path
+from typing import Any
 
-# local imports
-from src.video_dataset import VideoDataset, get_wlasl_info, get_data_set
+import numpy as np
+import torch  # type: ignore
+from torch import Tensor, nn, optim
+from torch.optim.lr_scheduler import LRScheduler, ReduceLROnPlateau
+from torch.utils.data import DataLoader
+from wandb.sdk.wandb_run import Run
+
+import wandb
 from src.configs import (
-    load_config,
-    print_config,
-    get_train_parser,
-    take_args,
-    set_seed,
     RunInfo,
     WandbInfo,
+    get_train_parser,
+    load_config,
+    print_config,
+    set_seed,
+    take_args,
 )
+from src.models import MVirTed, MViT_2D_t, extend_classifier, get_mae_model, get_model
 from src.run_types import (
-    SchedInfo,
     OptimizerInfo,
-    is_supervised_config,
+    SchedInfo,
     is_pretrain_config,
+    is_supervised_config,
 )
-from src.stopping import Stopper, StopperConfig
-from src.models import get_model, extend_classifier, get_mae_model, MVirTed, MViT_2D_t
-from src.utils import wandb_manager
+from src.stopping import Stopper
 from src.testing import save_test_sizes
+from src.utils import wandb_manager
 
+# local imports
+from src.video_dataset import VideoDataset, get_data_set, get_wlasl_info
 
 StrPath = str | PathLike[str]
 LossFn = Callable[..., Tensor]
 
 
-def setup_data(config: RunInfo) -> Tuple[Dict[str, DataLoader[VideoDataset]], int]:
+def setup_data(config: RunInfo) -> tuple[dict[str, DataLoader[VideoDataset]], int]:
     # NOTE: update for other datasets
     train_info = get_wlasl_info(config.admin.split, set_name="train")
     val_info = get_wlasl_info(config.admin.split, set_name="val")
@@ -79,7 +79,7 @@ def setup_data(config: RunInfo) -> Tuple[Dict[str, DataLoader[VideoDataset]], in
 
 
 def get_scheduler(
-    optimizer: optim.Optimizer, sched_conf: Optional[SchedInfo] = None
+    optimizer: optim.Optimizer, sched_conf: SchedInfo | None = None
 ) -> LRScheduler:
     """Get learning rate scheduler based on config."""
     no_sched = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda epoch: 1.0)
@@ -220,7 +220,7 @@ def get_optimizer(model: torch.nn.Module, conf: OptimizerInfo) -> optim.AdamW:
     return optim.AdamW(param_groups, eps=conf.eps)
 
 
-def save_checkpoint(checkpoint_data: Dict[str, Any], save_path: Path):
+def save_checkpoint(checkpoint_data: dict[str, Any], save_path: Path):
     checkpoint = checkpoint_data | {
         # RNG states
         "rng_torch": torch.get_rng_state(),
@@ -237,7 +237,7 @@ def save_checkpoint(checkpoint_data: Dict[str, Any], save_path: Path):
 
 def load_checkpoint(
     load_path: Path, device: torch.device, strict: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     if load_path.exists():
         checkpoint = torch.load(load_path, map_location=device)
         if "rng_cuda" in checkpoint:
@@ -267,7 +267,7 @@ def load_checkpoint(
 def load_pretrained(
     check_path: Path,
     model_name: str,
-    drop_p: Optional[float],  # uses default if None
+    drop_p: float | None,  # uses default if None
     final_classes: int,
     extend: bool = True,
 ) -> nn.Module:
@@ -295,7 +295,7 @@ def load_pretrained(
     return model
 
 
-def _init_accumulators() -> Tuple[int, int, float, float, Dict[str, Dict[str, float]]]:
+def _init_accumulators() -> tuple[int, int, float, float, dict[str, dict[str, float]]]:
     steps = 0
     epoch = 0
     best_val_loss = float("inf")
@@ -312,8 +312,8 @@ def _init_accumulators() -> Tuple[int, int, float, float, Dict[str, Dict[str, fl
 def _handle_recovery(
     save_path: Path,
     recover: bool,
-    load: Optional[StrPath] = None,
-) -> Optional[StrPath]:
+    load: StrPath | None = None,
+) -> StrPath | None:
     if recover:
         files = sorted([f.name for f in save_path.iterdir() if f.is_file()])
         if len(files) > 0:
@@ -331,7 +331,7 @@ def load_training(
     optimizer: optim.Optimizer,
     scheduler: optim.lr_scheduler.LRScheduler,
     stopper: Stopper,
-) -> Tuple[
+) -> tuple[
     nn.Module,
     optim.Optimizer,
     optim.lr_scheduler.LRScheduler,
@@ -340,7 +340,7 @@ def load_training(
     int,
     float,
     float,
-    Dict[str, Dict[str, float]],
+    dict[str, dict[str, float]],
 ]:
     """Load training state from a checkpoint
 
@@ -393,7 +393,7 @@ def load_training(
         best_val_acc = checkpoint["best_val_acc"]
 
     print(f"Resuming from epoch {epoch}, steps {steps}")
-    print(f"Loaded model from {str(load_path)}")
+    print(f"Loaded model from {load_path!s}")
 
     return (
         model,
@@ -419,7 +419,7 @@ def save_training(
     steps: int,
     best_val_loss: float,
     best_val_acc: float,
-    stopping_metrics: Dict[str, Dict[str, float]],
+    stopping_metrics: dict[str, dict[str, float]],
 ) -> None:
     """Save training state checkpoint"""
 
@@ -469,7 +469,7 @@ def train_epoch(
     loss_func: LossFn,
     optimizer: optim.Optimizer,
     wandb_run: Run,
-    stopping_metric: Dict[str, float],
+    stopping_metric: dict[str, float],
     stopper: Stopper,
     device: torch.device,
     epoch: int,
@@ -576,14 +576,14 @@ def val_epoch(
     loss_func: LossFn,
     scheduler: optim.lr_scheduler.LRScheduler,
     wandb_run: Run,
-    stopping_metric: Dict[str, float],
+    stopping_metric: dict[str, float],
     stopper: Stopper,
     device: torch.device,
     epoch: int,
     best_val_loss: float,
     best_val_acc: float,
     save_path: Path,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     phase_name = "val"
 
     model.eval()
@@ -664,24 +664,24 @@ def train_loop(
     model_name: str,
     config: RunInfo,
     wandb_run: Run,
-    load: Optional[StrPath] = None,
+    load: StrPath | None = None,
     save_every: int = 5,
     recover: bool = False,
-    event: Optional[EventClass] = None,
-) -> Optional[Dict[str, float]]:
+    event: EventClass | None = None,
+) -> dict[str, float] | None:
     """Train loop for video classification model.
 
     Args:
         model_name (str): Name of the model to train.
         wandb_run (Run): Wandb run instance for logging, and config.
-        load (Optional[StrPath], optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
+        load (StrPath | None, optional): Path to checkpoint to load, otherwise don't load checkpoint. Defaults to None.
         save_every (int, optional): Period of saving (epochs). Defaults to 5.
         recover (bool, optional): Continue from a failed run. Defaults to False.
         seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
-        event (Optional[EventClass], optional): Multiprocessing stopping event to pause training. Defaults to None.
+        event (EventClass | None, optional): Multiprocessing stopping event to pause training. Defaults to None.
 
     Returns:
-        Optional[Dict[str, float]]: Dictionary with keys: best_val_acc and best_val_loss
+        dict[str, float] | None: Dictionary with keys: best_val_acc and best_val_loss
     """
 
     set_seed(config.admin.seed)
@@ -808,7 +808,7 @@ def masked_pretrain_epoch(
     dataloader: DataLoader[VideoDataset],
     optimizer: optim.Optimizer,
     wandb_run: Run,
-    stopping_metric: Dict[str, float],
+    stopping_metric: dict[str, float],
     stopper: Stopper,
     device: torch.device,
     epoch: int,
@@ -893,7 +893,7 @@ def masked_preval_epoch(
     dataloader: DataLoader[VideoDataset],
     scheduler: optim.lr_scheduler.LRScheduler,
     wandb_run: Run,
-    stopping_metric: Dict[str, float],
+    stopping_metric: dict[str, float],
     stopper: Stopper,
     device: torch.device,
     epoch: int,
@@ -964,24 +964,24 @@ def pretrain_loop(
     model_name: str,
     config: RunInfo,
     wandb_run: Run,
-    load: Optional[StrPath] = None,
+    load: StrPath | None = None,
     save_every: int = 5,
     recover: bool = False,
-    event: Optional[EventClass] = None,
-) -> Optional[Dict[str, float]]:
+    event: EventClass | None = None,
+) -> dict[str, float] | None:
     """Pretrain loop for MAE-style self-supervised pretraining.
 
     Args:
         model_name (str): Name of the model to pretrain.
         wandb_run (Run): Wandb run instance for logging.
-        load (Optional[StrPath], optional): Path to checkpoint to load. Defaults to None.
+        load (StrPath | None, optional): Path to checkpoint to load. Defaults to None.
         save_every (int, optional): Period of saving (epochs). Defaults to 5.
         recover (bool, optional): Continue from a failed run. Defaults to False.
         seed (Optional[int], optional): Random seed value. Defaults to SEED.
-        event: Optional[EventClass] = None,
+        event: EventClass | None = None,
 
     Returns:
-        Optional[Dict[str, float]]: Dictionary with keys: best_val_loss
+        dict[str, float] | None: Dictionary with keys: best_val_loss
     """
 
     set_seed(config.admin.seed)
@@ -1104,11 +1104,11 @@ def train_model(
     model_name: str,
     config: RunInfo,
     wandb_run: Run,
-    load: Optional[StrPath] = None,
+    load: StrPath | None = None,
     save_every: int = 5,
     recover: bool = False,
-    event: Optional[EventClass] = None,
-) -> Optional[Dict[str, float]]:
+    event: EventClass | None = None,
+) -> dict[str, float] | None:
     if is_supervised_config(config.model_params):
         return train_loop(
             model_name=model_name,

@@ -46,6 +46,13 @@ parameters:
     max: 40
   tmult:
     values: [1, 2]
+  warmup_epochs:
+    values: [0, 2, 5, 8]
+  start_factor:
+    distribution: log_uniform
+    min: 0.01
+    max: 0.5
+
   #Augmentation params
   hflip_p:
     distribution: uniform
@@ -68,6 +75,7 @@ parameters:
   eta_min: {value: 0}
   batch_size: {value: 8}
   update_per_step: {value: 1}
+  end_factor: {value: 1.0}
 #   hflip_p: {value: 0.5}
   frame_size: {value: 224}
   target_length: {value: 32}

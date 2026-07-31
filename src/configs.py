@@ -1,11 +1,10 @@
-import configparser
 import argparse
 import ast
-from typing import Callable, Dict, Any, List, Optional, Union, Tuple, Literal
-
-from pathlib import Path
-
+import configparser
 import json
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any, Literal
 
 try:
     import tomllib  # type: ignore
@@ -14,22 +13,22 @@ except ImportError:
 # locals
 # from models import avail_models, norm_vals
 from src.run_types import (
-    WandbInfo,
-    RunInfo,
+    CLASSES_PATH,
+    CONFIG_FILETYPE,
+    CONFIGS_PATH,
+    ENTITY,
+    LABELS_PATH,
+    PROJECT_BASE,
+    RUNS_PATH,
+    SEED,
+    SRC_ROOT,
+    ZFILL,
     AdminInfo,
     AugInfo,
     OG_Sampler,
-    ENTITY,
-    PROJECT_BASE,
-    CLASSES_PATH,
-    LABELS_PATH,
-    RUNS_PATH,
-    CONFIGS_PATH,
-    ZFILL,
-    CONFIG_FILETYPE,
-    SEED,
+    RunInfo,
+    WandbInfo,
     strict_validate,
-    SRC_ROOT
 )
 
 
@@ -55,7 +54,7 @@ def correct_paths(admin: dict) -> dict:
     return corrected
 
 def ask_nicely(
-    message: str, requirment: Optional[Callable] = None, error: Optional[str] = None
+    message: str, requirment: Callable | None = None, error: str | None = None
 ) -> str:
     """Ask user for input, with optional requirement and error message."""
     while True:
@@ -71,9 +70,10 @@ def ask_nicely(
 
 def set_seed(seed: int):
     """Set the random seed across multiple environments."""
-    import torch
-    import numpy as np
     import random
+
+    import numpy as np
+    import torch
 
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -83,14 +83,14 @@ def set_seed(seed: int):
     torch.backends.cudnn.benchmark = False
 
 
-def get_avail_splits(pre_proc_dir: Union[str, Path] = LABELS_PATH) -> List[str]:
+def get_avail_splits(pre_proc_dir: str | Path = LABELS_PATH) -> list[str]:
     """Get the available splits from preprocessed labels directory."""
     ppd = Path(pre_proc_dir)
     if not ppd.exists() or not ppd.is_dir():
         raise ValueError(
             f"Invalid preprocessed directory: {pre_proc_dir}, must exist and be a directory"
         )
-    return list(map(lambda x: x.name, ppd.iterdir()))
+    return [x.name for x in ppd.iterdir()]
 
 
 def print_config(config: RunInfo):
@@ -110,7 +110,7 @@ def print_config(config: RunInfo):
         print()
 
 
-def get_class_list(classes_path: Union[str, Path] = CLASSES_PATH) -> List[str]:
+def get_class_list(classes_path: str | Path = CLASSES_PATH) -> list[str]:
     """Retrieve the classes list from file."""
     with open(classes_path, "r") as f:
         class_list = json.load(f)
@@ -129,7 +129,7 @@ def _convert_type(value: str) -> Any:
         return value
 
 
-def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
+def parse_ini_config(ini_file: str | Path) -> dict[str, Any]:
     """Parse .ini file into a nested dict with correctly typed values."""
     config = configparser.ConfigParser()
     config.read(ini_file)
@@ -140,7 +140,7 @@ def parse_ini_config(ini_file: Union[str, Path]) -> Dict[str, Any]:
 
 
 def _make_aug_info(
-    aug_conf: Optional[Dict[str, Any]],
+    aug_conf: dict[str, Any] | None,
     model_name: str,
     mode: Literal["train", "test", "val"],
 ) -> AugInfo:
@@ -253,7 +253,7 @@ def load_config(admin: AdminInfo, retro_support: bool = False) -> RunInfo:
 ###################### Path utilities ###############################
 
 
-def get_next_expno(split: str, model: str, runs_path: Union[str, Path] = RUNS_PATH) -> int:
+def get_next_expno(split: str, model: str, runs_path: str | Path = RUNS_PATH) -> int:
     model_dir = Path(runs_path) / split / model
     if not (model_dir.exists() and model_dir.is_dir()):
         return 0
@@ -265,7 +265,7 @@ def get_model_exp_dir(
     split: str,
     model: str,
     exp_no: int = 0,
-    runs_path: Union[str, Path] = RUNS_PATH,
+    runs_path: str | Path = RUNS_PATH,
     zd: int = ZFILL,
 ) -> Path:
     return Path(f"{runs_path}/{split}/{model}/exp{str(exp_no).zfill(zd)}")
@@ -273,7 +273,7 @@ def get_model_exp_dir(
 
 def get_model_checkpoint_dir(
     model_exp_dir: Path,
-    checkpoint_num: Optional[int] = None,
+    checkpoint_num: int | None = None,
     zd: int = ZFILL,
 ) -> Path:
     if checkpoint_num is None:
@@ -282,7 +282,7 @@ def get_model_checkpoint_dir(
 
 
 def get_model_results_dir(
-    model_exp_dir: Path, checkpoint_num: Optional[int] = None, zd: int = ZFILL
+    model_exp_dir: Path, checkpoint_num: int | None = None, zd: int = ZFILL
 ) -> Path:
     if checkpoint_num is None:
         return model_exp_dir / "results"
@@ -293,7 +293,7 @@ def get_config_path(
     split: str,
     model: str,
     exp_no: int = 0,
-    configs_dir: Union[str, Path] = CONFIGS_PATH,
+    configs_dir: str | Path = CONFIGS_PATH,
     zd: int = ZFILL,
     file_type: str = CONFIG_FILETYPE,
 ) -> Path:
@@ -304,10 +304,10 @@ def get_config_path(
 
 
 def get_train_parser(
-    prog: Optional[str] = None,
+    prog: str | None = None,
     desc: str = "Train a model",
-    model_opts: Optional[List[str]] = None,
-    split_opts: Optional[List[str]] = None,
+    model_opts: list[str] | None = None,
+    split_opts: list[str] | None = None,
 ) -> argparse.ArgumentParser:
     """Get parser for a training configuration
 
@@ -412,9 +412,9 @@ def get_train_parser(
 
 
 def take_args(
-    sup_args: Optional[List[str]] = None,
-    parsed_args: Optional[argparse.Namespace] = None,
-) -> Optional[Tuple[AdminInfo, WandbInfo]]:
+    sup_args: list[str] | None = None,
+    parsed_args: argparse.Namespace | None = None,
+) -> tuple[AdminInfo, WandbInfo] | None:
     """Retrieve and validate arguments for a new training run."""
     from src.models import avail_models
     from src.utils import enum_dir
@@ -519,7 +519,7 @@ def take_args(
 def main():
     maybe_args = take_args()
     if isinstance(maybe_args, tuple):
-        admin_info, wandb_info = maybe_args
+        admin_info, _wandb_info = maybe_args
     else:
         return
     config = load_config(admin_info)

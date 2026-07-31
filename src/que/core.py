@@ -1,49 +1,43 @@
-#!/usr/bin/env python
 """que
 ---
 A lightweight in-memory queue manager for experiment configurations with
 simple JSON-backed persistence.
 """
 
+import ast
+import json
+import logging
+import time
+import traceback
+from collections.abc import Callable, Sequence
+from contextlib import contextmanager
+from datetime import datetime
+from logging import Logger
+from multiprocessing.managers import BaseManager, DictProxy
+from pathlib import Path
 from typing import (
-    Protocol,
-    Optional,
-    Callable,
-    List,
-    Literal,
-    Sequence,
-    TypeAlias,
-    Tuple,
-    Dict,
     Any,
-    Union,
+    Literal,
+    Protocol,
+    TypeAlias,
     TypeGuard,
 )
-from typing_extensions import TypedDict, Unpack
-import ast
-import traceback
+
 from pydantic import BaseModel
-from pathlib import Path
-import json
-from logging import Logger
-import logging
-from multiprocessing.managers import BaseManager, DictProxy
-import time
-from datetime import datetime
-from contextlib import contextmanager
+from typing_extensions import TypedDict, Unpack
 
 # locals
 from src.run_types import (
     AVAIL_SPLITS,
-    ExpInfo,
-    CompExpInfo,
     AdminInfo,
-    WandbInfo,
+    CompExpInfo,
+    ExpInfo,
+    FailedExp,  # now defined in run_types
     RunInfo,
     Sumarised,
     SummarisedError,
     SummarisedRes,
-    FailedExp,  # now defined in run_types
+    WandbInfo,
     strict_validate,
     # ENTITY
 )
@@ -96,15 +90,15 @@ QueLocation: TypeAlias = Literal["to_run", "cur_run", "old_runs", "fail_runs"]
 ProcessNames: TypeAlias = Literal["Server", "Daemon", "Worker"]
 
 
-GenExp: TypeAlias = Union[ExpInfo, FailedExp, CompExpInfo]
-ExpQue: TypeAlias = Union[List[ExpInfo], List[FailedExp], List[CompExpInfo]]
+GenExp: TypeAlias = ExpInfo | FailedExp | CompExpInfo
+ExpQue: TypeAlias = list[ExpInfo] | list[FailedExp] | list[CompExpInfo]
 
 
 class AllRuns(BaseModel):
-    old_runs: List[CompExpInfo]
-    cur_run: List[ExpInfo]
-    to_run: List[ExpInfo]
-    fail_runs: List[FailedExp]
+    old_runs: list[CompExpInfo]
+    cur_run: list[ExpInfo]
+    to_run: list[ExpInfo]
+    fail_runs: list[FailedExp]
 
 
 class PositionInfo(BaseModel):
@@ -117,7 +111,7 @@ class RangePosition(PositionInfo):
 
 
 class SortInfo(BaseModel):
-    key_set: List[str]
+    key_set: list[str]
     reverse: bool
 
 
@@ -137,6 +131,7 @@ def _get_basic_logger() -> Logger:
     return logging.getLogger(__name__)
 
 
+QUE_LOGGER = _get_basic_logger()
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -239,11 +234,11 @@ def log_and_raise(logger: Logger, task: str = "Operation"):
     except Exception as e:
         logger.error(f"{task} failed: {e}")
         logger.error(traceback.format_exc())
-        raise e
+        raise
 
 
-def timestamp_path(path: Union[str, Path]) -> str:
-    formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+def timestamp_path(path: str | Path) -> str:
+    formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")  # noqa: DTZ005
     return str(path).replace(".json", f"_{formatted}.json")
 
 
@@ -255,15 +250,15 @@ def timestamp_path(path: Union[str, Path]) -> str:
 class Que:
     def __init__(
         self,
-        logger: Logger = _get_basic_logger(),
+        logger: Logger = QUE_LOGGER,
         runs_path: str | Path = RUN_PATH,
         auto_save: bool = False,
     ) -> None:
         self.runs_path: Path = Path(runs_path)
-        self.old_runs: List[CompExpInfo] = []
-        self.cur_run: List[ExpInfo] = []
-        self.to_run: List[ExpInfo] = []
-        self.fail_runs: List[FailedExp] = []
+        self.old_runs: list[CompExpInfo] = []
+        self.cur_run: list[ExpInfo] = []
+        self.to_run: list[ExpInfo] = []
+        self.fail_runs: list[FailedExp] = []
         self.auto_save: bool = auto_save
         self.logger = logger
         self.load_state()
@@ -315,7 +310,7 @@ class Que:
         return isinstance(run, CompExpInfo)
 
     @classmethod
-    def _run_sum(cls, run: GenExp, ndigits: Optional[int] = None) -> Sumarised:
+    def _run_sum(cls, run: GenExp, ndigits: int | None = None) -> Sumarised:
         """Extract a compact summary from a run model. Optionally round to ndigits"""
         run_id = run.wandb.run_id if isinstance(run, ExpInfo) and run.wandb else None
 
@@ -381,8 +376,8 @@ class Que:
         Returns:
             ExpInfo: A fresh run without any run-specific state.
         """
-        from utils import enum_dir
         from configs import ZFILL
+        from utils import enum_dir
 
         new_save_path = (
             str(enum_dir(run.admin.save_path, decimals=ZFILL))
@@ -403,8 +398,8 @@ class Que:
         )
 
     @classmethod
-    def _get_print_stats(cls, runs: List[Sumarised]) -> Dict[str, int]:
-        stats: Dict[str, int] = {
+    def _get_print_stats(cls, runs: list[Sumarised]) -> dict[str, int]:
+        stats: dict[str, int] = {
             "max_model_len": 0,
             "max_exp_no_len": 0,
             "max_run_id_len": 0,
@@ -433,11 +428,11 @@ class Que:
     # Persistence
     # -----------------------------------------------------------------------
 
-    def load_state(self, in_path: Optional[Union[str, Path]] = None):
+    def load_state(self, in_path: str | Path | None = None):
         """Load the queue state from a JSON file. If the file does not exist, start with an empty queue.
 
         Args:
-            in_path (Optional[Union[str, Path]], optional): The path to the JSON file containing the queue state. Defaults to None.
+            in_path (str | Path | None, optional): The path to the JSON file containing the queue state. Defaults to None.
         """
         if in_path is None:
             in_path = self.runs_path
@@ -470,14 +465,14 @@ class Que:
 
     def save_state(
         self,
-        out_path: Optional[Union[str, Path]] = None,
+        out_path: str | Path | None = None,
         timestamp: bool = False,
         archive: bool = True,
     ):
         """Save the state of the Que to a json file
 
         Args:
-            out_path (Optional[Union[str, Path]], optional): The output path. Defaults to None.
+            out_path (str | Path | None, optional): The output path. Defaults to None.
             timestamp (bool, optional): Whether to include a timestamp in the output path. Defaults to False.
             archive (bool, optional): Whether to archive the output file. Defaults to True.
         """
@@ -533,10 +528,10 @@ class Que:
         try:
             self.set_cur_run(next_run)  # type: ignore[arg-type]
             self.logger.info(f"Stashed new run: {sum_str}")
-        except QueBusy as qb:
+        except QueBusy:
             self.logger.error(f"Failed to stash new run: {sum_str}")
             self._set_run(TO_RUN, 0, next_run)
-            raise qb
+            raise
         return sum_str
 
     def store_fin_run(self):
@@ -561,8 +556,8 @@ class Que:
 
     @classmethod
     def _set_inplace(
-        cls, d: Dict[Any, Any], k: Any, ks: List[Any], val: Any
-    ) -> Dict[Any, Any]:
+        cls, d: dict[Any, Any], k: Any, ks: list[Any], val: Any
+    ) -> dict[Any, Any]:
         """Recursively set a value in a nested plain dict."""
         if hasattr(d, "__setitem__"):
             if len(ks) == 0:
@@ -580,12 +575,12 @@ class Que:
         return d
 
     @classmethod
-    def set_nested(cls, d: Dict[Any, Any], ks: List[Any], val: Any) -> Dict[Any, Any]:
+    def set_nested(cls, d: dict[Any, Any], ks: list[Any], val: Any) -> dict[Any, Any]:
         """Set a value at an arbitrary depth in a plain dict using a key path."""
         return cls._set_inplace(d, ks[0], ks[1:], val)
 
     @classmethod
-    def get_nested(cls, d: Any, ks: List[Any]) -> Any:
+    def get_nested(cls, d: Any, ks: list[Any]) -> Any:
         """Read a value at arbitrary depth from a plain dict or pydantic model."""
         for k in ks:
             if isinstance(d, BaseModel):
@@ -599,7 +594,7 @@ class Que:
         return next_run.admin.config_path
 
     @classmethod
-    def get_nested_or_none(cls, d: Any, ks: List[Any]) -> Any:
+    def get_nested_or_none(cls, d: Any, ks: list[Any]) -> Any:
         """Attempt to read a value at arbitrary depth from a plain dict or pydantic model. Return None if any key is not found."""
         try:
             return cls.get_nested(d, ks)
@@ -610,10 +605,10 @@ class Que:
     def list_manipulation(
         cls,
         runs: Sequence[GenExp],
-        sort_keys: list[list[str]] = [],
+        sort_keys: list[list[str]] | None = None,
         reverse: bool = False,
-        filter_keys: list[list[str]] = [],
-        criterions: list[Callable[[Any], bool]] = [],
+        filter_keys: list[list[str]] | None = None,
+        criterions: list[Callable[[Any], bool]] | None = None,
     ) -> Sequence[GenExp]:
         """Apply common list manipulation operations
 
@@ -630,6 +625,12 @@ class Que:
         Returns:
             list[GenExp]: _description_
         """
+        if criterions is None:
+            criterions = []
+        if filter_keys is None:
+            filter_keys = []
+        if sort_keys is None:
+            sort_keys = []
         if len(filter_keys) != len(criterions):
             raise ValueError("filter_key sets and criterions must be equal in length")
         elif len(filter_keys) > 0:
@@ -656,7 +657,7 @@ class Que:
 
         return runs
 
-    def get_val(self, run: GenExp, keys: List[str]) -> Any:
+    def get_val(self, run: GenExp, keys: list[str]) -> Any:
         with log_and_raise(self.logger, "get_nested"):
             return self.get_nested(run, keys)
 
@@ -671,7 +672,7 @@ class Que:
         config: RunInfo,
         wandb_dict: WandbInfo,
         loc: Literal["to_run", "cur_run"] = TO_RUN,
-        ndigits: Optional[int] = 2
+        ndigits: int | None = 2,
     ) -> None:
         """Add a new run the the Que"""
 
@@ -718,8 +719,8 @@ class Que:
         add_duplicates: bool = False,
     ) -> None:
         """Add a fully-tested completed run directly into old_runs."""
+        from configs import ZFILL, get_model_exp_dir, get_model_results_dir, load_config
         from testing import full_test, load_comp_res
-        from configs import get_model_exp_dir, get_model_results_dir, ZFILL, load_config
 
         with log_and_raise(self.logger, "add"):
             config: RunInfo = load_config(arg_dict)
@@ -822,7 +823,7 @@ class Que:
         o_loc: QueLocation,
         n_loc: QueLocation,
         oi_idx: int,
-        of_idx: Optional[int] = None,
+        of_idx: int | None = None,
     ) -> None:
         with log_and_raise(self.logger, "move"):
             if of_idx is None:
@@ -840,7 +841,7 @@ class Que:
         self,
         loc: QueLocation,
         idx: int,
-        keys: List[str],
+        keys: list[str],
         value: Any,
         do_eval: bool = False,
     ) -> None:
@@ -870,7 +871,7 @@ class Que:
 
     # Indirect indexing
 
-    def run_str(self, loc: QueLocation, idx: int, ndigits: Optional[int] = None) -> str:
+    def run_str(self, loc: QueLocation, idx: int, ndigits: int | None = None) -> str:
         return self._run_to_str(self._run_sum(self.peak_run(loc, idx), ndigits))
 
     def list_runs(
@@ -881,7 +882,7 @@ class Que:
     def select_runs(
         self,
         loc: QueLocation,
-        indexes: List[int],
+        indexes: list[int],
         **kwargs: Unpack[ListManipulationKwargs],
     ) -> ExpQue:
         """Select runs by index after applying list manipulations."""
@@ -900,16 +901,19 @@ class Que:
                 self._set_run(loc, idx + index, run)
 
     @classmethod
-    def summarise(cls, runs: ExpQue, ndigits: Optional[int] = None) -> List[Sumarised]:
+    def summarise(cls, runs: ExpQue, ndigits: int | None = None) -> list[Sumarised]:
         return [cls._run_sum(run, ndigits) for run in runs]  # type: ignore[arg-type]
 
     def summarise_runs(
-        self, loc: QueLocation, ndigits: Optional[int] = None, **kwargs: Unpack[ListManipulationKwargs]
-    ) -> List[Sumarised]:
+        self,
+        loc: QueLocation,
+        ndigits: int | None = None,
+        **kwargs: Unpack[ListManipulationKwargs],
+    ) -> list[Sumarised]:
         return self.summarise(self.list_runs(loc, **kwargs), ndigits=ndigits)
 
     @classmethod
-    def print_runs(cls, runs: List[Sumarised], exc: Optional[List[str]] = None) -> None:
+    def print_runs(cls, runs: list[Sumarised], exc: list[str] | None = None) -> None:
         """Pretty-print an already-retrieved summary list (e.g. from a proxy)."""
         if len(runs) == 0:
             print("  No runs available")
@@ -986,7 +990,7 @@ class Que:
     def disp_runs(
         self,
         loc: QueLocation,
-        exc: Optional[List[str]] = None,
+        exc: list[str] | None = None,
         **kwargs: Unpack[ListManipulationKwargs],
     ) -> None:
         self.print_runs(self.summarise_runs(loc, **kwargs), exc=exc)
@@ -999,7 +1003,7 @@ class Que:
     def copy_runs(
         self,
         o_loc: QueLocation,
-        o_indexes: List[int],
+        o_indexes: list[int],
         n_loc: QueLocation,
         n_idx: int = 0,
         clean_slate: bool = False,
@@ -1016,8 +1020,8 @@ class Que:
     # Meta features
 
     def find_runs(
-        self, to_search: ExpQue, keys: List[str], criterion: Callable[[Any], bool]
-    ) -> Tuple[List[int], List[GenExp]]:
+        self, to_search: ExpQue, keys: list[str], criterion: Callable[[Any], bool]
+    ) -> tuple[list[int], list[GenExp]]:
         idxs, runs = [], []
         for i, run in enumerate(to_search):
             if criterion(self.get_val(run, keys)):
@@ -1028,19 +1032,19 @@ class Que:
     def find_loc_runs(
         self,
         loc: QueLocation,
-        key_set: List[List[str]],
-        criterions: List[Callable[[Any], bool]],
-    ) -> Tuple[List[int], List[GenExp]]:
+        key_set: list[list[str]],
+        criterions: list[Callable[[Any], bool]],
+    ) -> tuple[list[int], list[GenExp]]:
         assert len(key_set) == len(criterions), (
             f"key_set length {len(key_set)} != criterions length {len(criterions)}"
         )
-        runs: List[GenExp] = list(self._fetch_state(loc))  # type: ignore[arg-type]
-        idxs: List[int] = []
+        runs: list[GenExp] = list(self._fetch_state(loc))  # type: ignore[arg-type]
+        idxs: list[int] = []
         for k_lst, crit in zip(key_set, criterions):
             idxs, runs = self.find_runs(runs, k_lst, crit)  # type: ignore[arg-type]
         return idxs, runs
 
-    def update_runs(self, key_set: List[str], transform: Callable[[Any], Any]) -> None:
+    def update_runs(self, key_set: list[str], transform: Callable[[Any], Any]) -> None:
         """Apply a transform to a nested field across every run in every location."""
         with log_and_raise(self.logger, "que.update_runs"):
             for run_list, model_cls in [
@@ -1068,10 +1072,10 @@ Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 # Maintained TypedDict for dictproxy in basemanager
 class WorkerStateDict(TypedDict):
     task: Worker_tasks
-    current_run_id: Optional[str]
-    working_pid: Optional[int]
-    exception: Optional[str]
-    # sweep_id: Optional[str]
+    current_run_id: str | None
+    working_pid: int | None
+    exception: str | None
+    # sweep_id: str | None
 
 
 class SweepInfo(TypedDict):
@@ -1081,22 +1085,23 @@ class SweepInfo(TypedDict):
     model: str
     dataset: str
     split: AVAIL_SPLITS
+    base_config: str
 
 
 class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
-    supervisor_pid: Optional[int]
-    sweep: Optional[SweepInfo]
+    supervisor_pid: int | None
+    sweep: SweepInfo | None
 
 
 def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
         task: Worker_tasks = "inactive"
-        current_run_id: Optional[str] = None
-        working_pid: Optional[int] = None
-        exception: Optional[str] = None
-        sweep_id: Optional[str] = None
+        current_run_id: str | None = None
+        working_pid: int | None = None
+        exception: str | None = None
+        sweep_id: str | None = None
 
     d = WorkerState.model_validate(obj)
     return {
@@ -1112,8 +1117,8 @@ def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):
         awake: bool = False
         stop_on_fail: bool = True
-        supervisor_pid: Optional[int] = None
-        sweep: Optional[SweepInfo] = None
+        supervisor_pid: int | None = None
+        sweep: SweepInfo | None = None
 
     d = DaemonState.model_validate(obj)
     return {
@@ -1125,12 +1130,12 @@ def daemon_state_validate(obj: Any) -> DaemonStateDict:
 
 
 class ServerState(BaseModel):
-    server_pid: Optional[int] = None
+    server_pid: int | None = None
     daemon_state: DaemonStateDict = daemon_state_validate({})
     worker_state: WorkerStateDict = worker_state_validate({})
 
 
-def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> ServerState:
+def read_server_state(state_path: Path | str = SERVER_STATE_PATH) -> ServerState:
     """Load and validate ServerState from JSON.  Raises ValidationError if invalid."""
     with open(state_path, "r") as f:
         data = json.load(f)
@@ -1138,7 +1143,7 @@ def read_server_state(state_path: Union[Path, str] = SERVER_STATE_PATH) -> Serve
     return ServerState.model_validate(data)
 
 
-Process_states: TypeAlias = Union[WorkerStateDict, DaemonStateDict, ServerState]
+Process_states: TypeAlias = WorkerStateDict | DaemonStateDict | ServerState
 
 
 # ---------------------------------------------------------------------------
@@ -1148,10 +1153,10 @@ Process_states: TypeAlias = Union[WorkerStateDict, DaemonStateDict, ServerState]
 
 class DaemonProtocol(Protocol):
     def start_supervisor(self) -> None: ...
-    def set_sweep(self, sweep: Optional[SweepInfo]) -> None: ...
+    def set_sweep(self, sweep: SweepInfo | None) -> None: ...
     def stop_supervisor(
         self,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         hard: bool = False,
         stop_worker: bool = False,
     ) -> None: ...
@@ -1168,9 +1173,9 @@ class ServerContextProtocol(Protocol):
     def get_state(self) -> ServerState: ...
     def set_state(
         self,
-        server: Optional[ServerState],
-        daemon: Optional[DaemonStateDict],
-        worker: Optional[WorkerStateDict],
+        server: ServerState | None,
+        daemon: DaemonStateDict | None,
+        worker: WorkerStateDict | None,
     ) -> None: ...
 
 

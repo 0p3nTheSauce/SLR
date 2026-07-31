@@ -136,6 +136,9 @@ SWEEP_KEY_MAP = {
     "t0":                      "scheduler.t0",
     "tmult":                   "scheduler.tmult",
     "eta_min":                 "scheduler.eta_min",
+    "start_factor":            "scheduler.warm_up.start_factor",
+    "end_factor":              "scheduler.warm_up.end_factor",
+    "warmup_epochs":           "scheduler.warm_upwarmup_epcochs",
 
     # training
     "batch_size":              "training.batch_size",

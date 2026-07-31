@@ -1,23 +1,24 @@
-from typing import Optional, Literal
 import logging
+import os
+import random
+import signal
+import string
+import time
+from logging import Logger
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
-from logging import Logger
-import os
-import signal
-import time
-import random
-import string
+from typing import Literal
 
 # locals
 from src.que.core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
-    connect_manager,
     DaemonStateDict,
     SweepInfo,
+    connect_manager,
 )
 from src.que.worker import Worker
+
 
 def generate_run_id(length: int = 8) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
@@ -36,8 +37,8 @@ class Daemon:
         self.logger = logger
         self.stop_worker_event = stop_worker_event
         self.stop_daemon_event = stop_daemon_event
-        self.worker_process: Optional[Process] = None
-        self.supervisor_process: Optional[Process] = None
+        self.worker_process: Process | None = None
+        self.supervisor_process: Process | None = None
         self.logger.info("Daemon initialized")
         self.set_state(state)
 
@@ -70,7 +71,7 @@ class Daemon:
             # add the sweep id from saved file
             self.start_supervisor(recover_run=True)
 
-    def set_sweep(self, sweep: Optional[SweepInfo]) -> None:
+    def set_sweep(self, sweep: SweepInfo | None) -> None:
         self.state["sweep"] = sweep
 
     def monitor_worker(self) -> bool:
@@ -149,7 +150,7 @@ class Daemon:
 
                 self.worker.cleanup()
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(f"Supervisor error: {e}")
                 cnt += 1
                 if cnt > retries:
@@ -195,7 +196,7 @@ class Daemon:
             return True
         except PermissionError:
             self.logger.error(f"No permission to send signal {sig} to process {pid}.")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error(f"Failed to send signal {sig} to process {pid}: {e}")
         return False
 
@@ -209,7 +210,7 @@ class Daemon:
             return True  # process exists but we don't have permission to signal it
 
     def _try_join(
-        self, process: Optional[Process], timeout: Optional[float] = None
+        self, process: Process | None, timeout: float | None = None
     ) -> bool:
         """Attempt to join a process and return whether it joined"""
         if process is not None:
@@ -236,10 +237,7 @@ class Daemon:
         else:
             return True
 
-        if self.pid_is_alive(pid) and not self._kill(pid, sig=signal.SIGKILL):
-            return False
-        else:
-            return True
+        return not (self.pid_is_alive(pid) and not self._kill(pid, sig=signal.SIGKILL))
 
     def _reset_process_state(self, worker: bool = False, supervisor: bool = False):
         if worker:
@@ -256,8 +254,8 @@ class Daemon:
     def _hard_stop(
         self,
         name: Literal["worker", "daemon"],
-        pid: Optional[int],
-        proc: Optional[Process],
+        pid: int | None,
+        proc: Process | None,
     ):
         self.logger.info(f"Killing {name}...")
 
@@ -280,7 +278,7 @@ class Daemon:
     def stop_proc(
         self,
         name: Literal["worker", "daemon"],
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         hard: bool = False,
     ) -> None:
         """Gracefully stop a process"""
@@ -323,7 +321,7 @@ class Daemon:
 
     def stop_supervisor(
         self,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         hard: bool = False,
         stop_worker: bool = False,
     ) -> None:

@@ -134,6 +134,17 @@ def parse_criterion(expr: str) -> Callable[[Any], bool]:
         raise TypeError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
 
+# --------------------------------------------------------------------------
+# sweep creation
+# --------------------------------------------------------------------------
+def create_sweep(sweep_path: Path, project: str, entity: str):
+    import yaml
+
+    import wandb
+    with open(sweep_path) as f:
+        sweep_config = yaml.safe_load(f)
+
+    return wandb.sweep(sweep_config, project=project, entity=entity)
 
 # --------------------------------------------------------------------------
 # json serialisation
@@ -816,8 +827,13 @@ class QueShell(cmdLib.Cmd):
 
     # Daemon
 
+    
+
     def do_daemon(self, arg):
         """Interact with the worker"""
+        from src.run_types import PROJECT_BASE
+
+
         with self.console.status("[bold green]Importing...", spinner="dots"):
             parsed_args = self._parse_args_or_cancel("daemon", arg)
             if parsed_args is None:
@@ -838,6 +854,12 @@ class QueShell(cmdLib.Cmd):
                     )
             elif parsed_args.command == "set_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
+
+                    if parsed_args.project is None:
+                        parsed_args.project = f"{PROJECT_BASE}-{parsed_args.split[3:]}"
+                    if parsed_args.sweep_id is None:
+                        parsed_args.sweep_id = create_sweep(parsed_args.sweep_path, parsed_args.project, parsed_args.entity)
+
                     self.daemon.set_sweep(
                         SweepInfo(
                             sweep_id=parsed_args.sweep_id,
@@ -846,6 +868,7 @@ class QueShell(cmdLib.Cmd):
                             model=parsed_args.model,
                             dataset=parsed_args.dataset,
                             split=parsed_args.split,
+                            base_config=parsed_args.base_config
                         )
                     )
             elif parsed_args.command == "clear_sweep":
@@ -1481,7 +1504,9 @@ class QueShell(cmdLib.Cmd):
     # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
+        from configs import PROJECT_BASE
         from models import avail_models
+        
 
         parser = argparse.ArgumentParser(
             description="Interact with the worker process", prog="daemon"
@@ -1519,17 +1544,31 @@ class QueShell(cmdLib.Cmd):
         set_sweep_parser = subparsers.add_parser(
             "set_sweep", help="Set daemon sweep parameters"
         )
-        set_sweep_parser.add_argument("project", type=str, help="Sweep project")
-        set_sweep_parser.add_argument("sweep_id", type=str, help="Sweep id")
         set_sweep_parser.add_argument(
-            "model",
-            type=str,
-            choices=avail_models(),
-            help="Model name from one of the implemented model",
-        )
+                    "model",
+                    type=str,
+                    choices=avail_models(),
+                    help="Model name from one of the implemented model",
+                )
         set_sweep_parser.add_argument(
             "split", type=str, choices=get_avail_splits(), help="The class split"
         )
+
+        set_sweep_parser.add_argument("base_config", type=Path, help="Path to a base_config.py defining BASE_CONFIG")
+
+        set_sweep_init_group = set_sweep_parser.add_mutually_exclusive_group(required=True)
+
+        set_sweep_init_group.add_argument("--sweep_id","-si", type=str, help="Sweep id. (Add already initialised run)")
+        set_sweep_init_group.add_argument("--sweep_path","-sp", type=Path, help="Sweep.yaml cofig path. ((initialise and add run))")
+
+        set_sweep_parser.add_argument(
+            "-p",
+            "--project",
+            type=str,
+            help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)",
+        )
+        
+        
         set_sweep_parser.add_argument(
             "-ds",
             "--dataset",
