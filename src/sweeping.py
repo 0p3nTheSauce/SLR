@@ -1,9 +1,20 @@
-"""Helpers for running wandb sweep trials in-process under wandb.agent(function=...).
-
-There is no `program`/`command` entrypoint anymore -- wandb.agent calls a Python
-function directly (see Worker._sweep_train), so this module builds a RunInfo
-from an in-memory config skeleton plus this trial's sweep-selected
-hyperparameters, rather than merging onto a base_config.toml file.
+"""Helpers for running wandb sweep trials, plus a standalone CLI entrypoint.
+ 
+This module serves two roles:
+ 
+1. A library of commonly-used pieces (build_base_config, SWEEP_KEY_MAP,
+   apply_sweep_overrides, create_sweep_run, ...) called in-process by the Que
+   system: Worker._sweep_train hands these to wandb.agent(function=...), so a
+   trial's RunInfo is built from an in-memory config skeleton plus that
+   trial's sweep-selected hyperparameters, rather than merging onto a
+   base_config.toml file on disk.
+ 
+2. A standalone script (see `main`/`get_sweep_parser` below) that can itself
+   be the target of a sweep yaml's `program`/`command` field, so the same
+   sweep can be launched the plain way -- `wandb agent <entity>/<project>/
+   <sweep_id>` -- for quick testing outside the Daemon/Worker stack. Keep
+   `main()` a valid, self-sufficient entrypoint: the `command` block in any
+   sweep yaml pointing at this file depends on it.
 """
 
 from __future__ import annotations
@@ -24,9 +35,6 @@ class SweepConfigError(ValueError):
     """Raised for any sweep-config problem that should fail loudly and early:
     a SWEEP_KEY_MAP entry that doesn't resolve against the skeleton, or a
     skeleton leaf that never got overridden by a sweep value."""
-
-
-
 
 
 BASE_CONFIG_ATTR = "base_config"

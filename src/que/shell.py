@@ -1,4 +1,5 @@
 import argparse
+import ast
 import atexit
 import cmd as cmdLib
 import getpass
@@ -73,10 +74,62 @@ SAFE_GLOBALS = {
 }
 
 
-def parse_criterion(expr: str) -> Callable[[Any], bool]:
-    """Evaluate a lambda string in a restricted namespace."""
+def _join_criterion_tokens(tokens: list[str]) -> str:
+    """Re-join one --criterion group's shell-tokenized words into a single
+    parseable expression string, e.g. ['x', '==', 'S3D'] -> 'x == S3D'.
 
-    result = eval(f"lambda x: {expr}", SAFE_GLOBALS)
+    A token only contains an internal space if the shell kept a quoted
+    multi-word value together on purpose (e.g. -c x == "video model") -- put
+    the quotes back for those so ast.parse treats it as one string rather
+    than two barewords sitting next to each other with no operator.
+    """
+    return " ".join(f'"{t}"' if " " in t else t for t in tokens)
+
+
+def _collect_bound_names(tree: ast.AST) -> set[str]:
+    """Names that must stay real names, not become string literals: the
+    criterion arg (`x`), SAFE_GLOBALS names, and anything bound within the
+    expression itself (comprehension variables, nested lambda args)."""
+    bound = {"x", *(k for k in SAFE_GLOBALS if k != "__builtins__")}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            bound.add(node.id)
+        elif isinstance(node, ast.Lambda):
+            bound.update(a.arg for a in node.args.args)
+    return bound
+
+
+class _BarewordStringifier(ast.NodeTransformer):
+    """Turn a bare Load-context name like `S3D` in `x == S3D` into the string
+    literal `"S3D"`, so criteria don't need shell-quoting to compare against
+    strings. Leaves `x`, SAFE_GLOBALS names, and anything bound inside the
+    expression (e.g. a generator variable) untouched."""
+
+    def __init__(self, bound_names: set[str]):
+        self._bound = bound_names
+
+    def visit_Name(self, node: ast.Name) -> ast.expr:
+        if not isinstance(node.ctx, ast.Load) or node.id in self._bound:
+            return node
+        return ast.copy_location(ast.Constant(value=node.id), node)
+
+
+def parse_criterion(expr: str) -> Callable[[Any], bool]:
+    """Evaluate a criterion expression string in a restricted namespace.
+
+    `expr` is the body of `lambda x: <expr>`, already joined from a
+    --criterion group's tokens (see _join_criterion_tokens). Bare unquoted
+    words that aren't `x`, a SAFE_GLOBALS name, or bound within `expr` itself
+    are auto-promoted to string literals, so `-c x == S3D` behaves the same
+    as `-c x == "S3D"` -- quoting a value is optional, not required.
+    """
+    tree = ast.parse(expr, mode="eval")
+    bound_names = _collect_bound_names(tree)
+    tree = _BarewordStringifier(bound_names).visit(tree)
+    ast.fix_missing_locations(tree)
+    stringified_expr = ast.unparse(tree)
+
+    result = eval(f"lambda x: {stringified_expr}", SAFE_GLOBALS)
     if not callable(result):
         raise TypeError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
@@ -215,7 +268,7 @@ class QueShell(cmdLib.Cmd):
             try:
                 self._reconnect_proxies()
                 self.console.print("[bold green][OK][/bold green] Reconnected!\n")
-            except Exception as reconnect_error:
+            except Exception as reconnect_error:  # noqa: BLE001
                 self.console.print(
                     f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}"
                 )
@@ -408,7 +461,7 @@ class QueShell(cmdLib.Cmd):
             parsed_args = parser.parse_args(args)
         except (SystemExit, ValueError):
             self.console.print("[yellow]add cancelled[/yellow]")
-            return None
+            return
 
         parsed_args.no_enum_chck = True  # bypass enum check
         # print(parsed_args.checkpoint_num)
@@ -454,14 +507,16 @@ class QueShell(cmdLib.Cmd):
         parsed_args = self._parse_args_or_cancel("recover", arg)
         if parsed_args is None:
             return
-        with self.unwrap_exception("Run recovered successfully"):
-            with self.console.status("[bold yellow]Recovering run...", spinner="dots"):
-                self.que.recover_run(
-                    from_loc=parsed_args.o_location,
-                    to_loc=parsed_args.n_location,
-                    index=parsed_args.index,
-                    clean_slate=parsed_args.clean_slate,
-                )
+        with (
+            self.unwrap_exception("Run recovered successfully"),
+            self.console.status("[bold yellow]Recovering run...", spinner="dots"),
+        ):
+            self.que.recover_run(
+                from_loc=parsed_args.o_location,
+                to_loc=parsed_args.n_location,
+                index=parsed_args.index,
+                clean_slate=parsed_args.clean_slate,
+            )
 
     def do_clear(self, arg):
         """Clear runs with confirmation"""
@@ -566,7 +621,8 @@ class QueShell(cmdLib.Cmd):
                         reverse=parsed_args.reverse,
                         filter_keys=parsed_args.filter_keys,
                         criterions=[
-                            parse_criterion(crit) for crit in parsed_args.criterion
+                            parse_criterion(_join_criterion_tokens(crit))
+                            for crit in parsed_args.criterion
                         ],
                     )
                 )
@@ -598,10 +654,10 @@ class QueShell(cmdLib.Cmd):
                 header_style="bold magenta",
             )
 
-            dict_runs = list(map(lambda x: x.model_dump(), runs))
+            dict_runs = [x.model_dump() for x in runs]
 
             table.add_column("Index", style="cyan", justify="right", width=8)
-            for raw_header in dict_runs[0].keys():
+            for raw_header in dict_runs[0]:
                 header = raw_header.replace("_", " ").capitalize()
                 table.add_column(header.capitalize(), style="white")
 
@@ -636,7 +692,8 @@ class QueShell(cmdLib.Cmd):
                     reverse=parsed_args.reverse,
                     filter_keys=parsed_args.filter_keys,
                     criterions=[
-                        parse_criterion(crit) for crit in parsed_args.criterion
+                        parse_criterion(_join_criterion_tokens(crit))
+                        for crit in parsed_args.criterion
                     ],
                 )
             )[parsed_args.index]
@@ -685,7 +742,10 @@ class QueShell(cmdLib.Cmd):
                 sort_keys=parsed_args.sort_keys,
                 reverse=parsed_args.reverse,
                 filter_keys=parsed_args.filter_keys,
-                criterions=[parse_criterion(crit) for crit in parsed_args.criterion],
+                criterions=[
+                    parse_criterion(_join_criterion_tokens(crit))
+                    for crit in parsed_args.criterion
+                ],
             )
 
             if parsed_args.clean_slate:
@@ -704,8 +764,11 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        with self.console.status("[bold green]Importing...", spinner="dots"), self.unwrap_exception(
-            "Config file updated successfully", "Failed to write config"
+        with (
+            self.console.status("[bold green]Importing...", spinner="dots"),
+            self.unwrap_exception(
+                "Config file updated successfully", "Failed to write config"
+            ),
         ):
             from src.que.runs_to_configs import update_config_file
 
@@ -718,7 +781,8 @@ class QueShell(cmdLib.Cmd):
                     reverse=parsed_args.reverse,
                     filter_keys=parsed_args.filter_keys,
                     criterions=[
-                        parse_criterion(crit) for crit in parsed_args.criterion
+                        parse_criterion(_join_criterion_tokens(crit))
+                        for crit in parsed_args.criterion
                     ],
                 )
             )[parsed_args.index]
@@ -942,10 +1006,10 @@ class QueShell(cmdLib.Cmd):
             else:
                 com = ["sudo", "journalctl", "-u", SYSTEMD_NAME, "-f"]
             try:
-                subprocess.run(com)
+                subprocess.run(com, check=False)
             except KeyboardInterrupt:
                 self.console.print("\n[cyan]Stopped streaming journalctl logs[/cyan]")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.console.print(f"[red]Error streaming journalctl logs: {e}[/red]")
             return
         else:
@@ -955,21 +1019,20 @@ class QueShell(cmdLib.Cmd):
             if Confirm.ask(f"[bold red]Clear all logs in {log_file}?[/bold red]"):
                 with self.unwrap_exception(
                     f"Cleared {log_file}", f"Failed to clear log file: {log_file}"
-                ):
-                    with open(log_file, "w") as f:
-                        f.truncate(0)
+                ), open(log_file, "w") as f:
+                    f.truncate(0)
                 return
             else:
                 self.console.print("[yellow]Action cancelled[/yellow].")
                 return
 
         try:
-            subprocess.run(["tail", "-f", "-n", str(parsed_args.top_n), log_file])
+            subprocess.run(["tail", "-f", "-n", str(parsed_args.top_n), log_file], check=False)
         except KeyboardInterrupt:
             self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
         except FileNotFoundError:
             self.console.print(f"[red]Error: Log file not found at {log_file}[/red]")
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.console.print(f"[red]Error reading log file: {e}[/red]")
 
     # Helper functions for parsing
@@ -1070,10 +1133,19 @@ class QueShell(cmdLib.Cmd):
     def _add_criterion_args(
         self,
         parser: argparse.ArgumentParser,
-        help: str = "criterion to filter runs by, complete the boolean expression 'lambda x: ', e.g. --criterion 'x > 0.8' (requires matching --filter_keys / -f to specify which keys to filter by)",
+        help: str = "criterion to filter runs by, completing the boolean expression 'lambda x: ', e.g. -c x == S3D or -c x > 0.8 (requires matching --filter_keys / -f to specify which keys to filter by; unquoted words like S3D are treated as strings automatically)",
     ) -> argparse.ArgumentParser:
-        """--criterion / -c: criterion to filter runs by, complete the boolean expression 'lambda x: ', e.g. --criterion 'x > 0.8' (requires matching --filter_keys / -f to specify which keys to filter by)"""
-        parser.add_argument("--criterion", "-c", action="append", help=help, default=[])
+        """--criterion / -c: criterion to filter runs by, completing the boolean
+        expression 'lambda x: ', e.g. -c x == S3D or -c x > 0.8 (requires
+        matching --filter_keys / -f to specify which keys to filter by).
+        nargs='+' so the expression can be typed as bare space-separated
+        tokens without shell-quoting -- see parse_criterion/_join_criterion_tokens
+        for how those tokens get re-joined and unquoted values get treated as
+        strings.
+        """
+        parser.add_argument(
+            "--criterion", "-c", nargs="+", action="append", help=help, default=[]
+        )
         return parser
 
     def _add_list_manipulation_args(
@@ -1152,7 +1224,7 @@ class QueShell(cmdLib.Cmd):
         self, parser: argparse.ArgumentParser, default=None
     ) -> argparse.ArgumentParser:
         """--o_location / -ol: origin location"""
-        kwargs = dict(type=str, choices=self.avail_locs, help="Origin location")
+        kwargs = {"type": str, "choices": self.avail_locs, "help": "Origin location"}
         if default is not None:
             kwargs["default"] = default
         parser.add_argument("--o_location", "-ol", **kwargs)  # type: ignore
@@ -1162,7 +1234,7 @@ class QueShell(cmdLib.Cmd):
         self, parser: argparse.ArgumentParser, default=None
     ) -> argparse.ArgumentParser:
         """--n_location / -nl: destination location"""
-        kwargs = dict(type=str, choices=self.avail_locs, help="Destination location")
+        kwargs = {"type": str, "choices": self.avail_locs, "help": "Destination location"}
         if default is not None:
             kwargs["default"] = default
         parser.add_argument("--n_location", "-nl", **kwargs)  # type: ignore
@@ -1406,8 +1478,6 @@ class QueShell(cmdLib.Cmd):
         self._add_list_manipulation_args(parser)
         return parser
 
-
-
     # Other
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
@@ -1545,7 +1615,7 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_wandb_parser(self) -> argparse.ArgumentParser:
-        from configs import get_avail_splits, ENTITY, PROJECT_BASE
+        from configs import ENTITY, PROJECT_BASE, get_avail_splits
 
         likely_projects = [
             f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()

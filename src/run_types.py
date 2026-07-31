@@ -51,7 +51,7 @@ SEED = 42
 ### for model normalisation
 
 
-class Normdict(BaseModel):
+class NormDict(BaseModel):
     mean: tuple[float, float, float]
     std: tuple[float, float, float]
 
@@ -252,14 +252,14 @@ class AugInfo(BaseModel):
 
     Attributes:
         normalise (bool): Flag to fetch norm values during config parsing. Default False.
-        norm_dict (Optional[Normdict]): Supplied Normalisation values. Default None.
+        norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
         temporal_aug (list[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
         spatial_aug (list[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
         strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
     """
 
     normalise: bool = False
-    norm_dict: Normdict | None = None
+    norm_dict: NormDict | None = None
     temporal_aug: list[TemporalAugs] = []
     spatial_aug: list[SpatialAugs] = []
     strict_size: bool = True
