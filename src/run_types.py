@@ -1,30 +1,28 @@
 from __future__ import annotations
+
+from pathlib import Path
 from typing import (
-    TypeGuard,
-    Literal,
-    Optional,
-    Union,
-    List,
-    Tuple,
     Annotated,
     Any,
-    Dict,
+    Literal,
     TypeAlias,
+    TypeGuard,
     TypeVar,
-    Type,
-    get_origin,
+    Union,
     get_args,
+    get_origin,
 )
+
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
-    model_validator,
     computed_field,
     field_validator,
-    ConfigDict,
+    model_validator,
 )
 from pydantic_core import PydanticUndefined
-from pathlib import Path
+
 # constants
 #wandb
 ENTITY = "ljgoodall2001-rhodes-university"
@@ -53,16 +51,16 @@ SEED = 42
 ### for model normalisation
 
 
-class NormDict(BaseModel):
-    mean: Tuple[float, float, float]
-    std: Tuple[float, float, float]
+class Normdict(BaseModel):
+    mean: tuple[float, float, float]
+    std: tuple[float, float, float]
 
 
 ####################### Data loading and augmentation #############################
 
 AVAIL_SETS : TypeAlias = Literal["train", "val", "test"]
 ORIGINAL_SPLITS : TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
-AVAIL_SPLITS : TypeAlias = Union[Literal["asl100_bottom", "asl100_worst"], ORIGINAL_SPLITS]
+AVAIL_SPLITS : TypeAlias = Literal["asl100_bottom", "asl100_worst"] | ORIGINAL_SPLITS
 
 ### Samplers
 
@@ -127,7 +125,7 @@ class SpeedSampler(BaseSampler):
     speed_max: float = 1.2
 
     @model_validator(mode="after")
-    def check_speeds(self) -> "SpeedSampler":
+    def check_speeds(self) -> SpeedSampler:
         if self.speed_min > self.speed_max:
             raise ValueError("speed_min cannot be > speed_max")
         return self
@@ -137,17 +135,7 @@ def is_sampler_config(config: TemporalAugs) -> TypeGuard[SamplerConfig]:
     return config.type in SAMPLER_TYPES
 
 SamplerConfig = Annotated[
-    Union[
-        UniformSampler,
-        WobbledSampler,
-        SpeedSampler,
-        FocalNormalSampler,
-        FocalLaplaceSampler,
-        FocalBetaSampler,
-        ChunkedSampler,
-        PadFramesT,
-        OG_Sampler,
-    ],
+    UniformSampler | WobbledSampler | SpeedSampler | FocalNormalSampler | FocalLaplaceSampler | FocalBetaSampler | ChunkedSampler | PadFramesT | OG_Sampler,
     Field(discriminator="type"),
 ]
 
@@ -156,7 +144,7 @@ SamplerConfig = Annotated[
 
 class ShuffleT(BaseModel):
     type: Literal["shuffle"] = "shuffle"
-    num_frames: Optional[int] = None
+    num_frames: int | None = None
 
 
 class ReverseT(BaseModel):
@@ -164,14 +152,14 @@ class ReverseT(BaseModel):
     probability: float = 0.5
 
 
-TemporalTransforms = Annotated[Union[ShuffleT, ReverseT], Field(discriminator="type")]
+TemporalTransforms = Annotated[ShuffleT |  ReverseT, Field(discriminator="type")]
 
 TEMPORAL_TYPES = {"shuffle", "reverse"}
 def is_temporal_config(config: TemporalAugs) -> TypeGuard[TemporalTransforms]:
     return config.type in TEMPORAL_TYPES
 
 TemporalAugs = Annotated[
-    Union[TemporalTransforms, SamplerConfig], Field(discriminator="type")
+    TemporalTransforms | SamplerConfig, Field(discriminator="type")
 ]
 
 
@@ -201,7 +189,7 @@ class RandomResizedConfig(CropConfig):
 
 
 CropTransforms = Annotated[
-    Union[CentreCropConfig, RandomCropConfig, ScaleAndPadConfig, RandomResizedConfig],
+    CentreCropConfig | RandomCropConfig | ScaleAndPadConfig | RandomResizedConfig,
     Field(discriminator="type"),
 ]
 
@@ -244,14 +232,7 @@ class RandAugConfig(BaseModel):
 
 
 SpatialTransforms = Annotated[
-    Union[
-        AutoAugmentConfig,
-        RandAugConfig,
-        HorizontalFlipConfig,
-        RandomGrayscaleConfig,
-        GaussianBlurConfig
-        
-    ],
+    AutoAugmentConfig | RandAugConfig | HorizontalFlipConfig | RandomGrayscaleConfig | GaussianBlurConfig,
     Field(discriminator="type"),
 ]
 
@@ -261,7 +242,7 @@ def is_spatial_transform_config(config: SpatialAugs) -> TypeGuard[SpatialTransfo
     return config.type in SPATIAL_TYPES
 
 SpatialAugs = Annotated[
-    Union[CropTransforms, SpatialTransforms],
+    CropTransforms | SpatialTransforms,
     Field(discriminator="type"),
 ]
 
@@ -271,22 +252,22 @@ class AugInfo(BaseModel):
 
     Attributes:
         normalise (bool): Flag to fetch norm values during config parsing. Default False.
-        norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
-        temporal_aug (List[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
-        spatial_aug (List[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
+        norm_dict (Optional[Normdict]): Supplied Normalisation values. Default None.
+        temporal_aug (list[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
+        spatial_aug (list[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
         strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
     """
 
     normalise: bool = False
-    norm_dict: Optional[NormDict] = None
-    temporal_aug: List[TemporalAugs] = []
-    spatial_aug: List[SpatialAugs] = []
+    norm_dict: Normdict | None = None
+    temporal_aug: list[TemporalAugs] = []
+    spatial_aug: list[SpatialAugs] = []
     strict_size: bool = True
-    target_length: Optional[int] = None
-    frame_size: Optional[int] = None
+    target_length: int | None = None
+    frame_size: int | None = None
 
     @model_validator(mode="after")
-    def _validate_augs(self) -> "AugInfo":
+    def _validate_augs(self) -> AugInfo:
         if not self.strict_size:
             return self
 
@@ -307,14 +288,14 @@ class AugInfo(BaseModel):
 
 
 class DataInfo(BaseModel):
-    train_augs: Optional[AugInfo] = None
-    test_augs: Optional[AugInfo] = None
+    train_augs: AugInfo | None = None
+    test_augs: AugInfo | None = None
     strict_size: bool = True  # from config
-    target_length: Optional[int] = None
-    frame_size: Optional[int] = None
+    target_length: int | None = None
+    frame_size: int | None = None
 
     @model_validator(mode="after")
-    def check_frame_strat(self) -> "DataInfo":
+    def check_frame_strat(self) -> DataInfo:
         if not self.strict_size:
             return self
 
@@ -358,7 +339,7 @@ class EarlyStopperInfo(BaseModel):
     min_delta: float
 
     @model_validator(mode="after")
-    def _config_precheck(self) -> "EarlyStopperInfo":
+    def _config_precheck(self) -> EarlyStopperInfo:
         if self.patience <= 0:
             raise ValueError(
                 f"Patience must be a positive integer, got {self.patience}"
@@ -371,7 +352,7 @@ class EarlyStopperInfo(BaseModel):
 
 
 StopperConfig = Annotated[
-    Union[StopperInfo, EarlyStopperInfo],
+    StopperInfo | EarlyStopperInfo,
     Field(discriminator="type"),
 ]
     
@@ -385,7 +366,7 @@ class StopperState(BaseModel):
     patience: int
     min_delta: float
     curr_epoch: int
-    best_score: Optional[float] = None
+    best_score: float | None = None
     best_epoch: int
     counter: int
     stop: bool
@@ -407,7 +388,7 @@ class AdminInfo(MinInfo):
     exp_no: str
     recover: bool
     config_path: str
-    weight_path: Optional[str] = None
+    weight_path: str | None = None
 
 
 class TrainingInfo(BaseModel):
@@ -432,13 +413,13 @@ TRAIN_TYPE: TypeAlias = Literal["supervised", "unsupervised"]
 
 
 class SupervisedInfo(BaseModel):
-    drop_p: Optional[float] = None
+    drop_p: float | None = None
     type: Literal["supervised"] = "supervised"
 
 
 class MVirTedInfo(BaseModel):
     type: Literal["mvir_ted"] = "mvir_ted"
-    drop_p: Optional[float] = None
+    drop_p: float | None = None
     embed_dim: int = 512
     num_heads: int = 8
     num_layers: int = 4
@@ -466,7 +447,7 @@ def is_pretrain_config(config: ModelInfo) -> TypeGuard[MVirTedMaeInfo]:
     return config.type in PRETRAIN_TYPES
 
 ModelInfo = Annotated[
-    Union[SupervisedInfo, MVirTedInfo, MVirTedMaeInfo],
+    SupervisedInfo | MVirTedInfo | MVirTedMaeInfo,
     Field(discriminator="type"),
 ]
 
@@ -486,7 +467,7 @@ class WarmUpSched(BaseModel):
 
 
 class SchedBase(BaseModel):
-    warm_up: Optional[WarmUpSched] = None
+    warm_up: WarmUpSched | None = None
 
 
 class WarmOnly(SchedBase):
@@ -514,13 +495,13 @@ class ReduceLROnPlateau(SchedBase):
     threshold: float
     threshold_mode: Literal["rel", "abs"]
     cooldown: int
-    min_lr: Union[List[float], float]
+    min_lr: list[float] | float
     eps: float
 
 
 # Discriminated union: pydantic dispatches on the 'type' field automatically
 SchedInfo = Annotated[
-    Union[WarmOnly, CosAnealInfo, WarmRestartInfo, ReduceLROnPlateau],
+    WarmOnly | CosAnealInfo | WarmRestartInfo | ReduceLROnPlateau,
     Field(discriminator="type"),
 ]
 
@@ -528,9 +509,9 @@ SchedInfo = Annotated[
 class WandbInfo(BaseModel):
     entity: str
     project: str
-    tags: List[str] = []
-    run_id: Optional[str] = None
-    sweep_id: Optional[str] = None
+    tags: list[str] = []
+    run_id: str | None = None
+    sweep_id: str | None = None
 
 # Results
 
@@ -548,14 +529,14 @@ class BaseRes(BaseModel):
 
 
 class ShuffRes(BaseRes):
-    perm: List[int]
+    perm: list[int]
     shannon_entropy: float
 
 
 class ClassReport(BaseModel):
-    cls_report: Dict[str, Dict[str, float]]
-    all_targets: List[int]
-    all_preds: List[int]
+    cls_report: dict[str, dict[str, float]]
+    all_targets: list[int]
+    all_preds: list[int]
 
 class CompRes(BaseModel):
     check_name: str
@@ -593,7 +574,7 @@ class RunInfo(BaseModel):
     optimizer: OptimizerInfo
     model_params: ModelInfo = Field(default_factory=SupervisedInfo)
     data: DataInfo
-    scheduler: Optional[SchedInfo] = None
+    scheduler: SchedInfo | None = None
     stopping: StopperConfig
 
     @field_validator("model_params", mode="before")
@@ -604,7 +585,7 @@ class RunInfo(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _resolve_norms(self) -> "RunInfo":
+    def _resolve_norms(self) -> RunInfo:
         """Substitute norm_dict based on model name when norm=True."""
         from src.models import norm_vals
 
@@ -624,12 +605,12 @@ class CompExpInfo(ExpInfo):
 
 
 
-GenInfo: TypeAlias = Dict[str, Any]
+GenInfo: TypeAlias = dict[str, Any]
 
 
 class ResSet(BaseModel):
     spec: GenInfo
-    results: List[RunRes]
+    results: list[RunRes]
 
 
 class RunRes(BaseModel):
@@ -643,7 +624,7 @@ class FailedExp(ExpInfo):
 
 
 class SumarisedNew(BaseModel):
-    run_id: Optional[str] = None
+    run_id: str | None = None
     model: str
     exp_no: str
     dataset: str
@@ -652,35 +633,35 @@ class SumarisedNew(BaseModel):
 
 
 class Sumarised(SumarisedNew):
-    best_val_acc: Optional[float] = None
-    best_val_loss: Optional[float] = None
+    best_val_acc: float | None = None
+    best_val_loss: float | None = None
 
 
 class SummarisedRes(Sumarised):
-    test_top1_acc: Optional[float] = None
-    test_av_loss: Optional[float] = None
+    test_top1_acc: float | None = None
+    test_av_loss: float | None = None
 
 
 class SummarisedError(Sumarised):
     error: str
 
 
-class CleverDict(Dict):
-    def __init__(self, dict: Dict[Any, Any]):
+class CleverDict(dict):
+    def __init__(self, dict: dict[Any, Any]):
         self.dict = dict
 
-    def __getitem__(self, keys: List[Any]) -> Any:
+    def __getitem__(self, keys: list[Any]) -> Any:
         d = self.dict.copy()
         for key in keys:
             d = d[key]
         return d
 
-    def __setitem__(self, keys: List[Any], val: Any):
+    def __setitem__(self, keys: list[Any], val: Any):
         self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
 
     def _set_inplace(
-        self, d: Dict[Any, Any], k: Any, ks: List[Any], val: Any
-    ) -> Dict[Any, Any]:
+        self, d: dict[Any, Any], k: Any, ks: list[Any], val: Any
+    ) -> dict[Any, Any]:
         if hasattr(d, "__setitem__"):
             if len(ks) == 0:
                 d[k] = val
@@ -696,7 +677,7 @@ class CleverDict(Dict):
                 d = {k: self._set_inplace({}, next_key, ks, val)}
         return d
 
-    def pop(self, keys: List[Any], default=None) -> Any:
+    def pop(self, keys: list[Any], default=None) -> Any:
         if len(keys) == 1:
             return self.dict.pop(keys[0], default)
 
@@ -707,7 +688,7 @@ class CleverDict(Dict):
 
         return parent.pop(keys[-1], default)
 
-    def to_dict(self) -> Dict[Any, Any]:
+    def to_dict(self) -> dict[Any, Any]:
         return self.dict.copy()
 
     def __str__(self) -> str:
@@ -719,7 +700,7 @@ class CleverDict(Dict):
     def __iter__(self):
         yield from self._iter_leaves(self.dict, [])
 
-    def _iter_leaves(self, d: Any, path: List[Any]):
+    def _iter_leaves(self, d: Any, path: list[Any]):
         if isinstance(d, dict):
             for key, val in d.items():
                 yield from self._iter_leaves(val, path + [key])
@@ -743,11 +724,11 @@ def _replace_in_annotation(annotation, old_cls, new_cls):
             _replace_in_annotation(arg, old_cls, new_cls)
             for arg in get_args(annotation)
         )
-        return Union[new_args]
+        return new_args
     return annotation
 
 
-def make_strict(model_cls: Type[BaseModel]) -> Type[BaseModel]:
+def make_strict(model_cls: type[BaseModel]) -> type[BaseModel]:
     namespace: dict = {"model_config": ConfigDict(extra="forbid")}
     annotations = {}
 
@@ -769,7 +750,7 @@ def make_strict(model_cls: Type[BaseModel]) -> Type[BaseModel]:
 
     return type(model_cls.__name__, (model_cls,), namespace)
 
-def _unwrap_annotation(annotation) -> Type | None:
+def _unwrap_annotation(annotation) -> type | None:
     origin = get_origin(annotation)
     if origin is Union:
         for arg in get_args(annotation):
@@ -781,7 +762,7 @@ def _unwrap_annotation(annotation) -> Type | None:
     return None
 
 
-def _strip_computed(model_cls: Type[BaseModel], data: dict) -> dict:
+def _strip_computed(model_cls: type[BaseModel], data: dict) -> dict:
     """Recursively remove computed field keys from a data dict before strict validation."""
     computed_keys = set(model_cls.model_computed_fields.keys())
     result = {}
@@ -799,7 +780,7 @@ def _strip_computed(model_cls: Type[BaseModel], data: dict) -> dict:
     return result
 
 
-def strict_validate(model_cls: Type[T], data: dict) -> T:
+def strict_validate(model_cls: type[T], data: dict) -> T:
     strict_cls = make_strict(model_cls)
     strict_cls.model_validate(_strip_computed(model_cls, data))
     return model_cls.model_validate(data)

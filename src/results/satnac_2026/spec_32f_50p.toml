@@ -1,6 +1,7 @@
 [training]
 batch_size_equivalent = 8
 
+
 [optimizer]
 eps = 1e-05
 backbone_init_lr = 0.0001
@@ -14,28 +15,33 @@ type = "supervised"
 
 [data]
 strict_size = true
-target_length = 16
+target_length = 32
 frame_size = 224
 
 [data.train_augs]
 normalise = true
 temporal_aug = [
-    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
 ]
 spatial_aug = [
     { frame_size = 224, type = "Random_crop" },
     { type = "HORIZONTAL_FLIP", p = 0.5 },
 ]
-
+strict_size = true
+target_length = 32
+frame_size = 224
 
 [data.test_augs]
 normalise = true
 temporal_aug = [
-    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
 ]
 spatial_aug = [
     { frame_size = 224, type = "Centre_crop" },
 ]
+strict_size = true
+target_length = 32
+frame_size = 224
 
 [scheduler]
 type = "CosineAnnealingWarmRestarts"
@@ -52,4 +58,4 @@ mode = "min"
 patience = 50
 min_delta = 0.01
 
-#spec for SATNAC at 16 frames and patience of 50
+#spec for SATNAC at 32 frames and patience of 15

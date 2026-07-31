@@ -1,21 +1,23 @@
 from __future__ import annotations
+
 import sys
-from typing import Dict, Any, List, Optional, cast
+from typing import Any, cast
 
 try:
     import tomllib  # type: ignore
 except ImportError:
     import tomli as tomllib
-from pathlib import Path
-from argparse import ArgumentParser
+import importlib.util
 import json
 import logging
-import importlib.util
+from argparse import ArgumentParser
+from pathlib import Path
 from types import ModuleType
 
 # locals
-from src.que.core import Que, ExpQue, GenExp
-from src.run_types import GenInfo, RunRes, CompExpInfo, CleverDict, SRC_ROOT
+from src.que.core import ExpQue, GenExp, Que
+from src.run_types import SRC_ROOT, CleverDict, CompExpInfo, GenInfo, RunRes
+
 # from results.saicair.saicair import additional_modifications
 
 
@@ -78,7 +80,7 @@ def get_filters(filters_path: Path) -> tuple[dict, list]:
     return module.additional_modifications, module.exclude_keys
 
 
-def load_config(config_path: str) -> Dict[str, Any]:
+def load_config(config_path: str) -> dict[str, Any]:
     """load config file as dictionary"""
     conf_path = Path(config_path)
     if not conf_path.exists():
@@ -155,7 +157,7 @@ def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
                 return str(item["type"])
             return json.dumps(item, sort_keys=True, default=str)
 
-        search_by_key: Dict[str, List[Any]] = {}
+        search_by_key: dict[str, list[Any]] = {}
         for item in search:
             search_by_key.setdefault(_key(item), []).append(item)
 
@@ -181,10 +183,10 @@ def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
     
 
 def modify(
-    search: Dict,
-    spec: Dict,
+    search: dict,
+    spec: dict,
     logger: logging.Logger,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Recursively apply modifications from spec to search, where spec values are callables."""
     for key, value in spec.items():
         if isinstance(value, dict):
@@ -207,10 +209,12 @@ def modify(
 
 
 def find_runs(
-    runs: ExpQue, spec: GenInfo, logger: logging.Logger, ignore: Dict[str, Any] = {}
-) -> List[GenExp]:
+    runs: ExpQue, spec: GenInfo, logger: logging.Logger, ignore: dict[str, Any] | None = None
+) -> list[GenExp]:
     # return [run for run in runs if snap(run.model_dump(), spec.model_dump())]
 
+    if ignore is None:
+        ignore = {}
     return [
         run
         for run in runs
@@ -229,12 +233,16 @@ def output_results(res_set: GenInfo, out_path: Path) -> None:
 
 
 def build_GenInfo(
-    runs: List[CompExpInfo],
+    runs: list[CompExpInfo],
     spec: GenInfo,
     logger: logging.Logger,
-    exclude: List[List[str]] = [],
-    extra_mods: Dict[str, Any] = {},
+    exclude: list[list[str]] | None = None,
+    extra_mods: dict[str, Any] | None = None,
 ) -> GenInfo:
+    if extra_mods is None:
+        extra_mods = {}
+    if exclude is None:
+        exclude = []
     run_set = []
     excluded = 0
     for run in runs:
@@ -246,7 +254,7 @@ def build_GenInfo(
 
         mods = CleverDict(extra_mods)
 
-        if any([not crit(run_res[key_chain]) for key_chain, crit in mods]):
+        if any(not crit(run_res[key_chain]) for key_chain, crit in mods):
             excluded += 1
             continue
 
@@ -259,12 +267,18 @@ def build_GenInfo(
 
 def load_config_and_find_runs(
     conf_path: Path,
-    exclude: List[List[str]] = [],
-    extra_mods: Dict[str, Any] = {},
-    ignore: Dict[str, Any] = {},
+    exclude: list[list[str]] | None = None,
+    extra_mods: dict[str, Any] | None = None,
+    ignore: dict[str, Any] | None = None,
     logger: logging.Logger = basic_logger,
     logging_level=logging.INFO,
-) -> Optional[GenInfo]:
+) -> GenInfo | None:
+    if ignore is None:
+        ignore = {}
+    if extra_mods is None:
+        extra_mods = {}
+    if exclude is None:
+        exclude = []
     gen_info = load_config(str(conf_path))
 
     # find_que_runs(args.out_path)

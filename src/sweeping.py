@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import wandb
-
-from src.run_types import RunInfo, AdminInfo, RUNS_PATH, strict_validate, AVAIL_SPLITS
-from src.configs import get_model_checkpoint_dir, get_avail_splits
+from src.configs import get_avail_splits, get_model_checkpoint_dir
+from src.run_types import AVAIL_SPLITS, RUNS_PATH, AdminInfo, RunInfo, strict_validate
 from src.training import train_model
 
 
@@ -81,7 +80,7 @@ def _resolve_list_index(lst: list, selector: str) -> int:
     raise KeyError(f"No item in list matches selector {selector!r}")
 
 
-def _set_nested(d: Any, keys: List[str], value: Any) -> None:
+def _set_nested(d: Any, keys: list[str], value: Any) -> None:
     """Set a value at a dotted/selector path inside a nested dict/list."""
     key = keys[0]
 
@@ -102,9 +101,9 @@ def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     _set_nested(d[key], keys[1:], value)
 
 
-def _find_unresolved(d: Any, path: str = "") -> List[str]:
+def _find_unresolved(d: Any, path: str = "") -> list[str]:
     """Recursively collect dotted paths of any leaf still set to None."""
-    unresolved: List[str] = []
+    unresolved: list[str] = []
     if isinstance(d, dict):
         for k, v in d.items():
             unresolved.extend(_find_unresolved(v, f"{path}.{k}" if path else k))
@@ -160,7 +159,7 @@ SWEEP_KEY_MAP = {
 }
 
 
-def apply_sweep_overrides(raw: Dict[str, Any], wandb_config: Dict[str, Any]) -> Dict[str, Any]:
+def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any]) -> dict[str, Any]:
     """Mutate `raw` in place, applying each wandb.config key via SWEEP_KEY_MAP
     (or, if absent from the map, as a literal dotted path)."""
     for key, value in wandb_config.items():
@@ -190,7 +189,7 @@ def validate_sweep_key_map(key_map: dict = SWEEP_KEY_MAP) -> None:
                         f"against the base config skeleton: {e}"
                     ) from None
 
-def validate_resolved(config: Dict[str, Any]) -> None:
+def validate_resolved(config: dict[str, Any]) -> None:
     """Raise if any skeleton placeholder was never overwritten by a sweep
     value -- catches a yaml `parameters` entry that got renamed/removed
     without updating SWEEP_KEY_MAP (or vice versa) before it silently reaches
