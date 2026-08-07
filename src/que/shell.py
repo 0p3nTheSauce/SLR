@@ -827,8 +827,6 @@ class QueShell(cmdLib.Cmd):
 
     # Daemon
 
-    
-
     def do_daemon(self, arg):
         """Interact with the worker"""
         from src.run_types import PROJECT_BASE
@@ -860,7 +858,7 @@ class QueShell(cmdLib.Cmd):
                     if parsed_args.sweep_id is None:
                         parsed_args.sweep_id = create_sweep(parsed_args.sweep_path, parsed_args.project, parsed_args.entity)
 
-                    self.daemon.set_sweep(
+                    self.server_context.set_sweep(
                         SweepInfo(
                             sweep_id=parsed_args.sweep_id,
                             sweep_project=parsed_args.project,
@@ -873,7 +871,13 @@ class QueShell(cmdLib.Cmd):
                     )
             elif parsed_args.command == "clear_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
-                    self.daemon.set_sweep(None)
+                    self.server_context.set_sweep({})
+
+            elif parsed_args.command == 'toggle_stop_on_fail':
+                with self.unwrap_exception("Toggled stop on fail", "Failed to toggle stop on fail"):
+                    self.server_context.toggle_stop_on_fail()
+
+
             else:
                 with self.unwrap_exception("", ""):
                     raise NotImplementedError(
@@ -920,8 +924,9 @@ class QueShell(cmdLib.Cmd):
         if daemon_state["supervisor_pid"]:
             daemon_table.add_row("Supervisor PID:", str(daemon_state["supervisor_pid"]))
 
-        sweep_state = daemon_state["sweep"]
-        if sweep_state is not None:
+        # sweep_state = daemon_state["sweep"]
+        sweep_state = status.sweep
+        if sweep_state:
             daemon_table.add_row(
                 "Sweep:",
                 f"{sweep_state['sweep_entity']}/{sweep_state['sweep_project']}/{sweep_state['sweep_id']}",
@@ -1516,8 +1521,9 @@ class QueShell(cmdLib.Cmd):
             dest="command", required=True, help="Daemon commands"
         )
 
-        
-
+        #on fail
+        subparsers.add_parser('toggle_stop_on_fail', help='Toggle stop on fail behaviour for the daemon')
+    
         # Start
         subparsers.add_parser("start", help="Start the supervisor")
 

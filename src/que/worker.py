@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import IO, cast
 
 import torch
+from pydantic import ValidationError
 
 import wandb
 from run_types import RunInfo
@@ -26,6 +27,7 @@ from src.que.core import (
     SweepInfo,  # now also carries model/split/dataset -- see note below
     WorkerStateDict,
     connect_manager,
+    sweep_info_validate,
 )
 from src.run_types import WandbInfo
 from src.sweeping import create_sweep_run
@@ -269,7 +271,7 @@ class Worker:
         """
         self.sweep_info = sweep_info
         try:
-            self.training_logger.info("Starting sweep trial")
+            self.training_logger.info(f"Starting sweep trial: {sweep_info['sweep_id']}")
             self.state['task'] = "training"
             wandb.agent(
                 sweep_info["sweep_id"],
@@ -398,7 +400,7 @@ class Worker:
 
 
 
-    def start(self, sweep_info: SweepInfo | None = None):
+    def start(self, sweep_info: SweepInfo | dict):
         """this is likely started in a seperate process, so que requires connecting"""
 
         #get state handlers
@@ -413,8 +415,23 @@ class Worker:
         self._attach_training_loggers()
         self._reattach_server_logger()
 
-        if sweep_info is not None and self.que.len_loc('to_run') == 0: #give preference to runs on Que
-            self.sweep(sweep_info)
+
+        try:
+            if sweep_info:
+                sweep = sweep_info_validate(sweep_info)
+            else:
+                sweep = None
+        except ValidationError as ve:
+            #log traceback and raise exception to be handled by the daemon
+            
+            self.server_logger.error(f"Invalid sweep info provided: {sweep_info!s}")
+            self.server_logger.error(traceback.format_exc())
+            self.state['exception'] = f"Invalid sweep info: {ve!s}"
+            self.state['working_pid'] = None
+            raise
+
+        if sweep is not None and self.que.len_loc('to_run') == 0: #give preference to runs on Que
+            self.sweep(sweep)
         else:
             self.train()
 

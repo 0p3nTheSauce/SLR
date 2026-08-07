@@ -60,9 +60,12 @@ class Daemon:
     def get_state(self) -> DaemonStateDict:
         return self.state
 
-    def set_state(self, state: DaemonStateDict) -> None:
-        self.state = state
-        if self.state["awake"]:
+    def set_state(self, state: DaemonStateDict, awake_on_state: bool = True) -> None:
+        if not hasattr(self, "state"):
+            self.state = state
+
+        self.state.update(state)
+        if self.state["awake"] and awake_on_state:
             self.logger.info("Daemon state is 'awake', starting supervisor...")
             self.logger.warning(
                 "There was likely a power outage/system failure which triggered this"
@@ -70,9 +73,6 @@ class Daemon:
             # it is likely cur_run will have a run in it, so we must recover this run
             # add the sweep id from saved file
             self.start_supervisor(recover_run=True)
-
-    def set_sweep(self, sweep: SweepInfo | None) -> None:
-        self.state["sweep"] = sweep
 
     def monitor_worker(self) -> bool:
         """
@@ -123,8 +123,7 @@ class Daemon:
         # Initialise shared state through proxy
         manager = connect_manager()
         self.state = manager.get_daemon_state()
-        self.worker.state = manager.get_worker_state()
-    
+        sweep = manager.get_sweep()
         # handle automatic recovery
         if recover_run:
             self.que = manager.get_que()
@@ -136,10 +135,10 @@ class Daemon:
         cnt = 0
         worker_pid = None
         while not self.stop_daemon_event.is_set():
-
+            
             try:
                 self.worker_process = Process(
-                    target=self.worker.start,args=(self.state["sweep"],)
+                    target=self.worker.start,args=(sweep,)
                 )
                 self.worker_process.start()
                 worker_pid = self.worker_process.pid

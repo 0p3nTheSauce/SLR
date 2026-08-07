@@ -1092,7 +1092,7 @@ class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
     supervisor_pid: int | None
-    sweep: SweepInfo | None
+    
 
 
 def worker_state_validate(obj: Any) -> WorkerStateDict:
@@ -1108,29 +1108,48 @@ def worker_state_validate(obj: Any) -> WorkerStateDict:
         "task": d.task,
         "current_run_id": d.current_run_id,
         "exception": d.exception,
-        # 'sweep_id':d.sweep_id,
         "working_pid": d.working_pid,
     }
 
+
+def sweep_info_validate(obj: Any) -> SweepInfo:
+    class SweepState(BaseModel):
+        sweep_id: str = ""
+        sweep_project: str = ""
+        sweep_entity: str = ""
+        model: str = ""
+        dataset: str = ""
+        split: AVAIL_SPLITS = "asl100"
+        base_config: str = ""
+
+    d = SweepState.model_validate(obj)
+    return {
+        "sweep_id": d.sweep_id,
+        "sweep_project": d.sweep_project,
+        "sweep_entity": d.sweep_entity,
+        "model": d.model,
+        "dataset": d.dataset,
+        "split": d.split,
+        "base_config": d.base_config,
+    }
 
 def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):
         awake: bool = False
         stop_on_fail: bool = True
         supervisor_pid: int | None = None
-        sweep: SweepInfo | None = None
 
     d = DaemonState.model_validate(obj)
     return {
         "awake": d.awake,
         "stop_on_fail": d.stop_on_fail,
         "supervisor_pid": d.supervisor_pid,
-        "sweep": d.sweep,
     }
 
 
 class ServerState(BaseModel):
     server_pid: int | None = None
+    sweep: SweepInfo | dict
     daemon_state: DaemonStateDict = daemon_state_validate({})
     worker_state: WorkerStateDict = worker_state_validate({})
 
@@ -1153,7 +1172,7 @@ Process_states: TypeAlias = WorkerStateDict | DaemonStateDict | ServerState
 
 class DaemonProtocol(Protocol):
     def start_supervisor(self) -> None: ...
-    def set_sweep(self, sweep: SweepInfo | None) -> None: ...
+    def set_state(self, state: DaemonStateDict, awake_on_state: bool = True) -> None: ...
     def stop_supervisor(
         self,
         timeout: float | None = None,
@@ -1171,22 +1190,26 @@ class ServerContextProtocol(Protocol):
     def save_state(self) -> None: ...
     def load_state(self) -> None: ...
     def get_state(self) -> ServerState: ...
-    def set_state(
-        self,
-        server: ServerState | None,
-        daemon: DaemonStateDict | None,
-        worker: WorkerStateDict | None,
-    ) -> None: ...
+    def set_sweep(self, sweep: SweepInfo | dict) -> None: ...
+    def toggle_stop_on_fail(self) -> None: ...
+    # def set_state(
+    #     self,
+    #     server: ServerState | None,
+    #     daemon: DaemonStateDict | None,
+    #     worker: WorkerStateDict | None,
+    #     sweep: SweepInfo | None
+    # ) -> None: ...
 
 
 class QueManagerProtocol(Protocol):
     def get_que(self) -> Que: ...
     def get_daemon(self) -> DaemonProtocol: ...
     def get_worker(self) -> WorkerProtocol: ...
+    def get_sweep(self) -> SweepInfo | dict: ...
     def get_daemon_state(self) -> DaemonStateDict: ...
     def get_worker_state(self) -> WorkerStateDict: ...
     def get_server_context(self) -> ServerContextProtocol: ...
-
+    
 
 class QueManager(BaseManager):
     pass
@@ -1197,10 +1220,9 @@ def connect_manager(
 ) -> "QueManagerProtocol":
     QueManager.register("get_que")
     QueManager.register("get_worker")
+    QueManager.register("get_sweep", proxytype=DictProxy)
     QueManager.register("get_worker_state", proxytype=DictProxy)
     QueManager.register("get_daemon_state", proxytype=DictProxy)
-    # QueManager.register("get_worker_state")
-    # QueManager.register("get_daemon_state")
     QueManager.register("get_daemon")
     QueManager.register("get_server_context")
 

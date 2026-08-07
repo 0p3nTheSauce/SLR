@@ -1,33 +1,35 @@
 import argparse
-from multiprocessing import Event
-from multiprocessing.managers import DictProxy
+import json
+import logging
+
 # from multiprocessing.managers import BaseManager
 import multiprocessing as mp
-import logging
-from logging import Logger
-import json
 import os
 import signal
 import sys
-from typing import Optional, Union, Tuple
+from logging import Logger
+from multiprocessing import Event
+from multiprocessing.managers import DictProxy
 from pathlib import Path
+from typing import Optional, Tuple, Union
 
 from src.que.core import (
-    timestamp_path,
-    Que,
-    QueManager,
+    DAEMON_NAME,
+    QUE_NAME,
     # ProcessNames,
     SERVER_LOG_PATH,
-    SERVER_STATE_PATH,
-    QUE_NAME,
     SERVER_NAME,
-    DAEMON_NAME,
+    SERVER_STATE_PATH,
     WORKER_NAME,
-    ServerState,
-    WorkerStateDict,
     DaemonStateDict,
+    Que,
+    QueManager,
+    ServerState,
+    SweepInfo,
+    WorkerStateDict,
     read_server_state,
     # Process_states
+    timestamp_path,
 )
 from src.que.daemon import Daemon
 from src.que.worker import Worker
@@ -45,15 +47,15 @@ class ServerContext:
         cleanup_timeout: float = 10.0,
         stop_on_fail: bool = True,
         awake: bool = False,
-        server_state_path: Union[str, Path] = SERVER_STATE_PATH,
+        server_state_path: str | Path = SERVER_STATE_PATH,
     ):
         # context attributes
         self.save_on_shutdown: bool = save_on_shutdown
         self.cleanup_timeout: float = cleanup_timeout
-        self.state_path: Union[str, Path] = server_state_path
+        self.state_path: str | Path = server_state_path
 
         # # Pids
-        self.server_pid: Optional[int] = os.getpid()
+        self.server_pid: int | None = os.getpid()
 
         # spawn for CUDA context
         mp.set_start_method("spawn", force=True)
@@ -76,6 +78,7 @@ class ServerContext:
 
 
         # Classes
+        self.sweep : dict = {}
         self.que = Que(logger=que_logger)
         self.worker = Worker(
             server_logger=worker_logger, que=self.que, stop_event=self.stop_worker_event,
@@ -95,7 +98,6 @@ class ServerContext:
             awake=awake,
             stop_on_fail=stop_on_fail,
             supervisor_pid=None,
-            sweep=None
         )
         )
         self.load_state()
@@ -155,18 +157,40 @@ class ServerContext:
     def get_state(self) -> ServerState:
         return ServerState(
             server_pid=self.server_pid,
+            sweep=self.sweep,
             daemon_state=self.daemon.get_state(),
             worker_state=self.worker.get_state(),
         )
 
-    def set_state(
+    def set_sweep(self, sweep: SweepInfo | dict) -> None:
+        """Sets the sweep information for the server context.
+
+        Args:
+            sweep (SweepInfo | dict): Sweep information to set.
+        """
+        self.sweep.clear()
+        self.sweep.update(sweep)
+
+    def toggle_stop_on_fail(self) -> None:
+        self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]
+
+    def _set_state(
         self,
-        server: Optional[ServerState] = None,
-        daemon: Optional[DaemonStateDict] = None,
-        worker: Optional[WorkerStateDict] = None,
+        server: ServerState | None = None,
+        daemon: DaemonStateDict | None = None,
+        worker: WorkerStateDict | None = None,
     ) -> None:
+        """Used by load_state to set the state of the server, daemon, sweep, and worker. This is separate from the set_state methods of the individual components to allow for a more centralized state management.
+
+        Args:
+            server (ServerState | None, optional): Server state to set. Defaults to None.
+            daemon (DaemonStateDict | None, optional): Daemon state to set. Defaults to None.
+            worker (WorkerStateDict | None, optional): Worker state to set. Defaults to None.
+        """
         if server is not None:
-            self.server_pid = server.server_pid
+            #do not reset server_pid after loading
+            self.sweep.clear()
+            self.sweep.update(server.sweep)
             self.daemon.set_state(server.daemon_state)
             self.worker.set_state(server.worker_state)
         if daemon is not None:
@@ -175,7 +199,7 @@ class ServerContext:
             self.worker.set_state(worker)
 
     def save_state(
-        self, out_path: Optional[Union[str, Path]] = None, timestamp: bool = False
+        self, out_path: str | Path | None = None, timestamp: bool = False
     ):
         if out_path is None:
             out_path = self.state_path
@@ -190,7 +214,7 @@ class ServerContext:
 
         self.server_logger.info(f"Saved state to: {out_path}")
 
-    def load_state(self, in_path: Optional[Union[str, Path]] = None) -> None:
+    def load_state(self, in_path: str | Path | None = None) -> None:
         if in_path is None:
             in_path = self.state_path
         elif not Path(in_path).exists():
@@ -201,11 +225,10 @@ class ServerContext:
 
         try:
             state = read_server_state(self.state_path)
-            #do not reset server_pid after loading
-            state.server_pid = self.server_pid 
+
             # do not override start up stop on fail
             state.daemon_state["stop_on_fail"] = self.daemon.state["stop_on_fail"]  
-            self.set_state(state)
+            self._set_state(state)
             self.server_logger.info(f"Loaded state from: {self.state_path}")
         except Exception as e:
             self.server_logger.warning(
@@ -256,6 +279,12 @@ def setup_manager(stop_on_fail: bool = True):
     QueManager.register(
         "get_worker_state",
         callable=lambda: context.worker.state,
+        proxytype=DictProxy,
+    )
+
+    QueManager.register(
+        "get_sweep",
+        callable=lambda: context.sweep,
         proxytype=DictProxy,
     )
 
