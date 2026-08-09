@@ -1,22 +1,30 @@
-from torch.utils.data import Dataset
 # import os
 import json
-import torch
+from collections.abc import Callable
 from pathlib import Path
 from typing import (
-    Callable,
-    cast,
-    Optional,
-    Tuple,
-    Literal,
-    # TypedDict,
-    Union,
-    List,
-    TypeAlias,
-    Dict,
     Any,
+    Literal,
+    TypeAlias,
+    cast,
 )
+
+import torch
+from torch.utils.data import Dataset
 from typing_extensions import TypedDict, Unpack
+
+from src.configs import LABELS_PATH, get_avail_splits
+from src.preprocess import Instance
+from src.run_types import (
+    AVAIL_SETS,
+    AVAIL_SPLITS,
+    LABEL_SUFFIX,
+    NUM_INSTANCES_SUFFIX,
+    RAW_DIR,
+    WLASL_ROOT,
+    WORST_INSTANCES_SUFFIX,
+    DataInfo,
+)
 
 # local imports
 from src.utils import load_rgb_frames_from_video
@@ -24,9 +32,6 @@ from src.video_transforms import (
     # correct_num_frames,
     get_transform,
 )
-from src.run_types import DataInfo, AVAIL_SETS, AVAIL_SPLITS, WLASL_ROOT, RAW_DIR, NUM_INSTANCES_SUFFIX, LABEL_SUFFIX, WORST_INSTANCES_SUFFIX
-from src.configs import  LABELS_PATH, get_avail_splits
-from src.preprocess import Instance
 
 ############################# Dictionaries and Types #############################
 
@@ -47,8 +52,8 @@ LOAD_DATA_POLICY: TypeAlias = Literal["strict", "accepting"]
 
 
 def load_data_from_json(
-    json_path: Union[str, Path], policy: LOAD_DATA_POLICY
-) -> List[Instance]:
+    json_path: str | Path, policy: LOAD_DATA_POLICY
+) -> list[Instance]:
     """Load list of Instance from a json file
 
     Args:
@@ -60,7 +65,7 @@ def load_data_from_json(
         data = json.load(f)
 
     if not isinstance(data, list):
-        raise ValueError(f"Data in {json_path} is not a list.")
+        raise TypeError(f"Data in {json_path} is not a list.")
 
     if policy == "strict":
         return [Instance.model_validate(item) for item in data]
@@ -144,7 +149,7 @@ def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -
 
     return label_file
 
-def load_split_set(split: AVAIL_SPLITS, set_name: AVAIL_SETS, policy: LOAD_DATA_POLICY) -> Union[List[Instance], List[Dict[str, Any]]]:
+def load_split_set(split: AVAIL_SPLITS, set_name: AVAIL_SETS, policy: LOAD_DATA_POLICY) -> list[Instance] | list[dict[str, Any]]:
     split_set = get_wlasl_info(split, set_name)
     return load_data_from_json(
         get_labels_path(set_name, split_set["labels"], split_set['label_suff']),
@@ -153,11 +158,11 @@ def load_split_set(split: AVAIL_SPLITS, set_name: AVAIL_SETS, policy: LOAD_DATA_
 
 
 def get_example_videos(
-    instances: List[Instance],
+    instances: list[Instance],
     video_dir: Path = Path(WLASL_ROOT) / RAW_DIR,
-    limit: Optional[int] = None,
+    limit: int | None = None,
     strict: bool = True,
-) -> List[Path]:
+) -> list[Path]:
     """Get example video paths for a given label number"""
     example_paths = []
     lim = limit if limit is not None else float("inf")
@@ -179,10 +184,8 @@ class VideoDataset(Dataset):
     def __init__(
         self,
         set_info: DataSetInfo,
-        transforms: Optional[Callable[[torch.Tensor], torch.Tensor]] = None,
-        item_transforms: Optional[
-            Callable[[torch.Tensor, Instance], torch.Tensor]
-        ] = None,
+        transforms: Callable[[torch.Tensor], torch.Tensor] | None = None,
+        item_transforms: Callable[[torch.Tensor, Instance], torch.Tensor] | None = None,
         include_meta: bool = False,
         load_policy: LOAD_DATA_POLICY = "accepting",  # NOTE: this may break
     ) -> None:
@@ -216,11 +219,11 @@ class VideoDataset(Dataset):
         )
 
         if load_policy == "accepting":
-            self.data = cast(List[Dict[str, Any]], self.data)
+            self.data = cast(list[dict[str, Any]], self.data)
         elif load_policy == "strict":
             self.data = [inst.model_dump() for inst in self.data]
 
-        self.classes = set([inst["label_num"] for inst in self.data])
+        self.classes = {inst["label_num"] for inst in self.data}
         self.num_classes = len(self.classes)
 
     def __manual_load__(self, item):
@@ -231,7 +234,7 @@ class VideoDataset(Dataset):
         ).to(torch.uint8)
 
     def __getitem__(self, idx):
-        item = cast(Dict[str, Any], self.data[idx])
+        item = cast(dict[str, Any], self.data[idx])
         frames = self.__manual_load__(item)
 
         if self.item_transforms is not None:
@@ -243,7 +246,7 @@ class VideoDataset(Dataset):
         if self.include_meta:
             result = {"frames": frames} | item
         else:
-            result = result = {"frames": frames, "label_num": item["label_num"]}
+            result = {"frames": frames, "label_num": item["label_num"]}
 
         return result
 
@@ -255,14 +258,14 @@ class VideoDataset(Dataset):
 
 
 class VideoDatasetKwargs(TypedDict, total=False):
-    item_transforms: Optional[Callable[[torch.Tensor, Instance], torch.Tensor]]
+    item_transforms: Callable[[torch.Tensor, Instance], torch.Tensor] | None
     include_meta: bool
     load_policy: LOAD_DATA_POLICY
 
 
 def get_data_set(
     set_info: DataSetInfo, data_info: DataInfo, **kwargs: Unpack[VideoDatasetKwargs]
-) -> Tuple[VideoDataset, Optional[List[int]], Optional[float]]:
+) -> tuple[VideoDataset, list[int] | None, float | None]:
     """
     Get the training, val or test set. Optionally, load frames unchanged.
 

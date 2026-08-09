@@ -11,7 +11,6 @@ from logging import Logger
 from multiprocessing import Event
 from multiprocessing.managers import DictProxy
 from pathlib import Path
-from typing import Optional, Tuple, Union
 
 from src.que.core import (
     DAEMON_NAME,
@@ -113,7 +112,7 @@ class ServerContext:
             sep += "\n"
         return sep.title()
 
-    def _setup_logging(self) -> Tuple[Logger, Logger, Logger, Logger]:
+    def _setup_logging(self) -> tuple[Logger, Logger, Logger, Logger]:
         """Sets up loggers for the server components."""
         logging.basicConfig(
             level=logging.DEBUG,
@@ -149,8 +148,8 @@ class ServerContext:
                 self.save_state()
             
             self.server_logger.info("Graceful shutdown complete")
-        except Exception as e:
-            self.server_logger.error(f"Error during shutdown: {e}", exc_info=True)
+        except Exception:
+            self.server_logger.exception("Error during shutdown",)
         finally:
             sys.exit(0)
 
@@ -322,7 +321,7 @@ def get_server_parser() -> argparse.ArgumentParser:
 
     return parser
 
-def start_server(stop_on_fail: bool = True, address: Tuple[str, int] = ("localhost", 50000), authkey: bytes = b"abracadabra"):
+def start_server(stop_on_fail: bool = True, address: tuple[str, int] = ("localhost", 50000), authkey: bytes = b"abracadabra"):
     setup_manager(stop_on_fail=stop_on_fail)
 
     # Note: We bind to localhost for security, change to 0.0.0.0 to expose externally
