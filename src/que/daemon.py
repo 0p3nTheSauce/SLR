@@ -135,10 +135,10 @@ class Daemon:
         cnt = 0
         worker_pid = None
         while not self.stop_daemon_event.is_set():
-            
+        
             try:
                 self.worker_process = Process(
-                    target=self.worker.start,args=(sweep,)
+                    target=self.worker.start,args=(dict(sweep) if sweep is not None else None,)
                 )
                 self.worker_process.start()
                 worker_pid = self.worker_process.pid

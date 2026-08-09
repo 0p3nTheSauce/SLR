@@ -1149,7 +1149,7 @@ def daemon_state_validate(obj: Any) -> DaemonStateDict:
 
 class ServerState(BaseModel):
     server_pid: int | None = None
-    sweep: SweepInfo | dict
+    sweep: SweepInfo | dict = {}
     daemon_state: DaemonStateDict = daemon_state_validate({})
     worker_state: WorkerStateDict = worker_state_validate({})
 

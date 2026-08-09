@@ -78,6 +78,13 @@ class Worker:
         else:
             return str(e)
 
+    def _fail(self, exc: Exception, label: str, clear_pid: bool = True) -> None:
+        """Shared failure-path state update for train/sweep/test except blocks."""
+        self.server_logger.info(f"{label}: {exc}")
+        self.state['exception'] = self.build_exception_info(exc)
+        if clear_pid:
+            self.state['working_pid'] = None
+
     def get_state(self) -> WorkerStateDict:
         return self.state
 
@@ -165,6 +172,38 @@ class Worker:
 
         self.server_logger.info("_train method completed successfully")
 
+    def _test(self) -> None:
+        """Tests the run in cur_runs and moves to old_runs"""
+        if not gpu_manager.wait_for_completion(
+            check_interval=10,
+            logger=self.server_logger,
+            # max_util_gb=0.5, #debugging
+            event=self.stop_event,
+        ):
+            self.server_logger.info("GPU not available, exiting")
+            return
+        else:
+            self.server_logger.info("GPU is available")
+
+        fin_run = self.que.peak_cur_run()
+        with redirect_stdout(self.log_adapter):
+            results = full_test(admin=fin_run.admin, data=fin_run.data, re_test=True)
+        comp_run = CompExpInfo(
+            admin=fin_run.admin,
+            training=fin_run.training,
+            optimizer=fin_run.optimizer,
+            model_params=fin_run.model_params,
+            data=fin_run.data,
+            scheduler=fin_run.scheduler,
+            stopping=fin_run.stopping,
+            wandb=fin_run.wandb,
+            results=results,
+        )
+        _ = self.que.pop_cur_run()
+        self.que.set_cur_run(comp_run)
+        self.que.store_fin_run()
+        self.server_logger.info("Exiting _test method")
+
     def _inject_sweep_config(self, config: RunInfo, run_id: str) -> None:
         """Injects the sweep config into the Que"""
         assert self.sweep_info is not None, "_inject_sweep_config called without sweep_info set"
@@ -230,133 +269,6 @@ class Worker:
 
         self.server_logger.info("_sweep_train method completed successfully")
 
-    def train(self) -> None:
-        """
-        The train method is the main entry point for training a model.
-        Currently implemented to be in a process started by the Daemon.
-        """
-        try:
-            self.training_logger.info("Starting training run")
-            self.state['task'] = "training"
-            self._train()
-        except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = self.build_exception_info(Qe)
-            self.state['working_pid'] = None
-            raise
-        except KeyboardInterrupt:
-            self.server_logger.info("Worker killed by user")
-            self.state['exception'] = "KeyboardInterrupt"
-            self.state['working_pid'] = None
-            raise
-        except Exception as e:
-            self.server_logger.error(f"Training run failed due to an error: {e}")
-            self.state['exception'] = self.build_exception_info(e)
-            self.state['working_pid'] = None
-            self.que.stash_failed_run(str(e))
-            self.que.save_state()
-            # exit with error
-            raise
-        finally:
-            self.cleanup()
-            # self.state.task = "inactive"
-            self.state['task'] = "inactive"
-
-    def sweep(self, sweep_info: SweepInfo) -> None:
-        """
-        Sweep-mode entry point -- bypasses the regular train() path entirely.
-        Runs exactly one trial (count=1) via wandb.agent, then returns control
-        to the Daemon's supervise loop, which will call start(sweep_info) again
-        for the next trial (or start() for a plain run, if the sweep's done).
-        """
-        self.sweep_info = sweep_info
-        try:
-            self.training_logger.info(f"Starting sweep trial: {sweep_info['sweep_id']}")
-            self.state['task'] = "training"
-            wandb.agent(
-                sweep_info["sweep_id"],
-                entity=sweep_info["sweep_entity"],
-                project=sweep_info["sweep_project"],
-                function=self._sweep_train,
-                count=1,
-            )
-        except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = self.build_exception_info(Qe)
-            self.state['working_pid'] = None
-            raise
-        except KeyboardInterrupt:
-            self.server_logger.info("Worker killed by user")
-            self.state['exception'] = "KeyboardInterrupt"
-            self.state['working_pid'] = None
-            raise
-        except Exception as e:
-            self.server_logger.error(f"Sweep trial failed due to an error: {e}")
-            self.state['exception'] = self.build_exception_info(e)
-            self.state['working_pid'] = None
-            self.que.stash_failed_run(str(e))
-            self.que.save_state()
-            raise
-        finally:
-            self.cleanup()
-            self.state['task'] = "inactive"
-
-    def _test(self) -> None:
-        """Tests the run in cur_runs and moves to old_runs"""
-        if not gpu_manager.wait_for_completion(
-            check_interval=10,
-            logger=self.server_logger,
-            # max_util_gb=0.5, #debugging
-            event=self.stop_event,
-        ):
-            self.server_logger.info("GPU not available, exiting")
-            return
-        else:
-            self.server_logger.info("GPU is available")
-
-        fin_run = self.que.peak_cur_run()
-        with redirect_stdout(self.log_adapter):
-            results = full_test(admin=fin_run.admin, data=fin_run.data, re_test=True)
-        comp_run = CompExpInfo(
-            admin=fin_run.admin,
-            training=fin_run.training,
-            optimizer=fin_run.optimizer,
-            model_params=fin_run.model_params,
-            data=fin_run.data,
-            scheduler=fin_run.scheduler,
-            stopping=fin_run.stopping,
-            wandb=fin_run.wandb,
-            results=results,
-        )
-        _ = self.que.pop_cur_run()
-        self.que.set_cur_run(comp_run)
-        self.que.store_fin_run()
-        self.server_logger.info("Exiting _test method")
-
-    def test(self) -> None:
-        try:
-            self.state['task'] = "testing"
-            self._test()
-        except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = self.build_exception_info(Qe)
-            raise
-        except KeyboardInterrupt:
-            self.server_logger.info("Worker killed by user")
-            self.state['exception'] = "KeyboardInterrupt"
-        except Exception as e:
-            self.server_logger.error(f"Testing run failed due to an error: {e}")
-            err_str = self.build_exception_info(e)
-            self.state['exception'] = err_str
-            self.que.stash_failed_run(err_str)
-            self.que.save_state()
-            # exit with error
-            raise
-        finally:
-            self.cleanup()
-            self.state['current_run_id'] = None
-            self.state['task'] = "inactive"
-
     def _reset_state(self):
         self.set_state(
             WorkerStateDict(
@@ -399,8 +311,91 @@ class Worker:
 
 
 
+    def train(self) -> None:
+        """
+        The train method is the main entry point for training a model.
+        Currently implemented to be in a process started by the Daemon.
+        """
+        try:
+            self.training_logger.info("Starting training run")
+            self.state['task'] = "training"
+            self._train()
+        except QueException as e:
+            self._fail(e, "que based error, cannot continue")
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.state['exception'] = "KeyboardInterrupt"
+            self.state['working_pid'] = None
+            raise
+        except Exception as e:
+            self._fail(e, "Training run failed due to an error")
+            self.que.stash_failed_run(str(e))
+            self.que.save_state()
+            raise
+        finally:
+            self.cleanup()
+            self.state['task'] = "inactive"
 
-    def start(self, sweep_info: SweepInfo | dict):
+    def sweep(self, sweep_info: SweepInfo) -> None:
+        self.sweep_info = sweep_info
+        try:
+            sweep_info_validate(sweep_info)
+            self.training_logger.info(f"Starting sweep trial: {sweep_info['sweep_id']}")
+            self.state['task'] = "training"
+            wandb.agent(
+                sweep_info["sweep_id"],
+                entity=sweep_info["sweep_entity"],
+                project=sweep_info["sweep_project"],
+                function=self._sweep_train,
+                count=1,
+            )
+        except (QueException, ValidationError) as e:
+            self._fail(e, f"{type(e).__name__} — cannot continue")
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.state['exception'] = "KeyboardInterrupt"
+            self.state['working_pid'] = None
+            raise
+        except Exception as e:
+            self._fail(e, "Sweep trial failed due to an error")
+            self.que.stash_failed_run(str(e))
+            self.que.save_state()
+            raise
+        finally:
+            self.cleanup()
+            self.state['task'] = "inactive"
+
+
+    def test(self) -> None:
+        try:
+            self.state['task'] = "testing"
+            self._test()
+        except QueException as Qe:
+            self.server_logger.info(f"que based error, cannot continue: {Qe}")
+            self.state['exception'] = self.build_exception_info(Qe)
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.state['exception'] = "KeyboardInterrupt"
+        except Exception as e:
+            self.server_logger.error(f"Testing run failed due to an error: {e}")
+            err_str = self.build_exception_info(e)
+            self.state['exception'] = err_str
+            self.que.stash_failed_run(err_str)
+            self.que.save_state()
+            # exit with error
+            raise
+        finally:
+            self.cleanup()
+            self.state['current_run_id'] = None
+            self.state['task'] = "inactive"
+
+
+
+
+    def start(self, sweep_info: SweepInfo | None = None) -> None:
         """this is likely started in a seperate process, so que requires connecting"""
 
         #get state handlers
@@ -415,23 +410,8 @@ class Worker:
         self._attach_training_loggers()
         self._reattach_server_logger()
 
-
-        try:
-            if sweep_info:
-                sweep = sweep_info_validate(sweep_info)
-            else:
-                sweep = None
-        except ValidationError as ve:
-            #log traceback and raise exception to be handled by the daemon
-            
-            self.server_logger.error(f"Invalid sweep info provided: {sweep_info!s}")
-            self.server_logger.error(traceback.format_exc())
-            self.state['exception'] = f"Invalid sweep info: {ve!s}"
-            self.state['working_pid'] = None
-            raise
-
-        if sweep is not None and self.que.len_loc('to_run') == 0: #give preference to runs on Que
-            self.sweep(sweep)
+        if sweep_info is not None and self.que.len_loc('to_run') == 0: #give preference to runs on Que
+            self.sweep(sweep_info)
         else:
             self.train()
 
