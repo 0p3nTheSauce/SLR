@@ -473,7 +473,11 @@ def train_epoch(
     steps: int,
     update_per_step: int,
 ) -> int:
+    """Train a model for a single epoch in a supervised manner
 
+    Returns:
+        int: The number of steps taken in this epoch
+    """
     phase_name = "train"
     model.train()
 
@@ -1106,6 +1110,23 @@ def train_model(
     recover: bool = False,
     event: EventClass | None = None,
 ) -> dict[str, float] | None:
+    """Train a model in a supervised or unsupervised manner
+
+    Args:
+        model_name (str): Name of the model to train.
+        config (RunInfo): Configuration for the training run.
+        wandb_run (Run): Wandb run instance for logging and configuration.
+        load (StrPath | None, optional): Path to the model checkpoint to load. Defaults to None.
+        save_every (int, optional): Save the model every n epochs. Defaults to 5.
+        recover (bool, optional): Whether to recover from a previous training run. Defaults to False.
+        event (EventClass | None, optional): Event instance for controlling the training process. Defaults to None.
+
+    Raises:
+        ValueError: If the model parameters type is not supported for training.
+
+    Returns:
+        dict[str, float] | None: Dictionary containing the best validation accuracy and loss, or None if training was not completed.
+    """
     if is_supervised_config(config.model_params):
         return train_loop(
             model_name=model_name,

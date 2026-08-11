@@ -32,7 +32,7 @@ from src.run_types import AVAIL_SETS, WLASL_ROOT, SPLIT_DIR, RAW_DIR
 
 class RawInstance(BaseModel):
     """Represents a single raw instance of a gloss in the dataset."""
-    bbox: List[int]  # [x_min, y_min, x_max, y_max]
+    bbox: list[int]  # [x_min, y_min, x_max, y_max]
     frame_end: int
     frame_start: int
     instance_id: int
@@ -53,7 +53,7 @@ class Instance(RawInstance):
 class WLASLClass(BaseModel):
     """Represents a single gloss and its associated raw instances."""
     gloss: str
-    instances: List[RawInstance]
+    instances: list[RawInstance]
 
 
 class BadInstance(Instance):
