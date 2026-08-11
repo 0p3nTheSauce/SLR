@@ -25,17 +25,62 @@ from pathlib import Path
 from typing import Any
 
 import wandb
+import yaml
 from src.configs import get_avail_splits, get_model_checkpoint_dir
 from src.run_types import AVAIL_SPLITS, RUNS_PATH, AdminInfo, RunInfo, strict_validate
 from src.training import train_model
 from src.utils import load_module_from_path
 
 
+
+def extract_config_path_from_command(command: list[str]) -> Path:
+    """Recover the base_config.py path from a sweep yaml's `command` block,
+    which already has to carry it for the standalone `wandb agent` CLI-mode
+    entrypoint (see get_sweep_parser/main). Reusing it here means the sweep
+    yaml only names the base_config path once -- callers no longer need it
+    duplicated as a separate argument.
+    """
+    literal_args = [c for c in command if not (isinstance(c, str) and c.startswith("${"))]
+    if not literal_args:
+        raise SweepConfigError("Sweep yaml `command` block has no literal args to parse a config_path from.")
+    # literal_args[0] is the interpreter (e.g. "python"); the rest are
+    # get_sweep_parser's own positionals/options, so reuse it rather than
+    # re-deriving the arg order by hand.
+    parsed = get_sweep_parser().parse_args(literal_args[1:])
+    return parsed.config_path
+
+
+def config_path_from_sweep_yaml(sweep_path: Path) -> Path:
+    """Load `sweep_path` and pull the base_config path out of its `command`
+    block. Used when creating a fresh sweep (`daemon set_sweep -sp`)."""
+    with open(sweep_path) as f:
+        sweep_cfg = yaml.safe_load(f)
+    command = sweep_cfg.get("command")
+    if not command:
+        raise SweepConfigError(f"{sweep_path} has no top-level `command` block to recover a config_path from.")
+    return extract_config_path_from_command(command)
+
+
+def config_path_from_existing_sweep(sweep_id: str, project: str, entity: str) -> Path:
+    """Fetch a previously-created sweep's stored config from wandb and pull
+    the base_config path out of its `command` block. Used when attaching to
+    an already-initialised sweep (`daemon set_sweep --sweep_id`), where no
+    local sweep yaml is necessarily available.
+    """
+    api = wandb.Api()
+    sweep = api.sweep(f"{entity}/{project}/{sweep_id}")
+    command = sweep.config.get("command")
+    if not command:
+        raise SweepConfigError(
+            f"Sweep {sweep_id!r} has no `command` block in its stored config -- "
+            "pass --base_config explicitly."
+        )
+    return extract_config_path_from_command(command)
+
 class SweepConfigError(ValueError):
     """Raised for any sweep-config problem that should fail loudly and early:
     a SWEEP_KEY_MAP entry that doesn't resolve against the skeleton, or a
     skeleton leaf that never got overridden by a sweep value."""
-
 
 BASE_CONFIG_ATTR = "base_config"
 

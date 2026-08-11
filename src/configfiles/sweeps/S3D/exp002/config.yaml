@@ -94,4 +94,5 @@ command:
   - ${program}
   - S3D
   - asl100
+  - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp002/base.py
 

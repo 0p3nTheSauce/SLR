@@ -53,6 +53,12 @@ from src.que.core import (
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
 from src.run_types import ENTITY
+from src.sweeping import (
+    SweepConfigError,
+    config_path_from_existing_sweep,
+    config_path_from_sweep_yaml,
+    validate_sweep_key_map,
+)
 
 # ---------------------------------------------------------------------------
 # Criterion parsing
@@ -871,7 +877,28 @@ class QueShell(cmdLib.Cmd):
 
                     if parsed_args.project is None:
                         parsed_args.project = f"{PROJECT_BASE}-{parsed_args.split[3:]}"
+
+                    if parsed_args.sweep_path is not None:
+                        base_config = config_path_from_sweep_yaml(parsed_args.sweep_path)
+                    else:
+                        base_config = config_path_from_existing_sweep(
+                            parsed_args.sweep_id, parsed_args.project, parsed_args.entity
+                        )
+
+                    # fail fast: catch a bad/missing/mismatched base_config
+                    # path before create_sweep hits the wandb API, and before
+                    # this ever reaches a trial (where the same check would
+                    # otherwise first surface, mid-training, inside
+                    # create_sweep_run)
+                    try:
+                        validate_sweep_key_map(base_config)
+                    except (SweepConfigError, FileNotFoundError, ImportError) as e:
+                        raise SweepConfigError(
+                            f"base_config at {base_config} failed validation: {e}"
+                        ) from None
+
                     if parsed_args.sweep_id is None:
+                        assert parsed_args.sweep_path is not None, "sweep_id and sweep_path cannot both be None"
                         parsed_args.sweep_id = create_sweep(parsed_args.sweep_path, parsed_args.project, parsed_args.entity)
 
                     self.server_context.set_sweep(
@@ -882,7 +909,7 @@ class QueShell(cmdLib.Cmd):
                             model=parsed_args.model,
                             dataset=parsed_args.dataset,
                             split=parsed_args.split,
-                            base_config=str(parsed_args.base_config)
+                            base_config=str(base_config),
                         )
                     )
             elif parsed_args.command == "clear_sweep":
@@ -1585,8 +1612,6 @@ class QueShell(cmdLib.Cmd):
         set_sweep_parser.add_argument(
             "split", type=str, choices=get_avail_splits(), help="The class split"
         )
-
-        set_sweep_parser.add_argument("base_config", type=Path, help="Path to a base_config.py defining BASE_CONFIG")
 
         set_sweep_init_group = set_sweep_parser.add_mutually_exclusive_group(required=True)
 
