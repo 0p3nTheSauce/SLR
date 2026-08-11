@@ -641,8 +641,6 @@ class QueShell(cmdLib.Cmd):
             if runs is None:
                 return
 
-            runs = self.que.summarise(runs, self.ndigits)
-
             # retrieve top n if specified
             if parsed_args.top_n is not None:
                 runs = runs[: parsed_args.top_n]
@@ -655,6 +653,24 @@ class QueShell(cmdLib.Cmd):
                     )
                 )
                 return
+
+            if parsed_args.display_keys is not None:
+                for idx, run in enumerate(runs):
+                    disp_components = {}
+
+                    for key_set in parsed_args.display_keys:
+                        info = Que.get_nested(run, key_set)
+                        disp_components = Que.set_nested(disp_components, key_set, info)
+
+                    title = f"Run {idx} in {parsed_args.location}"
+                    run_json = json.dumps(disp_components, indent=2, default=_json_default)
+                    syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
+                    self.console.print(
+                        Panel(syntax, title=title, border_style="cyan", padding=(1, 2))
+                    )
+                return
+
+            runs = self.que.summarise(runs, self.ndigits)
 
             # Create a styled table
             table = Table(
@@ -1432,6 +1448,14 @@ class QueShell(cmdLib.Cmd):
         self._add_top_n_arg(
             parser,
             help="Number of runs to display from the top of the list (default: 10)",
+        )
+        parser.add_argument(
+            "--display_keys",
+            "-d",
+            nargs="+",
+            type=str,
+            action="append",
+            help="list of keys to display for each run",
         )
         return parser
 
