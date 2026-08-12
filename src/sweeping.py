@@ -188,6 +188,7 @@ SWEEP_KEY_MAP = {
     # training
     "batch_size":              "training.batch_size",
     "update_per_step":         "training.update_per_step",
+    "max_epoch":               "training.max_epoch",
 
     # temporal aug -- now maps to both train and test
     "max_wobble":              "data.train_augs.temporal_aug.type:chunked.max_wobble",
@@ -207,7 +208,6 @@ SWEEP_KEY_MAP = {
     "num_magnitude_bins":      "data.train_augs.spatial_aug.type:RANDAUGMENT.num_magnitude_bins",
 
     # early stopping
-    "max_epoch":               "stopping.max_epoch",
     "patience":                "stopping.patience",
     "min_delta":               "stopping.min_delta",
 }

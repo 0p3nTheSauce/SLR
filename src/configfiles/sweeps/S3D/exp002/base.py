@@ -1,5 +1,5 @@
 base_config = {
-    "training": {"batch_size": None, "update_per_step": None},
+    "training": {"batch_size": None, "update_per_step": None, 'max_epoch': None},
     "optimizer": {
         "eps": None,
         "backbone_init_lr": None,
@@ -44,7 +44,6 @@ base_config = {
         },
     },
     "stopping": {
-        "max_epoch": None,
         "type": "early_stopper",
         "metric": "loss",
         "phase": "val",

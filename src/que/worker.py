@@ -309,8 +309,6 @@ class Worker:
             )
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
-
-
     def train(self) -> None:
         """
         The train method is the main entry point for training a model.
@@ -367,25 +365,22 @@ class Worker:
             self.cleanup()
             self.state['task'] = "inactive"
 
-
     def test(self) -> None:
         try:
             self.state['task'] = "testing"
             self._test()
-        except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = self.build_exception_info(Qe)
+        except QueException as e:
+            self._fail(e, "que based error, cannot continue", clear_pid=False)
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
             self.state['exception'] = "KeyboardInterrupt"
+            # note: no raise here, unlike train()/sweep() -- confirm this is intentional
         except Exception as e:
-            self.server_logger.error(f"Testing run failed due to an error: {e}")
             err_str = self.build_exception_info(e)
-            self.state['exception'] = err_str
+            self._fail(e, "Testing run failed due to an error")
             self.que.stash_failed_run(err_str)
             self.que.save_state()
-            # exit with error
             raise
         finally:
             self.cleanup()
