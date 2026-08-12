@@ -14,7 +14,6 @@ from src.que.core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
     DaemonStateDict,
-    SweepInfo,
     connect_manager,
 )
 from src.que.worker import Worker

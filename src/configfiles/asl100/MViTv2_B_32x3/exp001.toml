@@ -1,6 +1,7 @@
 [training]
 batch_size = 1
 update_per_step = 8
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -70,7 +71,6 @@ std = [
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -81,5 +81,6 @@ min_delta = 0.01
 # same as configfiles/asl100/MViTv2_S_011.ini but with
 # num_frames = 32 and batch size equivalent to 8 (batch_size = 1, update_per_step = 8)
 # and patience reduced to 15 from 50
+# updated by script
 # updated by script
 # updated by script

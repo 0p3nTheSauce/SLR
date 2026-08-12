@@ -121,9 +121,13 @@ def update_config_file(
     dry_run: bool = True,
     retro_support: bool = False,
     output: Path | None = None,
+    ignore_paths: list[str] | None = None
 ):
     from src.configs import load_config
     from src.run_types import AdminInfo
+
+    if ignore_paths is None:
+        ignore_paths = []
 
     if isinstance(run, GenExp):
         run_info = run.model_dump()
@@ -131,7 +135,9 @@ def update_config_file(
         run_info = run
 
     conf_path = Path(run_info["admin"]["config_path"])
-    print(f"Updating config file: {conf_path}")
+    if str(conf_path) in ignore_paths:
+        # print(f'Skipping: {conf_path!s}')
+        return
 
     if conf_path.exists():
         # get old comments
@@ -151,10 +157,11 @@ def update_config_file(
 
             mode: Literal["overwrite", "duplicate"] = default_mode
             print(f"Proceeding with {mode} mode.")
-
     else:
         old_comments = []
         mode: Literal["overwrite", "duplicate"] = "overwrite"
+
+    print(f"Updating config file: {conf_path}")
 
     # generate new config file
     config_str = _run_to_config(run_info, comments=old_comments + ["updated by script"])
@@ -183,6 +190,7 @@ def update_all_files(
     dry_run: bool = True,
     retro_support: bool = False,
     output: Path | None = None,
+    ignore_paths: list[str] | None = None
 ):
 
     KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
@@ -195,13 +203,16 @@ def update_all_files(
 
     for run_info in flat_all_runs:
         update_config_file(
-            run_info, default_mode, dry_run, retro_support, output=output
+            run_info, default_mode, dry_run, retro_support, output=output, ignore_paths=ignore_paths
         )
 
     print(len(flat_all_runs))
 
 
 if __name__ == "__main__":
+    
+    ignore_paths = ['<in-memory:sweep>', 'configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml']
+    
     parser = argparse.ArgumentParser(
         description="Utility script to update TOML configuration files from experiment run data."
     )
@@ -230,6 +241,7 @@ if __name__ == "__main__":
         default=None,
         help="Optional path to write a debug copy of the generated config.",
     )
+   
 
     # Sub-commands (making dest="command" optional by not enforcing required=True)
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
@@ -280,6 +292,7 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
             retro_support=args.retro_support,
             output=args.output,
+            ignore_paths=ignore_paths
         )
 
     elif chosen_command == "all":
@@ -288,4 +301,5 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
             retro_support=args.retro_support,
             output=args.output,
+            ignore_paths=ignore_paths
         )

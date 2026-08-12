@@ -53,12 +53,7 @@ from src.que.core import (
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
 from src.run_types import ENTITY
-from src.sweeping import (
-    SweepConfigError,
-    config_path_from_existing_sweep,
-    config_path_from_sweep_yaml,
-    validate_sweep_key_map,
-)
+
 
 # ---------------------------------------------------------------------------
 # Criterion parsing
@@ -852,7 +847,12 @@ class QueShell(cmdLib.Cmd):
     def do_daemon(self, arg):
         """Interact with the worker"""
         from src.run_types import PROJECT_BASE
-
+        from src.sweeping import (
+            SweepConfigError,
+            config_path_from_existing_sweep,
+            config_path_from_sweep_yaml,
+            validate_sweep_key_map,
+        )
 
         with self.console.status("[bold green]Importing...", spinner="dots"):
             parsed_args = self._parse_args_or_cancel("daemon", arg)

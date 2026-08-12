@@ -1,6 +1,7 @@
 [training]
 batch_size = 8
 update_per_step = 1
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -76,7 +77,6 @@ eta_min = 0.0
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -88,5 +88,6 @@ min_delta = 0.01
 # but with wobble = 4
 # sampler = focal_normal for both
 # and patience = 15
+# updated by script
 # updated by script
 # updated by script

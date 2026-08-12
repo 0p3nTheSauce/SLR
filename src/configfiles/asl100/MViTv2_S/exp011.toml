@@ -1,6 +1,7 @@
 [training]
 batch_size = 4
 update_per_step = 2
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -70,7 +71,6 @@ std = [
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -81,5 +81,6 @@ min_delta = 0.01
 # same as configfiles/asl100/MViTv2_S_010.ini but without
 # learning rate scheduler
 # this actually set the new best loss
+# updated by script
 # updated by script
 # updated by script

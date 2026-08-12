@@ -323,15 +323,9 @@ StoppingMetrics: TypeAlias = Literal["loss", "acc"]
 StoppingPhases: TypeAlias = Literal['val', 'train']
 StoppingModes: TypeAlias = Literal["min", "max"]
 
-class StopperInfo(BaseModel):
-    type: Literal["stopper"] = "stopper"
-    max_epoch: int
-    phase: StoppingPhases = 'train'
-
 
 class EarlyStopperInfo(BaseModel):
-    type: Literal["early_stopper"] = "early_stopper"
-    max_epoch: int
+    type: Literal['early_stopper'] = 'early_stopper'
     metric: StoppingMetrics
     phase: StoppingPhases = 'val'
     mode: StoppingModes
@@ -350,28 +344,11 @@ class EarlyStopperInfo(BaseModel):
             )
         return self
 
-
-StopperConfig = Annotated[
-    StopperInfo | EarlyStopperInfo,
-    Field(discriminator="type"),
-]
-    
-    
-class StopperState(BaseModel):
-    on: bool
-    max_epoch: int
-    phase: str
-    metric: str
-    mode: str
-    patience: int
-    min_delta: float
-    curr_epoch: int
+class StopperState(EarlyStopperInfo):
     best_score: float | None = None
-    best_epoch: int
-    counter: int
-    stop: bool
-    stopped_by_event: bool
-
+    best_epoch: int = 0
+    counter: int = 0
+    stop: bool = False
 
 ####################### Models #############################
 
@@ -394,6 +371,7 @@ class AdminInfo(MinInfo):
 class TrainingInfo(BaseModel):
     batch_size: int
     update_per_step: int
+    max_epoch: int
 
     @computed_field  # type: ignore[misc]
     @property
@@ -575,7 +553,7 @@ class RunInfo(BaseModel):
     model_params: ModelInfo = Field(default_factory=SupervisedInfo)
     data: DataInfo
     scheduler: SchedInfo | None = None
-    stopping: StopperConfig
+    stopping: EarlyStopperInfo | None = None
 
     @field_validator("model_params", mode="before")
     @classmethod

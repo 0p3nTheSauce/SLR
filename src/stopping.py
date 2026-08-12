@@ -1,18 +1,14 @@
-from typing import Optional
 from wandb.sdk.wandb_run import Run
-from multiprocessing.synchronize import Event as EventClass
+
 #local
-from src.run_types import StopperInfo, StopperState, EarlyStopperInfo, StopperConfig
+from src.run_types import EarlyStopperInfo, StopperState
 
 
+#TODO: add propper logging
+class EarlyStopper:
+    """Early stopping utility for training processes.
     
-class Stopper:
-    """Stopping utility for training processes.
-    
-    Stops if max epochs reached, and bundles other optional early stopping utilitise
-    including config based, and multiprocessing event class. 
-    
-    For config based setup: Monitors a specified metric and stops training if no improvement is seen 
+    Monitors a specified metric and stops training if no improvement is seen 
     for a defined number of epochs (patience). Supports both minimization and 
     maximization modes.
 
@@ -25,95 +21,62 @@ class Stopper:
 
     def __init__(
         self,
-        arg_dict: StopperConfig,
-        wandb_run: Optional[Run] = None,
-        event: Optional[EventClass] = None, # if in a multiprocessing context, can pass an Event to signal stopping
+        config: EarlyStopperInfo,
+        wandb_run: Run | None = None,
     ):
         """Initialise the stopper
 
         Args:
-            arg_dict (StopperConfig): Stopping information, at least max_epoch.
+            config (StopperConfig): Stopping information, at least max_epoch.
             wandb_run (Optional[Run], optional): For logging patience. Defaults to None.
-            event (Optional[EventClass], optional): Can pass an Event to signal stopping. Defaults to None.
         """
-    
-        self.max_epoch = arg_dict.max_epoch
         
-        if arg_dict.type == 'early_stopper':
-            self.stopping_early = True
-            self.metric = arg_dict.metric
-            self.mode = arg_dict.mode
-            self.patience = arg_dict.patience
-            self.min_delta = arg_dict.min_delta
-        else:
-            self.stopping_early = False
-            
-            
-        self.phase = arg_dict.phase
-        self.curr_epoch = 0
-        self.best_score = None
-        self.best_epoch = 0
-        self.counter = 0
+        self.state = StopperState.model_validate(config, from_attributes=True)
         self.wandb_run = wandb_run
-        self.stop = False
-        self.event = event
-        self.stopped_by_event = False
-
-
-    def step(self, score) -> None:
+    
+    
+    def step(self, phase: str, metrics: dict[str, float], epoch: int) -> None:
         """Update early stopping state based on current score.
         
         Args:
             score: The current metric value to evaluate.
+            epoch: The current epoch number.
         """
-        
-        if self.curr_epoch >= self.max_epoch:
-            self.stop = True
-            print("Maximum epochs reached")
+        if self.should_stop():
             return
-        
-        if self.event is not None and self.event.is_set():
-            self.stop = True
-            self.stopped_by_event = True
+        if phase != self.state.phase:
             return
-        
-        if not self.stopping_early:
-            self.curr_epoch += 1
-            return 
-        
+        score = metrics[self.state.metric]
+
         improved = False
-        if self.best_score is None:
+        if self.state.best_score is None:
             improved = True
-        elif self.mode == "min":
-            if score < self.best_score - self.min_delta:
+        elif self.state.mode == "min":
+            if score < self.state.best_score - self.state.min_delta:
                 improved = True
         else:  # 'max'
-            if score > self.best_score + self.min_delta:
+            if score > self.state.best_score + self.state.min_delta:
                 improved = True
-                                
-        if improved:
-            self.best_score = score
-            self.best_epoch = self.curr_epoch
-            self.counter = 0
-        else:
-            self.counter += 1
 
-        if self.counter >= self.patience:
+        if improved:
+            self.state.best_score = score
+            self.state.best_epoch = epoch
+            self.state.counter = 0
+        else:
+            self.state.counter += 1
+
+        if self.state.counter >= self.state.patience:
             print(
-                f"Early stopping triggered after {self.patience} epochs without improvement."
+                f"Early stopping triggered after {self.state.patience} epochs without improvement."
             )
             print(
-                f"Best {self.phase} {self.metric}: {self.best_score:.4f} at epoch {self.best_epoch}"
+                f"Best {self.state.phase} {self.state.metric}: {self.state.best_score:.4f} at epoch {self.state.best_epoch}"
             )
-            self.stop = True
+            self.state.stop = True
 
         if self.wandb_run:
-            self.wandb_run.log({"Patience count": self.counter})
+            self.wandb_run.log({"Patience count": self.state.counter})
             
-            
-            
-        self.curr_epoch += 1
-
     def state_dict(self) -> StopperState:
         """Return the current state as a StopperState model.
         
@@ -121,21 +84,7 @@ class Stopper:
             StopperState model containing the current state.
         """
         
-        return StopperState(
-            on=self.stopping_early,
-            max_epoch=self.max_epoch,
-            phase=self.phase,
-            metric=self.metric,
-            mode=self.mode,
-            patience=self.patience,
-            min_delta=self.min_delta,
-            curr_epoch=self.curr_epoch,
-            best_score=self.best_score,
-            best_epoch=self.best_epoch,
-            counter=self.counter,
-            stop=self.stop,
-            stopped_by_event=self.stopped_by_event
-        )
+        return self.state.model_copy() #return a copy not a reference
 
     def load_state_dict(self, state_dict: StopperState) -> None:
         """Load state from a StopperState model.
@@ -143,5 +92,39 @@ class Stopper:
         Args:
             state_dict: StopperState model containing state to restore.
         """
-        for key, value in state_dict.model_dump().items():
-            setattr(self, key, value)
+        self.state = state_dict
+
+    def should_stop(self) -> bool:
+        """Check if early stopping has been triggered.
+        
+        Returns:
+            True if early stopping is triggered, False otherwise.
+        """
+        return self.state.stop
+
+class NullEarlyStopper:
+    """No-op stand-in when early stopping is disabled."""
+    
+    
+
+    def step(self, phase: str, metrics: dict[str, float], epoch: int) -> None:
+        pass
+
+    def state_dict(self) -> None:
+        return None
+
+    def load_state_dict(self, state_dict) -> None:
+        pass
+    
+    def should_stop(self) -> bool:
+        return False
+
+
+def build_early_stopper(
+    config: EarlyStopperInfo | None, wandb_run: Run | None = None
+) -> EarlyStopper | NullEarlyStopper:
+    if config is None:
+        return NullEarlyStopper()
+    return EarlyStopper(config, wandb_run)
+
+MaybeStopper = EarlyStopper | NullEarlyStopper

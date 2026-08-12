@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader
 from wandb.sdk.wandb_run import Run
 
 import wandb
+
+#locals
 from src.configs import (
     RunInfo,
     WandbInfo,
@@ -22,18 +24,22 @@ from src.configs import (
     set_seed,
     take_args,
 )
-from src.models import MVirTed, MViT_2D_t, extend_classifier, get_mae_model, get_model
+from src.models import (  # noqa: F401
+    MVirTed,
+    MViT_2D_t,
+    extend_classifier,
+    get_mae_model,
+    get_model,
+)
 from src.run_types import (
     OptimizerInfo,
     SchedInfo,
     is_pretrain_config,
     is_supervised_config,
 )
-from src.stopping import Stopper
+from src.stopping import MaybeStopper, build_early_stopper
 from src.testing import save_test_sizes
 from src.utils import wandb_manager
-
-# local imports
 from src.video_dataset import VideoDataset, get_data_set, get_wlasl_info
 
 StrPath = str | PathLike[str]
@@ -231,6 +237,15 @@ def save_checkpoint(checkpoint_data: dict[str, Any], save_path: Path):
 
     print(f"Checkpoint saved: {checkpoint_path}")
 
+def warn(
+    message: str,
+    strict: bool = False,
+    ) -> None:
+    """Print a warning message or raise an error based on the strict flag."""
+    if strict:
+        raise Warning(message)
+    else:
+        print(f"Warning: {message}")
 
 def load_checkpoint(
     load_path: Path, device: torch.device, strict: bool = False
@@ -248,14 +263,10 @@ def load_checkpoint(
             np.random.set_state(checkpoint["rng_numpy"])
             random.setstate(checkpoint["rng_python"])
         else:
-            if strict:
-                raise Warning(
-                    f"Checkpoint: {load_path} without rng state was loaded. Reproducability will be impacted."
-                )
-            else:
-                print(
-                    f"Checkpoint: {load_path} without rng state was loaded. Reproducability will be impacted."
-                )
+            warn(
+                f"Checkpoint: {load_path} without rng state was loaded. Reproducability will be impacted.",
+                strict=strict
+            )
         return checkpoint
     else:
         raise ValueError(f"Load path not found: {load_path}")
@@ -327,38 +338,42 @@ def load_training(
     model: nn.Module,
     optimizer: optim.Optimizer,
     scheduler: optim.lr_scheduler.LRScheduler,
-    stopper: Stopper,
+    early_stopper: MaybeStopper,
+    strict: bool = False,
 ) -> tuple[
     nn.Module,
     optim.Optimizer,
     optim.lr_scheduler.LRScheduler,
-    Stopper,
+    MaybeStopper,
     int,
     int,
     float,
     float,
     dict[str, dict[str, float]],
 ]:
-    """Load training state from a checkpoint
-
+    """Load training state from a checkpoint. 
+    NOTE: This function was not built to handle config changes between runs. It will overwrite giving preference to the loaded checkpoint.
+    TODO: Decouple config from checkpoint loading to allow for config changes between runs.
+    
     Args:
         load_path (Path): path to checkpoint
         device (torch.device): device to map to
         model (nn.Module): model to load
         optimizer (optim.Optimizer): optimizer to load
         scheduler (optim.lr_scheduler.LRScheduler): scheduler to load
-        stopper (Stopper): stopper to load
+        early_stopper (MaybeStopper): early stopper to load
 
     Returns:
-        Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler.LRScheduler, Stopper, int, int, float, float]: model, optimizer, scheduler, stopper, epoch, steps, best_val_loss, best_val_acc
+        Tuple[nn.Module, optim.Optimizer, optim.lr_scheduler.LRScheduler, MaybeStopper, int, int, float, float]: model, optimizer, scheduler, early_stopper, epoch, steps, best_val_loss, best_val_acc
     """
     epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
     if load_path.name == "best.pth":
+        
         return (
             model,
             optimizer,
             scheduler,
-            stopper,
+            early_stopper,
             epoch,
             steps,
             best_val_loss,
@@ -366,16 +381,13 @@ def load_training(
             stopping_metrics,
         )
 
-    checkpoint = load_checkpoint(load_path, device)
+    checkpoint = load_checkpoint(load_path, device, strict=strict)
     model.load_state_dict(checkpoint["model_state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     if "scheduler_state_dict" in checkpoint:
         scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-    if "stopper_state_dict" in checkpoint:
-        stopper.load_state_dict(checkpoint["stopper_state_dict"])
-        if stopper.stopped_by_event:
-            stopper.stop = False  # reset stop if was set by event before
-            stopper.stopped_by_event = False
+    if checkpoint.get("stopper_state_dict") is not None:
+        early_stopper.load_state_dict(checkpoint["stopper_state_dict"])
     if "stopping_metrics" in checkpoint:
         stopping_metrics = checkpoint["stopping_metrics"]
 
@@ -396,7 +408,7 @@ def load_training(
         model,
         optimizer,
         scheduler,
-        stopper,
+        early_stopper,
         epoch,
         steps,
         best_val_loss,
@@ -408,7 +420,7 @@ def load_training(
 def save_training(
     save_path: Path,
     save_every: int,
-    stopper: Stopper,
+    early_stopper: MaybeStopper,
     model: nn.Module,
     optimizer: optim.Optimizer,
     scheduler: optim.lr_scheduler.LRScheduler,
@@ -420,7 +432,7 @@ def save_training(
 ) -> None:
     """Save training state checkpoint"""
 
-    if epoch % save_every == 0 or stopper.stop:
+    if epoch % save_every == 0 or early_stopper.should_stop():
         checkpoint_data = {
             "epoch": epoch,
             "steps": steps,
@@ -429,7 +441,7 @@ def save_training(
             "scheduler_state_dict": scheduler.state_dict(),
             "best_val_loss": best_val_loss,
             "best_val_acc": best_val_acc,
-            "stopper_state_dict": stopper.state_dict(),
+            "stopper_state_dict": early_stopper.state_dict(),
             "stopping_metrics": stopping_metrics,
         }
         save_checkpoint(checkpoint_data, save_path)
@@ -467,7 +479,7 @@ def train_epoch(
     optimizer: optim.Optimizer,
     wandb_run: Run,
     stopping_metric: dict[str, float],
-    stopper: Stopper,
+    early_stopper: MaybeStopper,
     device: torch.device,
     epoch: int,
     steps: int,
@@ -554,8 +566,7 @@ def train_epoch(
     # early stopping logic
     stopping_metric["loss"] = epoch_loss
     stopping_metric["acc"] = epoch_acc
-    if stopper.phase == phase_name:
-        stopper.step(stopping_metric[stopper.metric])
+    early_stopper.step(phase_name, stopping_metric, epoch)
 
     # print epoch level output
     epoch_summary(
@@ -578,7 +589,7 @@ def val_epoch(
     scheduler: optim.lr_scheduler.LRScheduler,
     wandb_run: Run,
     stopping_metric: dict[str, float],
-    stopper: Stopper,
+    early_stopper: MaybeStopper,
     device: torch.device,
     epoch: int,
     best_val_loss: float,
@@ -616,8 +627,8 @@ def val_epoch(
     # early stopping logic
     stopping_metric["loss"] = epoch_loss
     stopping_metric["acc"] = epoch_acc
-    if phase_name == stopper.phase:
-        stopper.step(stopping_metric[stopper.metric])
+    
+    early_stopper.step(phase_name, stopping_metric, epoch)
 
     # print epoch level output
     epoch_summary(
@@ -715,7 +726,7 @@ def train_loop(
 
     loss_func = nn.CrossEntropyLoss()
 
-    stopper = Stopper(arg_dict=config.stopping, wandb_run=wandb_run, event=event)
+    early_stopper = build_early_stopper(config=config.stopping, wandb_run=wandb_run)
 
     epoch, steps, best_val_loss, best_val_acc, stopping_metrics = _init_accumulators()
 
@@ -732,7 +743,7 @@ def train_loop(
             model,
             optimizer,
             scheduler,
-            stopper,
+            early_stopper,
             epoch,
             steps,
             best_val_loss,
@@ -744,13 +755,15 @@ def train_loop(
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
-            stopper=stopper,
+            early_stopper=early_stopper,
         )
 
     # train it
-    while not stopper.stop:
-        print(f"Epoch {stopper.curr_epoch}/{stopper.max_epoch}")
+    while not early_stopper.should_stop() and epoch < config.training.max_epoch and not (event.is_set() if event else False):
+        print(f"Epoch {epoch}/{config.training.max_epoch}")
         print("-" * 10)
+
+        epoch += 1
 
         # training stage
         phase_name = "train"
@@ -761,7 +774,7 @@ def train_loop(
             optimizer=optimizer,
             wandb_run=wandb_run,
             stopping_metric=stopping_metrics[phase_name],
-            stopper=stopper,
+            early_stopper=early_stopper,
             device=device,
             epoch=epoch,
             steps=steps,
@@ -777,7 +790,7 @@ def train_loop(
             scheduler=scheduler,
             wandb_run=wandb_run,
             stopping_metric=stopping_metrics[phase_name],
-            stopper=stopper,
+            early_stopper=early_stopper,
             device=device,
             epoch=epoch,
             best_val_loss=best_val_loss,
@@ -789,7 +802,7 @@ def train_loop(
         save_training(
             save_path=save_path,
             save_every=save_every,
-            stopper=stopper,
+            early_stopper=early_stopper,
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
@@ -802,303 +815,6 @@ def train_loop(
 
     print("Finished training successfully")
     return {"best_val_acc": best_val_acc, "best_val_loss": best_val_loss}
-
-
-def masked_pretrain_epoch(
-    mae_model: nn.Module,
-    dataloader: DataLoader[VideoDataset],
-    optimizer: optim.Optimizer,
-    wandb_run: Run,
-    stopping_metric: dict[str, float],
-    stopper: Stopper,
-    device: torch.device,
-    epoch: int,
-    steps: int,
-    update_per_step: int,
-) -> int:
-
-    phase_name = "train"
-    mae_model.train()
-
-    running_loss = 0.0
-    total_samples = 0
-    step_loss = 0.0
-    step_samples = 0
-    accumulated_steps = 0
-
-    for item in dataloader:
-        data = item["frames"].to(device)  # no labels needed
-        batch_size = data.size(0)
-        total_samples += batch_size
-
-        loss = mae_model(data)
-
-        # Accumulate metrics
-        running_loss += loss.item() * batch_size
-
-        # Accumulate for step logging
-        step_loss += loss.item() * batch_size
-        step_samples += batch_size
-
-        scaled_loss = loss / update_per_step
-        scaled_loss.backward()
-
-        accumulated_steps += 1
-
-        if accumulated_steps == update_per_step:
-            optimizer.step()
-            optimizer.zero_grad()
-            steps += 1
-
-            # Print step level output
-            if steps % 10 == 0:
-                avg_step_loss = step_loss / step_samples
-                print(f"Step {steps}: Loss: {avg_step_loss:.4f}, ")
-
-                wandb_run.log(
-                    {
-                        "Loss/Train_Step": avg_step_loss,
-                        "Step": steps,
-                    }
-                )
-
-                # Reset step metrics
-                step_loss = 0.0
-                step_samples = 0
-
-            # Reset accumulation
-            accumulated_steps = 0
-
-    # calculate  epoch metrics
-    epoch_loss = running_loss / total_samples
-
-    # early stopping logic
-    stopping_metric["loss"] = epoch_loss
-    if stopper.phase == phase_name:
-        stopper.step(stopping_metric[stopper.metric])
-
-    # print epoch level output
-    print(f"{phase_name.upper()} - Epoch {epoch}: Loss: {epoch_loss:.4f}")
-    wandb_run.log(
-        {
-            f"Loss/{phase_name.capitalize()}": epoch_loss,
-            "Epoch": epoch,
-        }
-    )
-
-    return steps
-
-
-def masked_preval_epoch(
-    mae_model: nn.Module,
-    dataloader: DataLoader[VideoDataset],
-    scheduler: optim.lr_scheduler.LRScheduler,
-    wandb_run: Run,
-    stopping_metric: dict[str, float],
-    stopper: Stopper,
-    device: torch.device,
-    epoch: int,
-    best_val_loss: float,
-    save_path: Path,
-) -> float:
-    phase_name = "val"
-
-    mae_model.eval()
-
-    running_loss = 0.0
-    total_samples = 0
-
-    for item in dataloader:
-        data = item["frames"].to(device)  # no labels needed
-        batch_size = data.size(0)
-        total_samples += batch_size
-
-        with torch.no_grad():
-            loss = mae_model(data)
-
-        # Accumulate metrics
-        running_loss += loss.item() * batch_size
-
-    # calculate  epoch metrics
-    epoch_loss = running_loss / total_samples
-
-    # early stopping logic
-    stopping_metric["loss"] = epoch_loss
-    if phase_name == stopper.phase:
-        stopper.step(stopping_metric[stopper.metric])
-
-    # print epoch level output
-    print(f"{phase_name.upper()} - Epoch {epoch}: Loss: {epoch_loss:.4f}")
-    wandb_run.log(
-        {
-            f"Loss/{phase_name.capitalize()}": epoch_loss,
-            "Epoch": epoch,
-        }
-    )
-
-    # Save best model
-    if epoch_loss < best_val_loss:
-        best_val_loss = epoch_loss
-        check_name = save_path / "best.pth"
-        torch.save(mae_model.state_dict(), check_name)
-        print(f"New best model saved: {check_name} (Loss: {epoch_loss:.2f}%)")
-
-    # log best validation metrics
-    wandb_run.log(
-        {
-            f"Best/{phase_name.capitalize()}_loss": best_val_loss,
-            "Epoch": epoch,
-        }
-    )
-
-    # scheduler
-    if isinstance(scheduler, ReduceLROnPlateau):
-        assert epoch_loss is not None, "Should be defined by now"
-        scheduler.step(epoch_loss)
-    else:
-        scheduler.step()
-
-    return best_val_loss
-
-
-def pretrain_loop(
-    model_name: str,
-    config: RunInfo,
-    wandb_run: Run,
-    load: StrPath | None = None,
-    save_every: int = 5,
-    recover: bool = False,
-    event: EventClass | None = None,
-) -> dict[str, float] | None:
-    """Pretrain loop for MAE-style self-supervised pretraining.
-
-    Args:
-        model_name (str): Name of the model to pretrain.
-        wandb_run (Run): Wandb run instance for logging.
-        load (StrPath | None, optional): Path to checkpoint to load. Defaults to None.
-        save_every (int, optional): Period of saving (epochs). Defaults to 5.
-        recover (bool, optional): Continue from a failed run. Defaults to False.
-        seed (Optional[int], optional): Random seed value. Defaults to SEED.
-        event: EventClass | None = None,
-
-    Returns:
-        dict[str, float] | None: Dictionary with keys: best_val_loss
-    """
-
-    set_seed(config.admin.seed)
-
-    dataloaders, _ = setup_data(config)  # no num_classes needed
-
-    # TODO: generalise model loading
-
-    assert is_pretrain_config(config.model_params), "not implemented"
-    encoder_info = config.model_params.encoder_info
-
-    encoder = MVirTed(
-        MViT_2D_t(),
-        0,  # NA
-        encoder_info.drop_p,  # NA,
-        embed_dim=encoder_info.embed_dim,
-        num_heads=encoder_info.num_heads,
-        num_layers=encoder_info.num_layers,
-        max_frames=encoder_info.max_frames,
-        mvit_out_dim=encoder_info.mvit_out_dim,
-    )
-
-    mae_model = get_mae_model(
-        model_name=model_name,
-        encoder=encoder,
-        mask_ratio=config.model_params.mask_ratio,
-        embed_dim=config.model_params.embed_dim,
-    )  # returns masked autoencoder model
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    mae_model.to(device)
-
-    optimizer = get_optimizer(mae_model, config.optimizer)
-    scheduler = get_scheduler(optimizer, config.scheduler)
-    stopper = Stopper(arg_dict=config.stopping, wandb_run=wandb_run, event=event)
-
-    epoch, steps, best_val_loss, _, stopping_metrics = _init_accumulators()
-    save_path = Path(config.admin.save_path)
-
-    load = _handle_recovery(save_path=save_path, recover=recover, load=load)
-
-    save_test_sizes(config.data, save_path.parent)
-
-    if load:
-        (
-            mae_model,
-            optimizer,
-            scheduler,
-            stopper,
-            epoch,
-            steps,
-            best_val_loss,
-            _,
-            stopping_metrics,
-        ) = load_training(
-            load_path=Path(load),
-            device=device,
-            model=mae_model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            stopper=stopper,
-        )
-
-    while not stopper.stop:
-        print(f"Epoch {stopper.curr_epoch}/{stopper.max_epoch}")
-        print("-" * 10)
-
-        epoch += 1
-
-        # training stage
-        phase_name = "train"
-        steps = masked_pretrain_epoch(
-            mae_model=mae_model,
-            dataloader=dataloaders[phase_name],
-            optimizer=optimizer,
-            wandb_run=wandb_run,
-            stopping_metric=stopping_metrics[phase_name],
-            stopper=stopper,
-            device=device,
-            epoch=epoch,
-            steps=steps,
-            update_per_step=config.training.update_per_step,
-        )
-
-        # validation stage
-        phase_name = "val"
-        best_val_loss = masked_preval_epoch(
-            mae_model=mae_model,
-            dataloader=dataloaders[phase_name],
-            scheduler=scheduler,
-            wandb_run=wandb_run,
-            stopping_metric=stopping_metrics[phase_name],
-            stopper=stopper,
-            device=device,
-            epoch=epoch,
-            best_val_loss=best_val_loss,
-            save_path=save_path,
-        )
-
-        # Save checkpoint
-        save_training(
-            save_path=save_path,
-            save_every=save_every,
-            stopper=stopper,
-            model=mae_model,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            epoch=epoch,
-            steps=steps,
-            best_val_loss=best_val_loss,
-            best_val_acc=0,
-            stopping_metrics=stopping_metrics,
-        )
-
-    print("Finished pretraining successfully")
-    return {"best_val_loss": best_val_loss}
 
 
 def train_model(
@@ -1138,14 +854,8 @@ def train_model(
             event=event,
         )
     elif is_pretrain_config(config.model_params):
-        return pretrain_loop(
-            model_name=model_name,
-            config=config,
-            wandb_run=wandb_run,
-            load=load,
-            save_every=save_every,
-            recover=recover,
-            event=event,
+        raise DeprecationWarning(
+            "Pretraining is no longer supported in this training loop. Please use the pretraining script."
         )
     else:
         raise ValueError(

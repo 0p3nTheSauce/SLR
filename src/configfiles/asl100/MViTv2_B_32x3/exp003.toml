@@ -1,6 +1,7 @@
 [training]
 batch_size = 1
 update_per_step = 8
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -69,7 +70,6 @@ std = [
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -82,5 +82,6 @@ min_delta = 0.01
 # drop_p = None (same as og config)
 # and patience reduced to 15 from 50
 # did worse than exp002, thus drop_p is useful
+# updated by script
 # updated by script
 # updated by script

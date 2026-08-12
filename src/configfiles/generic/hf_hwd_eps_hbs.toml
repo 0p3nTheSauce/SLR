@@ -1,6 +1,7 @@
 [training]
 batch_size = 8
 update_per_step = 1
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -75,7 +76,6 @@ eta_min = 1e-05
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -85,5 +85,6 @@ min_delta = 0.01
 
 # Same as hframe_hwd_leps4, but with increased batch size (same equivalent)
 # and drop_p = 0.1
+# updated by script
 # updated by script
 # updated by script

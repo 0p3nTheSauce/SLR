@@ -1,6 +1,7 @@
 [training]
 batch_size = 1
 update_per_step = 8
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -87,7 +88,6 @@ eta_min = 0.0
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -103,4 +103,5 @@ min_delta = 0.01
 # Crop
 # same as /configfiles/RandAug/MViT_B_32x3_eda_ops3_no_wobble.toml
 # but with random resize crop instead of centre crop during training
+# updated by script
 # updated by script

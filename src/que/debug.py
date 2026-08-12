@@ -40,49 +40,7 @@ def test_read_server_state():
     s = read_server_state()
     print(s.model_dump())
 
-def update_runs15():
-    from src.stopping import StopperInfo, EarlyStopperInfo
 
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
-        all_runs = json.load(f)
-
-    for loc in KEYS:
-        que_list = all_runs[loc]
-        new_quelist = []
-        for run in que_list:
-            
-            stopping = run.pop('stopping', None)
-            
-            if stopping is None:
-                raise ValueError(f"Run {run['admin']['config_path']} is missing 'stopping' information.")
-            elif stopping['type'] == 'stopper':
-                stopping = StopperInfo(max_epoch=stopping['max_epoch'])
-            elif stopping['type'] == 'early_stopper':
-                stopping = EarlyStopperInfo(
-                    max_epoch=stopping['max_epoch'],
-                    metric=stopping['metric'],
-                    phase=stopping['phase'],
-                    mode=stopping['mode'],
-                    patience=stopping['patience'],
-                    min_delta=stopping['min_delta']
-                )
-            print(stopping.model_dump())
-            
-            run['stopping'] = stopping.model_dump()
-
-            if loc in KEYS[:2]:
-                run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
-                run = CompExpInfo.model_validate(run).model_dump()
-            else:
-                run = FailedExp.model_validate(run).model_dump()
-
-            new_quelist.append(run)
-
-        all_runs[loc] = new_quelist
-
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
-        json.dump(all_runs, f, indent=4)
 
 def fix_file_path(path: str) -> str:
     """Fix file path by replacing '/home/luke/Code/SLR/src/' with 'src/'"""
@@ -96,6 +54,8 @@ def fix_file_path(path: str) -> str:
     except ValueError:
         print(f"Path {path} is not under 'src/'. Returning original path...")
         return path  # Return the original path if it doesn't match either condition
+    
+    
 def update_runs16():
     q = Que()
     
@@ -114,10 +74,46 @@ def update_runs17():
     q.update_runs(key_set2, fix_file_path)
     q.save_state('/home/luke/Code/SLR/src/que/Runs_updated.json')
 
+
+def update_runs18():
+
+    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+        all_runs = json.load(f)
+
+    for loc in KEYS:
+        que_list = all_runs[loc]
+        new_quelist = []
+        for run in que_list:
+            
+            stopping = run.pop('stopping', None)
+            training = run.pop('training', None)
+            assert stopping is not None 
+            assert training is not None
+            
+            training['max_epoch'] = stopping.pop('max_epoch', 200)
+            
+            run['stopping'] = stopping
+            run['training'] = training
+
+            if loc in KEYS[:2]:
+                run = ExpInfo.model_validate(run).model_dump()
+            elif loc == KEYS[2]:
+                run = CompExpInfo.model_validate(run).model_dump()
+            else:
+                run = FailedExp.model_validate(run).model_dump()
+
+            new_quelist.append(run)
+
+        all_runs[loc] = new_quelist
+
+    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
+        json.dump(all_runs, f, indent=4)
+
+
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
-    update_runs16()
+    update_runs18()
     # pass
     
     

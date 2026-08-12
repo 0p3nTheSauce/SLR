@@ -1,6 +1,7 @@
 [training]
 batch_size = 4
 update_per_step = 2
+max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
@@ -76,7 +77,6 @@ eta_min = 0.0
 
 [stopping]
 type = "early_stopper"
-max_epoch = 200
 metric = "loss"
 phase = "val"
 mode = "min"
@@ -85,5 +85,6 @@ min_delta = 0.01
 
 
 # same as hframe_hwd_warmrestarts in generic, but with frames = 16
+# updated by script
 # updated by script
 # updated by script
