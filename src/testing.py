@@ -1,51 +1,53 @@
+import gc
+import json
+import re
+from argparse import ArgumentParser
+from pathlib import Path
 from typing import (
-    Optional,
-    Union,
-    Tuple,
     Dict,
     List,
+    Optional,
+    Tuple,
+    Union,
 )
-from argparse import ArgumentParser
-import torch
-import json
-from sklearn.metrics import accuracy_score, classification_report
-import numpy as np
-from torch.utils.data import DataLoader
-from torch import Tensor
-import tqdm
-from pathlib import Path
-import gc
-import re
 
-# locals
-from src.visualise import plot_confusion_matrix, plot_bar_graph, plot_heatmap
-from src.models import get_model, avail_models
+import numpy as np
+import torch
+import tqdm
+from sklearn.metrics import accuracy_score, classification_report
+from torch import Tensor
+from torch.utils.data import DataLoader
+
+from src.configs import (
+    get_avail_splits,
+    get_model_checkpoint_dir,
+    get_model_exp_dir,
+    get_model_results_dir,
+    set_seed,
+)
+from src.models import avail_models, get_model
+from src.run_types import (
+    BaseRes,
+    ClassReport,
+    CompRes,
+    DataInfo,
+    MinInfo,
+    ShuffleT,
+    ShuffRes,
+    TemporalAugs,
+    TopKRes,
+    is_sampler_config,
+)
 from src.video_dataset import (
+    AVAIL_SETS,
+    AVAIL_SPLITS,
     VideoDataset,
     get_data_set,
     get_wlasl_info,
-    AVAIL_SETS,
-    AVAIL_SPLITS,
 )
-from src.configs import (
-    set_seed,
-    get_avail_splits,
-    get_model_results_dir,
-    get_model_exp_dir,
-    get_model_checkpoint_dir,
-)
-from src.run_types import (
-    CompRes,
-    ClassReport,
-    MinInfo,
-    BaseRes,
-    ShuffRes,
-    TopKRes,
-    DataInfo,
-    ShuffleT,
-    TemporalAugs,
-    is_sampler_config
-)
+
+# locals
+from src.visualise import plot_bar_graph, plot_confusion_matrix, plot_heatmap
 
 # constants
 

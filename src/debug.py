@@ -402,12 +402,6 @@ def test_filter_runs():
     _ = q.summarise_runs('old_runs')
     
 
-def test_instance():
-    from src.stopping import StopperOn, StopperInfo
-    
-    i = StopperInfo(max_epoch=1)
-    print(isinstance(i, StopperOn))
-
 if __name__ == '__main__':
     # test_dump_peak()
     # test_dump_peak_server()
@@ -428,4 +422,4 @@ if __name__ == '__main__':
     # test_set_nested2()
     # test_load_checkpoint()
     # test_pop_nested()
-    test_instance()
+    pass

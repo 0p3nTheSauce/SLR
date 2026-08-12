@@ -19,7 +19,7 @@ import torch
 import wandb
 
 #locals
-from src.run_types import CONFIGS_PATH, ZFILL
+from src.run_types import ZFILL
 
 ################ GPU ###################
 
@@ -622,10 +622,6 @@ def plot_from_lists(
 
 
 ##################### Misc ###################################
-
-
-def to_mark_down(configs_path: Path = Path(CONFIGS_PATH)):
-    pass
 
 def extract_num(fname):
     num_substrs = re.findall(r"\d+", fname)
