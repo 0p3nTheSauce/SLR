@@ -1,30 +1,26 @@
-from typing import (
-    List,
-    Literal,
-    Optional,
-    Any,
-    Tuple,
-    TypeGuard,
-    Union,
-)
-from pydantic import BaseModel, TypeAdapter
 import json
-import torch
-import tqdm
-from ultralytics import YOLO  # type: ignore
+from argparse import ArgumentParser
+from pathlib import Path
+from typing import (
+    Any,
+    Literal,
+    TypeGuard,
+)
 
 # NOTE: Running this script will mess up the environment you are using, becuase of this stupid YOLO thing
 # it will give a '3D conv not implemented yada yada' error message
 # The solution is to delete and recreate the environment
 import cv2
-from argparse import ArgumentParser
-from pathlib import Path
+import torch
+import tqdm
+from pydantic import BaseModel, TypeAdapter, ValidationError
+from ultralytics import YOLO  # type: ignore
+
+from src.configs import LABELS_PATH
+from src.run_types import AVAIL_SETS, RAW_DIR, SPLIT_DIR, WLASL_ROOT
 
 # local imports
 from src.utils import load_rgb_frames_from_video
-from src.configs import LABELS_PATH
-from src.run_types import AVAIL_SETS, WLASL_ROOT, SPLIT_DIR, RAW_DIR
-
 
 """Naming convention:
 - set: one of train, test and val
@@ -65,7 +61,7 @@ class ErrLog(BaseModel):
     """Format for storing bad instances"""
     policy: str
     num_offenders: int
-    instances: List[BadInstance]
+    instances: list[BadInstance]
 
 
 def is_processed_instance(obj: Any) -> TypeGuard[Instance]:
@@ -73,7 +69,7 @@ def is_processed_instance(obj: Any) -> TypeGuard[Instance]:
     try:
         Instance.model_validate(obj)
         return True
-    except Exception:
+    except ValidationError:
         return False
 
 
@@ -92,8 +88,8 @@ def processed_to_bad(d: Instance, reason: str) -> BadInstance:
 
 
 def get_set(
-    lst_wlasl_class_dicts: List[WLASLClass], set_name: AVAIL_SETS
-) -> List[Instance]:
+    lst_wlasl_class_dicts: list[WLASLClass], set_name: AVAIL_SETS
+) -> list[Instance]:
     """Filters list of WLASLClass based on whether the instances are from the provided set_name."""
     mod_instances = []
     for i, gloss_d in enumerate(lst_wlasl_class_dicts):
@@ -104,9 +100,9 @@ def get_set(
 
 
 def output_bad(
-    bad_instances: List[BadInstance],
+    bad_instances: list[BadInstance],
     remove_policy: str,
-    log_path: Union[str, Path],
+    log_path: str | Path,
     fixing_description: str,
 ) -> None:
     """Output offending instances to a file using Pydantic's JSON serialization."""
@@ -126,14 +122,14 @@ def output_bad(
 
 def fix_bad_frame_range(
     raw_path: Path,
-    instances: List[Instance],
+    instances: list[Instance],
     log_dir: Path,
     remove_policy: Literal["strict", "reset"] = "strict",
     file_extension: str = "bad_frame_ranges.json",
-) -> List[Instance]:
+) -> list[Instance]:
     """Remove videos where the file cannot be read, or the start or end frame are impossible."""
-    bad_instances: List[BadInstance] = []
-    clean_instances: List[Instance] = []
+    bad_instances: list[BadInstance] = []
+    clean_instances: list[Instance] = []
     
     for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
         vid_path = raw_path / f"{instance.video_id}.mp4"
@@ -182,37 +178,33 @@ def fix_bad_frame_range(
     return clean_instances
 
 
-def get_largest_bbox(bboxes: List[List[float]]) -> Optional[List[float]]:
+def get_largest_bbox(bboxes: list[list[float]]) -> list[float] | None:
     """Given a list of bounding boxes, returns the largest bounding box that encompasses all of them, if one exists."""
     if not bboxes:
         return None
     x_min, y_min, x_max, y_max = bboxes[0]
     for box in bboxes:
         x1, y1, x2, y2 = box
-        if x1 < x_min:
-            x_min = x1
-        if y1 < y_min:
-            y_min = y1
-        if x2 > x_max:
-            x_max = x2
-        if y2 > y_max:
-            y_max = y2
+        x_min = min(x_min, x1)
+        y_min = min(y_min, y1)
+        x_max = max(x_max, x2)
+        y_max = max(y_max, y2)
     return [x_min, y_min, x_max, y_max]
 
 
 def fix_bad_bboxes(
     raw_path: Path,
-    instances: List[Instance],
+    instances: list[Instance],
     log_dir: Path,
     remove_policy: Literal["strict", "reset"] = "strict",
     file_extension: str = "bad_bboxes.json",
-) -> List[Instance]:
+) -> list[Instance]:
     """Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video."""
     model = YOLO("yolov8n.pt")  # Load a pre-trained YOLO model
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    bad_instances: List[BadInstance] = []
-    clean_instances: List[Instance] = []
+    bad_instances: list[BadInstance] = []
+    clean_instances: list[Instance] = []
 
     for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
         vid_path = raw_path / f"{instance.video_id}.mp4"
@@ -260,11 +252,11 @@ def fix_bad_bboxes(
 
 
 def remove_short_samples(
-    instances: List[Instance],
+    instances: list[Instance],
     log_dir: Path,
     cutoff: int = 9,
     file_extension: str = "removed_short_samples.json",
-) -> List[Instance]:
+) -> list[Instance]:
     """Remove samples where the number of frames is less than or equal to the cutoff."""
     clean_instances = []
     short_samples = []
@@ -323,7 +315,7 @@ def preprocess_split(
     output_base: Path,
     verbose: bool = False,
     file_extension: str = "_fixed_frange_bboxes_len.json",
-    strictness: Tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
+    strictness: tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
     do_bboxes: bool = True,
     length_cuttoff: int = 9
 ) -> None:
@@ -340,7 +332,7 @@ def preprocess_split(
         return
 
     # Use Pydantic TypeAdapter to validate the incoming JSON dynamically 
-    wlasl_adapter = TypeAdapter(List[WLASLClass])
+    wlasl_adapter = TypeAdapter(list[WLASLClass])
     asl_num = wlasl_adapter.validate_python(raw_json_data)
 
     # create train, test, val splits
