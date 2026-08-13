@@ -24,6 +24,9 @@ conda activate wlasl
 # conda env create -f wlasl_cpu.yml 
 # conda activate wlasl_cpu
 
+# add as package:
+pip install -e .
+
 #download data
 mkdir data/WLASL && cd data/WLASL
 wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/splits.zip"
