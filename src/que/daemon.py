@@ -137,7 +137,7 @@ class Daemon:
         
             try:
                 self.worker_process = Process(
-                    target=self.worker.start,args=(dict(sweep) if sweep is not None else None,)
+                    target=self.worker.start,args=(dict(sweep).copy() if sweep is not None else None,)
                 )
                 self.worker_process.start()
                 worker_pid = self.worker_process.pid

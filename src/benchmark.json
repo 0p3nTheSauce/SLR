@@ -1,0 +1,79 @@
+{
+    "S3D": {
+        "gpu_info": {
+            "mem_total_mb": 12288.0
+        },
+        "train": {
+            "n_trials": 5,
+            "latency_ms": {
+                "mean": 35.55210791015625,
+                "std": 0.06791306454276087
+            },
+            "throughput_batches_per_s": {
+                "mean": 28.12780953983758,
+                "std": 0.053745872646940855
+            },
+            "throughput_samples_per_s": {
+                "mean": 28.12780953983758,
+                "std": 0.053745872646940855
+            },
+            "gpu_utilisation_percent": {
+                "mean": 99.94366197183099,
+                "std": 0.0771440221838227
+            },
+            "gpu_utilisation_peak_percent": 100,
+            "peak_memory_mb": {
+                "mean": 544.98388671875,
+                "std": 0.0
+            },
+            "raw_trial_latencies_ms": [
+                35.47987060546875,
+                35.48263916015625,
+                35.56556884765625,
+                35.616235351562494,
+                35.6162255859375
+            ],
+            "profiler_comparison": {
+                "profiler_latency_ms": 46.76438,
+                "profiler_cpu_latency_ms": 46.730263560000004,
+                "iterations": 50
+            }
+        },
+        "infer": {
+            "n_trials": 5,
+            "latency_ms": {
+                "mean": 11.2982685546875,
+                "std": 0.000639880538647614
+            },
+            "throughput_batches_per_s": {
+                "mean": 88.50913728289581,
+                "std": 0.0050123823215850955
+            },
+            "throughput_samples_per_s": {
+                "mean": 88.50913728289581,
+                "std": 0.0050123823215850955
+            },
+            "gpu_utilisation_percent": {
+                "mean": 100,
+                "std": 0.0
+            },
+            "gpu_utilisation_peak_percent": 100,
+            "peak_memory_mb": {
+                "mean": 164.4306640625,
+                "std": 0.0
+            },
+            "raw_trial_latencies_ms": [
+                11.299398193359377,
+                11.2981494140625,
+                11.297863769531249,
+                11.297955322265624,
+                11.29797607421875
+            ],
+            "profiler_comparison": {
+                "profiler_latency_ms": 14.53444,
+                "profiler_cpu_latency_ms": 14.486748760000001,
+                "iterations": 50
+            }
+        }
+    }
+}
