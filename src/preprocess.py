@@ -433,7 +433,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     root = Path(args.root)
-    raw_dir = root / args.raw_dir
+    raw_dir = Path(args.raw_dir)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -443,7 +443,7 @@ if __name__ == "__main__":
         todo_splits = [args.asl_split]
 
     for split in todo_splits:
-        split_path = root / args.split_dir / f"{split}.json"
+        split_path = Path(args.split_dir) / f"{split}.json"
         preprocess_split(
             split_path=split_path,
             raw_path=raw_dir, 
