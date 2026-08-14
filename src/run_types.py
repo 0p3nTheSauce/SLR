@@ -36,8 +36,8 @@ ZFILL = 3
 CONFIG_FILETYPE = ".toml"
 #Directories
 CURRENT_FILE = Path(__file__).resolve()
-SLR_ROOT = CURRENT_FILE.parent
-SRC_ROOT = SLR_ROOT / "src"
+SRC_ROOT = CURRENT_FILE.parent
+SLR_ROOT = SRC_ROOT.parent
 CLASSES_PATH = SRC_ROOT / "info/wlasl_class_list.json"
 RUNS_PATH = SRC_ROOT / "runs"
 CONFIGS_PATH = SRC_ROOT / "configfiles"
