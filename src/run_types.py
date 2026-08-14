@@ -35,7 +35,8 @@ WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
 ZFILL = 3
 CONFIG_FILETYPE = ".toml"
 #Directories
-SLR_ROOT = Path.home() / "Code/SLR"
+CURRENT_FILE = Path(__file__).resolve()
+SLR_ROOT = CURRENT_FILE.parent
 SRC_ROOT = SLR_ROOT / "src"
 CLASSES_PATH = SRC_ROOT / "info/wlasl_class_list.json"
 RUNS_PATH = SRC_ROOT / "runs"
