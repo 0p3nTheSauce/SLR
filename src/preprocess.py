@@ -1,455 +1,765 @@
-import json
-from argparse import ArgumentParser
+from __future__ import annotations
+
 from pathlib import Path
 from typing import (
+    Annotated,
     Any,
     Literal,
+    TypeAlias,
     TypeGuard,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
 )
 
-# NOTE: Running this script will mess up the environment you are using, becuase of this stupid YOLO thing
-# it will give a '3D conv not implemented yada yada' error message
-# The solution is to delete and recreate the environment
-import cv2
-import torch
-import tqdm
-from pydantic import BaseModel, TypeAdapter, ValidationError
-from ultralytics import YOLO  # type: ignore
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
+from pydantic_core import PydanticUndefined
 
-from src.configs import LABELS_PATH
-from src.run_types import AVAIL_SETS, RAW_DIR, SPLIT_DIR, WLASL_ROOT
+# constants
+#wandb
+ENTITY = "ljgoodall2001-rhodes-university"
+PROJECT_BASE = "WLASL"
 
-# local imports
-from src.utils import load_rgb_frames_from_video
-
-"""Naming convention:
-- set: one of train, test and val
-- split: one of asl100, asl300, asl1000, asl2000"""
-
-class RawInstance(BaseModel):
-    """Represents a single raw instance of a gloss in the dataset."""
-    bbox: list[int]  # [x_min, y_min, x_max, y_max]
-    frame_end: int
-    frame_start: int
-    instance_id: int
-    signer_id: int
-    source: str
-    split: str
-    url: str
-    variation_id: int
-    video_id: str
-
-
-class Instance(RawInstance):
-    """Represents a single instance of a gloss in the dataset, with the label_num and label_name added."""
-    label_num: int
-    label_name: str
+#Files
+LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+NUM_INSTANCES_SUFFIX = "num_instances.json"
+WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
+ZFILL = 3
+CONFIG_FILETYPE = ".toml"
+#Directories
+CURRENT_FILE = Path(__file__).resolve()
+SRC_ROOT = CURRENT_FILE.parent
+SLR_ROOT = SRC_ROOT.parent
+CLASSES_PATH = SRC_ROOT / "info/wlasl_class_list.json"
+RUNS_PATH = SRC_ROOT / "runs"
+CONFIGS_PATH = SRC_ROOT / "configfiles"
+WLASL_ROOT = SLR_ROOT / "data/WLASL"
+LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
+RAW_DIR = WLASL_ROOT / "WLASL2000"
+SPLIT_DIR = WLASL_ROOT / "splits"
+# Misc
+SEED = 42
 
 
-class WLASLClass(BaseModel):
-    """Represents a single gloss and its associated raw instances."""
-    gloss: str
-    instances: list[RawInstance]
+### for model normalisation
 
 
-class BadInstance(Instance):
-    """Adds reason to an instance that was discarded/modified from the dataset"""
-    reason: str
+class NormDict(BaseModel):
+    mean: tuple[float, float, float]
+    std: tuple[float, float, float]
 
 
-class ErrLog(BaseModel):
-    """Format for storing bad instances"""
-    policy: str
-    num_offenders: int
-    instances: list[BadInstance]
+####################### Data loading and augmentation #############################
+
+AVAIL_SETS : TypeAlias = Literal["train", "val", "test"]
+ORIGINAL_SPLITS : TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
+AVAIL_SPLITS : TypeAlias = Literal["asl100_bottom", "asl100_worst"] | ORIGINAL_SPLITS
+
+### Samplers
 
 
-def is_processed_instance(obj: Any) -> TypeGuard[Instance]:
-    """Type guard to check if an object is a valid Instance dict/object."""
-    try:
-        Instance.model_validate(obj)
-        return True
-    except ValidationError:
-        return False
+class BaseSampler(BaseModel):
+    """required target frames"""
+
+    # f(Tensor, num_frames) -> Tensor
+    target_length: int
+    max_wobble: int = 0  # NOTE: this is probably redundant
 
 
-def instance_to_processed(d: RawInstance, label_num: int, label_name: str) -> Instance:
-    """Convert a RawInstance to a Instance by adding labels."""
-    return Instance(
-        **d.model_dump(),
-        label_num=label_num,
-        label_name=label_name,
-    )
+class OG_Sampler(BaseSampler):
+    """Directs to correct_num_frames"""
+
+    type: Literal["og"] = "og"
+    randomise: bool = False
 
 
-def processed_to_bad(d: Instance, reason: str) -> BadInstance:
-    """Convert a Instance to a BadInstance by adding a reason."""
-    return BadInstance(**d.model_dump(), reason=reason)
+class PadFramesT(BaseSampler):
+    type: Literal["pad"] = "pad"
 
 
-def get_set(
-    lst_wlasl_class_dicts: list[WLASLClass], set_name: AVAIL_SETS
-) -> list[Instance]:
-    """Filters list of WLASLClass based on whether the instances are from the provided set_name."""
-    mod_instances = []
-    for i, gloss_d in enumerate(lst_wlasl_class_dicts):
-        for inst in gloss_d.instances:
-            if inst.split == set_name:
-                mod_instances.append(instance_to_processed(inst, i, gloss_d.gloss))
-    return mod_instances
+class UniformSampler(BaseSampler):
+    """Uniformly sampled"""
+
+    type: Literal["uniform"] = "uniform"
 
 
-def output_bad(
-    bad_instances: list[BadInstance],
-    remove_policy: str,
-    log_path: str | Path,
-    fixing_description: str,
-) -> None:
-    """Output offending instances to a file using Pydantic's JSON serialization."""
-    if len(bad_instances) != 0:
-        err_dict = ErrLog(
-            policy=remove_policy,
-            num_offenders=len(bad_instances),
-            instances=bad_instances,
-        )
-        with open(log_path, "w") as log_file:
-            # use model_dump_json to serialize safely
-            log_file.write(err_dict.model_dump_json(indent=4))
-        print(f"Bad {fixing_description} logged to {log_path}.")
-    else:
-        print(f"No {fixing_description} ranges found")
+class ChunkedSampler(BaseSampler):
+    """Random frames in chunks"""
+
+    type: Literal["chunked"] = "chunked"
 
 
-def fix_bad_frame_range(
-    raw_path: Path,
-    instances: list[Instance],
-    log_dir: Path,
-    remove_policy: Literal["strict", "reset"] = "strict",
-    file_extension: str = "bad_frame_ranges.json",
-) -> list[Instance]:
-    """Remove videos where the file cannot be read, or the start or end frame are impossible."""
-    bad_instances: list[BadInstance] = []
-    clean_instances: list[Instance] = []
-    
-    for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
-        vid_path = raw_path / f"{instance.video_id}.mp4"
+class WobbledSampler(BaseSampler):
+    type: Literal["wobbled"] = "wobbled"
+    max_wobble: int = 4
 
-        cap = cv2.VideoCapture(str(vid_path))
-        if not cap.isOpened():
-            message = f"Could not open video {instance.video_id}. Removing"
-            bad_instances.append(processed_to_bad(instance, message))
-            continue
-        else:
-            num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        start = instance.frame_start
-        end = instance.frame_end
+class FocalNormalSampler(BaseSampler):
+    type: Literal["focal_normal"] = "focal_normal"
+    mean: float = 0.5
+    std: float = 0.25
+
+
+class FocalLaplaceSampler(BaseSampler):
+    type: Literal["focal_laplace"] = "focal_laplace"
+    mean: float = 0.5
+    diversity: float = 0.175
+
+
+class FocalBetaSampler(BaseSampler):
+    type: Literal["focal_beta"] = "focal_beta"
+    alpha: float = 4.0
+    beta: float = 4.0
+
+
+class SpeedSampler(BaseSampler):
+    type: Literal["speed"] = "speed"
+    speed_min: float = 0.8
+    speed_max: float = 1.2
+
+    @model_validator(mode="after")
+    def check_speeds(self) -> SpeedSampler:
+        if self.speed_min > self.speed_max:
+            raise ValueError("speed_min cannot be > speed_max")
+        return self
+
+SAMPLER_TYPES = {"og", "pad", "uniform", "chunked", "wobbled", "focal_normal", "focal_laplace", "focal_beta", "speed"}
+def is_sampler_config(config: TemporalAugs) -> TypeGuard[SamplerConfig]:
+    return config.type in SAMPLER_TYPES
+
+SamplerConfig = Annotated[
+    UniformSampler | WobbledSampler | SpeedSampler | FocalNormalSampler | FocalLaplaceSampler | FocalBetaSampler | ChunkedSampler | PadFramesT | OG_Sampler,
+    Field(discriminator="type"),
+]
+
+### Temporal augs
+
+
+class ShuffleT(BaseModel):
+    type: Literal["shuffle"] = "shuffle"
+    num_frames: int | None = None
+
+
+class ReverseT(BaseModel):
+    type: Literal["reverse"] = "reverse"
+    probability: float = 0.5
+
+
+TemporalTransforms = Annotated[ShuffleT |  ReverseT, Field(discriminator="type")]
+
+TEMPORAL_TYPES = {"shuffle", "reverse"}
+def is_temporal_config(config: TemporalAugs) -> TypeGuard[TemporalTransforms]:
+    return config.type in TEMPORAL_TYPES
+
+TemporalAugs = Annotated[
+    TemporalTransforms | SamplerConfig, Field(discriminator="type")
+]
+
+
+
+### Spatial augs
+
+
+## Cropping
+class CropConfig(BaseModel):
+    frame_size: int
+
+
+class CentreCropConfig(CropConfig):
+    type: Literal["Centre_crop"] = "Centre_crop"
+
+
+class RandomCropConfig(CropConfig):
+    type: Literal["Random_crop"] = "Random_crop"
+
+
+class ScaleAndPadConfig(CropConfig):
+    type: Literal["Scale_and_pad"] = "Scale_and_pad"
+
+
+class RandomResizedConfig(CropConfig):
+    type: Literal["Random_Resized_crop"] = "Random_Resized_crop"
+
+
+CropTransforms = Annotated[
+    CentreCropConfig | RandomCropConfig | ScaleAndPadConfig | RandomResizedConfig,
+    Field(discriminator="type"),
+]
+
+CROP_TYPES = {"Centre_crop", "Random_crop", "Scale_and_pad", "Random_Resized_crop"}
+def is_crop_config(config: SpatialAugs) -> TypeGuard[CropTransforms]:
+    return config.type in CROP_TYPES
+
+class HorizontalFlipConfig(BaseModel):
+    type: Literal["HORIZONTAL_FLIP"] = "HORIZONTAL_FLIP"
+    p: float = 0.5
+
+
+class RandomGrayscaleConfig(BaseModel):
+    type: Literal["RANDOM_GRAYSCALE"]
+    p: float = 0.1
+
+
+class GaussianBlurConfig(BaseModel):
+    type: Literal["GAUSSIAN_BLUR"]
+    kernel_size: int = 3
+    sigma: tuple[float, float] = (0.1, 2.0)
+
+
+InterpMode: TypeAlias = Literal[
+    "nearest", "nearest-exact", "bilinear", "bicubic", "box", "hamming", "lanczos"
+]
+
+
+class AutoAugmentConfig(BaseModel):
+    type: Literal["IMAGENET", "CIFAR10", "SVHN"]
+    interpolation: InterpMode = "nearest"
+
+
+class RandAugConfig(BaseModel):
+    type: Literal["RANDAUGMENT"]
+    num_ops: int = 2
+    magnitude: int = 9
+    num_magnitude_bins: int = 31
+    interpolation: InterpMode = "nearest"
+
+
+SpatialTransforms = Annotated[
+    AutoAugmentConfig | RandAugConfig | HorizontalFlipConfig | RandomGrayscaleConfig | GaussianBlurConfig,
+    Field(discriminator="type"),
+]
+
+SPATIAL_TYPES = {"HORIZONTAL_FLIP", "RANDOM_GRAYSCALE", "GAUSSIAN_BLUR", "IMAGENET", "CIFAR10", "SVHN", "RANDAUGMENT"}
+
+def is_spatial_transform_config(config: SpatialAugs) -> TypeGuard[SpatialTransforms]:
+    return config.type in SPATIAL_TYPES
+
+SpatialAugs = Annotated[
+    CropTransforms | SpatialTransforms,
+    Field(discriminator="type"),
+]
+
+
+class AugInfo(BaseModel):
+    """Augmentation info for a video
+
+    Attributes:
+        normalise (bool): Flag to fetch norm values during config parsing. Default False.
+        norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
+        temporal_aug (list[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
+        spatial_aug (list[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
+        strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
+    """
+
+    normalise: bool = False
+    norm_dict: NormDict | None = None
+    temporal_aug: list[TemporalAugs] = []
+    spatial_aug: list[SpatialAugs] = []
+    strict_size: bool = True
+    target_length: int | None = None
+    frame_size: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_augs(self) -> AugInfo:
+        if not self.strict_size:
+            return self
+
+        samplers = [augT for augT in self.temporal_aug if is_sampler_config(augT)]
+        crops = [augS for augS in self.spatial_aug if is_crop_config(augS)]
         
-        if start < 0 or start >= num_frames:
-            message = f"Invalid start frame {start} for video {instance.video_id} with length {num_frames}."
-            if remove_policy == "strict":
-                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
-                continue
-            elif remove_policy == "reset_frames":
-                bad_instances.append(processed_to_bad(instance, message + " Setting to 0."))
-            start = 0
-            
-        if end <= start or end > (start + num_frames):
-            message = f"Invalid end frame {end} for video {instance.video_id} with length {num_frames} and start frame {start}."
-            if remove_policy == "strict":
-                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
-                continue
-            elif remove_policy == "reset_frames":
-                bad_instances.append(processed_to_bad(instance, message + " Setting to num_frames."))
-            end = start + num_frames
-            
-        instance.frame_start = start
-        instance.frame_end = end
-        clean_instances.append(instance)
+        if len(samplers) == 0:
+            raise ValueError("At least one temporal aug must be a sampler")
+        last_sampler = samplers[-1]
+        self.target_length = last_sampler.target_length
 
-    log_path = log_dir / f"{remove_policy}_{file_extension}"
-    output_bad(
-        bad_instances=bad_instances,
-        remove_policy=remove_policy,
-        log_path=log_path,
-        fixing_description="frame range",
-    )
+        if len(crops) == 0:
+            raise ValueError("At least one spatial aug must be a crop")
+        last_crop = crops[-1]
+        self.frame_size = last_crop.frame_size
 
-    return clean_instances
+        return self
 
 
-def get_largest_bbox(bboxes: list[list[float]]) -> list[float] | None:
-    """Given a list of bounding boxes, returns the largest bounding box that encompasses all of them, if one exists."""
-    if not bboxes:
-        return None
-    x_min, y_min, x_max, y_max = bboxes[0]
-    for box in bboxes:
-        x1, y1, x2, y2 = box
-        x_min = min(x_min, x1)
-        y_min = min(y_min, y1)
-        x_max = max(x_max, x2)
-        y_max = max(y_max, y2)
-    return [x_min, y_min, x_max, y_max]
+class DataInfo(BaseModel):
+    train_augs: AugInfo | None = None
+    test_augs: AugInfo | None = None
+    strict_size: bool = True  # from config
+    target_length: int | None = None
+    frame_size: int | None = None
 
+    @model_validator(mode="after")
+    def check_frame_strat(self) -> DataInfo:
+        if not self.strict_size:
+            return self
 
-def fix_bad_bboxes(
-    raw_path: Path,
-    instances: list[Instance],
-    log_dir: Path,
-    remove_policy: Literal["strict", "reset"] = "strict",
-    file_extension: str = "bad_bboxes.json",
-) -> list[Instance]:
-    """Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video."""
-    model = YOLO("yolov8n.pt")  # Load a pre-trained YOLO model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+        if self.train_augs is None or self.test_augs is None:
+            raise ValueError("Aug info cannot be None if strict_size enabled")
 
-    bad_instances: list[BadInstance] = []
-    clean_instances: list[Instance] = []
+        self.target_length = self.train_augs.target_length
+        self.frame_size = self.train_augs.frame_size
 
-    for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
-        vid_path = raw_path / f"{instance.video_id}.mp4"
-        frames = load_rgb_frames_from_video(
-            str(vid_path), instance.frame_start, instance.frame_end
+        assert self.train_augs.target_length == self.test_augs.target_length, (
+            f"Train/test target_length mismatch: "
+            f"{self.train_augs.target_length} vs {self.test_augs.target_length}"
         )
-        frames = frames.float() / 255.0
 
-        results = model(frames, device=device, verbose=False)
-        bboxes = []
-        for result in results:
-            person_bboxes = result.boxes.xyxy[result.boxes.cls == 0]
-            if len(person_bboxes) > 0:
-                bboxes.extend(person_bboxes.tolist())
+        assert self.train_augs.frame_size == self.test_augs.frame_size, (
+            f"Train/test target_length mismatch: "
+            f"{self.train_augs.frame_size} vs {self.test_augs.frame_size}"
+        )
 
-        if not bboxes:
-            message = f"No bounding boxes found for video {instance.video_id}."
-            if remove_policy == "strict":
-                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
-                continue
-            elif remove_policy == "reset_bbox":
-                bad_instances.append(processed_to_bad(instance, message + " Using whole frame."))
-                largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
+        return self
+
+
+########################## Early stopping #############################
+StoppingMetrics: TypeAlias = Literal["loss", "acc"]
+StoppingPhases: TypeAlias = Literal['val', 'train']
+StoppingModes: TypeAlias = Literal["min", "max"]
+
+
+class EarlyStopperInfo(BaseModel):
+    type: Literal['early_stopper'] = 'early_stopper'
+    metric: StoppingMetrics
+    phase: StoppingPhases = 'val'
+    mode: StoppingModes
+    patience: int
+    min_delta: float
+
+    @model_validator(mode="after")
+    def _config_precheck(self) -> EarlyStopperInfo:
+        if self.patience <= 0:
+            raise ValueError(
+                f"Patience must be a positive integer, got {self.patience}"
+            )
+        if self.min_delta < 0:
+            raise ValueError(
+                f"Min delta must be non-negative, got {self.min_delta}"
+            )
+        return self
+
+class StopperState(EarlyStopperInfo):
+    best_score: float | None = None
+    best_epoch: int = 0
+    counter: int = 0
+    stop: bool = False
+
+####################### Models #############################
+
+
+class MinInfo(BaseModel):
+    model: str
+    dataset: str
+    split: AVAIL_SPLITS
+    save_path: str
+    seed: int = SEED
+
+
+class AdminInfo(MinInfo):
+    exp_no: str
+    recover: bool
+    config_path: str
+    weight_path: str | None = None
+
+
+class TrainingInfo(BaseModel):
+    batch_size: int
+    update_per_step: int
+    max_epoch: int
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def batch_size_equivalent(self) -> int:
+        return self.batch_size * self.update_per_step
+
+
+class OptimizerInfo(BaseModel):
+    eps: float
+    backbone_init_lr: float
+    backbone_weight_decay: float
+    classifier_init_lr: float
+    classifier_weight_decay: float
+
+
+TRAIN_TYPE: TypeAlias = Literal["supervised", "unsupervised"]
+
+
+class SupervisedInfo(BaseModel):
+    drop_p: float | None = None
+    type: Literal["supervised"] = "supervised"
+
+
+class MVirTedInfo(BaseModel):
+    type: Literal["mvir_ted"] = "mvir_ted"
+    drop_p: float | None = None
+    embed_dim: int = 512
+    num_heads: int = 8
+    num_layers: int = 4
+    max_frames: int = 64
+    mvit_out_dim: int = 768
+
+
+class UnsupervisedInfo(BaseModel):
+    type: Literal["unsupervised"] = "unsupervised"
+
+
+class MVirTedMaeInfo(BaseModel):
+    type: Literal["mvir_ted_mae"] = "mvir_ted_mae"
+    encoder_info: MVirTedInfo = MVirTedInfo()
+    mask_ratio: float = 0.5
+    embed_dim: int = 512
+
+SUPERVISED_TYPES = {"supervised"}
+PRETRAIN_TYPES = {"mvir_ted_mae"}
+
+def is_supervised_config(config: ModelInfo) -> TypeGuard[SupervisedInfo]:
+    return config.type in SUPERVISED_TYPES
+
+def is_pretrain_config(config: ModelInfo) -> TypeGuard[MVirTedMaeInfo]:
+    return config.type in PRETRAIN_TYPES
+
+ModelInfo = Annotated[
+    SupervisedInfo | MVirTedInfo | MVirTedMaeInfo,
+    Field(discriminator="type"),
+]
+
+
+class WarmUpSched(BaseModel):
+    start_factor: float
+    end_factor: float
+    warmup_epochs: int
+
+    @model_validator(mode="after")
+    def _check_factors(self) -> WarmUpSched:
+        if self.warmup_epochs < 0:
+            raise ValueError("warmup_epochs must be non-negative")
+        if not (0 <= self.start_factor < self.end_factor <= 1.0):
+            raise ValueError(f"start_factor must be >= 0 and < end_factor <= 1.0, but got: start {self.start_factor} end {self.end_factor}")
+        return self
+
+
+class SchedBase(BaseModel):
+    warm_up: WarmUpSched | None = None
+
+
+class WarmOnly(SchedBase):
+    type: Literal["WarmOnly"]
+
+
+class CosAnealInfo(SchedBase):
+    type: Literal["CosineAnnealingLR"]
+    tmax: int
+    eta_min: float
+
+
+class WarmRestartInfo(SchedBase):
+    type: Literal["CosineAnnealingWarmRestarts"]
+    t0: int
+    tmult: int
+    eta_min: float
+
+
+class ReduceLROnPlateau(SchedBase):
+    type: Literal["ReduceLROnPlateau"]
+    mode: Literal["min", "max"]
+    factor: float
+    patience: int
+    threshold: float
+    threshold_mode: Literal["rel", "abs"]
+    cooldown: int
+    min_lr: list[float] | float
+    eps: float
+
+
+# Discriminated union: pydantic dispatches on the 'type' field automatically
+SchedInfo = Annotated[
+    WarmOnly | CosAnealInfo | WarmRestartInfo | ReduceLROnPlateau,
+    Field(discriminator="type"),
+]
+
+
+class WandbInfo(BaseModel):
+    entity: str
+    project: str
+    tags: list[str] = []
+    run_id: str | None = None
+    sweep_id: str | None = None
+
+# Results
+
+
+class TopKRes(BaseModel):
+    top1: float
+    top5: float
+    top10: float
+
+
+class BaseRes(BaseModel):
+    top_k_average_per_class_acc: TopKRes
+    top_k_per_instance_acc: TopKRes
+    average_loss: float
+
+
+class ShuffRes(BaseRes):
+    perm: list[int]
+    shannon_entropy: float
+
+
+class ClassReport(BaseModel):
+    cls_report: dict[str, dict[str, float]]
+    all_targets: list[int]
+    all_preds: list[int]
+
+class CompRes(BaseModel):
+    check_name: str
+    best_val_acc: float
+    best_val_loss: float
+    test: BaseRes
+    val: BaseRes
+    # test_shuff: ShuffRes
+
+class VerboseRes(BaseModel):
+    check_name: str
+    best_val_acc: float
+    best_val_loss: float
+    test: BaseRes
+    val: BaseRes
+    test_shuff: ShuffRes
+
+
+
+class SumRes(BaseModel):
+    check_name: str
+    best_val_acc: float
+    best_val_loss: float
+    test: BaseRes
+    val: BaseRes
+    test_shuff: BaseRes
+
+
+# Runs
+
+
+class RunInfo(BaseModel):
+    admin: AdminInfo
+    training: TrainingInfo
+    optimizer: OptimizerInfo
+    model_params: ModelInfo = Field(default_factory=SupervisedInfo)
+    data: DataInfo
+    scheduler: SchedInfo | None = None
+    stopping: EarlyStopperInfo | None = None
+
+    @field_validator("model_params", mode="before")
+    @classmethod
+    def _default_model_type(cls, v: Any) -> Any:
+        if isinstance(v, dict) and "type" not in v:
+            v = {"type": "supervised", **v}
+        return v
+
+    @model_validator(mode="after")
+    def _resolve_norms(self) -> RunInfo:
+        """Substitute norm_dict based on model name when norm=True."""
+        from src.models import norm_vals
+
+        for aug_info in (self.data.train_augs, self.data.test_augs):
+            if aug_info is not None and aug_info.normalise:
+                aug_info.norm_dict = norm_vals(self.admin.model)  # type: ignore  doesnt liek the 2
+        return self
+
+
+class ExpInfo(RunInfo):
+    model_config = ConfigDict(extra="forbid")
+    wandb: WandbInfo
+
+
+class CompExpInfo(ExpInfo):
+    results: CompRes
+
+
+
+GenInfo: TypeAlias = dict[str, Any]
+
+
+class ResSet(BaseModel):
+    spec: GenInfo
+    results: list[RunRes]
+
+
+class RunRes(BaseModel):
+    admin: AdminInfo
+    wandb: WandbInfo
+    results: CompRes
+
+
+class FailedExp(ExpInfo):
+    error: str
+
+
+class SumarisedNew(BaseModel):
+    run_id: str | None = None
+    model: str
+    exp_no: str
+    dataset: str
+    split: str
+    config_path: str
+
+
+class Sumarised(SumarisedNew):
+    best_val_acc: float | None = None
+    best_val_loss: float | None = None
+
+
+class SummarisedRes(Sumarised):
+    test_top1_acc: float | None = None
+    test_av_loss: float | None = None
+
+
+class SummarisedError(Sumarised):
+    error: str
+
+
+class CleverDict(dict):
+    def __init__(self, dict: dict[Any, Any]):
+        self.dict = dict
+
+    def __getitem__(self, keys: list[Any]) -> Any:
+        d = self.dict.copy()
+        for key in keys:
+            d = d[key]
+        return d
+
+    def __setitem__(self, keys: list[Any], val: Any):
+        self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
+
+    def _set_inplace(
+        self, d: dict[Any, Any], k: Any, ks: list[Any], val: Any
+    ) -> dict[Any, Any]:
+        if hasattr(d, "__setitem__"):
+            if len(ks) == 0:
+                d[k] = val
             else:
-                raise ValueError(f"Invalid remove_policy: {remove_policy}")
+                next_key = ks.pop(0)
+                old_val = d.get(k, {})
+                d[k] = self._set_inplace(old_val, next_key, ks, val)
         else:
-            largest_bbox = get_largest_bbox(bboxes)
-            assert largest_bbox is not None, "largest_bbox can not be None here"
+            if len(ks) == 0:
+                d = {k: val}
+            else:
+                next_key = ks.pop(0)
+                d = {k: self._set_inplace({}, next_key, ks, val)}
+        return d
 
-        # Round the coordinates to integers and update the Pydantic model
-        largest_bbox = [round(coord) for coord in largest_bbox] 
-        instance.bbox = largest_bbox
-        clean_instances.append(instance)
+    def pop(self, keys: list[Any], default=None) -> Any:
+        if len(keys) == 1:
+            return self.dict.pop(keys[0], default)
 
-    log_path = log_dir / f"{remove_policy}_{file_extension}"
+        # Navigate to the parent of the target key
+        parent = self.dict
+        for key in keys[:-1]:
+            parent = parent[key]
 
-    output_bad(
-        bad_instances=bad_instances,
-        remove_policy=remove_policy,
-        log_path=log_path,
-        fixing_description="bounding boxes",
-    )
+        return parent.pop(keys[-1], default)
 
-    return clean_instances
+    def to_dict(self) -> dict[Any, Any]:
+        return self.dict.copy()
 
+    def __str__(self) -> str:
+        return str(self.dict)
 
-def remove_short_samples(
-    instances: list[Instance],
-    log_dir: Path,
-    cutoff: int = 9,
-    file_extension: str = "removed_short_samples.json",
-) -> list[Instance]:
-    """Remove samples where the number of frames is less than or equal to the cutoff."""
-    clean_instances = []
-    short_samples = []
-    
-    for inst in instances:
-        num_frame = inst.frame_end - inst.frame_start
-        if num_frame > cutoff:
-            clean_instances.append(inst)
+    def __delitem__(self, key):
+        raise NotImplementedError
+
+    def __iter__(self):
+        yield from self._iter_leaves(self.dict, [])
+
+    def _iter_leaves(self, d: Any, path: list[Any]):
+        if isinstance(d, dict):
+            for key, val in d.items():
+                yield from self._iter_leaves(val, path + [key])
         else:
-            # Fixed bug: Append a BadInstance instead of a raw string
-            short_samples.append(
-                processed_to_bad(inst, f"bad number of frames {num_frame} for video {inst.video_id}, removing.")
-            )
-
-    log_path = log_dir / f"cutoff_{cutoff}_{file_extension}"
-
-    output_bad(
-        bad_instances=short_samples,
-        remove_policy="strict",
-        log_path=log_path,
-        fixing_description="short samples",
-    )
-
-    return clean_instances
+            yield path, d
 
 
-def print_v(s: str, y: bool) -> None:
-    if y:
-        print(s)
+# not ignoring extra keys overrides: Claudes baby
 
 
-def check_paths(
-    split_path: Path, raw_path: Path, output_path: Path, verbose: bool
-) -> bool:
-    """Checks if the provided paths exist and are of the correct type."""
-    if split_path.exists() and split_path.is_file():
-        print_v(f"split path: {split_path}, found", verbose)
-    else:
-        print(f"split path: {split_path}, not found")
-        return False
-    if raw_path.exists() and raw_path.is_dir():
-        print_v(f"raw path: {raw_path}, found", verbose)
-    else:
-        print(f"raw path: {raw_path}, not found")
-        return False
-    if output_path.exists() and output_path.is_dir():
-        print_v(f"output path: {output_path}, found", verbose)
-    else:
-        print(f"output path: {output_path}, not found")
-        return False
-    return True
+T = TypeVar("T", bound=BaseModel)
 
-def preprocess_split(
-    split_path: Path,
-    raw_path: Path,
-    output_base: Path,
-    verbose: bool = False,
-    file_extension: str = "_fixed_frange_bboxes_len.json",
-    strictness: tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
-    do_bboxes: bool = True,
-    length_cuttoff: int = 9
-) -> None:
-    """Preprocesses a split of the WLASL dataset."""
 
-    if not check_paths(split_path, raw_path, output_base, verbose):
-        return
-
-    with open(split_path, "r") as f:
-        raw_json_data = json.load(f)
-
-    if not raw_json_data:
-        print(f"no data found in {split_path}")
-        return
-
-    # Use Pydantic TypeAdapter to validate the incoming JSON dynamically 
-    wlasl_adapter = TypeAdapter(list[WLASLClass])
-    asl_num = wlasl_adapter.validate_python(raw_json_data)
-
-    # create train, test, val splits
-    train_instances = get_set(asl_num, "train")
-    test_instances = get_set(asl_num, "test")
-    val_instances = get_set(asl_num, "val")
-
-    # setup storage
-    base_name = split_path.name.replace(".json", "")
-    output_dir = output_base / base_name
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    print_v(f"Processing {base_name}", verbose)
-    for subset, instances in [
-        ("train", train_instances),
-        ("test", test_instances),
-        ("val", val_instances),
-    ]:
-        print_v(f"For split: {subset}", verbose)
-        print_v("Fixing frame ranges", verbose)
-        instances = fix_bad_frame_range(
-            raw_path=raw_path,
-            instances=instances,
-            log_dir=output_dir,
-            remove_policy=strictness[0],
-            file_extension=f"bad_frame_ranges_{subset}.json",
+def _replace_in_annotation(annotation, old_cls, new_cls):
+    """Replace old_cls with new_cls inside an annotation, preserving Optional/Union wrappers."""
+    if annotation is old_cls:
+        return new_cls
+    origin = get_origin(annotation)
+    if origin is Union:
+        new_args = tuple(
+            _replace_in_annotation(arg, old_cls, new_cls)
+            for arg in get_args(annotation)
         )
-
-        if do_bboxes:
-            print_v("Fixing bounding boxes", verbose)
-            instances = fix_bad_bboxes(
-                raw_path=raw_path,
-                instances=instances,
-                log_dir=output_dir,
-                remove_policy=strictness[1],
-                file_extension=f"bad_bboxes_{subset}.json",
-            )
-
-        print_v("Removing small samples", verbose)
-        instances = remove_short_samples(
-            instances=instances,
-            log_dir=output_dir,
-            cutoff=length_cuttoff,
-            file_extension=f"removed_short_samples_{subset}.json",
-        )
-
-        print_v("Saving results", verbose)
-        inst_path = output_dir / f"{subset}_instances{file_extension}"
-        with open(inst_path, "w") as f:
-            # Serialize back to JSON list using model_dump
-            json.dump([inst.model_dump() for inst in instances], f, indent=2)
-
-    print("\n------------------------- finished preprocessing ---------------\n")
+        return new_args
+    return annotation
 
 
-if __name__ == "__main__":
-    avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
+def make_strict(model_cls: type[BaseModel]) -> type[BaseModel]:
+    namespace: dict = {"model_config": ConfigDict(extra="forbid")}
+    annotations = {}
 
-    parser = ArgumentParser(description="preprocess.py")
-    parser.add_argument(
-        "asl_split",
-        type=str,
-        choices=avail_splits + ['all'],
-        help="Which WLASL split to preprocess",
-    )
-    parser.add_argument(
-        "-rt",
-        "--root",
-        type=str,
-        help=f"WLASL root if not {WLASL_ROOT}",
-        default=WLASL_ROOT,
-    )
-    parser.add_argument(
-        "-sd",
-        "--split_dir",
-        type=str,
-        help=f"Split directory if not {SPLIT_DIR}",
-        default=SPLIT_DIR,
-    )
-    parser.add_argument(
-        "-rd",
-        "--raw_dir",
-        type=str,
-        help=f"Video directory if not {RAW_DIR}",
-        default=RAW_DIR,
-    )
-    parser.add_argument(
-        "-od",
-        "--output_dir",
-        type=str,
-        help=f"Output directory if not {LABELS_PATH}",
-        default=LABELS_PATH,
-    )
-    parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
-    parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['reset', 'reset'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
-    parser.add_argument('-nb', '--no_bbox', action='store_true', help='Skip intense bbox step')
-    parser.add_argument('-lc', '--length_cutoff', type=int, default=0, help='Minimum number of frames for a sample to be kept.')
-    args = parser.parse_args()
+    for name, field_info in model_cls.model_fields.items():
+        annotation = field_info.annotation
+        inner = _unwrap_annotation(annotation)
+        if inner is not None and issubclass(inner, BaseModel):
+            strict_inner = make_strict(inner)
+            # Preserve Optional[...] wrapper rather than just using the raw strict class
+            annotations[name] = _replace_in_annotation(annotation, inner, strict_inner)
+            # Preserve default so Optional fields don't become required
+            if field_info.default is not PydanticUndefined:
+                namespace[name] = field_info.default
+            elif field_info.default_factory is not None:
+                namespace[name] = Field(default_factory=field_info.default_factory)
 
-    root = Path(args.root)
-    raw_dir = Path(args.raw_dir)
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if annotations:
+        namespace["__annotations__"] = annotations
 
-    if args.asl_split == 'all':
-        todo_splits = avail_splits
-    else:
-        todo_splits = [args.asl_split]
+    return type(model_cls.__name__, (model_cls,), namespace)
 
-    for split in todo_splits:
-        split_path = Path(args.split_dir) / f"{split}.json"
-        preprocess_split(
-            split_path=split_path,
-            raw_path=raw_dir, 
-            output_base=output_dir,
-            verbose=args.verbose,
-            strictness=tuple(args.strictness),
-            do_bboxes=(not args.no_bbox),
-            length_cuttoff=args.length_cutoff,
-        )
+def _unwrap_annotation(annotation) -> type | None:
+    origin = get_origin(annotation)
+    if origin is Union:
+        for arg in get_args(annotation):
+            result = _unwrap_annotation(arg)
+            if result is not None:
+                return result
+    elif isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+    return None
+
+
+def _strip_computed(model_cls: type[BaseModel], data: dict) -> dict:
+    """Recursively remove computed field keys from a data dict before strict validation."""
+    computed_keys = set(model_cls.model_computed_fields.keys())
+    result = {}
+
+    for k, v in data.items():
+        if k in computed_keys:
+            continue
+        field_info = model_cls.model_fields.get(k)
+        if field_info and isinstance(v, dict):
+            inner = _unwrap_annotation(field_info.annotation)
+            if inner is not None and issubclass(inner, BaseModel):
+                v = _strip_computed(inner, v)
+        result[k] = v
+
+    return result
+
+
+def strict_validate(model_cls: type[T], data: dict) -> T:
+    strict_cls = make_strict(model_cls)
+    strict_cls.model_validate(_strip_computed(model_cls, data))
+    return model_cls.model_validate(data)
