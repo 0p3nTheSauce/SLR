@@ -22,5 +22,5 @@ src/que/old_ques/
 src/que/experiments
 .vscode/
 ./.vscode/
-
+slr.egg-info/
 
