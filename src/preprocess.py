@@ -429,7 +429,7 @@ if __name__ == "__main__":
     parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
     parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['reset', 'reset'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
     parser.add_argument('-nb', '--no_bbox', action='store_true', help='Skip intense bbox step')
-    parser.add_argument('-lc', '--length_cutoff', type=int, default=9, help='Minimum number of frames for a sample to be kept.')
+    parser.add_argument('-lc', '--length_cutoff', type=int, default=0, help='Minimum number of frames for a sample to be kept.')
     args = parser.parse_args()
 
     root = Path(args.root)
