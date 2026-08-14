@@ -5,6 +5,7 @@ import cmd as cmdLib
 import getpass
 import io
 import json
+import re
 import readline
 import shlex
 import subprocess
@@ -74,6 +75,9 @@ SAFE_GLOBALS = {
     "list": list,
 }
 
+    
+_LEADING_ZERO_INT_RE = re.compile(r"^[+-]?0[0-9]+$")
+
 
 def _join_criterion_tokens(tokens: list[str]) -> str:
     """Re-join one --criterion group's shell-tokenized words into a single
@@ -84,8 +88,16 @@ def _join_criterion_tokens(tokens: list[str]) -> str:
     the quotes back for those so ast.parse treats it as one string rather
     than two barewords sitting next to each other with no operator.
     """
-    return " ".join(f'"{t}"' if " " in t else t for t in tokens)
+    def _needs_quoting(t: str) -> bool:
+        if " " in t:
+            return True
+        # Leading-zero decimal integers (e.g. zfilled exp numbers like
+        # "082") are invalid Python literals and blow up ast.parse before
+        # the bareword stringifier ever runs -- quote them proactively so
+        # they parse as string constants, same as "S3D" does.
+        return bool(_LEADING_ZERO_INT_RE.match(t))
 
+    return " ".join(f'"{t}"' if _needs_quoting(t) else t for t in tokens)
 
 def _collect_bound_names(tree: ast.AST) -> set[str]:
     """Names that must stay real names, not become string literals: the
