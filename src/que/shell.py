@@ -13,6 +13,7 @@ import sys
 import time
 import traceback
 import webbrowser
+from ast import literal_eval
 from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
@@ -55,7 +56,6 @@ from src.que.core import (
 from src.que.tmux import tmux_manager
 from src.run_types import ENTITY
 
-
 # ---------------------------------------------------------------------------
 # Criterion parsing
 # ---------------------------------------------------------------------------
@@ -75,29 +75,45 @@ SAFE_GLOBALS = {
     "list": list,
 }
 
-    
-_LEADING_ZERO_INT_RE = re.compile(r"^[+-]?0[0-9]+$")
+
+# Non-identifier tokens that are still legitimate parts of a bare
+# expression (operators, punctuation) and must never be quoted.
+_BARE_OPERATORS = {
+    "==", "!=", "<", ">", "<=", ">=",
+    "+", "-", "*", "/", "//", "%", "**",
+    "(", ")", "[", "]", ",", ":", ".",
+}
+
+
+def _is_bare_safe(token: str) -> bool:
+    """True if `token` can be left unquoted in the criterion expression --
+    i.e. it's a recognised operator, a valid Python identifier/keyword
+    (and/or/not/in/is/True/False/None all qualify here too), or a valid
+    numeric literal. Anything else (a raw wandb id like '9vhjo3au', a
+    zfilled string like '082', a multi-word value) is not a valid bare
+    atom and must be quoted so it becomes a string constant instead of
+    tripping ast.parse.
+    """
+    if token in _BARE_OPERATORS:
+        return True
+    if token.isidentifier():
+        # covers real identifiers (S3D, x) AND keywords (and, or, not,
+        # in, is, True, False, None) -- isidentifier() only checks
+        # lexical shape, and ast.parse treats keywords as keyword nodes
+        # rather than Name nodes, so _BarewordStringifier never touches them
+        return True
+    try:
+        literal_eval(token)  # valid int/float/complex literal?
+        return True
+    except (ValueError, SyntaxError):
+        return False
 
 
 def _join_criterion_tokens(tokens: list[str]) -> str:
-    """Re-join one --criterion group's shell-tokenized words into a single
-    parseable expression string, e.g. ['x', '==', 'S3D'] -> 'x == S3D'.
+    """...(existing docstring)..."""
+    return " ".join(t if _is_bare_safe(t) else f'"{t}"' for t in tokens)
 
-    A token only contains an internal space if the shell kept a quoted
-    multi-word value together on purpose (e.g. -c x == "video model") -- put
-    the quotes back for those so ast.parse treats it as one string rather
-    than two barewords sitting next to each other with no operator.
-    """
-    def _needs_quoting(t: str) -> bool:
-        if " " in t:
-            return True
-        # Leading-zero decimal integers (e.g. zfilled exp numbers like
-        # "082") are invalid Python literals and blow up ast.parse before
-        # the bareword stringifier ever runs -- quote them proactively so
-        # they parse as string constants, same as "S3D" does.
-        return bool(_LEADING_ZERO_INT_RE.match(t))
 
-    return " ".join(f'"{t}"' if _needs_quoting(t) else t for t in tokens)
 
 def _collect_bound_names(tree: ast.AST) -> set[str]:
     """Names that must stay real names, not become string literals: the
@@ -158,6 +174,35 @@ def create_sweep(sweep_path: Path, project: str, entity: str):
         sweep_config = yaml.safe_load(f)
 
     return wandb.sweep(sweep_config, project=project, entity=entity)
+
+DEFAULT_SWEEP_META_FILENAME = "sweep_meta.json"
+
+def record_sweep_metadata(
+    sweep_info: SweepInfo,
+    filename: str = DEFAULT_SWEEP_META_FILENAME,
+) -> None:
+    """Append sweep metadata to a JSON file in the base_config's folder.
+
+    A single config.yaml/base.py pair may have multiple sweeps over time
+    (e.g. re-run, or attached to an existing sweep via sweep_id), so this
+    always appends rather than overwrites.
+    """
+    import json
+    import time
+    from pathlib import Path
+
+    folder = Path(sweep_info['base_config']).parent
+    meta_path = folder / filename
+
+    entries = []
+    if meta_path.exists():
+        entries = json.loads(meta_path.read_text())
+
+    entries.append({
+        "recorded": time.strftime("%Y-%m-%d %H:%M:%S"),
+    } | sweep_info)
+
+    meta_path.write_text(json.dumps(entries, indent=2))
 
 # --------------------------------------------------------------------------
 # json serialisation
@@ -913,17 +958,20 @@ class QueShell(cmdLib.Cmd):
                         assert parsed_args.sweep_path is not None, "sweep_id and sweep_path cannot both be None"
                         parsed_args.sweep_id = create_sweep(parsed_args.sweep_path, parsed_args.project, parsed_args.entity)
 
-                    self.server_context.set_sweep(
-                        SweepInfo(
-                            sweep_id=parsed_args.sweep_id,
-                            sweep_project=parsed_args.project,
-                            sweep_entity=parsed_args.entity,
-                            model=parsed_args.model,
-                            dataset=parsed_args.dataset,
-                            split=parsed_args.split,
-                            base_config=str(base_config),
-                        )
+                    sweep_info = SweepInfo(
+                        sweep_id=parsed_args.sweep_id,
+                        sweep_project=parsed_args.project,
+                        sweep_entity=parsed_args.entity,
+                        model=parsed_args.model,
+                        dataset=parsed_args.dataset,
+                        split=parsed_args.split,
+                        base_config=str(base_config),
                     )
+                    self.server_context.set_sweep(sweep_info)
+                    #save sweep metadata to a JSON file in the base_config's folder, for future reference
+                    record_sweep_metadata(sweep_info)
+                    
+                    
             elif parsed_args.command == "clear_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
                     self.server_context.set_sweep({})
