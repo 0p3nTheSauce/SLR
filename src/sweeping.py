@@ -300,7 +300,7 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset
         split=split,
         exp_no=run.id,
         recover=False,
-        config_path="<in-memory:sweep>",  # no file backs this config anymore
+        config_path=str(config_path),  # save the original sweep file
         save_path=str(save_path),
         weight_path=None,
     )
