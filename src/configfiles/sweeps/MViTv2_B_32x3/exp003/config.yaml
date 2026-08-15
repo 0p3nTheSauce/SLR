@@ -96,3 +96,5 @@ command:
   - asl100
   - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/exp005/base.py
 
+#based on /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp004/config.yaml
+#not run yet
