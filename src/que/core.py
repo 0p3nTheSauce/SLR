@@ -1077,24 +1077,6 @@ class WorkerStateDict(TypedDict):
     exception: str | None
     # sweep_id: str | None
 
-
-class SweepInfo(TypedDict):
-    sweep_id: str
-    sweep_project: str
-    sweep_entity: str
-    model: str
-    dataset: str
-    split: AVAIL_SPLITS
-    base_config: str
-
-
-class DaemonStateDict(TypedDict):
-    awake: bool
-    stop_on_fail: bool
-    supervisor_pid: int | None
-    
-
-
 def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
         task: Worker_tasks = "inactive"
@@ -1110,6 +1092,15 @@ def worker_state_validate(obj: Any) -> WorkerStateDict:
         "exception": d.exception,
         "working_pid": d.working_pid,
     }
+
+class SweepInfo(TypedDict):
+    sweep_id: str
+    sweep_project: str
+    sweep_entity: str
+    model: str
+    dataset: str
+    split: AVAIL_SPLITS
+    base_config: str
 
 
 def sweep_info_validate(obj: Any) -> SweepInfo:
@@ -1132,6 +1123,12 @@ def sweep_info_validate(obj: Any) -> SweepInfo:
         "split": d.split,
         "base_config": d.base_config,
     }
+
+class DaemonStateDict(TypedDict):
+    awake: bool
+    stop_on_fail: bool
+    supervisor_pid: int | None
+    
 
 def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):
