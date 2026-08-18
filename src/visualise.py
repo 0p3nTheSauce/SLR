@@ -172,25 +172,23 @@ class FrameVisualiser:
 class FrameFetcher:
     def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
         self.frames: Tensor | None = None
+        self.cur_idx : int = 0
+        dataloader = DataLoader(
+                        MiniSet(**kwargs),
+                        batch_size=1,
+                        shuffle=False,
+                        num_workers=4,
+                        pin_memory=False,
+                    )
+        
         self.iter_loader = iter(
-            DataLoader(
-                MiniSet(**kwargs),
-                batch_size=1,
-                shuffle=False,
-                num_workers=4,
-                pin_memory=False,
-            )
+            dataloader
         )
-
-    def __getitem__(self, key: int) -> Tensor:
-        if self.frames is not None:
-            return self.frames[key]
-        else:
-            raise IndexError('No frames set, call frame_fetcher()')
+        self.len = len(dataloader)
 
     def __call__(self) -> Tensor:
         frames = next(self.iter_loader)[0]
-        self.frames = frames
+        self.cur_idx += 1
         if len(frames.shape) == 5:
             frames = frames.squeeze(dim=0)
         if frames.shape[1] != 3:
