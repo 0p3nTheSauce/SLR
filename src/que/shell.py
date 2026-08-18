@@ -56,7 +56,6 @@ from src.que.core import (
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
 from src.run_types import ENTITY
-from src.utils import load_module_from_path
 
 # ---------------------------------------------------------------------------
 # Filtering
@@ -65,13 +64,15 @@ from src.utils import load_module_from_path
 
 def load_filters_module(filters_path: Path) -> ModuleType:
     """Load an arbitrary filters.py file by path as a standalone module."""
+    from src.utils import load_module_from_path
     return load_module_from_path(filters_path, module_prefix="_filters")
+
 
 def get_filters_drop_keys(filters_path: Path) -> tuple[dict, list[list[str]]]:
     """Load filters_path and pull out filters and keys to drop
 
     Args:
-        filters_path (Path): Path to filters.py file.  
+        filters_path (Path): Path to filters.py file.
 
     Raises:
         AttributeError: If file does not contain 'filters' and 'drop_keys' attributes
@@ -81,11 +82,7 @@ def get_filters_drop_keys(filters_path: Path) -> tuple[dict, list[list[str]]]:
     """
     module = load_filters_module(filters_path)
 
-    missing = [
-        name
-        for name in ("filters", "drop_keys")
-        if not hasattr(module, name)
-    ]
+    missing = [name for name in ("filters", "drop_keys") if not hasattr(module, name)]
     if missing:
         raise AttributeError(
             f"{filters_path} is missing required attribute(s): {missing}"
@@ -94,11 +91,13 @@ def get_filters_drop_keys(filters_path: Path) -> tuple[dict, list[list[str]]]:
     return module.filters, module.drop_keys
 
 
-def _unpack_filters(filters: dict) -> tuple[list[list[str]], list[Callable[[Any], bool]]]:
-    """Recursively flatten a nested dict. The ouput is a list of key sets which directly index a value, and a 
+def _unpack_filters(
+    filters: dict,
+) -> tuple[list[list[str]], list[Callable[[Any], bool]]]:
+    """Recursively flatten a nested dict. The ouput is a list of key sets which directly index a value, and a
     corresponding list of citeria to match the value against. Useful for converting compact
-    nested dict specifications to the form expecte by the Que.find_runs method. 
-    
+    nested dict specifications to the form expecte by the Que.find_runs method.
+
 
     Args:
         filters (dict): Nested dictionary.
@@ -111,45 +110,47 @@ def _unpack_filters(filters: dict) -> tuple[list[list[str]], list[Callable[[Any]
     """
     filter_key_sets: list[list[str]] = []
     criterions: list[Callable[[Any], bool]] = []
-    
+
     for key, value in filters.items():
         key_set = [key]
         if isinstance(value, Callable):
             criterions.append(value)
-            filter_key_sets.append(key_set) 
+            filter_key_sets.append(key_set)
             continue
-            
+
         elif isinstance(value, dict):
-            sub_key_sets, crits =  _unpack_filters(value)
+            sub_key_sets, crits = _unpack_filters(value)
             for sublist in sub_key_sets:
                 filter_key_sets.append(key_set + sublist)
-            
+
             criterions.extend(crits)
         else:
-            raise TypeError(f'value should be dict or Callable, instead got: {type(value)}')
-        
+            raise TypeError(
+                f"value should be dict or Callable, instead got: {type(value)}"
+            )
 
     return filter_key_sets, criterions
 
+
 def _drop_keys(d: dict, keys: list[Any]) -> dict:
-    """Drop a nested value from a dict and return the dict. 
+    """Drop a nested value from a dict and return the dict.
 
     Args:
         d (dict): A dictionary to modify in place
-        keys (list[Any]): List of keys in order to index. 
+        keys (list[Any]): List of keys in order to index.
 
     Returns:
         dict: The reference the original dictionary
     """
     if len(keys) == 0:
         return d
-    
+
     parent = d
     for key in keys[:-1]:
         parent = parent[key]
 
     parent.pop(keys[-1])
-    
+
     return d
 
 
@@ -337,9 +338,11 @@ def _json_default(obj):
         return str(obj)
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
+
 # --------------------------------------------------------------------------
 # Main Shell interface
 # --------------------------------------------------------------------------
+
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -796,9 +799,14 @@ class QueShell(cmdLib.Cmd):
             unpack = unpack[k]
         return unpack
 
-    def _print_list(self, location: QueLocation, runs: list[GenExp], display_keys: list[list[str]] | None = None) -> None:
+    def _print_list(
+        self,
+        location: QueLocation,
+        runs: list[GenExp],
+        display_keys: list[list[str]] | None = None,
+    ) -> None:
         """Print runs in a table"""
-        
+
         if not runs:
             self.console.print(
                 Panel(
@@ -817,12 +825,8 @@ class QueShell(cmdLib.Cmd):
                     disp_components = Que.set_nested(disp_components, key_set, info)
 
                 title = f"Run {idx} in {location}"
-                run_json = json.dumps(
-                    disp_components, indent=2, default=_json_default
-                )
-                syntax = Syntax(
-                    run_json, "json", theme="monokai", line_numbers=True
-                )
+                run_json = json.dumps(disp_components, indent=2, default=_json_default)
+                syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
                 self.console.print(
                     Panel(syntax, title=title, border_style="cyan", padding=(1, 2))
                 )
@@ -854,22 +858,31 @@ class QueShell(cmdLib.Cmd):
             table.add_row(str(idx).zfill(3), *row_values)
 
         self.console.print(table)
-        
+
     def do_list(self, arg):
         """Display runs in a table"""
-        with self.console.status("[bold green]Importing...", spinner="dots"), self.unwrap_exception("", "Failed to list runs"):
+        with (
+            self.console.status("[bold green]Importing...", spinner="dots"),
+            self.unwrap_exception("", "Failed to list runs"),
+        ):
             parsed_args = self._parse_args_or_cancel("list", arg)
             if parsed_args is None:
                 return
 
             if parsed_args.input_path:
-                file_filters, file_drop_key_sets = get_filters_drop_keys(parsed_args.input_path)
+                file_filters, file_drop_key_sets = get_filters_drop_keys(
+                    parsed_args.input_path
+                )
                 file_filter_keys, file_criterions = _unpack_filters(file_filters)
             else:
-                file_filter_keys, file_criterions, file_drop_key_sets,  = [], [], []
-                
+                (
+                    file_filter_keys,
+                    file_criterions,
+                    file_drop_key_sets,
+                ) = [], [], []
+
             runs = None
-            
+
             runs = list(
                 Que.list_manipulation(
                     self.que.list_runs(
@@ -881,7 +894,8 @@ class QueShell(cmdLib.Cmd):
                     criterions=[
                         parse_criterion(_join_criterion_tokens(crit))
                         for crit in parsed_args.criterion
-                    ] + file_criterions,
+                    ]
+                    + file_criterions,
                 )
             )
 
@@ -892,16 +906,25 @@ class QueShell(cmdLib.Cmd):
             if parsed_args.top_n is not None:
                 runs = runs[: parsed_args.top_n]
 
-            self._print_list(location=parsed_args.location,runs=runs,display_keys=parsed_args.display_keys )
-            
             if parsed_args.output_path:
                 dict_runs = [bm.model_dump() for bm in runs]
-                outruns = [_drop_keys(d, drop_keys) for d, drop_keys in zip(dict_runs, file_drop_key_sets) ] 
-                with open(parsed_args.output_path, 'w') as f:
-                    json.dump(outruns, f)
-            
-            
-            
+                outruns = (
+                    [
+                        _drop_keys(d, drop_keys)
+                        for d, drop_keys in zip(dict_runs, file_drop_key_sets)
+                    ]
+                    if file_drop_key_sets
+                    else dict_runs
+                )
+                with open(parsed_args.output_path, "w") as f:
+                    json.dump(outruns, f, indent=4)
+
+            self._print_list(
+                location=parsed_args.location,
+                runs=runs,
+                display_keys=parsed_args.display_keys,
+            )
+
     def do_display(self, arg):
         """Display run details in a styled panel"""
 
@@ -1024,7 +1047,6 @@ class QueShell(cmdLib.Cmd):
                 retro_support=parsed_args.retro_support,
                 output=parsed_args.output,
             )
-                    
 
     #   Worker
 
@@ -1580,40 +1602,40 @@ class QueShell(cmdLib.Cmd):
             default=default,
             help=f"{help} (default: {default}",
             type=type,
-            required=required
+            required=required,
         )
         return parser
-    
+
     def _add_output_file_arg(
-            self,
-            parser: argparse.ArgumentParser,
-            help: str = "Output path",
-            default: Path | None = None,
-            required: bool = False,
-            type=Path,
-        ) -> argparse.ArgumentParser:
-            parser.add_argument(
-                "--output_path",
-                "-op",
-                default=default,
-                help=f"{help} (default: {default}",
-                type=type,
-                required=required
-            )
-            return parser
+        self,
+        parser: argparse.ArgumentParser,
+        help: str = "Output path",
+        default: Path | None = None,
+        required: bool = False,
+        type=Path,
+    ) -> argparse.ArgumentParser:
+        parser.add_argument(
+            "--output_path",
+            "-op",
+            default=default,
+            help=f"{help} (default: {default}",
+            type=type,
+            required=required,
+        )
+        return parser
 
     def _add_display_keys_arg(
         self,
         parser: argparse.ArgumentParser,
     ) -> argparse.ArgumentParser:
         parser.add_argument(
-                "--display_keys",
-                "-d",
-                nargs="+",
-                type=str,
-                action="append",
-                help="list of keys to display for each run",
-            )
+            "--display_keys",
+            "-d",
+            nargs="+",
+            type=str,
+            action="append",
+            help="list of keys to display for each run",
+        )
         return parser
 
     # Que
@@ -1739,8 +1761,8 @@ class QueShell(cmdLib.Cmd):
             help="Number of runs to display from the top of the list",
         )
         self._add_display_keys_arg(parser)
-        self._add_input_file_arg(parser, help='Path to filters.py')
-        self._add_output_file_arg(parser, help='Path to ouput.json')
+        self._add_input_file_arg(parser, help="Path to filters.py")
+        self._add_output_file_arg(parser, help="Path to ouput.json")
         return parser
 
     def _get_display_parser(self) -> argparse.ArgumentParser:
