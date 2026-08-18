@@ -46,7 +46,7 @@ from src.run_types import (
 
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants and types
 # ---------------------------------------------------------------------------
 SYSTEMD_NAME = "que-training.service"
 QUE_DIR = Path(__file__).parent
@@ -116,6 +116,14 @@ class SortInfo(BaseModel):
 
 
 NO_SORT = SortInfo(key_set=[], reverse=False)
+
+# Specification for filtering results
+
+
+class Specification(BaseModel):
+    training: dict[str, int]
+    
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -623,14 +631,16 @@ class Que:
             ValueError: If filter keys are not paired with criterions
 
         Returns:
-            list[GenExp]: _description_
+            list[GenExp]: Filtered and or sorted runs
         """
+        #set defaults
         if criterions is None:
             criterions = []
         if filter_keys is None:
             filter_keys = []
         if sort_keys is None:
             sort_keys = []
+        #filter
         if len(filter_keys) != len(criterions):
             raise ValueError("filter_key sets and criterions must be equal in length")
         elif len(filter_keys) > 0:
@@ -643,7 +653,7 @@ class Que:
                     for run in runs
                     if crit(Que.get_nested_or_none(run, filter_key_set))
                 ]
-
+        #sort
         if len(sort_keys) > 0:
             return sorted(
                 runs,

@@ -5,7 +5,6 @@ import cmd as cmdLib
 import getpass
 import io
 import json
-import re
 import readline
 import shlex
 import subprocess
@@ -17,6 +16,7 @@ from ast import literal_eval
 from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from pydantic import BaseModel
@@ -46,6 +46,7 @@ from src.que.core import (
     GenExp,
     Que,
     QueDupExp,
+    QueLocation,
     QueManagerProtocol,
     ServerState,
     SweepInfo,
@@ -55,6 +56,102 @@ from src.que.core import (
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
 from src.run_types import ENTITY
+from src.utils import load_module_from_path
+
+# ---------------------------------------------------------------------------
+# Filtering
+# ---------------------------------------------------------------------------
+
+
+def load_filters_module(filters_path: Path) -> ModuleType:
+    """Load an arbitrary filters.py file by path as a standalone module."""
+    return load_module_from_path(filters_path, module_prefix="_filters")
+
+def get_filters_drop_keys(filters_path: Path) -> tuple[dict, list[list[str]]]:
+    """Load filters_path and pull out filters and keys to drop
+
+    Args:
+        filters_path (Path): Path to filters.py file.  
+
+    Raises:
+        AttributeError: If file does not contain 'filters' and 'drop_keys' attributes
+
+    Returns:
+        tuple[dict, list[str]]: filters, drop_keys
+    """
+    module = load_filters_module(filters_path)
+
+    missing = [
+        name
+        for name in ("filters", "drop_keys")
+        if not hasattr(module, name)
+    ]
+    if missing:
+        raise AttributeError(
+            f"{filters_path} is missing required attribute(s): {missing}"
+        )
+
+    return module.filters, module.drop_keys
+
+
+def _unpack_filters(filters: dict) -> tuple[list[list[str]], list[Callable[[Any], bool]]]:
+    """Recursively flatten a nested dict. The ouput is a list of key sets which directly index a value, and a 
+    corresponding list of citeria to match the value against. Useful for converting compact
+    nested dict specifications to the form expecte by the Que.find_runs method. 
+    
+
+    Args:
+        filters (dict): Nested dictionary.
+
+    Raises:
+        TypeError: If filters does not have str keys, or Callable[[Any], bool] leaf values.
+
+    Returns:
+        tuple[list[list[str]], list[Callable[[Any], bool]]]: filter_key_sets, criterions
+    """
+    filter_key_sets: list[list[str]] = []
+    criterions: list[Callable[[Any], bool]] = []
+    
+    for key, value in filters.items():
+        key_set = [key]
+        if isinstance(value, Callable):
+            criterions.append(value)
+            filter_key_sets.append(key_set) 
+            continue
+            
+        elif isinstance(value, dict):
+            sub_key_sets, crits =  _unpack_filters(value)
+            for sublist in sub_key_sets:
+                filter_key_sets.append(key_set + sublist)
+            
+            criterions.extend(crits)
+        else:
+            raise TypeError(f'value should be dict or Callable, instead got: {type(value)}')
+        
+
+    return filter_key_sets, criterions
+
+def _drop_keys(d: dict, keys: list[Any]) -> dict:
+    """Drop a nested value from a dict and return the dict. 
+
+    Args:
+        d (dict): A dictionary to modify in place
+        keys (list[Any]): List of keys in order to index. 
+
+    Returns:
+        dict: The reference the original dictionary
+    """
+    if len(keys) == 0:
+        return d
+    
+    parent = d
+    for key in keys[:-1]:
+        parent = parent[key]
+
+    parent.pop(keys[-1])
+    
+    return d
+
 
 # ---------------------------------------------------------------------------
 # Criterion parsing
@@ -79,9 +176,26 @@ SAFE_GLOBALS = {
 # Non-identifier tokens that are still legitimate parts of a bare
 # expression (operators, punctuation) and must never be quoted.
 _BARE_OPERATORS = {
-    "==", "!=", "<", ">", "<=", ">=",
-    "+", "-", "*", "/", "//", "%", "**",
-    "(", ")", "[", "]", ",", ":", ".",
+    "==",
+    "!=",
+    "<",
+    ">",
+    "<=",
+    ">=",
+    "+",
+    "-",
+    "*",
+    "/",
+    "//",
+    "%",
+    "**",
+    "(",
+    ")",
+    "[",
+    "]",
+    ",",
+    ":",
+    ".",
 }
 
 
@@ -112,7 +226,6 @@ def _is_bare_safe(token: str) -> bool:
 def _join_criterion_tokens(tokens: list[str]) -> str:
     """...(existing docstring)..."""
     return " ".join(t if _is_bare_safe(t) else f'"{t}"' for t in tokens)
-
 
 
 def _collect_bound_names(tree: ast.AST) -> set[str]:
@@ -163,6 +276,7 @@ def parse_criterion(expr: str) -> Callable[[Any], bool]:
         raise TypeError(f"Criterion must be callable, got: {type(result)}")
     return result  # type: ignore[return-value]
 
+
 # --------------------------------------------------------------------------
 # sweep creation
 # --------------------------------------------------------------------------
@@ -170,12 +284,15 @@ def create_sweep(sweep_path: Path, project: str, entity: str):
     import yaml
 
     import wandb
+
     with open(sweep_path) as f:
         sweep_config = yaml.safe_load(f)
 
     return wandb.sweep(sweep_config, project=project, entity=entity)
 
+
 DEFAULT_SWEEP_META_FILENAME = "sweep_meta.json"
+
 
 def record_sweep_metadata(
     sweep_info: SweepInfo,
@@ -191,18 +308,22 @@ def record_sweep_metadata(
     import time
     from pathlib import Path
 
-    folder = Path(sweep_info['base_config']).parent
+    folder = Path(sweep_info["base_config"]).parent
     meta_path = folder / filename
 
     entries = []
     if meta_path.exists():
         entries = json.loads(meta_path.read_text())
 
-    entries.append({
-        "recorded": time.strftime("%Y-%m-%d %H:%M:%S"),
-    } | sweep_info)
+    entries.append(
+        {
+            "recorded": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        | sweep_info
+    )
 
     meta_path.write_text(json.dumps(entries, indent=2))
+
 
 # --------------------------------------------------------------------------
 # json serialisation
@@ -216,6 +337,9 @@ def _json_default(obj):
         return str(obj)
     raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
 
+# --------------------------------------------------------------------------
+# Main Shell interface
+# --------------------------------------------------------------------------
 
 class QueShell(cmdLib.Cmd):
     avail_locs = QUE_LOCATIONS + list(SYNONYMS.keys())
@@ -453,7 +577,7 @@ class QueShell(cmdLib.Cmd):
                 "Queue state saved to file", "Failed to save que state"
             ):
                 self.que.save_state(
-                    out_path=parsed_args.Output_Path, timestamp=parsed_args.Timestamp
+                    out_path=parsed_args.output_path, timestamp=parsed_args.Timestamp
                 )
         elif parsed_args.command == "server":
             with self.unwrap_exception(
@@ -476,7 +600,7 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Que state loaded from file", "Failed to load Que state from file"
             ):
-                self.que.load_state(parsed_args.Input_Path)
+                self.que.load_state(parsed_args.input_path)
         elif parsed_args.command == "server":
             with self.unwrap_exception(
                 "Server state loaded from file", "Failed to load server state from file"
@@ -672,29 +796,94 @@ class QueShell(cmdLib.Cmd):
             unpack = unpack[k]
         return unpack
 
+    def _print_list(self, location: QueLocation, runs: list[GenExp], display_keys: list[list[str]] | None = None) -> None:
+        """Print runs in a table"""
+        
+        if not runs:
+            self.console.print(
+                Panel(
+                    f"[yellow]No runs found in {location}[/yellow]",
+                    border_style="yellow",
+                )
+            )
+            return
+
+        if display_keys is not None:
+            for idx, run in enumerate(runs):
+                disp_components = {}
+
+                for key_set in display_keys:
+                    info = Que.get_nested(run, key_set)
+                    disp_components = Que.set_nested(disp_components, key_set, info)
+
+                title = f"Run {idx} in {location}"
+                run_json = json.dumps(
+                    disp_components, indent=2, default=_json_default
+                )
+                syntax = Syntax(
+                    run_json, "json", theme="monokai", line_numbers=True
+                )
+                self.console.print(
+                    Panel(syntax, title=title, border_style="cyan", padding=(1, 2))
+                )
+            return
+
+        # Create a styled table
+        table = Table(
+            title=f"Runs in {location}",
+            box=box.ROUNDED,
+            border_style="cyan",
+            show_header=True,
+            header_style="bold magenta",
+        )
+
+        dict_runs = [x.model_dump() for x in self.que.summarise(runs, self.ndigits)]
+
+        table.add_column("Index", style="cyan", justify="right", width=8)
+        for raw_header in dict_runs[0]:
+            header = raw_header.replace("_", " ").capitalize()
+            table.add_column(header.capitalize(), style="white")
+
+        # runs are a list of Summarised dicts
+
+        for idx, row in enumerate(dict_runs):
+            row_values = []
+            for value in row.values():
+                value_str = str(value)
+                row_values.append(value_str)
+            table.add_row(str(idx).zfill(3), *row_values)
+
+        self.console.print(table)
+        
     def do_list(self, arg):
-        """Display runs in a beautiful table"""
-        with self.console.status("[bold green]Importing...", spinner="dots"):
+        """Display runs in a table"""
+        with self.console.status("[bold green]Importing...", spinner="dots"), self.unwrap_exception("", "Failed to list runs"):
             parsed_args = self._parse_args_or_cancel("list", arg)
             if parsed_args is None:
                 return
 
+            if parsed_args.input_path:
+                file_filters, file_drop_key_sets = get_filters_drop_keys(parsed_args.input_path)
+                file_filter_keys, file_criterions = _unpack_filters(file_filters)
+            else:
+                file_filter_keys, file_criterions, file_drop_key_sets,  = [], [], []
+                
             runs = None
-            with self.unwrap_exception("", "Failed to list runs"):
-                runs = list(
-                    Que.list_manipulation(
-                        self.que.list_runs(
-                            parsed_args.location,
-                        ),
-                        sort_keys=parsed_args.sort_keys,
-                        reverse=parsed_args.reverse,
-                        filter_keys=parsed_args.filter_keys,
-                        criterions=[
-                            parse_criterion(_join_criterion_tokens(crit))
-                            for crit in parsed_args.criterion
-                        ],
-                    )
+            
+            runs = list(
+                Que.list_manipulation(
+                    self.que.list_runs(
+                        parsed_args.location,
+                    ),
+                    sort_keys=parsed_args.sort_keys,
+                    reverse=parsed_args.reverse,
+                    filter_keys=parsed_args.filter_keys + file_filter_keys,
+                    criterions=[
+                        parse_criterion(_join_criterion_tokens(crit))
+                        for crit in parsed_args.criterion
+                    ] + file_criterions,
                 )
+            )
 
             if runs is None:
                 return
@@ -703,60 +892,16 @@ class QueShell(cmdLib.Cmd):
             if parsed_args.top_n is not None:
                 runs = runs[: parsed_args.top_n]
 
-            if not runs:
-                self.console.print(
-                    Panel(
-                        f"[yellow]No runs found in {parsed_args.location}[/yellow]",
-                        border_style="yellow",
-                    )
-                )
-                return
-
-            if parsed_args.display_keys is not None:
-                for idx, run in enumerate(runs):
-                    disp_components = {}
-
-                    for key_set in parsed_args.display_keys:
-                        info = Que.get_nested(run, key_set)
-                        disp_components = Que.set_nested(disp_components, key_set, info)
-
-                    title = f"Run {idx} in {parsed_args.location}"
-                    run_json = json.dumps(disp_components, indent=2, default=_json_default)
-                    syntax = Syntax(run_json, "json", theme="monokai", line_numbers=True)
-                    self.console.print(
-                        Panel(syntax, title=title, border_style="cyan", padding=(1, 2))
-                    )
-                return
-
-            runs = self.que.summarise(runs, self.ndigits)
-
-            # Create a styled table
-            table = Table(
-                title=f"Runs in {parsed_args.location}",
-                box=box.ROUNDED,
-                border_style="cyan",
-                show_header=True,
-                header_style="bold magenta",
-            )
-
-            dict_runs = [x.model_dump() for x in runs]
-
-            table.add_column("Index", style="cyan", justify="right", width=8)
-            for raw_header in dict_runs[0]:
-                header = raw_header.replace("_", " ").capitalize()
-                table.add_column(header.capitalize(), style="white")
-
-            # runs are a list of Summarised dicts
-
-            for idx, row in enumerate(dict_runs):
-                row_values = []
-                for value in row.values():
-                    value_str = str(value)
-                    row_values.append(value_str)
-                table.add_row(str(idx).zfill(3), *row_values)
-
-            self.console.print(table)
-
+            self._print_list(location=parsed_args.location,runs=runs,display_keys=parsed_args.display_keys )
+            
+            if parsed_args.output_path:
+                dict_runs = [bm.model_dump() for bm in runs]
+                outruns = [_drop_keys(d, drop_keys) for d, drop_keys in zip(dict_runs, file_drop_key_sets) ] 
+                with open(parsed_args.output_path, 'w') as f:
+                    json.dump(outruns, f)
+            
+            
+            
     def do_display(self, arg):
         """Display run details in a styled panel"""
 
@@ -879,6 +1024,7 @@ class QueShell(cmdLib.Cmd):
                 retro_support=parsed_args.retro_support,
                 output=parsed_args.output,
             )
+                    
 
     #   Worker
 
@@ -931,15 +1077,18 @@ class QueShell(cmdLib.Cmd):
                     )
             elif parsed_args.command == "set_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
-
                     if parsed_args.project is None:
                         parsed_args.project = f"{PROJECT_BASE}-{parsed_args.split[3:]}"
 
                     if parsed_args.sweep_path is not None:
-                        base_config = config_path_from_sweep_yaml(parsed_args.sweep_path)
+                        base_config = config_path_from_sweep_yaml(
+                            parsed_args.sweep_path
+                        )
                     else:
                         base_config = config_path_from_existing_sweep(
-                            parsed_args.sweep_id, parsed_args.project, parsed_args.entity
+                            parsed_args.sweep_id,
+                            parsed_args.project,
+                            parsed_args.entity,
                         )
 
                     # fail fast: catch a bad/missing/mismatched base_config
@@ -955,8 +1104,14 @@ class QueShell(cmdLib.Cmd):
                         ) from None
 
                     if parsed_args.sweep_id is None:
-                        assert parsed_args.sweep_path is not None, "sweep_id and sweep_path cannot both be None"
-                        parsed_args.sweep_id = create_sweep(parsed_args.sweep_path, parsed_args.project, parsed_args.entity)
+                        assert parsed_args.sweep_path is not None, (
+                            "sweep_id and sweep_path cannot both be None"
+                        )
+                        parsed_args.sweep_id = create_sweep(
+                            parsed_args.sweep_path,
+                            parsed_args.project,
+                            parsed_args.entity,
+                        )
 
                     sweep_info = SweepInfo(
                         sweep_id=parsed_args.sweep_id,
@@ -968,18 +1123,18 @@ class QueShell(cmdLib.Cmd):
                         base_config=str(base_config),
                     )
                     self.server_context.set_sweep(sweep_info)
-                    #save sweep metadata to a JSON file in the base_config's folder, for future reference
+                    # save sweep metadata to a JSON file in the base_config's folder, for future reference
                     record_sweep_metadata(sweep_info)
-                    
-                    
+
             elif parsed_args.command == "clear_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
                     self.server_context.set_sweep({})
 
-            elif parsed_args.command == 'toggle_stop_on_fail':
-                with self.unwrap_exception("Toggled stop on fail", "Failed to toggle stop on fail"):
+            elif parsed_args.command == "toggle_stop_on_fail":
+                with self.unwrap_exception(
+                    "Toggled stop on fail", "Failed to toggle stop on fail"
+                ):
                     self.server_context.toggle_stop_on_fail()
-
 
             else:
                 with self.unwrap_exception("", ""):
@@ -1148,9 +1303,12 @@ class QueShell(cmdLib.Cmd):
 
         if parsed_args.clear:
             if Confirm.ask(f"[bold red]Clear all logs in {log_file}?[/bold red]"):
-                with self.unwrap_exception(
-                    f"Cleared {log_file}", f"Failed to clear log file: {log_file}"
-                ), open(log_file, "w") as f:
+                with (
+                    self.unwrap_exception(
+                        f"Cleared {log_file}", f"Failed to clear log file: {log_file}"
+                    ),
+                    open(log_file, "w") as f,
+                ):
                     f.truncate(0)
                 return
             else:
@@ -1158,7 +1316,9 @@ class QueShell(cmdLib.Cmd):
                 return
 
         try:
-            subprocess.run(["tail", "-f", "-n", str(parsed_args.top_n), log_file], check=False)
+            subprocess.run(
+                ["tail", "-f", "-n", str(parsed_args.top_n), log_file], check=False
+            )
         except KeyboardInterrupt:
             self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
         except FileNotFoundError:
@@ -1365,7 +1525,11 @@ class QueShell(cmdLib.Cmd):
         self, parser: argparse.ArgumentParser, default=None
     ) -> argparse.ArgumentParser:
         """--n_location / -nl: destination location"""
-        kwargs = {"type": str, "choices": self.avail_locs, "help": "Destination location"}
+        kwargs = {
+            "type": str,
+            "choices": self.avail_locs,
+            "help": "Destination location",
+        }
         if default is not None:
             kwargs["default"] = default
         parser.add_argument("--n_location", "-nl", **kwargs)  # type: ignore
@@ -1402,6 +1566,56 @@ class QueShell(cmdLib.Cmd):
         )
         return parser
 
+    def _add_input_file_arg(
+        self,
+        parser: argparse.ArgumentParser,
+        help: str = "Input path",
+        default: Path | None = None,
+        required: bool = False,
+        type=Path,
+    ) -> argparse.ArgumentParser:
+        parser.add_argument(
+            "--input_path",
+            "-ip",
+            default=default,
+            help=f"{help} (default: {default}",
+            type=type,
+            required=required
+        )
+        return parser
+    
+    def _add_output_file_arg(
+            self,
+            parser: argparse.ArgumentParser,
+            help: str = "Output path",
+            default: Path | None = None,
+            required: bool = False,
+            type=Path,
+        ) -> argparse.ArgumentParser:
+            parser.add_argument(
+                "--output_path",
+                "-op",
+                default=default,
+                help=f"{help} (default: {default}",
+                type=type,
+                required=required
+            )
+            return parser
+
+    def _add_display_keys_arg(
+        self,
+        parser: argparse.ArgumentParser,
+    ) -> argparse.ArgumentParser:
+        parser.add_argument(
+                "--display_keys",
+                "-d",
+                nargs="+",
+                type=str,
+                action="append",
+                help="list of keys to display for each run",
+            )
+        return parser
+
     # Que
 
     def _get_quit_parser(self) -> argparse.ArgumentParser:
@@ -1422,13 +1636,7 @@ class QueShell(cmdLib.Cmd):
         que_parser.add_argument(
             "--Timestamp", "-t", action="store_true", help="Timestamp the output file"
         )
-        que_parser.add_argument(
-            "--Output_Path",
-            "-op",
-            type=str,
-            default=RUN_PATH,
-            help=f"Output path (default: {RUN_PATH})",
-        )
+        self._add_output_file_arg(que_parser, default=RUN_PATH)
 
         # Daemon Subparser
         subparsers.add_parser("server", help="Save Server state")
@@ -1444,13 +1652,7 @@ class QueShell(cmdLib.Cmd):
 
         # Que Subparser
         que_load = subparsers.add_parser("que", help="Load Que state")
-        que_load.add_argument(
-            "--Input_Path",
-            "-ip",
-            type=str,
-            default=RUN_PATH,
-            help=f"Input path (default: {RUN_PATH})",
-        )
+        self._add_input_file_arg(que_load, default=RUN_PATH)
 
         # Daemon Subparser
         subparsers.add_parser("server", help="Load Server state")
@@ -1534,16 +1736,11 @@ class QueShell(cmdLib.Cmd):
         self._add_list_manipulation_args(parser)
         self._add_top_n_arg(
             parser,
-            help="Number of runs to display from the top of the list (default: 10)",
+            help="Number of runs to display from the top of the list",
         )
-        parser.add_argument(
-            "--display_keys",
-            "-d",
-            nargs="+",
-            type=str,
-            action="append",
-            help="list of keys to display for each run",
-        )
+        self._add_display_keys_arg(parser)
+        self._add_input_file_arg(parser, help='Path to filters.py')
+        self._add_output_file_arg(parser, help='Path to ouput.json')
         return parser
 
     def _get_display_parser(self) -> argparse.ArgumentParser:
@@ -1552,14 +1749,7 @@ class QueShell(cmdLib.Cmd):
         )
         self._add_location_arg(parser)
         self._add_index_arg(parser)
-        parser.add_argument(
-            "--display_keys",
-            "-dk",
-            nargs="+",
-            type=str,
-            action="append",
-            help="list of keys to display within the run",
-        )
+        self._add_display_keys_arg(parser)
         self._add_list_manipulation_args(parser)
         return parser
 
@@ -1622,7 +1812,6 @@ class QueShell(cmdLib.Cmd):
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
         from configs import PROJECT_BASE
         from models import avail_models
-        
 
         parser = argparse.ArgumentParser(
             description="Interact with the worker process", prog="daemon"
@@ -1632,9 +1821,11 @@ class QueShell(cmdLib.Cmd):
             dest="command", required=True, help="Daemon commands"
         )
 
-        #on fail
-        subparsers.add_parser('toggle_stop_on_fail', help='Toggle stop on fail behaviour for the daemon')
-    
+        # on fail
+        subparsers.add_parser(
+            "toggle_stop_on_fail", help="Toggle stop on fail behaviour for the daemon"
+        )
+
         # Start
         subparsers.add_parser("start", help="Start the supervisor")
 
@@ -1664,19 +1855,31 @@ class QueShell(cmdLib.Cmd):
             "set_sweep", help="Set daemon sweep parameters"
         )
         set_sweep_parser.add_argument(
-                    "model",
-                    type=str,
-                    choices=avail_models(),
-                    help="Model name from one of the implemented model",
-                )
+            "model",
+            type=str,
+            choices=avail_models(),
+            help="Model name from one of the implemented model",
+        )
         set_sweep_parser.add_argument(
             "split", type=str, choices=get_avail_splits(), help="The class split"
         )
 
-        set_sweep_init_group = set_sweep_parser.add_mutually_exclusive_group(required=True)
+        set_sweep_init_group = set_sweep_parser.add_mutually_exclusive_group(
+            required=True
+        )
 
-        set_sweep_init_group.add_argument("--sweep_id","-si", type=str, help="Sweep id. (Add already initialised run)")
-        set_sweep_init_group.add_argument("--sweep_path","-sp", type=Path, help="Sweep.yaml cofig path. ((initialise and add run))")
+        set_sweep_init_group.add_argument(
+            "--sweep_id",
+            "-si",
+            type=str,
+            help="Sweep id. (Add already initialised run)",
+        )
+        set_sweep_init_group.add_argument(
+            "--sweep_path",
+            "-sp",
+            type=Path,
+            help="Sweep.yaml cofig path. ((initialise and add run))",
+        )
 
         set_sweep_parser.add_argument(
             "-p",
@@ -1684,8 +1887,7 @@ class QueShell(cmdLib.Cmd):
             type=str,
             help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)",
         )
-        
-        
+
         set_sweep_parser.add_argument(
             "-ds",
             "--dataset",

@@ -18,7 +18,7 @@ import torch
 
 import wandb
 
-#locals
+# locals
 from src.run_types import ZFILL
 
 ################ GPU ###################
@@ -50,7 +50,7 @@ class gpu_manager:
             ],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
         if result.returncode != 0:
             raise RuntimeError(f"nvidia-smi failed: {result.stderr.strip()}")
@@ -235,7 +235,7 @@ class wandb_manager:
             url = f"https://wandb.ai/{entity}/{project}/"
         else:
             url = f"https://wandb.ai/{entity}/{project}/runs/{run_id}"
-        subprocess.run(["xdg-open", url],check=False)
+        subprocess.run(["xdg-open", url], check=False)
 
 
 ################# Loading #####################
@@ -260,6 +260,7 @@ def load_module_from_path(path: Path, module_prefix: str = "_module") -> ModuleT
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
 
 def load_rgb_frames_from_video(
     video_path: str | Path, start: int, end: int, all: bool = False
@@ -433,27 +434,32 @@ def plt_display(
     num: int,
     size: tuple[float, float] = (5.0, 5.0),
     adapt: bool = False,
-    output: str | Path | None = None,
+    output_dir: str | Path | None = None,
+    file_suffix: str = ".png",
+    dpi : float | None = None,
+    interpolation: str = 'antialiased'
 ):
     """
     Visualise a subset of frames using matplotlib.
 
     Args:
-                                    frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
-                                    num (int): Number of frames to display (evenly sampled). Must be >= 1.
-                                    size (tuple, optional): Figure size (width, height) in inches. Defaults to (5, 5).
-                                    adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
-                                    output (str | Path, optional): If provided, directory to save each plotted frame as 'frame{i}.png'.
+        frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
+        num (int): Number of frames to display (evenly sampled). Must be >= 1.
+        size (tuple, optional): Figure size (width, height) in inches. Defaults to (5, 5).
+        adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
+        output (str | Path | None, optional): If provided, directory to save each plotted frame as 'frame{i}.file_suffix'.
 
     Returns:
-                                    None
+        None
 
     Raises:
-                                    ValueError: If num < 1 or frames has incompatible shape.
+        ValueError: If num < 1 or frames has incompatible shape.
     """
-    if output:
-        output = Path(output)
+    if output_dir:
+        output = Path(output_dir)
         output.mkdir(parents=True, exist_ok=True)
+    else:
+        output = None
 
     if adapt:
         factor = 5 / 256
@@ -476,11 +482,15 @@ def plt_display(
         # Normalize to [0, 1] range
         np_frame = (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
 
-        plt.figure(figsize=size)
-        plt.imshow(np_frame)
+        plt.figure(figsize=size,dpi=dpi,)
+        plt.imshow(np_frame, interpolation=interpolation)
         plt.axis("off")
         if output:
-            plt.savefig(output / f"frame{i}.png", bbox_inches="tight", pad_inches=0)
+            plt.savefig(
+                (output / f"frame{i}").with_suffix(file_suffix),
+                bbox_inches="tight",
+                pad_inches=0,
+            )
         plt.show()
 
 
@@ -496,18 +506,18 @@ def plt_display_grid(
     Visualise a subset of frames in a grid layout using matplotlib.
 
     Args:
-                                    frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
-                                    num (int): Number of frames to display (evenly sampled). Must be >= 1.
-                                    size (tuple, optional): Size (width, height) in inches per cell. Defaults to (5, 5).
-                                    adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
-                                    output (str | Path, optional): If provided, saves the grid figure as output.
-                                    cols (int, optional): Maximum number of frames per row. Defaults to 8.
+        frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
+        num (int): Number of frames to display (evenly sampled). Must be >= 1.
+        size (tuple, optional): Size (width, height) in inches per cell. Defaults to (5, 5).
+        adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
+        output (str | Path, optional): If provided, saves the grid figure as output.
+        cols (int, optional): Maximum number of frames per row. Defaults to 8.
 
     Returns:
-                                    None
+        None
 
     Raises:
-                                    ValueError: If num < 1 or frames has incompatible shape.
+        ValueError: If num < 1 or frames has incompatible shape.
     """
     if num < 1:
         raise ValueError("num must be >= 1")
@@ -623,6 +633,7 @@ def plot_from_lists(
 
 ##################### Misc ###################################
 
+
 def extract_num(fname):
     num_substrs = re.findall(r"\d+", fname)
     if len(num_substrs) > 1:
@@ -693,8 +704,10 @@ def is_removable(f: Path, rem_files: list[str]) -> bool:
             return True
     return False
 
+
 def is_empty(path):
     return not any(Path(path).iterdir())
+
 
 def clean_checkpoint_dirs(
     path: Path,
@@ -730,8 +743,8 @@ def clean_checkpoint_dirs(
         for item in path_obj.iterdir()
         if item.is_dir() and key_word in item.name
     ]
-    
-    #Remove files with specified suffixes in rem_files 
+
+    # Remove files with specified suffixes in rem_files
     if rem_files:
         to_rem = [p for p in path_obj.iterdir() if is_removable(p, rem_files)]
         for f in to_rem:
@@ -748,7 +761,7 @@ def clean_checkpoint_dirs(
             else:
                 print(f"Skipping {f}")
 
-    #Removing empty directories
+    # Removing empty directories
     if len(check_point_dirs) == 0 or all(
         is_empty(path_obj / d) for d in check_point_dirs
     ):
@@ -778,7 +791,12 @@ def clean_checkpoint_dirs(
         to_empty = path_obj / check
 
         dirty = sorted([item.name for item in to_empty.iterdir() if item.is_file()])
-        files = [file for file in dirty if file.endswith(".pth") and not any(keyword in file for keyword in ignore_keywords)]
+        files = [
+            file
+            for file in dirty
+            if file.endswith(".pth")
+            and not any(keyword in file for keyword in ignore_keywords)
+        ]
 
         if add_zfill:
             for i, f in enumerate(files):
@@ -791,7 +809,7 @@ def clean_checkpoint_dirs(
             continue
 
         # leave best.pth and the last checkpoint
-        to_remove = files[:-1]  
+        to_remove = files[:-1]
         if ask:
             ans = "none"
             while ans != "y" and ans != "" and ans != "n":
@@ -816,7 +834,7 @@ def recursive_cleaner(
     rem_files: list[str] | None = None,
     stopping_keyword="checkpoints",
 ):
-    """Recursively clean runs checkpoints and miscilaneaous files 
+    """Recursively clean runs checkpoints and miscilaneaous files
 
     Args:
         path (str | Path): Base runs directory to clean
@@ -879,8 +897,6 @@ def main():
         rem_empty=args.remove_empty,
         rem_files=args.remove_files,
     )
-
-
 
 
 if __name__ == "__main__":

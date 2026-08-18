@@ -148,10 +148,8 @@ class MiniSet(Dataset):
 
 class FrameVisualiser:
     def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
-        if "target_length" in kwargs:
-            self.target_frames = kwargs["target_length"]
-        else:
-            self.target_frames = 16
+        self.target_frames = kwargs.get("target_length", 16)
+        self.frame_size = kwargs.get('frame_size', 224)
         self.iter_loader = iter(
             DataLoader(
                 MiniSet(**kwargs),
@@ -168,7 +166,37 @@ class FrameVisualiser:
             frames = frames.squeeze(dim=0)
         if frames.shape[1] != 3:
             frames = frames.permute(1, 0, 2, 3)  # swap T and C
+        
         plt_display_grid(frames, self.target_frames)
+        
+class FrameFetcher:
+    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
+        self.frames: Tensor | None = None
+        self.iter_loader = iter(
+            DataLoader(
+                MiniSet(**kwargs),
+                batch_size=1,
+                shuffle=False,
+                num_workers=4,
+                pin_memory=False,
+            )
+        )
+
+    def __getitem__(self, key: int) -> Tensor:
+        if self.frames is not None:
+            return self.frames[key]
+        else:
+            raise IndexError('No frames set, call frame_fetcher()')
+
+    def __call__(self) -> Tensor:
+        frames = next(self.iter_loader)[0]
+        self.frames = frames
+        if len(frames.shape) == 5:
+            frames = frames.squeeze(dim=0)
+        if frames.shape[1] != 3:
+            frames = frames.permute(1, 0, 2, 3)  # swap T and C
+        
+        return frames
 
 
 # Standardised plots for results
