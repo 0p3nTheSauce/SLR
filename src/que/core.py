@@ -387,11 +387,13 @@ class Que:
         from configs import ZFILL
         from utils import enum_dir
 
-        new_save_path = (
-            str(enum_dir(run.admin.save_path, decimals=ZFILL))
-            if enum_chck
-            else run.admin.save_path
-        )
+        if enum_chck:
+            #probably copying a run, so make sure the previous save path is created otherwise enum_dir will fail
+            Path(run.admin.save_path).mkdir(parents=True, exist_ok=True)
+            new_save_path = str(enum_dir(run.admin.save_path, decimals=ZFILL))
+        else:
+            new_save_path = run.admin.save_path
+        
         new_admin = run.admin.model_copy(
             update={"recover": False, "save_path": new_save_path}
         )

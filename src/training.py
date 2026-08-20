@@ -26,7 +26,7 @@ from src.configs import (
 )
 from src.models import (  # noqa: F401
     MVirTed,
-    MViT_2D_t,
+    # MViT_2D_t,
     extend_classifier,
     get_mae_model,
     get_model,
