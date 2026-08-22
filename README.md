@@ -28,7 +28,7 @@ conda activate wlasl
 pip install -e .
 
 #download data
-mkdir data/WLASL && cd data/WLASL
+mkdir -p data/WLASL && cd data/WLASL
 wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/splits.zip"
 wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/WLASL2000.zip"
 unzip splits.zip
@@ -36,7 +36,7 @@ unzip WLASL2000.zip
 cd ../..
 
 #preprocess data
-cd code
+cd src
 python preprocess.py all -ve
 ```
 

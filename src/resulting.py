@@ -36,36 +36,9 @@ if not basic_logger.handlers:
     basic_logger.addHandler(_handler)
 
 
-# def load_filters_module(filters_path: Path) -> ModuleType:
-#     """Load an arbitrary filters.py file by path as a standalone module.
-
-#     This works regardless of where filters_path lives on disk - it doesn't
-#     need to be on sys.path or part of any package.
-#     """
-#     if not filters_path.exists():
-#         raise FileNotFoundError(f"No such filters file: {filters_path}")
-
-#     module_name = f"_filters_{filters_path.stem}"
-#     spec = importlib.util.spec_from_file_location(module_name, filters_path)
-#     if spec is None or spec.loader is None:
-#         raise ImportError(f"Could not load spec for {filters_path}")
-
-#     module = importlib.util.module_from_spec(spec)
-#     # Registering in sys.modules first lets the module's own top-level code
-#     # (e.g. dataclasses, or anything doing `import module_name`) resolve
-#     # correctly, and avoids it being garbage-collected mid-exec.
-#     sys.modules[module_name] = module
-#     spec.loader.exec_module(module)
-#     return module
-
-
 def load_filters_module(filters_path: Path) -> ModuleType:
     """Load an arbitrary filters.py file by path as a standalone module."""
     return load_module_from_path(filters_path, module_prefix="_filters")
-
-
-
-
 
 def get_filters(filters_path: Path) -> tuple[dict, list]:
     """Load filters_path and pull out the two attributes load_find needs.
@@ -97,46 +70,6 @@ def load_config(config_path: str) -> dict[str, Any]:
     with open(conf_path, "rb") as f:
         raw = tomllib.load(f)
     return raw
-
-
-def snap0(search: Any, spec: Any, logger: logging.Logger) -> bool:
-
-    if isinstance(spec, dict):
-        
-        if not isinstance(search, dict):
-            logger.debug(f"type mismatch: search is {type(search)}, spec is dict")
-            return False
-
-        for key, value in spec.items():
-            if key not in search:
-                logger.debug(f"key '{key}' not found in search")
-                return False
-            if not snap(search[key], value, logger):
-                return False
-
-    elif isinstance(spec, list):
-        
-        if not isinstance(search, list):
-            logger.debug(f"type mismatch: search is {type(search)}, spec is list")
-            return False
-        
-        spec = sorted(spec, key=lambda x: str(x))  # sort spec for consistent comparison
-        search = sorted(search, key=lambda x: str(x))  # sort search for consistent comparison
-
-        # every item in spec must match at least one item in search
-        for spec_item in spec:
-            if not any(snap(search_item, spec_item, logger) for search_item in search):
-                logger.debug(f"no match found in search for spec item: {spec_item}")
-                return False
-
-    else:
-        # leaf value — must match exactly
-        if search != spec:
-            logger.debug(f"value mismatch: search={search}, spec={spec}")
-            return False
-
-    return True
-
 
 def snap(search: Any, spec: Any, logger: logging.Logger) -> bool:
 

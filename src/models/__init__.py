@@ -1,24 +1,32 @@
-from typing import Optional, Tuple
 import torch
-import torch.nn as nn
-from pydantic import BaseModel
+from torch import nn
 
+# from src.models.detectron_mvit import MViT_2D_t
+from src.models.mvirted_mae import SepMViTBERTMAE
 
-# locals
+# slowfast mvit
+from src.models.og_mvit import (
+    MVITv2_B_32x3_basic,
+    MVITv2_B_32x3_reduced,
+    MVITv2_S_16x4_basic,
+    MVITv2_S_16x4_extended,
+)
 
-from src.run_types import NormDict
 #pytorch lib models
-from src.models.pytorch_mvit import MViTv2S_basic, MViTv2S_extended, MViTv1B_basic
-from src.models.pytorch_swin3d import Swin3DBig_basic, Swin3DSmall_basic, Swin3DTiny_basic
+from src.models.pytorch_mvit import MViTv1B_basic, MViTv2S_basic, MViTv2S_extended
 from src.models.pytorch_r3d import Resnet2_plus1D_18_basic, Resnet3D_18_basic
 from src.models.pytorch_s3d import S3D_basic
-# slowfast mvit
-from src.models.og_mvit import MVITv2_B_32x3_basic, MVITv2_S_16x4_basic
-#custem seperable mvit
-from src.models.sep_mvit_bert import MVirTed_t_basic, MVirTed
-from src.models.mvirted_mae import SepMViTBERTMAE
-from src.models.detectron_mvit import MViT_2D_t
+from src.models.pytorch_swin3d import (
+    Swin3DBig_basic,
+    Swin3DSmall_basic,
+    Swin3DTiny_basic,
+)
 
+#custem seperable mvit
+from src.models.sep_mvit_bert import MVirTed, MVirTed_t_basic
+
+# locals
+from src.run_types import NormDict
 
 S3D = "S3D"
 R3D_18 = "R3D_18"
@@ -30,10 +38,12 @@ MViTv2_S = "MViTv2_S"
 MViTv2_S_e = "MViTv2_S_e"
 MViTv1_B = "MViTv1_B"
 MViTv2_S_16x4 = "MViTv2_S_16x4"
+MViTv2_S_16x4_e = "MViTv2_S_16x4_e"
 MViTv2_B_32x3 = "MViTv2_B_32x3"
+MViTv2_B_32x3_r = "MViTv2_B_32x3_r"
 MVirTed_t = "MVirTed_t"
 MVirTed_t_MAE = MVirTed_t + '_MAE'
-
+#TODO: just make one class for extended and reduced models
 
 model_names = [
     S3D,
@@ -46,13 +56,15 @@ model_names = [
     MViTv2_S_e,
     MViTv1_B,
     MViTv2_S_16x4,
+    MViTv2_S_16x4_e,
     MViTv2_B_32x3,
+    MViTv2_B_32x3_r,
     MVirTed_t,
     MVirTed_t_MAE
 ]
 
 
-def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> torch.nn.Module:
+def get_model(model_name: str, num_classes: int, drop_p: float | None) -> torch.nn.Module:
     """Get model by name.
 
     Args:
@@ -81,7 +93,9 @@ def get_model(model_name: str, num_classes: int, drop_p: Optional[float]) -> tor
 
     model_constructors_opdp = { #optional dropout, defaults to original config
         MViTv2_S_16x4: MVITv2_S_16x4_basic,
+        MViTv2_S_16x4_e: MVITv2_S_16x4_extended,
         MViTv2_B_32x3: MVITv2_B_32x3_basic,
+        MViTv2_B_32x3_r: MVITv2_B_32x3_reduced,
         MVirTed_t: MVirTed_t_basic,
         }
 
@@ -179,7 +193,9 @@ def norm_vals(model_name: str) -> NormDict:
         MViTv1_B: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         #new mvit
         MViTv2_S_16x4: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        MViTv2_S_16x4_e: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         MViTv2_B_32x3: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
+        MViTv2_B_32x3_r: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         #seperable mvit
         MVirTed_t: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
         MVirTed_t_MAE: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
@@ -238,18 +254,20 @@ def get_num_parameters(model: nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
 
 __all__ = [
-    "get_model",
-    "extend_classifier",
-    "S3D_basic",
-    "Resnet3D_18_basic",
-    "Resnet2_plus1D_18_basic",
-    "Swin3DTiny_basic",
-    "Swin3DSmall_basic",
-    "Swin3DBig_basic",
+    "MVITv2_B_32x3_basic",
+    "MVITv2_B_32x3_reduced",
+    "MVITv2_S_16x4_basic",
+    "MVITv2_S_16x4_extended",
+    "MViTv1B_basic",
     "MViTv2S_basic",
     "MViTv2S_extended",
-    "MViTv1B_basic",
-    "MVITv2_S_16x4_basic",
-    "MVITv2_B_32x3_basic",
     "MVirTed_t_basic",
+    "Resnet2_plus1D_18_basic",
+    "Resnet3D_18_basic",
+    "S3D_basic",
+    "Swin3DBig_basic",
+    "Swin3DSmall_basic",
+    "Swin3DTiny_basic",
+    "extend_classifier",
+    "get_model",
 ]

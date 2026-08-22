@@ -46,7 +46,7 @@ from src.run_types import (
 
 
 # ---------------------------------------------------------------------------
-# Constants
+# Constants and types
 # ---------------------------------------------------------------------------
 SYSTEMD_NAME = "que-training.service"
 QUE_DIR = Path(__file__).parent
@@ -116,6 +116,14 @@ class SortInfo(BaseModel):
 
 
 NO_SORT = SortInfo(key_set=[], reverse=False)
+
+# Specification for filtering results
+
+
+class Specification(BaseModel):
+    training: dict[str, int]
+    
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -379,11 +387,13 @@ class Que:
         from configs import ZFILL
         from utils import enum_dir
 
-        new_save_path = (
-            str(enum_dir(run.admin.save_path, decimals=ZFILL))
-            if enum_chck
-            else run.admin.save_path
-        )
+        if enum_chck:
+            #probably copying a run, so make sure the previous save path is created otherwise enum_dir will fail
+            Path(run.admin.save_path).mkdir(parents=True, exist_ok=True)
+            new_save_path = str(enum_dir(run.admin.save_path, decimals=ZFILL))
+        else:
+            new_save_path = run.admin.save_path
+        
         new_admin = run.admin.model_copy(
             update={"recover": False, "save_path": new_save_path}
         )
@@ -623,14 +633,16 @@ class Que:
             ValueError: If filter keys are not paired with criterions
 
         Returns:
-            list[GenExp]: _description_
+            list[GenExp]: Filtered and or sorted runs
         """
+        #set defaults
         if criterions is None:
             criterions = []
         if filter_keys is None:
             filter_keys = []
         if sort_keys is None:
             sort_keys = []
+        #filter
         if len(filter_keys) != len(criterions):
             raise ValueError("filter_key sets and criterions must be equal in length")
         elif len(filter_keys) > 0:
@@ -643,7 +655,7 @@ class Que:
                     for run in runs
                     if crit(Que.get_nested_or_none(run, filter_key_set))
                 ]
-
+        #sort
         if len(sort_keys) > 0:
             return sorted(
                 runs,
@@ -1077,24 +1089,6 @@ class WorkerStateDict(TypedDict):
     exception: str | None
     # sweep_id: str | None
 
-
-class SweepInfo(TypedDict):
-    sweep_id: str
-    sweep_project: str
-    sweep_entity: str
-    model: str
-    dataset: str
-    split: AVAIL_SPLITS
-    base_config: str
-
-
-class DaemonStateDict(TypedDict):
-    awake: bool
-    stop_on_fail: bool
-    supervisor_pid: int | None
-    
-
-
 def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
         task: Worker_tasks = "inactive"
@@ -1110,6 +1104,15 @@ def worker_state_validate(obj: Any) -> WorkerStateDict:
         "exception": d.exception,
         "working_pid": d.working_pid,
     }
+
+class SweepInfo(TypedDict):
+    sweep_id: str
+    sweep_project: str
+    sweep_entity: str
+    model: str
+    dataset: str
+    split: AVAIL_SPLITS
+    base_config: str
 
 
 def sweep_info_validate(obj: Any) -> SweepInfo:
@@ -1132,6 +1135,12 @@ def sweep_info_validate(obj: Any) -> SweepInfo:
         "split": d.split,
         "base_config": d.base_config,
     }
+
+class DaemonStateDict(TypedDict):
+    awake: bool
+    stop_on_fail: bool
+    supervisor_pid: int | None
+    
 
 def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):

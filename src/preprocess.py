@@ -1,11 +1,7 @@
 import json
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import (
-    Any,
-    Literal,
-    TypeGuard,
-)
+from typing import Any, Literal, TypeAlias, TypeGuard
 
 # NOTE: Running this script will mess up the environment you are using, becuase of this stupid YOLO thing
 # it will give a '3D conv not implemented yada yada' error message
@@ -14,6 +10,7 @@ import cv2
 import torch
 import tqdm
 from pydantic import BaseModel, TypeAdapter, ValidationError
+from torch.utils.data import DataLoader, Dataset
 from ultralytics import YOLO  # type: ignore
 
 from src.configs import LABELS_PATH
@@ -26,8 +23,10 @@ from src.utils import load_rgb_frames_from_video
 - set: one of train, test and val
 - split: one of asl100, asl300, asl1000, asl2000"""
 
+
 class RawInstance(BaseModel):
     """Represents a single raw instance of a gloss in the dataset."""
+
     bbox: list[int]  # [x_min, y_min, x_max, y_max]
     frame_end: int
     frame_start: int
@@ -42,23 +41,27 @@ class RawInstance(BaseModel):
 
 class Instance(RawInstance):
     """Represents a single instance of a gloss in the dataset, with the label_num and label_name added."""
+
     label_num: int
     label_name: str
 
 
 class WLASLClass(BaseModel):
     """Represents a single gloss and its associated raw instances."""
+
     gloss: str
     instances: list[RawInstance]
 
 
 class BadInstance(Instance):
     """Adds reason to an instance that was discarded/modified from the dataset"""
+
     reason: str
 
 
 class ErrLog(BaseModel):
     """Format for storing bad instances"""
+
     policy: str
     num_offenders: int
     instances: list[BadInstance]
@@ -130,7 +133,7 @@ def fix_bad_frame_range(
     """Remove videos where the file cannot be read, or the start or end frame are impossible."""
     bad_instances: list[BadInstance] = []
     clean_instances: list[Instance] = []
-    
+
     for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
         vid_path = raw_path / f"{instance.video_id}.mp4"
 
@@ -144,25 +147,33 @@ def fix_bad_frame_range(
 
         start = instance.frame_start
         end = instance.frame_end
-        
+
         if start < 0 or start >= num_frames:
             message = f"Invalid start frame {start} for video {instance.video_id} with length {num_frames}."
             if remove_policy == "strict":
-                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Removing instance.")
+                )
                 continue
             elif remove_policy == "reset_frames":
-                bad_instances.append(processed_to_bad(instance, message + " Setting to 0."))
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Setting to 0.")
+                )
             start = 0
-            
+
         if end <= start or end > (start + num_frames):
             message = f"Invalid end frame {end} for video {instance.video_id} with length {num_frames} and start frame {start}."
             if remove_policy == "strict":
-                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Removing instance.")
+                )
                 continue
             elif remove_policy == "reset_frames":
-                bad_instances.append(processed_to_bad(instance, message + " Setting to num_frames."))
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Setting to num_frames.")
+                )
             end = start + num_frames
-            
+
         instance.frame_start = start
         instance.frame_end = end
         clean_instances.append(instance)
@@ -192,7 +203,94 @@ def get_largest_bbox(bboxes: list[list[float]]) -> list[float] | None:
     return [x_min, y_min, x_max, y_max]
 
 
+class VideoFrameDataset(Dataset):
+    def __init__(self, raw_path: Path, instances: list[Instance]):
+        self.raw_path = raw_path
+        self.instances = instances
+
+    def __len__(self):
+        return len(self.instances)
+
+    def __getitem__(self, idx):
+        instance = self.instances[idx]
+        vid_path = self.raw_path / f"{instance.video_id}.mp4"
+        frames = load_rgb_frames_from_video(
+            str(vid_path), instance.frame_start, instance.frame_end
+        )
+        # stays uint8 here — 4x smaller in the prefetch queue than float32
+        return frames, instance
+
 def fix_bad_bboxes(
+    raw_path: Path,
+    instances: list[Instance],
+    log_dir: Path,
+    remove_policy: Literal["strict", "reset"] = "strict",
+    file_extension: str = "bad_bboxes.json",
+    num_workers: int = 8,
+) -> list[Instance]:
+    """Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video."""
+    model = YOLO("yolov8n.pt")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    dataset = VideoFrameDataset(raw_path, instances)
+    loader = DataLoader(
+        dataset,
+        batch_size=1,
+        num_workers=num_workers,  # tune to your CPU core count
+        collate_fn=lambda batch: batch[0],  # unwrap the single (frames, instance) pair
+        pin_memory=True,
+        prefetch_factor=4,
+    )
+
+    bad_instances: list[BadInstance] = []
+    clean_instances: list[Instance] = []
+
+    for frames, instance in tqdm.tqdm(
+        loader, total=len(instances), desc="Fixing bounding boxes"
+    ):
+        frames = frames.to(device).float() / 255.0   # normalize after transfer, not before
+        results = model(frames, device=device, verbose=False)
+        bboxes = []
+        for result in results:
+            person_bboxes = result.boxes.xyxy[result.boxes.cls == 0]
+            if len(person_bboxes) > 0:
+                bboxes.extend(person_bboxes.tolist())
+
+        if not bboxes:
+            message = f"No bounding boxes found for video {instance.video_id}."
+            if remove_policy == "strict":
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Removing instance.")
+                )
+                continue
+            elif remove_policy == "reset_bbox":
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Using whole frame.")
+                )
+                largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
+            else:
+                raise ValueError(f"Invalid remove_policy: {remove_policy}")
+        else:
+            largest_bbox = get_largest_bbox(bboxes)
+            assert largest_bbox is not None, "largest_bbox can not be None here"
+
+        largest_bbox = [round(coord) for coord in largest_bbox]
+        instance.bbox = largest_bbox
+        clean_instances.append(instance)
+
+    log_path = log_dir / f"{remove_policy}_{file_extension}"
+
+    output_bad(
+        bad_instances=bad_instances,
+        remove_policy=remove_policy,
+        log_path=log_path,
+        fixing_description="bounding boxes",
+    )
+
+    return clean_instances
+
+
+def fix_bad_bboxes_og(
     raw_path: Path,
     instances: list[Instance],
     log_dir: Path,
@@ -223,10 +321,14 @@ def fix_bad_bboxes(
         if not bboxes:
             message = f"No bounding boxes found for video {instance.video_id}."
             if remove_policy == "strict":
-                bad_instances.append(processed_to_bad(instance, message + " Removing instance."))
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Removing instance.")
+                )
                 continue
             elif remove_policy == "reset_bbox":
-                bad_instances.append(processed_to_bad(instance, message + " Using whole frame."))
+                bad_instances.append(
+                    processed_to_bad(instance, message + " Using whole frame.")
+                )
                 largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
             else:
                 raise ValueError(f"Invalid remove_policy: {remove_policy}")
@@ -235,7 +337,7 @@ def fix_bad_bboxes(
             assert largest_bbox is not None, "largest_bbox can not be None here"
 
         # Round the coordinates to integers and update the Pydantic model
-        largest_bbox = [round(coord) for coord in largest_bbox] 
+        largest_bbox = [round(coord) for coord in largest_bbox]
         instance.bbox = largest_bbox
         clean_instances.append(instance)
 
@@ -260,7 +362,7 @@ def remove_short_samples(
     """Remove samples where the number of frames is less than or equal to the cutoff."""
     clean_instances = []
     short_samples = []
-    
+
     for inst in instances:
         num_frame = inst.frame_end - inst.frame_start
         if num_frame > cutoff:
@@ -268,7 +370,10 @@ def remove_short_samples(
         else:
             # Fixed bug: Append a BadInstance instead of a raw string
             short_samples.append(
-                processed_to_bad(inst, f"bad number of frames {num_frame} for video {inst.video_id}, removing.")
+                processed_to_bad(
+                    inst,
+                    f"bad number of frames {num_frame} for video {inst.video_id}, removing.",
+                )
             )
 
     log_path = log_dir / f"cutoff_{cutoff}_{file_extension}"
@@ -309,17 +414,81 @@ def check_paths(
         return False
     return True
 
+
+SetIdInst: TypeAlias = dict[str, dict[str, Instance]]
+StrictValues: TypeAlias = Literal["strict", "reset"]
+
+def load_instance_cache(cache_path: Path) -> dict[str, Instance]:
+    if not cache_path.exists():
+        return {}
+    with open(cache_path, "r") as f:
+        raw = json.load(f)
+    return {item["video_id"]: Instance.model_validate(item) for item in raw}
+
+
+def save_instance_cache(cache_path: Path, cache: dict[str, Instance]) -> None:
+    with open(cache_path, "w") as f:
+        json.dump([inst.model_dump() for inst in cache.values()], f, indent=2)
+        
+def _apply_fixes(
+    instances: list[Instance],
+    subset: str,
+    do_bboxes: bool,
+    length_cuttoff: int,
+    strictness: tuple[StrictValues, StrictValues],
+    raw_path: Path,
+    output_dir: Path,
+    verbose: bool,
+) -> list[Instance]:
+    print_v("Fixing frame ranges", verbose)
+    instances = fix_bad_frame_range(
+        raw_path=raw_path,
+        instances=instances,
+        log_dir=output_dir,
+        remove_policy=strictness[0],
+        file_extension=f"bad_frame_ranges_{subset}.json",
+    )
+
+    if do_bboxes:
+        print_v("Fixing bounding boxes", verbose)
+        instances = fix_bad_bboxes(
+            raw_path=raw_path,
+            instances=instances,
+            log_dir=output_dir,
+            remove_policy=strictness[1],
+            file_extension=f"bad_bboxes_{subset}.json",
+        )
+
+    print_v("Removing small samples", verbose)
+    instances = remove_short_samples(
+        instances=instances,
+        log_dir=output_dir,
+        cutoff=length_cuttoff,
+        file_extension=f"removed_short_samples_{subset}.json",
+    )
+    return instances
+
 def preprocess_split(
     split_path: Path,
     raw_path: Path,
     output_base: Path,
     verbose: bool = False,
     file_extension: str = "_fixed_frange_bboxes_len.json",
-    strictness: tuple[Literal['strict', 'reset'], Literal['strict', 'reset']] = ('strict', 'strict'),
+    strictness: tuple[StrictValues, StrictValues] = ("strict", "strict"),
     do_bboxes: bool = True,
-    length_cuttoff: int = 9
+    length_cuttoff: int = 9,
+    cache_path: Path | None = None,
+    use_cache: bool = True,
 ) -> None:
-    """Preprocesses a split of the WLASL dataset."""
+    """Preprocesses a split of the WLASL dataset, reusing fixes for
+    instances already processed in a previous split (e.g. asl100 -> asl300).
+
+    use_cache: if True, trusts that fix parameters (length_cuttoff, strictness,
+    etc.) are unchanged since the cache was built and reuses cached instances
+    as-is. If False, ignores the cache for reads and reprocesses every
+    instance from scratch (still writing results back to the cache for later
+    runs).
+    """
 
     if not check_paths(split_path, raw_path, output_base, verbose):
         return
@@ -331,19 +500,19 @@ def preprocess_split(
         print(f"no data found in {split_path}")
         return
 
-    # Use Pydantic TypeAdapter to validate the incoming JSON dynamically 
     wlasl_adapter = TypeAdapter(list[WLASLClass])
     asl_num = wlasl_adapter.validate_python(raw_json_data)
 
-    # create train, test, val splits
     train_instances = get_set(asl_num, "train")
     test_instances = get_set(asl_num, "test")
     val_instances = get_set(asl_num, "val")
 
-    # setup storage
     base_name = split_path.name.replace(".json", "")
     output_dir = output_base / base_name
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    cache_path = cache_path or (output_base / "instance_cache.json")
+    cache = load_instance_cache(cache_path) if use_cache else {}
 
     print_v(f"Processing {base_name}", verbose)
     for subset, instances in [
@@ -352,41 +521,34 @@ def preprocess_split(
         ("val", val_instances),
     ]:
         print_v(f"For split: {subset}", verbose)
-        print_v("Fixing frame ranges", verbose)
-        instances = fix_bad_frame_range(
+
+        cached = [inst for inst in instances if inst.video_id in cache]
+        uncached = [inst for inst in instances if inst.video_id not in cache]
+        print_v(f"Reusing {len(cached)} cached / fixing {len(uncached)} new", verbose)
+
+        newly_fixed = _apply_fixes(
+            instances=uncached,
+            subset=subset,
+            do_bboxes=do_bboxes,
+            length_cuttoff=length_cuttoff,
+            strictness=strictness,
             raw_path=raw_path,
-            instances=instances,
-            log_dir=output_dir,
-            remove_policy=strictness[0],
-            file_extension=f"bad_frame_ranges_{subset}.json",
+            output_dir=output_dir,
+            verbose=verbose,
         )
 
-        if do_bboxes:
-            print_v("Fixing bounding boxes", verbose)
-            instances = fix_bad_bboxes(
-                raw_path=raw_path,
-                instances=instances,
-                log_dir=output_dir,
-                remove_policy=strictness[1],
-                file_extension=f"bad_bboxes_{subset}.json",
-            )
+        processed = [inst.model_copy() for inst in cached] + newly_fixed
 
-        print_v("Removing small samples", verbose)
-        instances = remove_short_samples(
-            instances=instances,
-            log_dir=output_dir,
-            cutoff=length_cuttoff,
-            file_extension=f"removed_short_samples_{subset}.json",
-        )
+        for inst in newly_fixed:
+            cache[inst.video_id] = inst
 
         print_v("Saving results", verbose)
         inst_path = output_dir / f"{subset}_instances{file_extension}"
         with open(inst_path, "w") as f:
-            # Serialize back to JSON list using model_dump
-            json.dump([inst.model_dump() for inst in instances], f, indent=2)
+            json.dump([inst.model_dump() for inst in processed], f, indent=2)
 
+    save_instance_cache(cache_path, cache)
     print("\n------------------------- finished preprocessing ---------------\n")
-
 
 if __name__ == "__main__":
     avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
@@ -395,7 +557,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "asl_split",
         type=str,
-        choices=avail_splits + ['all'],
+        choices=avail_splits + ["all"],
         help="Which WLASL split to preprocess",
     )
     parser.add_argument(
@@ -427,26 +589,41 @@ if __name__ == "__main__":
         default=LABELS_PATH,
     )
     parser.add_argument("-ve", "--verbose", action="store_true", help="verbose output")
-    parser.add_argument('-ss', '--strictness', nargs=2, choices=['strict', 'reset'], default=['reset', 'reset'], help='The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.')
-    parser.add_argument('-nb', '--no_bbox', action='store_true', help='Skip intense bbox step')
-    parser.add_argument('-lc', '--length_cutoff', type=int, default=9, help='Minimum number of frames for a sample to be kept.')
+    parser.add_argument(
+        "-ss",
+        "--strictness",
+        nargs=2,
+        choices=["strict", "reset"],
+        default=["reset", "reset"],
+        help="The strictness levels for frame range, and bounding boxes respectively. Reset takes the full video/frame. Strict disgards. Both log.",
+    )
+    parser.add_argument(
+        "-nb", "--no_bbox", action="store_true", help="Skip intense bbox step"
+    )
+    parser.add_argument(
+        "-lc",
+        "--length_cutoff",
+        type=int,
+        default=0,
+        help="Minimum number of frames for a sample to be kept. (default: %(default)s)",
+    )
     args = parser.parse_args()
 
     root = Path(args.root)
-    raw_dir = root / args.raw_dir
+    raw_dir = Path(args.raw_dir)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.asl_split == 'all':
+    if args.asl_split == "all":
         todo_splits = avail_splits
     else:
         todo_splits = [args.asl_split]
 
     for split in todo_splits:
-        split_path = root / args.split_dir / f"{split}.json"
+        split_path = Path(args.split_dir) / f"{split}.json"
         preprocess_split(
             split_path=split_path,
-            raw_path=raw_dir, 
+            raw_path=raw_dir,
             output_base=output_dir,
             verbose=args.verbose,
             strictness=tuple(args.strictness),
