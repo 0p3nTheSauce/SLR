@@ -90,7 +90,7 @@ def get_avail_splits(pre_proc_dir: str | Path = LABELS_PATH) -> list[str]:
         raise ValueError(
             f"Invalid preprocessed directory: {pre_proc_dir}, must exist and be a directory"
         )
-    return [x.name for x in ppd.iterdir()]
+    return [x.name for x in ppd.iterdir() if x.is_dir()]
 
 
 def print_config(config: RunInfo):

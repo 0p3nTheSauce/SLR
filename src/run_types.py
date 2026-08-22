@@ -29,7 +29,8 @@ ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT_BASE = "WLASL"
 
 #Files
-LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+LABEL_SUFFIX = "fixed_frange_bboxes.json"
+
 NUM_INSTANCES_SUFFIX = "num_instances.json"
 WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
 ZFILL = 3
@@ -43,7 +44,6 @@ RUNS_PATH = SRC_ROOT / "runs"
 CONFIGS_PATH = SRC_ROOT / "configfiles"
 WLASL_ROOT = SLR_ROOT / "data/WLASL"
 LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
-LABELS_PATH_CUTOFF_9  = WLASL_ROOT  / "preprocessed/labels_cuttof_9"
 RAW_DIR = WLASL_ROOT / "WLASL2000"
 SPLIT_DIR = WLASL_ROOT / "splits"
 # Misc
@@ -63,7 +63,13 @@ class NormDict(BaseModel):
 
 AVAIL_SETS : TypeAlias = Literal["train", "val", "test"]
 ORIGINAL_SPLITS : TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
-AVAIL_SPLITS : TypeAlias = Literal["asl100_bottom", "asl100_worst"] | ORIGINAL_SPLITS
+#Splits with different frame cuttoff
+CUTOFF_SPLITS : TypeAlias = Literal["asl100_cutoff_9", "asl300_cutoff_9", "asl1000_cutoff_9", "asl2000_cutoff_9"]
+CUTOFF_9_NAMES : list[CUTOFF_SPLITS] = ["asl100_cutoff_9", "asl300_cutoff_9", "asl1000_cutoff_9", "asl2000_cutoff_9"]
+#Splits reconstructed from the worst and fewest classes
+WORST_SPLITS : TypeAlias = Literal["asl100_bottom", "asl100_worst"]
+
+AVAIL_SPLITS : TypeAlias =  ORIGINAL_SPLITS | CUTOFF_SPLITS | WORST_SPLITS
 
 ### Samplers
 

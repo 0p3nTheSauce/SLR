@@ -220,6 +220,7 @@ class VideoFrameDataset(Dataset):
         # stays uint8 here — 4x smaller in the prefetch queue than float32
         return frames, instance
 
+
 def fix_bad_bboxes(
     raw_path: Path,
     instances: list[Instance],
@@ -248,7 +249,9 @@ def fix_bad_bboxes(
     for frames, instance in tqdm.tqdm(
         loader, total=len(instances), desc="Fixing bounding boxes"
     ):
-        frames = frames.to(device).float() / 255.0   # normalize after transfer, not before
+        frames = (
+            frames.to(device).float() / 255.0
+        )  # normalize after transfer, not before
         results = model(frames, device=device, verbose=False)
         bboxes = []
         for result in results:
@@ -418,6 +421,7 @@ def check_paths(
 SetIdInst: TypeAlias = dict[str, dict[str, Instance]]
 StrictValues: TypeAlias = Literal["strict", "reset"]
 
+
 def load_instance_cache(cache_path: Path) -> dict[str, Instance]:
     if not cache_path.exists():
         return {}
@@ -429,7 +433,8 @@ def load_instance_cache(cache_path: Path) -> dict[str, Instance]:
 def save_instance_cache(cache_path: Path, cache: dict[str, Instance]) -> None:
     with open(cache_path, "w") as f:
         json.dump([inst.model_dump() for inst in cache.values()], f, indent=2)
-        
+
+
 def _apply_fixes(
     instances: list[Instance],
     subset: str,
@@ -468,12 +473,13 @@ def _apply_fixes(
     )
     return instances
 
+
 def preprocess_split(
     split_path: Path,
     raw_path: Path,
     output_base: Path,
     verbose: bool = False,
-    file_extension: str = "_fixed_frange_bboxes_len.json",
+    file_extension: str = "fixed_frange_bboxes.json",
     strictness: tuple[StrictValues, StrictValues] = ("strict", "strict"),
     do_bboxes: bool = True,
     length_cuttoff: int = 9,
@@ -508,6 +514,9 @@ def preprocess_split(
     val_instances = get_set(asl_num, "val")
 
     base_name = split_path.name.replace(".json", "")
+    base_name = (
+        f"{base_name}_cutoff_{length_cuttoff}" if length_cuttoff > 0 else base_name
+    )
     output_dir = output_base / base_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -543,12 +552,13 @@ def preprocess_split(
             cache[inst.video_id] = inst
 
         print_v("Saving results", verbose)
-        inst_path = output_dir / f"{subset}_instances{file_extension}"
+        inst_path = output_dir / f"{subset}_{file_extension}"
         with open(inst_path, "w") as f:
             json.dump([inst.model_dump() for inst in processed], f, indent=2)
 
     save_instance_cache(cache_path, cache)
     print("\n------------------------- finished preprocessing ---------------\n")
+
 
 if __name__ == "__main__":
     avail_splits = ["asl100", "asl300", "asl1000", "asl2000"]
