@@ -55,13 +55,15 @@ data = (
 )
 
 acc_cuttoff = 10
-avail_models = [
-    "MViTv2_S",
-    "MViTv2_S_16x4",
-    "MViTv2_B_32x3",
-    "MViTv2_S_e",
-]
-
+# avail_models = [
+#     "MViTv2_S",
+#     "MViTv2_S_16x4",
+#     "MViTv2_S_16x4_e",
+#     "MViTv2_B_32x3",
+#     "MViTv2_B_32x3_r",
+#     "MViTv2_S_e",
+# ]
+ignore_models = ['S3D']
 
 filters = {
     "training": lambda x: match(x, training),
@@ -70,7 +72,7 @@ filters = {
     "stopping": lambda x: match(x, stopping),
     "scheduler": lambda x: x is None,
     "results": {"best_val_acc": lambda x: x > acc_cuttoff},
-    "admin": {"model": lambda x: x in avail_models},
+    "admin": {"model": lambda x: x not in ignore_models},
 }
 
 drop_keys = [] #no drop keys means runs can be imported with typing

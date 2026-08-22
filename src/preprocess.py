@@ -605,7 +605,7 @@ if __name__ == "__main__":
         "--length_cutoff",
         type=int,
         default=0,
-        help="Minimum number of frames for a sample to be kept.",
+        help="Minimum number of frames for a sample to be kept. (default: %(default)s)",
     )
     args = parser.parse_args()
 
