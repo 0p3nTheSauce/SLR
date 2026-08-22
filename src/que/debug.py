@@ -151,8 +151,9 @@ def update_runs19():
     # print(json.dumps(z['admin'], indent=4))
     key_set = []
     q.update_runs(key_set, lambda x: fix_split(x, ids))
-    q.save_state('/home/luke/Code/SLR/src/que/Runs_updated.json')
-    
+    fp = '/home/luke/Code/SLR/src/que/Runs_updated.json'
+    q.save_state(fp)
+    q.load_state(fp) #check that it can load
 
 
 if __name__ == "__main__":
