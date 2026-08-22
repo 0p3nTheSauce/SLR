@@ -118,8 +118,7 @@ def fix_split(inst: dict, ids: list[str]) -> dict:
         run = ExpInfo.model_validate(inst)
     except Exception:
         run = CompExpInfo.model_validate(inst)
-    except Exception:
-        raise
+        
     
     new_split_names : dict[AVAIL_SPLITS, CUTOFF_SPLITS] = {
         'asl100' : 'asl100_cutoff_9',

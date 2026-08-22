@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from src.run_types import CUTOFF_9_NAMES
+
 
 def match(obj, target):
     d = obj.model_dump() if isinstance(obj, BaseModel) else obj
@@ -65,6 +67,7 @@ acc_cuttoff = 10
 # ]
 ignore_models = ['S3D']
 
+
 filters = {
     "training": lambda x: match(x, training),
     "optimizer": lambda x: match(x, optimizer),
@@ -72,7 +75,8 @@ filters = {
     "stopping": lambda x: match(x, stopping),
     "scheduler": lambda x: x is None,
     "results": {"best_val_acc": lambda x: x > acc_cuttoff},
-    "admin": {"model": lambda x: x not in ignore_models},
+    "admin": {"model": lambda x: x not in ignore_models,
+              "split": lambda x: x in CUTOFF_9_NAMES},
 }
 
 drop_keys = [] #no drop keys means runs can be imported with typing

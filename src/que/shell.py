@@ -65,6 +65,7 @@ from src.run_types import ENTITY
 def load_filters_module(filters_path: Path) -> ModuleType:
     """Load an arbitrary filters.py file by path as a standalone module."""
     from src.utils import load_module_from_path
+
     return load_module_from_path(filters_path, module_prefix="_filters")
 
 
@@ -152,6 +153,29 @@ def _drop_keys(d: dict, keys: list[Any]) -> dict:
     parent.pop(keys[-1])
 
     return d
+
+
+def get_filters_crits_dropkeys(filters_path: Path):
+    """Load filtering spec from file path in format expected by find"""
+    file_filters, file_drop_key_sets = get_filters_drop_keys(filters_path)
+    file_filter_keys, file_criterions = _unpack_filters(file_filters)
+    return file_filter_keys, file_criterions, file_drop_key_sets
+
+
+def output_filtered_runs(
+    runs: list[GenExp], output_path: str | Path, file_drop_key_sets: list[list[str]]
+) -> None:
+    dict_runs = [bm.model_dump() for bm in runs]
+    outruns = (
+        [
+            _drop_keys(d, drop_keys)
+            for d, drop_keys in zip(dict_runs, file_drop_key_sets)
+        ]
+        if file_drop_key_sets
+        else dict_runs
+    )
+    with open(output_path, "w") as f:
+        json.dump(outruns, f, indent=4)
 
 
 # ---------------------------------------------------------------------------
@@ -870,10 +894,9 @@ class QueShell(cmdLib.Cmd):
                 return
 
             if parsed_args.input_path:
-                file_filters, file_drop_key_sets = get_filters_drop_keys(
-                    parsed_args.input_path
+                file_filter_keys, file_criterions, file_drop_key_sets = (
+                    get_filters_crits_dropkeys(parsed_args.input_path)
                 )
-                file_filter_keys, file_criterions = _unpack_filters(file_filters)
             else:
                 (
                     file_filter_keys,
@@ -907,17 +930,11 @@ class QueShell(cmdLib.Cmd):
                 runs = runs[: parsed_args.top_n]
 
             if parsed_args.output_path:
-                dict_runs = [bm.model_dump() for bm in runs]
-                outruns = (
-                    [
-                        _drop_keys(d, drop_keys)
-                        for d, drop_keys in zip(dict_runs, file_drop_key_sets)
-                    ]
-                    if file_drop_key_sets
-                    else dict_runs
+                output_filtered_runs(
+                    runs=runs,
+                    output_path=parsed_args.output_path,
+                    file_drop_key_sets=file_drop_key_sets,
                 )
-                with open(parsed_args.output_path, "w") as f:
-                    json.dump(outruns, f, indent=4)
 
             self._print_list(
                 location=parsed_args.location,
