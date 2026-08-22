@@ -43,10 +43,12 @@ RUNS_PATH = SRC_ROOT / "runs"
 CONFIGS_PATH = SRC_ROOT / "configfiles"
 WLASL_ROOT = SLR_ROOT / "data/WLASL"
 LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
+LABELS_PATH_CUTOFF_9  = WLASL_ROOT  / "preprocessed/labels_cuttof_9"
 RAW_DIR = WLASL_ROOT / "WLASL2000"
 SPLIT_DIR = WLASL_ROOT / "splits"
 # Misc
 SEED = 42
+
 
 
 ### for model normalisation

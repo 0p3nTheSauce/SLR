@@ -2,7 +2,6 @@
 batch_size = 8
 update_per_step = 1
 max_epoch = 200
-batch_size_equivalent = 8
 
 [optimizer]
 eps = 4.64460308721673e-05
@@ -24,21 +23,6 @@ frame_size = 224
 normalise = true
 temporal_aug = [
     { target_length = 32, max_wobble = 5, type = "chunked" },
-]
-strict_size = true
-target_length = 32
-frame_size = 224
-
-[data.train_augs.norm_dict]
-mean = [
-    0.43216,
-    0.394666,
-    0.37645,
-]
-std = [
-    0.22803,
-    0.22145,
-    0.216989,
 ]
 
 [[data.train_augs.spatial_aug]]
@@ -63,21 +47,6 @@ temporal_aug = [
 ]
 spatial_aug = [
     { frame_size = 224, type = "Centre_crop" },
-]
-strict_size = true
-target_length = 32
-frame_size = 224
-
-[data.test_augs.norm_dict]
-mean = [
-    0.43216,
-    0.394666,
-    0.37645,
-]
-std = [
-    0.22803,
-    0.22145,
-    0.216989,
 ]
 
 [scheduler]

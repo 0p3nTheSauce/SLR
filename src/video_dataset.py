@@ -13,12 +13,15 @@ import torch
 from torch.utils.data import Dataset
 from typing_extensions import TypedDict, Unpack
 
-from src.configs import LABELS_PATH, get_avail_splits
+from src.configs import get_avail_splits
 from src.preprocess import Instance
 from src.run_types import (
+    AVAIL_DATASETS,
     AVAIL_SETS,
     AVAIL_SPLITS,
     LABEL_SUFFIX,
+    LABELS_PATH,
+    LABELS_PATH_CUTOFF_9,
     NUM_INSTANCES_SUFFIX,
     RAW_DIR,
     WLASL_ROOT,
@@ -73,27 +76,48 @@ def load_data_from_json(
     return data
 
 
-def get_wlasl_info(
-    split: AVAIL_SPLITS, set_name: AVAIL_SETS
-) -> DataSetInfo:
-    """Get wlasl dataset loading information in a tpyed dict
+def get_wlasl_info(split: AVAIL_SPLITS, set_name: AVAIL_SETS, frame_cuttoff: int | None = None) -> DataSetInfo:
+    """_summary_
 
     Args:
-        split (str): One of avail_splits, E.g. asl100
-        set_name (Literal['train', 'test', 'val']): Set to use
+        split (AVAIL_SPLITS): One of available splits, E.g. asl100
+        set_name (AVAIL_SETS): One of available set names, E.g. test
+        frame_cuttoff (int | None, optional): Optionally select a version of wlasl with different frame cuttoff. Defaults to None.
+
     Raises:
+        NotImplementedError: If the frame count cuttoff is not available
         ValueError: If split is not available
 
     Returns:
         DataSetInfo: For get_dataloader
     """
-    if split == 'asl100_bottom':
+    
+    """Get wlasl dataset
+    
+        Args:
+            split (str): One of avail_splits, E.g. asl100
+            set_name (Literal['train', 'test', 'val']): Set to use
+        Raises:
+            ValueError: If split is not available
+    
+        Returns:
+            DataSetInfo: For get_dataloader
+        """
+    
+    if split == "asl100_bottom":
         label_suffix = NUM_INSTANCES_SUFFIX
-    elif split == 'asl100_worst':
+    elif split == "asl100_worst":
         label_suffix = WORST_INSTANCES_SUFFIX
     else:
         label_suffix = LABEL_SUFFIX
-    
+
+    if frame_cuttoff is None:
+        labels_dir = LABELS_PATH
+    elif frame_cuttoff == 9:
+        labels_dir = LABELS_PATH_CUTOFF_9
+    else:
+        raise NotImplementedError(f'No wlasl version available with frame cuttoff == {frame_cuttoff}')
+
     avail_sp = get_avail_splits()
     if split not in avail_sp:
         raise ValueError(
@@ -102,10 +126,11 @@ def get_wlasl_info(
 
     return {
         "root": Path(WLASL_ROOT) / RAW_DIR,
-        "labels": Path(LABELS_PATH) / split,
+        "labels": Path(labels_dir) / split,
         "label_suff": label_suffix,
         "set_name": set_name,
     }
+
 
 
 def get_video_path(video_id: str, video_dir: Path) -> Path:
@@ -149,11 +174,13 @@ def get_labels_path(set_name: AVAIL_SETS, labels_dir: Path, label_suffix: str) -
 
     return label_file
 
-def load_split_set(split: AVAIL_SPLITS, set_name: AVAIL_SETS, policy: LOAD_DATA_POLICY) -> list[Instance] | list[dict[str, Any]]:
+
+def load_split_set(
+    split: AVAIL_SPLITS, set_name: AVAIL_SETS, policy: LOAD_DATA_POLICY
+) -> list[Instance] | list[dict[str, Any]]:
     split_set = get_wlasl_info(split, set_name)
     return load_data_from_json(
-        get_labels_path(set_name, split_set["labels"], split_set['label_suff']),
-        policy
+        get_labels_path(set_name, split_set["labels"], split_set["label_suff"]), policy
     )
 
 
