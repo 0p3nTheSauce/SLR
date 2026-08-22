@@ -1,15 +1,16 @@
-from typing import Optional, Union
-from que.core import Que, QueEmpty, connect_manager, _get_basic_logger
 import json
+import logging
 import subprocess
 import sys
-import logging
-import torch
-import video_dataset
-import preprocess
 import time
 from pathlib import Path
+from typing import Optional, Union
 
+import torch
+
+import preprocess
+import video_dataset
+from que.core import Que, QueEmpty, _get_basic_logger, connect_manager
 from run_types import CleverDict
 
 logging.basicConfig(

@@ -122,7 +122,6 @@ NO_SORT = SortInfo(key_set=[], reverse=False)
 
 class Specification(BaseModel):
     training: dict[str, int]
-    
 
 
 # ---------------------------------------------------------------------------
@@ -388,12 +387,12 @@ class Que:
         from utils import enum_dir
 
         if enum_chck:
-            #probably copying a run, so make sure the previous save path is created otherwise enum_dir will fail
+            # probably copying a run, so make sure the previous save path is created otherwise enum_dir will fail
             Path(run.admin.save_path).mkdir(parents=True, exist_ok=True)
             new_save_path = str(enum_dir(run.admin.save_path, decimals=ZFILL))
         else:
             new_save_path = run.admin.save_path
-        
+
         new_admin = run.admin.model_copy(
             update={"recover": False, "save_path": new_save_path}
         )
@@ -587,6 +586,8 @@ class Que:
     @classmethod
     def set_nested(cls, d: dict[Any, Any], ks: list[Any], val: Any) -> dict[Any, Any]:
         """Set a value at an arbitrary depth in a plain dict using a key path."""
+        if len(ks) == 0:
+            return val
         return cls._set_inplace(d, ks[0], ks[1:], val)
 
     @classmethod
@@ -635,14 +636,14 @@ class Que:
         Returns:
             list[GenExp]: Filtered and or sorted runs
         """
-        #set defaults
+        # set defaults
         if criterions is None:
             criterions = []
         if filter_keys is None:
             filter_keys = []
         if sort_keys is None:
             sort_keys = []
-        #filter
+        # filter
         if len(filter_keys) != len(criterions):
             raise ValueError("filter_key sets and criterions must be equal in length")
         elif len(filter_keys) > 0:
@@ -655,7 +656,7 @@ class Que:
                     for run in runs
                     if crit(Que.get_nested_or_none(run, filter_key_set))
                 ]
-        #sort
+        # sort
         if len(sort_keys) > 0:
             return sorted(
                 runs,
@@ -1067,9 +1068,8 @@ class Que:
             ]:
                 for idx, run in enumerate(run_list):
                     run_dict = run.model_dump()
-                    current_val = self.get_nested(run_dict, key_set)
                     run_dict = self.set_nested(
-                        run_dict, key_set, transform(current_val)
+                        run_dict, key_set, transform(self.get_nested(run_dict, key_set))
                     )
                     run_list[idx] = model_cls.model_validate(run_dict)  # type: ignore[index]
 
@@ -1089,6 +1089,7 @@ class WorkerStateDict(TypedDict):
     exception: str | None
     # sweep_id: str | None
 
+
 def worker_state_validate(obj: Any) -> WorkerStateDict:
     class WorkerState(BaseModel):
         task: Worker_tasks = "inactive"
@@ -1104,6 +1105,7 @@ def worker_state_validate(obj: Any) -> WorkerStateDict:
         "exception": d.exception,
         "working_pid": d.working_pid,
     }
+
 
 class SweepInfo(TypedDict):
     sweep_id: str
@@ -1136,11 +1138,12 @@ def sweep_info_validate(obj: Any) -> SweepInfo:
         "base_config": d.base_config,
     }
 
+
 class DaemonStateDict(TypedDict):
     awake: bool
     stop_on_fail: bool
     supervisor_pid: int | None
-    
+
 
 def daemon_state_validate(obj: Any) -> DaemonStateDict:
     class DaemonState(BaseModel):
@@ -1181,7 +1184,9 @@ Process_states: TypeAlias = WorkerStateDict | DaemonStateDict | ServerState
 
 class DaemonProtocol(Protocol):
     def start_supervisor(self) -> None: ...
-    def set_state(self, state: DaemonStateDict, awake_on_state: bool = True) -> None: ...
+    def set_state(
+        self, state: DaemonStateDict, awake_on_state: bool = True
+    ) -> None: ...
     def stop_supervisor(
         self,
         timeout: float | None = None,
@@ -1201,6 +1206,7 @@ class ServerContextProtocol(Protocol):
     def get_state(self) -> ServerState: ...
     def set_sweep(self, sweep: SweepInfo | dict) -> None: ...
     def toggle_stop_on_fail(self) -> None: ...
+
     # def set_state(
     #     self,
     #     server: ServerState | None,
@@ -1218,7 +1224,7 @@ class QueManagerProtocol(Protocol):
     def get_daemon_state(self) -> DaemonStateDict: ...
     def get_worker_state(self) -> WorkerStateDict: ...
     def get_server_context(self) -> ServerContextProtocol: ...
-    
+
 
 class QueManager(BaseManager):
     pass

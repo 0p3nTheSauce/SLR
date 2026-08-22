@@ -1,22 +1,15 @@
-from typing import Optional, Literal
 import json
 from pathlib import Path
+from typing import Literal, Optional
 
 # from .server import connect_manager
-
 # from que.shell import QueShell
-from src.que.core import (
-    TO_RUN,
-    CUR_RUN,
-    OLD_RUNS,
-    FAIL_RUNS,
-    Que,
-    _get_basic_logger
-)
+from src.que.core import CUR_RUN, FAIL_RUNS, OLD_RUNS, TO_RUN, Que, _get_basic_logger
 from src.run_types import (
-    FailedExp,
+    AVAIL_SPLITS,
     CompExpInfo,
     ExpInfo,
+    FailedExp,
 )
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
@@ -110,10 +103,62 @@ def update_runs18():
         json.dump(all_runs, f, indent=4)
 
 
+def _fetch_ids(path: str = '/home/luke/Code/SLR/src/que/wlasl_cuttoff_0.csv') -> list[str]:
+    import csv
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f)
+        
+        return [row['ID'] for row in reader]
+        
+
+def fix_split(inst: dict, ids: list[str]) -> dict:
+    from src.run_types import CUTOFF_SPLITS
+
+    try:
+        run = ExpInfo.model_validate(inst)
+    except Exception:
+        run = CompExpInfo.model_validate(inst)
+    except Exception:
+        raise
+    
+    new_split_names : dict[AVAIL_SPLITS, CUTOFF_SPLITS] = {
+        'asl100' : 'asl100_cutoff_9',
+        'asl300' : 'asl300_cutoff_9',
+        'asl1000' : 'asl1000_cutoff_9',
+        'asl2000' : 'asl2000_cutoff_9'
+    }
+    split = run.admin.split
+    if run.wandb.run_id not in ids and split in new_split_names:
+        new_split = new_split_names[run.admin.split]
+        # print(f'Updating split: {split} -> {new_split}')
+        run.admin.split = new_split
+    else:
+        print(f'Skipping split: {split} with run_id: {run.wandb.run_id}')
+        
+        
+    return run.model_dump()
+        
+
+def update_runs19():
+
+    ids = _fetch_ids()
+    
+    q = Que()
+    
+    # r = q.old_runs[len(q.old_runs)-1].model_dump()
+    # z = fix_split(r, ids)
+    # print(ids)
+    # print(json.dumps(z['admin'], indent=4))
+    key_set = []
+    q.update_runs(key_set, lambda x: fix_split(x, ids))
+    q.save_state('/home/luke/Code/SLR/src/que/Runs_updated.json')
+    
+
+
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
-    update_runs18()
+    update_runs19()
     # pass
     
     
