@@ -1,0 +1,65 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_loss
+  goal: minimize
+entity: ljgoodall2001-rhodes-university
+project: WLASL-100
+
+early_terminate:
+  type: hyperband
+  min_iter: 15
+  eta: 3
+
+parameters:
+  # --- tuned ---
+  #Optimizer params
+  eps:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.001 #reduced by factor of 10 from exp001, 
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 0.00001 #increased lower bound
+    max: 0.001 #reduced by factor of 10 from exp001, because sweep data shows that this is a good upper bound
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 0.000005 #reduced by factor of 10 from exp001, to explore lower learning rates,
+    max: 0.01 #reduced by factor of 10 from exp001, because sweep data shows that this is a good upper bound
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.1
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.1
+  #model params
+  drop_p:
+    distribution: uniform
+    min: 0.1
+    max: 0.7 
+
+  # --- fixed ---
+  batch_size: {value: 4}
+  update_per_step: {value: 2}
+  hflip_p: {value: 0.5}
+  frame_size: {value: 224}
+  target_length: {value: 32}
+  max_epoch: {value: 200}
+  patience: {value: 20}
+  min_delta: {value: 0.01}
+
+# Only consumed by CLI/subprocess-mode agents (`wandb agent <sweep_id>`).
+# Worker._sweep_train ignores program/command entirely -- it calls
+# create_sweep_run(model=..., split=..., dataset=...) directly with values
+# supplied via SweepInfo from the Daemon, not from this list.
+command:
+  - ${env}
+  - python
+  - ${program}
+  - S3D
+  - asl100
+  - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp005/base.py
+
+#Run at home
