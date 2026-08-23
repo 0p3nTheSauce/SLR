@@ -136,7 +136,8 @@ def fix_split(inst: dict, ids: list[str]) -> dict:
         
         
     return run.model_dump()
-        
+
+
 
 def update_runs19():
 
@@ -155,10 +156,30 @@ def update_runs19():
     q.load_state(fp) #check that it can load
 
 
+def fix_project(inst: dict) -> dict:
+    try:
+        run = ExpInfo.model_validate(inst)
+    except Exception:
+        run = CompExpInfo.model_validate(inst)
+
+    #update the project to match the admin split
+    run.wandb.project = run.admin.split.replace('asl', 'WLASL-')
+    return run.model_dump()
+
+def update_runs20():
+    
+    q = Que()
+    key_set = []
+    q.update_runs(key_set, lambda x: fix_project(x))
+    fp = '/home/luke/Code/SLR/src/que/Runs_updated.json'
+    q.save_state(fp)
+    q.load_state(fp) #check that it can load
+
+
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
-    update_runs19()
+    update_runs20()
     # pass
     
     

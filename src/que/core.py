@@ -476,23 +476,26 @@ class Que:
         self,
         out_path: str | Path | None = None,
         timestamp: bool = False,
-        archive: bool = True,
+        archive: bool = False,
     ):
         """Save the state of the Que to a json file
 
         Args:
             out_path (str | Path | None, optional): The output path. Defaults to None.
             timestamp (bool, optional): Whether to include a timestamp in the output path. Defaults to False.
-            archive (bool, optional): Whether to archive the output file. Defaults to True.
+            archive (bool, optional): Whether to archive the output file. Defaults to False.
         """
 
         if out_path is None:
             out_path = self.runs_path
-        elif Path(out_path).exists() and not timestamp:
+        else:
+            out_path = Path(out_path)
+            
+        if out_path.exists() and not timestamp:
             self.logger.warning(f"Overwriting existing state file: {out_path}")
 
         if archive:
-            out_path = ARCHIVE_DIR / out_path
+            out_path = ARCHIVE_DIR / out_path.name
 
         if timestamp:
             out_path = timestamp_path(out_path)
