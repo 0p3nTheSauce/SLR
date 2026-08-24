@@ -73,8 +73,8 @@ parameters:
   # --- fixed ---
 #   eps: {value: 0.00001}
   eta_min: {value: 0}
-  batch_size: {value: 2} #need to set back to 1
-  update_per_step: {value: 4} #need to set back to 8
+  batch_size: {value: 2} 
+  update_per_step: {value: 4} 
   end_factor: {value: 1.0}
 #   hflip_p: {value: 0.5}
   frame_size: {value: 224}
@@ -92,11 +92,15 @@ command:
   - ${env}
   - python
   - ${program}
-  - MViTv2_B_32x3
+  - MViTv2_S_16x4_e
   - asl100_cutoff_9
-  - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/exp003/base.py
+  - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_S_16x4_e/exp000/base.py
 
-#based on /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp004/config.yaml 
+
+#based on /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/exp003/config.yaml
+#which was itself based on:
+#/home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp004/config.yaml 
 # except with updated batch size
 
-#created with id: 2vdftjlj: failed because batch size was too large
+#created with id: imootel6
+#pending...

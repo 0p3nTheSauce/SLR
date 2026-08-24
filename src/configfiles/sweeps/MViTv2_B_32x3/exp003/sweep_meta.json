@@ -1,0 +1,12 @@
+[
+  {
+    "recorded": "2026-08-24 04:06:38",
+    "sweep_id": "2vdftjlj",
+    "sweep_project": "WLASL-100",
+    "sweep_entity": "ljgoodall2001-rhodes-university",
+    "model": "MViTv2_B_32x3",
+    "dataset": "WLASL",
+    "split": "asl100",
+    "base_config": "/home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/exp003/base.py"
+  }
+]
