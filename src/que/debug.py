@@ -1,3 +1,4 @@
+from src.run_types import RUNS_PATH, AdminInfo
 import json
 from pathlib import Path
 from typing import Literal, Optional
@@ -176,10 +177,55 @@ def update_runs20():
     q.load_state(fp) #check that it can load
 
 
+
+
+
+
+def get_temp_save_path(logger, inst: CompExpInfo, runs_path: Path | str = RUNS_PATH) -> Path:
+    
+    assert inst.admin.split == 'asl100'
+    # if not Path(inst.admin.save_path).exists():
+    #     logger.warning(f'{inst.admin.save_path} not found')
+    split = f'{inst.admin.split}_cutoff_0'
+    model = inst.admin.model
+    if 'sweep' in str(inst.admin.save_path):
+        return Path(runs_path) / split / model / f"sweep_{inst.wandb.sweep_id}" / str(inst.wandb.run_id)
+    else:
+        return Path(f"{runs_path}/{split}/{model}/exp{str(inst.admin.exp_no).zfill(3)}")
+    
+
+
+    
+def fix_save_path(inst: dict, runs_path: Path | str = RUNS_PATH) -> dict:
+    try:
+        run = ExpInfo.model_validate(inst)
+    except Exception:
+        run = CompExpInfo.model_validate(inst)
+    
+    split = run.admin.split
+    model = run.admin.model
+    if 'sweep' in str(run.admin.save_path):
+        run.admin.save_path = str(Path(runs_path) / split / model / f"sweep_{run.wandb.sweep_id}" / str(run.wandb.run_id))
+    else:
+        run.admin.save_path = str(Path(f"{runs_path}/{split}/{model}/exp{str(run.admin.exp_no).zfill(3)}"))
+
+    return run.model_dump()
+
+def update_runs21():
+    
+    q = Que()
+    key_set = []
+    q.update_runs(key_set, lambda x: fix_save_path(x))
+    fp = '/home/luke/Code/SLR/src/que/Runs_updated.json'
+    q.save_state(fp)
+    q.load_state(fp) #check that it can load
+    
+
+
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
-    update_runs20()
+    update_runs21()
     # pass
     
     
