@@ -24,8 +24,10 @@ command:
   - python
   - ${program}
   - MViTv2_B_32x3
-  - asl100
+  - asl100_cutoff_9
   - --base_config
   - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml
 
 # run as mkwuo5qv
+
+#This sweep was affected by the move to the new split

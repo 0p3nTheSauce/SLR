@@ -270,8 +270,8 @@ def update_runs22():
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
-    update_runs22()
-    # pass
+    # update_runs22()
+    pass
     
     
     

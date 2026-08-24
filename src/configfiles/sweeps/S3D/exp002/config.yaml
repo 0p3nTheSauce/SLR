@@ -93,6 +93,7 @@ command:
   - python
   - ${program}
   - S3D
-  - asl100
+  - asl100_cutoff_9
   - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp002/base.py
 
+#This sweep was affected by the move to the new split
