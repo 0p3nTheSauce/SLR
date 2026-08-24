@@ -1,5 +1,6 @@
-from src.run_types import RUNS_PATH, AdminInfo
 import json
+import logging
+import sys
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -8,12 +9,24 @@ from typing import Literal, Optional
 from src.que.core import CUR_RUN, FAIL_RUNS, OLD_RUNS, TO_RUN, Que, _get_basic_logger
 from src.run_types import (
     AVAIL_SPLITS,
+    RUNS_PATH,
+    AdminInfo,
     CompExpInfo,
     ExpInfo,
     FailedExp,
 )
 
 KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
+
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    h = logging.StreamHandler(sys.stdout)
+    h.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(h)
+logger.propagate = False  # don't also send to root's (possibly broken) handlers
 
 
 def rem_updated(name:str) -> str:
@@ -219,13 +232,45 @@ def update_runs21():
     fp = '/home/luke/Code/SLR/src/que/Runs_updated.json'
     q.save_state(fp)
     q.load_state(fp) #check that it can load
+
+
+
+def fix_weight_path(inst: dict, runs_path: Path | str = RUNS_PATH) -> dict:
+    import re
+    try:
+        run = ExpInfo.model_validate(inst)
+    except Exception:
+        run = CompExpInfo.model_validate(inst)
+    
+    
+    if run.admin.split.endswith('_cutoff_9') and run.admin.weight_path is not None:
+        
+        old_weight_path = run.admin.weight_path
+        # logger.info(old_split)
+        old_asl = re.search(r'asl\d+', old_weight_path).group(0)  
+        new_asl = f'{old_asl}_cutoff_9'
+        new_weight_path = old_weight_path.replace(old_asl, new_asl)
+        logger.info(f'Fixed: {old_weight_path} -> {new_weight_path}\n for split: {new_asl} from split: {old_asl}')
+        run.admin.weight_path = new_weight_path
+
+    return run.model_dump()
     
 
+    
+def update_runs22():
+    
+    q = Que()
+    key_set = []
+    q.update_runs(key_set, lambda x: fix_weight_path(x))
+    fp = '/home/luke/Code/SLR/src/que/Runs_updated.json'
+    q.save_state(fp)
+    q.load_state(fp) #check that it can load
+    
 
 if __name__ == "__main__":
     # update_runs14()
     # test_read_server_state()
-    update_runs21()
+    update_runs22()
     # pass
     
     

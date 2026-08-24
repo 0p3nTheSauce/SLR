@@ -109417,7 +109417,7 @@
                 "exp_no": "050",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_32f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/S3D/exp049/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000/S3D/exp049/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -109575,7 +109575,7 @@
                 "exp_no": "049",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_16f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/S3D/exp048/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000/S3D/exp048/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -109733,7 +109733,7 @@
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/MViTv2_S_e/exp000/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000/MViTv2_S_e/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 2,
@@ -109891,7 +109891,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_16f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/MViTv2_S/exp002/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000/MViTv2_S/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -110049,7 +110049,7 @@
                 "exp_no": "049",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_32f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/S3D/exp048/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300/S3D/exp048/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -110207,7 +110207,7 @@
                 "exp_no": "048",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_16f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/S3D/exp047/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300/S3D/exp047/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -110365,7 +110365,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/MViTv2_S_e/exp000/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300/MViTv2_S_e/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 2,
@@ -110523,7 +110523,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_16f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/MViTv2_S/exp003/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300/MViTv2_S/exp003/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -110681,7 +110681,7 @@
                 "exp_no": "048",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_32f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp088/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/S3D/exp088/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -110839,7 +110839,7 @@
                 "exp_no": "047",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/S3D/config_16f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp087/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/S3D/exp087/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -110997,7 +110997,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_32f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/MViTv2_S_e/exp002/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/MViTv2_S_e/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 2,
@@ -111155,7 +111155,7 @@
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "/home/luke/Code/SLR/src/results/satnac_2026/MViTv2_S/config_16f_15p.toml",
-                "weight_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/MViTv2_S/exp021/checkpoints/best.pth"
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/MViTv2_S/exp021/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -114720,7 +114720,7 @@
                 "exp_no": "005",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp005.toml",
-                "weight_path": "runs/asl1000_cutoff_9/MViTv2_B_32x3/exp002/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_B_32x3/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -114881,7 +114881,7 @@
                 "exp_no": "002",
                 "recover": true,
                 "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp002.toml",
-                "weight_path": "runs/asl300_cutoff_9/MViTv2_B_32x3/exp002/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_B_32x3/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -115042,7 +115042,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_B_32x3/exp002.toml",
-                "weight_path": "runs/asl100_cutoff_9/MViTv2_B_32x3/exp010/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_B_32x3/exp010/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -119318,7 +119318,7 @@
                 "exp_no": "004",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp004.toml",
-                "weight_path": "runs/asl1000_cutoff_9/MViTv2_B_32x3/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_B_32x3/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -119478,7 +119478,7 @@
                 "exp_no": "001",
                 "recover": true,
                 "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp001.toml",
-                "weight_path": "runs/asl300_cutoff_9/MViTv2_B_32x3/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_B_32x3/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -119638,7 +119638,7 @@
                 "exp_no": "001",
                 "recover": true,
                 "config_path": "configfiles/asl300/MViTv2_B_32x3/exp001.toml",
-                "weight_path": "runs/asl100_cutoff_9/MViTv2_B_32x3/exp008/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_B_32x3/exp008/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -120425,7 +120425,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp002.toml",
-                "weight_path": "runs/asl2000_cutoff_9/MViTv2_B_32x3/exp001/checkpoints/checkpoint_018.pth"
+                "weight_path": "runs/asl2000/MViTv2_B_32x3/exp001/checkpoints/checkpoint_018.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -120577,7 +120577,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl2000/S3D/exp002.toml",
-                "weight_path": "runs/asl1000_cutoff_9/S3D/exp002/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/S3D/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -120730,7 +120730,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl1000/S3D/exp002.toml",
-                "weight_path": "runs/asl300_cutoff_9/S3D/exp004/checkpoints/best.pth"
+                "weight_path": "runs/asl300/S3D/exp004/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -120883,7 +120883,7 @@
                 "exp_no": "004",
                 "recover": false,
                 "config_path": "configfiles/asl300/S3D/exp004.toml",
-                "weight_path": "runs/asl100_cutoff_9/S3D/exp076/checkpoints/best.pth"
+                "weight_path": "runs/asl100/S3D/exp076/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -121188,7 +121188,7 @@
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl2000/S3D/exp001.toml",
-                "weight_path": "runs/asl1000_cutoff_9/S3D/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/S3D/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -121341,7 +121341,7 @@
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl1000/S3D/exp001.toml",
-                "weight_path": "runs/asl300_cutoff_9/S3D/exp003/checkpoints/best.pth"
+                "weight_path": "runs/asl300/S3D/exp003/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -121494,7 +121494,7 @@
                 "exp_no": "003",
                 "recover": false,
                 "config_path": "configfiles/asl300/S3D/exp003.toml",
-                "weight_path": "runs/asl100_cutoff_9/S3D/exp075/checkpoints/best.pth"
+                "weight_path": "runs/asl100/S3D/exp075/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 8,
@@ -121799,7 +121799,7 @@
                 "exp_no": "000",
                 "recover": true,
                 "config_path": "configfiles/asl2000/MViTv2_S_16x4/exp000.toml",
-                "weight_path": "runs/asl1000_cutoff_9/MViTv2_S_16x4/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_S_16x4/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -121952,7 +121952,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_S_16x4/exp000.toml",
-                "weight_path": "runs/asl300_cutoff_9/MViTv2_S_16x4/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_S_16x4/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -122105,7 +122105,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_S_16x4/exp000.toml",
-                "weight_path": "runs/asl100_cutoff_9/MViTv2_S_16x4/exp003/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_S_16x4/exp003/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -122877,7 +122877,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_B_32x3/exp000.toml",
-                "weight_path": "runs/asl1000_cutoff_9/MViTv2_B_32x3/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_B_32x3/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -123029,7 +123029,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_B_32x3/exp000.toml",
-                "weight_path": "runs/asl300_cutoff_9/MViTv2_B_32x3/exp000/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_B_32x3/exp000/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -123181,7 +123181,7 @@
                 "exp_no": "000",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_B_32x3/exp000.toml",
-                "weight_path": "runs/asl100_cutoff_9/MViTv2_B_32x3/exp007/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_B_32x3/exp007/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 1,
@@ -128009,7 +128009,7 @@
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl2000/MViTv2_S/exp001.toml",
-                "weight_path": "runs/asl1000_cutoff_9/MViTv2_S/exp001/checkpoints/best.pth"
+                "weight_path": "runs/asl1000/MViTv2_S/exp001/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -128163,7 +128163,7 @@
                 "exp_no": "001",
                 "recover": false,
                 "config_path": "configfiles/asl1000/MViTv2_S/exp001.toml",
-                "weight_path": "runs/asl300_cutoff_9/MViTv2_S/exp002/checkpoints/best.pth"
+                "weight_path": "runs/asl300/MViTv2_S/exp002/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
@@ -128317,7 +128317,7 @@
                 "exp_no": "002",
                 "recover": false,
                 "config_path": "configfiles/asl300/MViTv2_S/exp002.toml",
-                "weight_path": "runs/asl100_cutoff_9/MViTv2_S/exp011/checkpoints/best.pth"
+                "weight_path": "runs/asl100/MViTv2_S/exp011/checkpoints/best.pth"
             },
             "training": {
                 "batch_size": 4,
