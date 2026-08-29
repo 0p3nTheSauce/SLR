@@ -62,7 +62,9 @@ def cleanup_memory():
         torch.cuda.synchronize()
     gc.collect()
 
+
 #################################### Multiview #################################
+
 
 def sample_multiview(
     frames: Tensor,
@@ -76,7 +78,9 @@ def sample_multiview(
     # If video is shorter than target_length, loop-pad it
     if T < target_length:
         repeats = (target_length // T) + 1
-        frames = frames.repeat(repeats, 1, 1, 1)[:target_length]  # (target_length, C, H, W)
+        frames = frames.repeat(repeats, 1, 1, 1)[
+            :target_length
+        ]  # (target_length, C, H, W)
         T = target_length
 
     views = []
@@ -87,7 +91,7 @@ def sample_multiview(
         else:
             start = int(i * (T - target_length) / (num_clips - 1))
         start = max(0, min(start, T - target_length))  # clamp
-        end = start + target_length - 1                # now always valid
+        end = start + target_length - 1  # now always valid
 
         indices = torch.linspace(start, end, target_length).long()
         clip = frames[indices]  # (T, C, H, W)
@@ -96,6 +100,7 @@ def sample_multiview(
             views.append(crop)
 
     return torch.stack(views).permute(0, 2, 1, 3, 4)  # (K*M, C, T, H, W)
+
 
 def _spatial_crops(
     clip: Tensor,
@@ -117,30 +122,32 @@ def _spatial_crops(
         # Centre crop only
         y = (H - crop_size) // 2
         x = (W - crop_size) // 2
-        crops.append(clip[:, :, y:y+crop_size, x:x+crop_size])
+        crops.append(clip[:, :, y : y + crop_size, x : x + crop_size])
 
     elif num_crops == 3:
         # 3 crops along the longer axis
         if W >= H:  # landscape → left/centre/right
             xs = [0, (W - crop_size) // 2, W - crop_size]
-            y  = (H - crop_size) // 2
+            y = (H - crop_size) // 2
             for x in xs:
-                crops.append(clip[:, :, y:y+crop_size, x:x+crop_size])
-        else:        # portrait → top/centre/bottom
+                crops.append(clip[:, :, y : y + crop_size, x : x + crop_size])
+        else:  # portrait → top/centre/bottom
             ys = [0, (H - crop_size) // 2, H - crop_size]
-            x  = (W - crop_size) // 2
+            x = (W - crop_size) // 2
             for y in ys:
-                crops.append(clip[:, :, y:y+crop_size, x:x+crop_size])
+                crops.append(clip[:, :, y : y + crop_size, x : x + crop_size])
 
     elif num_crops == 5:
         # 3 crops along longer axis + 2 corners
         crops = _spatial_crops(clip, crop_size, 3, H, W)
         if W >= H:
-            crops.append(clip[:, :, 0:crop_size,            0:crop_size])           # top-left
-            crops.append(clip[:, :, H-crop_size:H,          W-crop_size:W])         # bottom-right
+            crops.append(clip[:, :, 0:crop_size, 0:crop_size])  # top-left
+            crops.append(
+                clip[:, :, H - crop_size : H, W - crop_size : W]
+            )  # bottom-right
         else:
-            crops.append(clip[:, :, 0:crop_size,            0:crop_size])
-            crops.append(clip[:, :, H-crop_size:H,          W-crop_size:W])
+            crops.append(clip[:, :, 0:crop_size, 0:crop_size])
+            crops.append(clip[:, :, H - crop_size : H, W - crop_size : W])
     else:
         raise ValueError(f"num_crops must be 1, 3, or 5, got {num_crops}")
 
@@ -400,7 +407,6 @@ def test_topk_clsrep(
     return topk_res, cls_report, all_targets, all_preds
 
 
-
 def test_topk_clsrep_multiview(
     model: torch.nn.Module,
     test_loader: DataLoader[VideoDataset],
@@ -467,14 +473,13 @@ def test_topk_clsrep_multiview(
             ).to(device)  # (K*M, T, C, H, W)
 
             # Forward all views — batch them to avoid OOM
-            # logits = model(views)                      
-            # probs  = torch.softmax(logits, dim=-1)     
-            # predictions = probs.mean(dim=0)              
+            # logits = model(views)
+            # probs  = torch.softmax(logits, dim=-1)
+            # predictions = probs.mean(dim=0)
             logits_all = model(views)
-            mean_logits = logits_all.mean(dim=0, keepdim=True)   # (1, num_classes)
-            loss = loss_func(mean_logits, target)                 # CrossEntropyLoss 
-            predictions = torch.softmax(mean_logits, dim=-1)      
-
+            mean_logits = logits_all.mean(dim=0, keepdim=True)  # (1, num_classes)
+            loss = loss_func(mean_logits, target)  # CrossEntropyLoss
+            predictions = torch.softmax(mean_logits, dim=-1)
 
             # for loss
             loss = loss_func(predictions, target)
@@ -555,8 +560,6 @@ def test_topk_clsrep_multiview(
     return topk_res, cls_report, all_targets, all_preds
 
 
-
-
 def collect_results(res_p: Path):
     with open(res_p, "r") as f:
         res = json.load(f)
@@ -582,7 +585,7 @@ def setup_data(
     split: AVAIL_SPLITS,
     data_info: DataInfo,
     shuffle: bool = False,  # override for shuffle test
-    pin_memory: bool = True
+    pin_memory: bool = True,
     # video_length: Optional[int] = None
 ) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
     test_info = get_wlasl_info(split, set_name=set_name)
@@ -665,7 +668,7 @@ def test_run(
         heatmap (bool, optional): Create heatmap. Defaults to False.
         disp (bool, optional): Display plots. Defaults to False.
         save (bool, optional): Save results. Defaults to True.
-        save_img (bool, optional): Save plots. Defaults to False. 
+        save_img (bool, optional): Save plots. Defaults to False.
         re_test (bool, optional): Test even if results already saved. Defaults to False.
 
     Returns:
@@ -734,7 +737,6 @@ def test_run(
     if save:
         with open(save2, "w") as f:
             json.dump(results, f, indent=4)
-        
 
     if heatmap:
         fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
@@ -811,9 +813,10 @@ def get_res_path(save_path: Path) -> Path:
     res_path = out_dir / "best_val_loss.json"  # TODO: add other types of saves?
     return res_path
 
+
 def get_cls_rep_path(save_path: Path) -> Path:
     out_dir = checkpoint_dir_to_result_dir(save_path)
-    res_path = out_dir / "cls_rep_all_targets_preds.json"  
+    res_path = out_dir / "cls_rep_all_targets_preds.json"
     return res_path
 
 
@@ -829,7 +832,7 @@ def full_test(
     - The best validation loss, and accuracy for the whole training run
     - The test, val and 'shuffled test' results.
     - The test, val and shuffled results all contain the average loss, topk per instance, and per class accuracy.
-    
+
     Args:
         admin (MinInfo): Dictionary containing information on where to load weights and which dataset to use
         data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
@@ -871,7 +874,7 @@ def full_test(
     best_val_loss = last_check["best_val_loss"]
 
     # test set
-    test, cls_report, all_targets, all_preds= test_run(
+    test, cls_report, all_targets, all_preds = test_run(
         admin,
         data,
         "test",
@@ -900,21 +903,19 @@ def full_test(
     #     all_targets=all_targets,
     #     all_preds=all_preds
     # )
-    
+
     class_report = {
-        'cls_report': cls_report,
-        'all_targets': [int(i) for i in all_targets],
-        'all_preds': [int(i) for i in all_preds]
+        "cls_report": cls_report,
+        "all_targets": [int(i) for i in all_targets],
+        "all_preds": [int(i) for i in all_preds],
     }
-        
 
     if save:
         with open(res_path, "w") as f:
             json.dump(results.model_dump(), f, indent=4)
-        with open(cls_rep_path, 'w') as f:
+        with open(cls_rep_path, "w") as f:
             # json.dump(class_report.model_dump(), f, indent=4)
             json.dump(class_report, f, indent=4)
-        
 
     return results
 
