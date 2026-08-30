@@ -165,7 +165,7 @@ def _find_unresolved(d: Any, path: str = "") -> list[str]:
         unresolved.append(path)
     return unresolved
 
-
+#TODO: This key map is hardcoded to a specific sweep base structure, need to be sweep specific
 SWEEP_KEY_MAP = {
     # optimizer
     "backbone_init_lr":        "optimizer.backbone_init_lr",
