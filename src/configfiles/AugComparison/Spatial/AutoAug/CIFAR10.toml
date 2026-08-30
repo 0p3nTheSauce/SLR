@@ -26,7 +26,7 @@ temporal_aug = [
     { target_length = 16, max_wobble = 0, type = "uniform" },
 ]
 spatial_aug = [
-    { frame_size = 224, type = "CentreCrop" },
+    { frame_size = 224, type = "Centre_crop" },
     { type = "HORIZONTAL_FLIP", p = 0.5 },
     { type = 'CIFAR10', interpolation = 'nearest'}
 ]

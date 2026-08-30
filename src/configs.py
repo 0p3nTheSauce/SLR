@@ -408,6 +408,13 @@ def get_train_parser(
         default=CONFIG_FILETYPE,
         help=f"Config file type, defaults to: {CONFIG_FILETYPE}",
     )
+    #TODO: needs to be move to shell
+    parser.add_argument(
+        "--make",
+        "-m",
+        action='store_true',
+        help="Make directory (helpful for automatic experiment enumeration)",
+    )
     return parser
 
 
@@ -512,6 +519,10 @@ def take_args(
         weight_path=weights_path,
         seed=args.seed,
     )
+    
+    if args.make:
+        #make the output directory
+        save_path.mkdir(parents=True, exist_ok=True)
 
     return admin_info, wandb_info
 
