@@ -1,0 +1,55 @@
+[training]
+batch_size = 4
+update_per_step = 2
+max_epoch = 200
+batch_size_equivalent = 8
+
+[optimizer]
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
+
+[model_params]
+drop_p = 0.5
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
+
+
+# same as /home/luke/Code/SLR/src/configfiles/asl100/MViTv2_S/exp011.toml (similar to Sacair 2026)
+# patience adjusted to 15
+# also uniform sampler instead of og
