@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import copy
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import yaml
@@ -83,41 +84,59 @@ class SweepConfigError(ValueError):
     skeleton leaf that never got overridden by a sweep value."""
 
 BASE_CONFIG_ATTR = "base_config"
+SWEEP_KEY_MAP_ATTR = "sweep_key_map"
 
+def load_attribute(module: ModuleType, attr_name: str, module_prefix: str = '_base_config') -> dict:
+    """Load a top-level dict attribute from a module, raising SweepConfigError if it's missing.
 
-def build_base_config(config_path: Path) -> dict:
-    """The fixed shape every sweep trial's config takes, loaded from an
-    arbitrary Python file at `config_path` rather than hardcoded here.
+    Args:
+        module (ModuleType): The module from which to load the attribute.
+        attr_name (str): The name of the attribute to load.
+        module_prefix (str, optional): The prefix for the module name. Defaults to '_base_config'.
 
-    `config_path` must define a top-level dict named `BASE_CONFIG`. `None`
-    marks a leaf that MUST be supplied by SWEEP_KEY_MAP/run.config --
-    validate_resolved() checks this after overrides are applied. The
-    skeleton typically assumes exactly one sampler and one cropper per split
-    (train: flip + crop + randaugment; test: crop only) -- this is what makes
-    flat wandb params workable instead of needing list-index paths -- and
-    hardcodes the sampler and crop method, so a different combination needs
-    its own base_config.py and sweep.
+    Raises:
+        SweepConfigError: If the specified attribute is not found in the module.
 
-    Returns a fresh deep copy each call, since apply_sweep_overrides mutates
-    its input in place and the loaded module-level dict must stay pristine
-    across repeated calls (e.g. multiple trials in the same sweep agent
-    process).
+    Returns:
+        dict: The loaded attribute from the module.
     """
+    if not hasattr(module, attr_name):
+        raise SweepConfigError(
+            f"{module.__file__} has no top-level `{attr_name}` attribute for load_attribute to load."
+        )
+    attr = getattr(module, attr_name)
+    if not isinstance(attr, dict):
+        raise SweepConfigError(
+            f"{module.__file__}: `{attr_name}` must be a dict, got {type(attr).__name__}."
+        )
+    return attr
+
+def build_base_config(config_path: Path, load_attributes: list[str] | None = None) -> dict[str, dict]:
+    """Load arbitrary attributes from a python file. By default, these attributes include a 
+    `base_config` attribute and `sweep_key_map` attribute. The wandb sweep only works with a flat 
+    config structure for the Python API, so it is the role of `sweep_key_map` to expand this to the
+    nested config structure used in this codebase. The config structure does not currently support
+    arbitrary combinations of parameters, and by extension the augmentations cannot be swept against 
+    eachother. This means the `sweep_key_map` must hard code the sampling and cropping transforms, 
+    and is specific to the `base_config`. The `base_config` is a skeleton config structure with all
+    the parameters that can be swept over set to None. The config incoming from the sweep controller 
+    must override all of these None values, otherwise the sweep will fail. 
+
+    Args:
+        config_path (Path): Path to the base_config.py file containing the `base_config` and `sweep_key_map` attributes.
+        load_attributes (list[str] | None, optional): List of attribute names to load. Defaults to None.
+
+    Returns:
+        dict[str, dict]: A dictionary containing the loaded attributes from the module. By default 
+        includes the `base_config` and `sweep_key_map` attributes.
+    """
+    if load_attributes is None:
+        load_attributes = [BASE_CONFIG_ATTR, SWEEP_KEY_MAP_ATTR]
+    
+    
     module = load_module_from_path(config_path, module_prefix="_base_config")
 
-    if not hasattr(module, BASE_CONFIG_ATTR):
-        raise SweepConfigError(
-            f"{config_path} has no top-level `{BASE_CONFIG_ATTR}` dict for build_base_config to load."
-        )
-
-    base_config = getattr(module, BASE_CONFIG_ATTR)
-    if not isinstance(base_config, dict):
-        raise SweepConfigError(
-            f"{config_path}: `{BASE_CONFIG_ATTR}` must be a dict, got {type(base_config).__name__}."
-        )
-
-    return copy.deepcopy(base_config)
-
+    return {attr_name: copy.deepcopy(load_attribute(module, attr_name)) for attr_name in load_attributes}
 
 def _resolve_list_index(lst: list, selector: str) -> int:
     """selector like 'type:RANDAUGMENT' -> index of the first list item whose
@@ -165,71 +184,26 @@ def _find_unresolved(d: Any, path: str = "") -> list[str]:
         unresolved.append(path)
     return unresolved
 
-#TODO: This key map is hardcoded to a specific sweep base structure, need to be sweep specific
-SWEEP_KEY_MAP = {
-    # optimizer
-    "backbone_init_lr":        "optimizer.backbone_init_lr",
-    "classifier_init_lr":      "optimizer.classifier_init_lr",
-    "backbone_weight_decay":   "optimizer.backbone_weight_decay",
-    "classifier_weight_decay": "optimizer.classifier_weight_decay",
-    "eps":                     "optimizer.eps",
 
-    # model
-    "drop_p":                  "model_params.drop_p",
-
-    # scheduler (WarmRestartInfo)
-    "t0":                      "scheduler.t0",
-    "tmult":                   "scheduler.tmult",
-    "eta_min":                 "scheduler.eta_min",
-    "start_factor":            "scheduler.warm_up.start_factor",
-    "end_factor":              "scheduler.warm_up.end_factor",
-    "warmup_epochs":           "scheduler.warm_up.warmup_epochs",
-
-    # training
-    "batch_size":              "training.batch_size",
-    "update_per_step":         "training.update_per_step",
-    "max_epoch":               "training.max_epoch",
-
-    # temporal aug -- now maps to both train and test
-    "max_wobble":              "data.train_augs.temporal_aug.type:chunked.max_wobble",
-    "target_length": [
-        "data.train_augs.temporal_aug.type:chunked.target_length",
-        "data.test_augs.temporal_aug.type:uniform.target_length"
-    ],
-
-    # spatial aug -- now maps to both train and test
-    "hflip_p":                 "data.train_augs.spatial_aug.type:HORIZONTAL_FLIP.p",
-    "frame_size": [
-        "data.train_augs.spatial_aug.type:Centre_crop.frame_size",
-        "data.test_augs.spatial_aug.type:Centre_crop.frame_size"
-    ],
-    "magnitude":               "data.train_augs.spatial_aug.type:RANDAUGMENT.magnitude",
-    "num_ops":                 "data.train_augs.spatial_aug.type:RANDAUGMENT.num_ops",
-    "num_magnitude_bins":      "data.train_augs.spatial_aug.type:RANDAUGMENT.num_magnitude_bins",
-
-    # early stopping
-    "patience":                "stopping.patience",
-    "min_delta":               "stopping.min_delta",
-}
-
-
-def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any]) -> dict[str, Any]:
+def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any], sweep_key_map: dict[str, str]) -> dict[str, Any]:
     """Mutate `raw` in place, applying each wandb.config key via SWEEP_KEY_MAP
     (or, if absent from the map, as a literal dotted path)."""
     for key, value in wandb_config.items():
-        dotted_or_list = SWEEP_KEY_MAP.get(key, key)
+        dotted_or_list = sweep_key_map.get(key, key)
         dotted_keys = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
         for dotted_key in dotted_keys:
             _set_nested(raw, dotted_key.split("."), value)
     return raw
 
 
-def validate_sweep_key_map(config_path: Path, key_map: dict = SWEEP_KEY_MAP) -> None:
-    """Check every SWEEP_KEY_MAP target resolves against the skeleton shape.
+def validate_sweep_key_map(config_path: Path) -> None:
+    """Check every `sweep_key_map` target resolves against the skeleton shape.
     Structural check only -- doesn't require any particular run's values, so
     it can run once at sweep-launch time, independent of wandb.init().
     """
-    raw = build_base_config(config_path)
+    attributes = build_base_config(config_path)
+    raw = attributes[BASE_CONFIG_ATTR]
+    key_map = attributes[SWEEP_KEY_MAP_ATTR]
     for name, dotted_or_list in key_map.items():
         dotted_list = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
         for dotted in dotted_list:
@@ -282,10 +256,12 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset
 
     run = wandb.init()
 
-    raw = build_base_config(config_path)
+    attributes = build_base_config(config_path)
+    raw = attributes[BASE_CONFIG_ATTR]
+    key_map = attributes[SWEEP_KEY_MAP_ATTR]
     sweep_overrides = dict(run.config)
     if sweep_overrides:
-        raw = apply_sweep_overrides(raw, sweep_overrides)
+        raw = apply_sweep_overrides(raw, sweep_overrides, key_map)
 
     validate_resolved(raw)
 
