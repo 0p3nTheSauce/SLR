@@ -1091,8 +1091,8 @@ class QueShell(cmdLib.Cmd):
         from src.run_types import PROJECT_BASE
         from src.sweeping import (
             SweepConfigError,
-            config_path_from_existing_sweep,
-            config_path_from_sweep_yaml,
+            args_from_existing_sweep,
+            args_from_sweep_yaml,
             validate_sweep_key_map,
         )
 
@@ -1116,15 +1116,14 @@ class QueShell(cmdLib.Cmd):
                     )
             elif parsed_args.command == "set_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
-                    if parsed_args.project is None:
-                        parsed_args.project = f"{PROJECT_BASE}-{parsed_args.split[3:]}"
+                    
 
                     if parsed_args.sweep_path is not None:
-                        base_config = config_path_from_sweep_yaml(
+                        sweep_args = args_from_sweep_yaml(
                             parsed_args.sweep_path
                         )
                     else:
-                        base_config = config_path_from_existing_sweep(
+                        sweep_args = args_from_existing_sweep(
                             parsed_args.sweep_id,
                             parsed_args.project,
                             parsed_args.entity,
@@ -1136,10 +1135,10 @@ class QueShell(cmdLib.Cmd):
                     # otherwise first surface, mid-training, inside
                     # create_sweep_run)
                     try:
-                        validate_sweep_key_map(base_config)
+                        validate_sweep_key_map(sweep_args.config_path)
                     except (SweepConfigError, FileNotFoundError, ImportError) as e:
                         raise SweepConfigError(
-                            f"base_config at {base_config} failed validation: {e}"
+                            f"base_config at {sweep_args.config_path} failed validation: {e}"
                         ) from None
 
                     if parsed_args.sweep_id is None:
@@ -1156,10 +1155,10 @@ class QueShell(cmdLib.Cmd):
                         sweep_id=parsed_args.sweep_id,
                         sweep_project=parsed_args.project,
                         sweep_entity=parsed_args.entity,
-                        model=parsed_args.model,
-                        dataset=parsed_args.dataset,
-                        split=parsed_args.split,
-                        base_config=str(base_config),
+                        model=sweep_args.model,
+                        dataset=sweep_args.dataset,
+                        split=sweep_args.split,
+                        base_config=str(sweep_args.config_path),
                     )
                     self.server_context.set_sweep(sweep_info)
                     # save sweep metadata to a JSON file in the base_config's folder, for future reference
@@ -1893,15 +1892,6 @@ class QueShell(cmdLib.Cmd):
         set_sweep_parser = subparsers.add_parser(
             "set_sweep", help="Set daemon sweep parameters"
         )
-        set_sweep_parser.add_argument(
-            "model",
-            type=str,
-            choices=avail_models(),
-            help="Model name from one of the implemented model",
-        )
-        set_sweep_parser.add_argument(
-            "split", type=str, choices=get_avail_splits(), help="The class split"
-        )
 
         set_sweep_init_group = set_sweep_parser.add_mutually_exclusive_group(
             required=True
@@ -1924,16 +1914,7 @@ class QueShell(cmdLib.Cmd):
             "-p",
             "--project",
             type=str,
-            help=f"wandb project name, if not {PROJECT_BASE}-num_classes (e.g. {PROJECT_BASE}-100)",
-        )
-
-        set_sweep_parser.add_argument(
-            "-ds",
-            "--dataset",
-            type=str,
-            choices=["WLASL"],
-            default="WLASL",
-            help="Not implemented yet",
+            help=f"wandb project name, if not {PROJECT_BASE}-sweep",
         )
 
         set_sweep_parser.add_argument(

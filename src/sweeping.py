@@ -34,38 +34,33 @@ from src.training import train_model
 from src.utils import load_module_from_path
 
 
-def extract_config_path_from_command(command: list[str]) -> Path:
-    """Recover the base_config.py path from a sweep yaml's `command` block,
-    which already has to carry it for the standalone `wandb agent` CLI-mode
-    entrypoint (see get_sweep_parser/main). Reusing it here means the sweep
-    yaml only names the base_config path once -- callers no longer need it
-    duplicated as a separate argument.
+def extract_args_from_command(command: list[str]) -> argparse.Namespace:
+    """Recover the args from a sweep yaml's `command` block, which already has to carry them for
+    the standalone `wandb agent` CLI-mode entrypoint (see get_sweep_parser/main).
+    Reusing it here means the sweep yaml only names the args once.
+    The args returned are the same as those returned by get_sweep_parser().parse_args()
     """
     literal_args = [c for c in command if not (isinstance(c, str) and c.startswith("${"))]
     if not literal_args:
-        raise SweepConfigError("Sweep yaml `command` block has no literal args to parse a config_path from.")
+        raise SweepConfigError("Sweep yaml `command` block has no literal args to parse from.")
     # literal_args[0] is the interpreter (e.g. "python"); the rest are
     # get_sweep_parser's own positionals/options, so reuse it rather than
     # re-deriving the arg order by hand.
     parsed = get_sweep_parser().parse_args(literal_args[1:])
-    return parsed.config_path
+    return parsed
 
-
-def config_path_from_sweep_yaml(sweep_path: Path) -> Path:
-    """Load `sweep_path` and pull the base_config path out of its `command`
-    block. Used when creating a fresh sweep (`daemon set_sweep -sp`)."""
+def args_from_sweep_yaml(sweep_path: Path) -> argparse.Namespace:
+    """Load `sweep_path` and pull the args out of its `command` block. Used when creating a fresh sweep (`daemon set_sweep -sp`)."""
     with open(sweep_path) as f:
         sweep_cfg = yaml.safe_load(f)
     command = sweep_cfg.get("command")
     if not command:
-        raise SweepConfigError(f"{sweep_path} has no top-level `command` block to recover a config_path from.")
-    return extract_config_path_from_command(command)
+        raise SweepConfigError(f"{sweep_path} has no top-level `command` block to recover args from.")
+    return extract_args_from_command(command)
 
-
-def config_path_from_existing_sweep(sweep_id: str, project: str, entity: str) -> Path:
+def args_from_existing_sweep(sweep_id: str, project: str, entity: str) -> argparse.Namespace:
     """Fetch a previously-created sweep's stored config from wandb and pull
-    the base_config path out of its `command` block. Used when attaching to
-    an already-initialised sweep (`daemon set_sweep --sweep_id`), where no
+    the args out of its `command` block. Used when attaching to an already-initialised sweep (`daemon set_sweep --sweep_id`), where no
     local sweep yaml is necessarily available.
     """
     api = wandb.Api()
@@ -76,7 +71,9 @@ def config_path_from_existing_sweep(sweep_id: str, project: str, entity: str) ->
             f"Sweep {sweep_id!r} has no `command` block in its stored config -- "
             "pass --base_config explicitly."
         )
-    return extract_config_path_from_command(command)
+    return extract_args_from_command(command)
+
+
 
 class SweepConfigError(ValueError):
     """Raised for any sweep-config problem that should fail loudly and early:
