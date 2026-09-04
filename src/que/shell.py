@@ -644,37 +644,36 @@ class QueShell(cmdLib.Cmd):
 
     def do_create(self, arg):
         """Create with progress indication"""
-        
-
-        try:
-            from configs import take_args
-                    
-            args = shlex.split(arg)
-            maybe_args = take_args(sup_args=args)
-        except (SystemExit):
-            self.console.print("[yellow]Create cancelled (incorrect arguments)[/yellow]")
-            return
-        except Exception as e: # noqa: BLE001
-            self.console.print(f"[red]Create cancelled (error: {e})[/red]")
-            return
-        
-        with self.unwrap_exception(
-            "Run created successfully", "Failed to create new run"
-        ):    
-            if isinstance(maybe_args, tuple):
-                admin_info, wandb_info = maybe_args
-            else:
-                self.console.print("[yellow]Create cancelled (by user)[/yellow]")
-                return
-
+        with self.console.status("[bold green]Creating...", spinner="dots"):
             try:
-                self.que.create_run(admin_info, wandb_info)
-            except QueDupExp:
-                # ask if want to create anyway
-                if Confirm.ask(
-                    "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
-                ):
-                    self.que.create_run(admin_info, wandb_info, add_duplicates=True)
+                from configs import take_args
+                        
+                args = shlex.split(arg)
+                maybe_args = take_args(sup_args=args)
+            except (SystemExit):
+                self.console.print("[yellow]Create cancelled (incorrect arguments)[/yellow]")
+                return
+            except Exception as e: # noqa: BLE001
+                self.console.print(f"[red]Create cancelled (error: {e})[/red]")
+                return
+            
+            with self.unwrap_exception(
+                "Run created successfully", "Failed to create new run"
+            ):    
+                if isinstance(maybe_args, tuple):
+                    admin_info, wandb_info = maybe_args
+                else:
+                    self.console.print("[yellow]Create cancelled (by user)[/yellow]")
+                    return
+
+                try:
+                    self.que.create_run(admin_info, wandb_info)
+                except QueDupExp:
+                    # ask if want to create anyway
+                    if Confirm.ask(
+                        "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
+                    ):
+                        self.que.create_run(admin_info, wandb_info, add_duplicates=True)
 
     def do_add(self, arg):
         """Add run with feedback"""
