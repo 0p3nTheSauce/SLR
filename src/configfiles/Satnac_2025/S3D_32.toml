@@ -1,0 +1,54 @@
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 200
+
+[optimizer]
+eps = 0.001
+backbone_init_lr = 1e-05
+backbone_weight_decay = 0.0001
+classifier_init_lr = 0.001
+classifier_weight_decay = 1e-07
+
+[model_params]
+drop_p = 0.5
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
+]
+
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 100
+eta_min = 1e-05
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 50
+min_delta = 0.01
+
