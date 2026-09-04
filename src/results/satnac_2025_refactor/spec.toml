@@ -1,0 +1,92 @@
+[training]
+batch_size = 4
+update_per_step = 2
+max_epoch = 200
+batch_size_equivalent = 8
+
+[optimizer]
+eps = 0.001
+backbone_init_lr = 1e-05
+backbone_weight_decay = 0.0001
+classifier_init_lr = 0.001
+classifier_weight_decay = 1e-07
+
+[model_params]
+drop_p = 0.5
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.train_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 16
+frame_size = 224
+
+[data.test_augs.norm_dict]
+mean = [
+    0.43216,
+    0.394666,
+    0.37645,
+]
+std = [
+    0.22803,
+    0.22145,
+    0.216989,
+]
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 100
+eta_min = 1e-05
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 50
+min_delta = 0.01
+
+
+# need to repeat some exps with 16 frames
+# turned the batch size up a little (same equiv batch)
+# hopefully will not crash from out of memory
+# updated by script
+# updated by script
+# updated by script
+# created by script

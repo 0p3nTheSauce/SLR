@@ -1040,7 +1040,7 @@ class QueShell(cmdLib.Cmd):
                 "Config file updated successfully", "Failed to write config"
             ),
         ):
-            from src.que.runs_to_configs import update_config_file
+            from src.que.runs_to_configs import write_config_file
 
             run = list(
                 Que.list_manipulation(
@@ -1057,12 +1057,9 @@ class QueShell(cmdLib.Cmd):
                 )
             )[parsed_args.index]
 
-            update_config_file(
+            write_config_file(
                 run,
-                default_mode=parsed_args.mode,
-                dry_run=parsed_args.dry_run,
-                retro_support=parsed_args.retro_support,
-                output=parsed_args.output,
+                output=parsed_args.output_path,
             )
 
     #   Worker
@@ -1798,32 +1795,7 @@ class QueShell(cmdLib.Cmd):
         )
         self._add_location_arg(parser)
         self._add_index_arg(parser)
-        parser.add_argument(
-            "--mode",
-            "-m",
-            choices=["overwrite", "duplicate"],
-            default="overwrite",
-            help="Save mode if a config file already exists at the target path (default: %(default)s)",
-        )
-        parser.add_argument(
-            "--dry_run",
-            "-dr",
-            action="store_true",
-            help="Print the generated config instead of writing it to disk",
-        )
-        parser.add_argument(
-            "--retro_support",
-            "-rs",
-            action="store_true",
-            help="Enable legacy/retro support when validating an existing config",
-        )
-        parser.add_argument(
-            "--output",
-            "-o",
-            type=Path,
-            default=None,
-            help="Optional path to also write a debug copy of the generated config",
-        )
+        self._add_output_file_arg(parser, help="Path to output config file")
         self._add_list_manipulation_args(parser)
         return parser
 

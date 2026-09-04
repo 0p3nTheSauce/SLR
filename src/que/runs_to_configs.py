@@ -54,7 +54,8 @@ def _get_old_comments(contents: str) -> list[str]:
 def _get_save_name(
     save_path: str, mode: Literal["overwrite", "duplicate"] = "duplicate"
 ) -> str:
-    """Generate a save name based on the save path and mode.
+    """Generate a save name based on the save path and mode. 
+    Adds a .toml suffix
 
     Args:
         save_path (str): The path where the file will be saved.
@@ -184,6 +185,34 @@ def update_config_file(
             f.write(config_str)
         print(f"Debug config saved to: {output}")
 
+
+
+def write_config_file(
+    run: GenExp | dict,   
+    output: Path,
+) -> None:
+    if isinstance(run, GenExp):
+        run_info = run.model_dump()
+    else:
+        run_info = run
+
+    conf_path = Path(run_info["admin"]["config_path"])
+    if conf_path.exists():
+        # get old comments
+        with open(conf_path, "r") as f:
+            old_contents = f.read()
+        old_comments = _get_old_comments(old_contents)
+    else:
+        old_comments = []
+    
+    # generate new config file
+    config_str = _run_to_config(run_info, comments=old_comments + ["created by script"])
+    
+    with open(output, "w") as f:
+        f.write(config_str)
+    print(f"Config saved to: {output}")
+    
+    
 
 def update_all_files(
     default_mode: Literal["overwrite", "duplicate"] = "overwrite",
