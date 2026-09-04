@@ -1,15 +1,15 @@
 [training]
-batch_size = 4
-update_per_step = 2
+batch_size = 2
+update_per_step = 4
 max_epoch = 200
 batch_size_equivalent = 8
 
 [optimizer]
-eps = 0.001
-backbone_init_lr = 1e-05
-backbone_weight_decay = 0.0001
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
 classifier_init_lr = 0.001
-classifier_weight_decay = 1e-07
+classifier_weight_decay = 0.001
 
 [model_params]
 drop_p = 0.5
@@ -35,14 +35,14 @@ frame_size = 224
 
 [data.train_augs.norm_dict]
 mean = [
-    0.43216,
-    0.394666,
-    0.37645,
+    0.485,
+    0.456,
+    0.406,
 ]
 std = [
-    0.22803,
-    0.22145,
-    0.216989,
+    0.229,
+    0.224,
+    0.225,
 ]
 
 [data.test_augs]
@@ -59,20 +59,21 @@ frame_size = 224
 
 [data.test_augs.norm_dict]
 mean = [
-    0.43216,
-    0.394666,
-    0.37645,
+    0.485,
+    0.456,
+    0.406,
 ]
 std = [
-    0.22803,
-    0.22145,
-    0.216989,
+    0.229,
+    0.224,
+    0.225,
 ]
 
 [scheduler]
-type = "CosineAnnealingLR"
-tmax = 100
-eta_min = 1e-05
+type = "CosineAnnealingWarmRestarts"
+t0 = 10
+tmult = 1
+eta_min = 0.0
 
 [stopping]
 type = "early_stopper"
@@ -83,9 +84,8 @@ patience = 50
 min_delta = 0.01
 
 
-# need to repeat some exps with 16 frames
-# turned the batch size up a little (same equiv batch)
-# hopefully will not crash from out of memory
+# same as hframe_hwd_warmrestarts in generic, but with frames = 16
+# adjusted batch size accordingly
 # updated by script
 # updated by script
 # updated by script
