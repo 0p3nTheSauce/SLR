@@ -26,9 +26,9 @@ temporal_aug = [
     { target_length = 16, max_wobble = 0, type = "uniform" },
 ]
 spatial_aug = [
-    { frame_size = 224, type = "CentreCrop" },
+    { frame_size = 224, type = "Centre_crop" },
     { type = "HORIZONTAL_FLIP", p = 0.5 },
-    { type = 'CIFAR10', interpolation = 'nearest'}
+    { frame_size = 224, type = "RANDAUGMENT", num_magnitude_bins = 31 , num_ops = 3, magnitude = 8},
 ]
 
 [data.test_augs]
@@ -52,5 +52,5 @@ min_delta = 0.01
 
 
 # same as /home/luke/Code/SLR/src/configfiles/sweeps/AugComparison/baseline.toml
-#but with Autoaugment type = 'CIFAR10', interpolation = 'nearest'
-#and centre crop
+# but with randAugment num_magnitude_bins = 31, num_ops = 3, magnitude = 8
+#using centre crop instead of random crop 

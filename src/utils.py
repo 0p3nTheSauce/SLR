@@ -688,7 +688,10 @@ def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
             path_str += "0".zfill(decimals)
         path = Path(path_str)
         while path.exists():
-            num = int(path_str[-decimals:])
+            try: 
+                num = int(path_str[-decimals:])
+            except ValueError:
+                raise ValueError(f"Failed to parse number from path: {path_str}")
             path_str = path_str[:-decimals] + str(num + 1).zfill(decimals)
             path = Path(path_str)
     if make:
