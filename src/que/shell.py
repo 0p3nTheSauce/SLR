@@ -644,17 +644,23 @@ class QueShell(cmdLib.Cmd):
 
     def do_create(self, arg):
         """Create with progress indication"""
+        
+
+        try:
+            from configs import take_args
+                    
+            args = shlex.split(arg)
+            maybe_args = take_args(sup_args=args)
+        except (SystemExit):
+            self.console.print("[yellow]Create cancelled (incorrect arguments)[/yellow]")
+            return
+        except Exception as e: # noqa: BLE001
+            self.console.print(f"[red]Create cancelled (error: {e})[/red]")
+            return
+        
         with self.unwrap_exception(
             "Run created successfully", "Failed to create new run"
-        ):
-            from configs import take_args
-
-            args = shlex.split(arg)
-
-            # parser = self._get_parser("create")
-            # parsed_args = parser.parse_args(args)
-            maybe_args = take_args(sup_args=args)
-
+        ):    
             if isinstance(maybe_args, tuple):
                 admin_info, wandb_info = maybe_args
             else:
