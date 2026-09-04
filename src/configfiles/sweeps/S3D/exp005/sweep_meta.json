@@ -1,0 +1,22 @@
+[
+  {
+    "recorded": "2026-09-04 22:39:18",
+    "sweep_id": "hhe8aqjb",
+    "sweep_project": "broad_sweep_2",
+    "sweep_entity": "ljgoodall2001-rhodes-university",
+    "model": "S3D",
+    "dataset": "WLASL",
+    "split": "asl100_cutoff_9",
+    "base_config": "/home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp005/base.py"
+  },
+  {
+    "recorded": "2026-09-04 22:47:26",
+    "sweep_id": "i6g6do1w",
+    "sweep_project": "Sweeps",
+    "sweep_entity": "ljgoodall2001-rhodes-university",
+    "model": "S3D",
+    "dataset": "WLASL",
+    "split": "asl100_cutoff_9",
+    "base_config": "/home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp005/base.py"
+  }
+]

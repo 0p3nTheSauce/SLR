@@ -1,0 +1,76 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_loss
+  goal: minimize
+entity: ljgoodall2001-rhodes-university
+project: Sweeps
+
+early_terminate:
+  type: hyperband
+  min_iter: 15
+  eta: 3
+
+parameters:
+  # --- tuned ---
+  #Optimizer params
+  eps:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.1
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.1
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.1
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.1
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 0.0000005
+    max: 0.1
+  #model params
+  drop_p:
+    distribution: uniform
+    min: 0.0
+    max: 0.9
+  #Augmentation params
+  hflip_p:
+    distribution: uniform
+    min: 0
+    max: 0.5
+  #Data
+  target_length:
+    values: [16, 32] 
+
+  # --- fixed ---
+  update_per_step: {value: 1}
+  frame_size: {value: 224}
+  batch_size: {value: 8}
+  max_epoch: {value: 200}
+  patience: {value: 10}
+  min_delta: {value: 0.001}
+
+# Only consumed by CLI/subprocess-mode agents (`wandb agent <sweep_id>`).
+# Worker._sweep_train also used program/command to load model, split 
+
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - S3D
+  - asl100_cutoff_9
+  - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp005/base.py
+  
+
+#Not run yet.
+#setting a baseline with no augs, or scheduler.
+#testing new sweep config loading setup, where base_config and sweep_key_map are loaded from base.py
+
+#defined with id: i6g6do1w

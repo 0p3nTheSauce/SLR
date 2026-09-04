@@ -291,7 +291,7 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset
 # Function mode (Worker._sweep_train calling create_sweep_run directly) is the
 # path used by the Que system. This entrypoint exists so the same sweep can
 # also be launched the plain way -- `wandb agent <entity>/<project>/<sweep_id>`
-# -- for quick standalone testing outside the Daemon/Worker stack. To use this
+# -- for standalone sweeping outside the Daemon/Worker stack. To use this
 # mode, the sweep yaml needs `program`/`command` pointing back at this script,
 # e.g.:
 #
@@ -299,9 +299,9 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset
 #     - ${env}
 #     - python
 #     - ${program}
-#     - MViTv2_B_32x3
+#     - S3D
 #     - asl100
-#     - /path/to/base_config.py
+#     - /path/to/base.py
 #
 # model/split/config_path/dataset/save_every are CLI args here, NOT wandb
 # parameters -- they aren't tuned, so they don't belong in the sweep's
@@ -311,7 +311,7 @@ def get_sweep_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run a single trial of a wandb sweep")
     parser.add_argument("model", type=str)
     parser.add_argument("split", type=str, choices=get_avail_splits())
-    parser.add_argument("config_path", type=Path, help="Path to a base_config.py defining BASE_CONFIG")
+    parser.add_argument("config_path", type=Path, help="Path to a base.py defining base_config and sweep_key_map attributes. ")
     parser.add_argument("-ds", "--dataset", type=str, default="WLASL")
     parser.add_argument("-se", "--save_every", type=int, default=5)
     return parser

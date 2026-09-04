@@ -533,6 +533,7 @@ class Que:
 
     def set_cur_run(self, run: ExpInfo) -> None:
         self._set_run(CUR_RUN, 0, run)
+        
 
     def stash_next_run(self) -> str:
         next_run = self._pop_run(TO_RUN, 0)
@@ -702,6 +703,10 @@ class Que:
             if loc == TO_RUN:
                 self.to_run.append(exp_info)
             elif loc == CUR_RUN:
+                if len(self.cur_run) != 0:
+                    self.logger.error("Cannot add to cur_run: already occupied, added to fail_runs instead")
+                    self.fail_runs.append(FailedExp.model_validate({**exp_info.model_dump(), "error": "Attempted to add to cur_run but it was already occupied"}))
+                    raise QueBusy
                 self.cur_run.append(exp_info)
             else:
                 raise ValueError(

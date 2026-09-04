@@ -1,1 +1,0 @@
-[{"sweep_id": "qsh82m4w", "sweep_project": "WLASL-100", "sweep_entity": "ljgoodall2001-rhodes-university", "model": "S3D", "dataset": "WLASL", "split": "asl100", "base_config": "/home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp004/base.py"}]

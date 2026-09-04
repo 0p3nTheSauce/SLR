@@ -375,7 +375,7 @@ class Worker:
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
             self.state['exception'] = "KeyboardInterrupt"
-            # note: no raise here, unlike train()/sweep() -- confirm this is intentional
+            raise
         except Exception as e:
             err_str = self.build_exception_info(e)
             self._fail(e, "Testing run failed due to an error")
@@ -386,8 +386,6 @@ class Worker:
             self.cleanup()
             self.state['current_run_id'] = None
             self.state['task'] = "inactive"
-
-
 
 
     def start(self, sweep_info: SweepInfo | None = None) -> None:
@@ -412,11 +410,13 @@ class Worker:
 
         if self.stop_event is not None and self.stop_event.is_set():
             self.server_logger.warning("Training was interrupted by stopping event.")
-            self.que.save_state()  # keep current run for recovery
-        else:
+        elif self.que.len_loc('cur_run') == 1:
             self.server_logger.info("Training finished successfully. Running tests")
             self.test()
-            self.que.save_state()
+        else:
+            self.server_logger.warning("No run in cur_run. Skipping tests.")
+        
+        self.que.save_state()  # save state
 
 
 if __name__ == "__main__":
