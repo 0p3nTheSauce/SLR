@@ -1,2 +1,6 @@
 Misc TODOs:
 - switch from str to Literal for model names
+
+Plotting:
+- redo old plots with new visualisations
+
