@@ -12,12 +12,6 @@ classifier_weight_decay = 1e-07
 
 [model_params]
 drop_p = 0.5
-type = "supervised"
-
-[data]
-strict_size = true
-target_length = 32
-frame_size = 224
 
 [data.train_augs]
 normalise = true
@@ -34,7 +28,6 @@ normalise = true
 temporal_aug = [
     { target_length = 32, max_wobble = 0, type = "og", randomise = false },
 ]
-
 spatial_aug = [
     { frame_size = 224, type = "Centre_crop" },
 ]
@@ -52,3 +45,5 @@ mode = "min"
 patience = 50
 min_delta = 0.01
 
+
+# updated by script to remove training.type
