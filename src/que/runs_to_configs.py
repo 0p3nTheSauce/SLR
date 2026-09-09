@@ -96,7 +96,7 @@ def _run_to_config(
     Returns:
         str: String representation of the config file content for this run
     """
-
+    
     if comments is None:
         comments = []
     if ignore_sections is None:
@@ -125,12 +125,19 @@ def _run_to_config(
     else:
         run_info = run
 
+    run_info = _drop_nested(run_info, ignore_sections)
+
     filtered = {
-        section_name: _strip_none(_drop_nested(section_content, ignore_sections) )
-        for section_name, section_content in run_info.items()
+        section_name: _strip_none(section_content)
+        for section_name, section_content in run_info.items() 
+        if section_content
     }
 
-    config_str = tomli_w.dumps(filtered)
+    try:
+        config_str = tomli_w.dumps(filtered)
+    except TypeError:
+        print(filtered)
+        raise
 
     if len(comments) > 0:
         config_str += "\n"
@@ -147,7 +154,8 @@ def update_config_file(
     dry_run: bool = True,
     retro_support: bool = False,
     output: Path | None = None,
-    ignore_paths: list[str] | None = None
+    ignore_paths: list[str] | None = None,
+    message: str = "updated by script"
 ):
     from src.configs import load_config
     from src.run_types import AdminInfo
@@ -190,7 +198,7 @@ def update_config_file(
     print(f"Updating config file: {conf_path}")
 
     # generate new config file
-    config_str = _run_to_config(run_info, comments=old_comments + ["updated by script"])
+    config_str = _run_to_config(run_info, comments=old_comments + [message])
     # get save path
     save_name = _get_save_name(conf_path.as_posix(), mode=mode)
 
@@ -244,7 +252,8 @@ def update_all_files(
     dry_run: bool = True,
     retro_support: bool = False,
     output: Path | None = None,
-    ignore_paths: list[str] | None = None
+    ignore_paths: list[str] | None = None,
+    message: str = "updated by script"
 ):
 
     KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
@@ -257,7 +266,7 @@ def update_all_files(
 
     for run_info in flat_all_runs:
         update_config_file(
-            run_info, default_mode, dry_run, retro_support, output=output, ignore_paths=ignore_paths
+            run_info, default_mode, dry_run, retro_support, output=output, ignore_paths=ignore_paths, message=message
         )
 
     print(len(flat_all_runs))
@@ -322,6 +331,12 @@ if __name__ == "__main__":
         default=0,
         help="The list index to extract from the specified key section (default: %(default)s).",
     )
+    parser.add_argument(
+        "--message",
+        type=str,
+        default="updated by script",
+        help="Extra comment to add to explain what this script does"
+    )
 
     # Sub-command: all
     all_parser = subparsers.add_parser(
@@ -346,7 +361,8 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
             retro_support=args.retro_support,
             output=args.output,
-            ignore_paths=ignore_paths
+            ignore_paths=ignore_paths,
+            message=args.message
         )
 
     elif chosen_command == "all":
@@ -355,5 +371,6 @@ if __name__ == "__main__":
             dry_run=args.dry_run,
             retro_support=args.retro_support,
             output=args.output,
-            ignore_paths=ignore_paths
+            ignore_paths=ignore_paths,
+            message=args.message
         )

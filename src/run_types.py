@@ -592,9 +592,14 @@ def _pop(d : dict, keys: list[Any], default=None) -> Any:
         return d.pop(keys[0], default)
     
     # Navigate to the parent of the target key
-    parent = d
+    parent = d.copy()
     for key in keys[:-1]:
-        parent = parent[key]
+        try:
+            parent = parent[key]
+        except KeyError:
+            print(f'Parent: {parent}, Key: {key}')
+            raise
+            
 
     return parent.pop(keys[-1], default)
         
