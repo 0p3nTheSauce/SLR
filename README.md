@@ -336,4 +336,4 @@ Contributions are welcome! Please open issues or submit pull requests.
 
 The data provided in this project is subject to the C-UDA license of the forked WLASL dataset. By downloading or using this data, you agree to the terms of the C-UDA and any downstream redistribution must also comply with these terms. See [C-UDA-1.0.pdf](C-UDA-1.0.pdf)
 
-Some models used are implemented from other repositories. By using any of these models you are implicitly subject to their licenses. See the [models README.md](./code/models/README.md) for more details.  
+Some of the MViTv2 models (the ones that have 16x4 or 32x3 in the name) are implemented from the [Slowfast repository](https://github.com/facebookresearch/slowfast). By using any of these models you are implicitly subject to their [license](./src/models/mvit/SLOWFAST_LICENSE.md).

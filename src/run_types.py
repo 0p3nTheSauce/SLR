@@ -18,7 +18,6 @@ from pydantic import (
     ConfigDict,
     Field,
     computed_field,
-    field_validator,
     model_validator,
 )
 from pydantic_core import PydanticUndefined
@@ -397,47 +396,8 @@ class OptimizerInfo(BaseModel):
     classifier_weight_decay: float
 
 
-TRAIN_TYPE: TypeAlias = Literal["supervised", "unsupervised"]
-
-
-class SupervisedInfo(BaseModel):
+class ModelClassifierInfo(BaseModel):
     drop_p: float | None = None
-    type: Literal["supervised"] = "supervised"
-
-
-class MVirTedInfo(BaseModel):
-    type: Literal["mvir_ted"] = "mvir_ted"
-    drop_p: float | None = None
-    embed_dim: int = 512
-    num_heads: int = 8
-    num_layers: int = 4
-    max_frames: int = 64
-    mvit_out_dim: int = 768
-
-
-class UnsupervisedInfo(BaseModel):
-    type: Literal["unsupervised"] = "unsupervised"
-
-
-class MVirTedMaeInfo(BaseModel):
-    type: Literal["mvir_ted_mae"] = "mvir_ted_mae"
-    encoder_info: MVirTedInfo = MVirTedInfo()
-    mask_ratio: float = 0.5
-    embed_dim: int = 512
-
-SUPERVISED_TYPES = {"supervised"}
-PRETRAIN_TYPES = {"mvir_ted_mae"}
-
-def is_supervised_config(config: ModelInfo) -> TypeGuard[SupervisedInfo]:
-    return config.type in SUPERVISED_TYPES
-
-def is_pretrain_config(config: ModelInfo) -> TypeGuard[MVirTedMaeInfo]:
-    return config.type in PRETRAIN_TYPES
-
-ModelInfo = Annotated[
-    SupervisedInfo | MVirTedInfo | MVirTedMaeInfo,
-    Field(discriminator="type"),
-]
 
 
 class WarmUpSched(BaseModel):
@@ -560,17 +520,10 @@ class RunInfo(BaseModel):
     admin: AdminInfo
     training: TrainingInfo
     optimizer: OptimizerInfo
-    model_params: ModelInfo = Field(default_factory=SupervisedInfo)
+    model_params: ModelClassifierInfo 
     data: DataInfo
     scheduler: SchedInfo | None = None
     stopping: EarlyStopperInfo | None = None
-
-    @field_validator("model_params", mode="before")
-    @classmethod
-    def _default_model_type(cls, v: Any) -> Any:
-        if isinstance(v, dict) and "type" not in v:
-            v = {"type": "supervised", **v}
-        return v
 
     @model_validator(mode="after")
     def _resolve_norms(self) -> RunInfo:

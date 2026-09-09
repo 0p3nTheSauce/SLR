@@ -30,7 +30,7 @@ import yaml
 import wandb
 from src.configs import get_avail_splits, get_model_checkpoint_dir
 from src.run_types import AVAIL_SPLITS, RUNS_PATH, AdminInfo, RunInfo, strict_validate
-from src.training import train_model
+from src.training import train_loop
 from src.utils import load_module_from_path
 
 
@@ -324,7 +324,7 @@ def main():
         model=args.model, split=args.split, config_path=args.config_path, dataset=args.dataset
     )
 
-    train_model(args.model, config, run, save_every=args.save_every, recover=False)
+    train_loop(args.model, config, run, save_every=args.save_every, recover=False)
     run.finish()
 
 

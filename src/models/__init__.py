@@ -1,9 +1,6 @@
 import torch
 from torch import nn
 
-# from src.models.detectron_mvit import MViT_2D_t
-from src.models.mvirted_mae import SepMViTBERTMAE
-
 # slowfast mvit
 from src.models.og_mvit import (
     MVITv2_B_32x3_basic,
@@ -22,9 +19,6 @@ from src.models.pytorch_swin3d import (
     Swin3DTiny_basic,
 )
 
-#custem seperable mvit
-from src.models.sep_mvit_bert import MVirTed, MVirTed_t_basic
-
 # locals
 from src.run_types import NormDict
 
@@ -41,8 +35,6 @@ MViTv2_S_16x4 = "MViTv2_S_16x4"
 MViTv2_S_16x4_e = "MViTv2_S_16x4_e"
 MViTv2_B_32x3 = "MViTv2_B_32x3"
 MViTv2_B_32x3_r = "MViTv2_B_32x3_r"
-MVirTed_t = "MVirTed_t"
-MVirTed_t_MAE = MVirTed_t + '_MAE'
 #TODO: just make one class for extended and reduced models
 
 model_names = [
@@ -59,8 +51,6 @@ model_names = [
     MViTv2_S_16x4_e,
     MViTv2_B_32x3,
     MViTv2_B_32x3_r,
-    MVirTed_t,
-    MVirTed_t_MAE
 ]
 
 
@@ -96,7 +86,6 @@ def get_model(model_name: str, num_classes: int, drop_p: float | None) -> torch.
         MViTv2_S_16x4_e: MVITv2_S_16x4_extended,
         MViTv2_B_32x3: MVITv2_B_32x3_basic,
         MViTv2_B_32x3_r: MVITv2_B_32x3_reduced,
-        MVirTed_t: MVirTed_t_basic,
         }
 
     if model_name not in model_constructors_dp and model_name not in model_constructors_opdp:
@@ -108,45 +97,6 @@ def get_model(model_name: str, num_classes: int, drop_p: float | None) -> torch.
         return model_constructors_dp[model_name](num_classes=num_classes, drop_p=drop_p)
     else:
         return model_constructors_opdp[model_name](num_classes=num_classes, drop_p=drop_p)
-
-
-# def get_mae_encoder(encoder_name: str, encoder: MVirTed, mask_ratio: float, embed_dim: int) -> torch.nn.Module:
-#     """Map a name to an encoder"""
-    
-#     model_constructors = {
-#         MVirTed_t: MVirTed    
-#     }
-    
-#     if model_name not in model_constructors:
-#         raise ValueError(
-#             f"Model {model_name} not recognized. Available models: {', '.join(model_constructors.keys())}"
-#         )
-
-#     return model_constructors[model_name](encoder=encoder, mask_ratio=mask_ratio, embed_dim=embed_dim)
-
-
-def get_mae_model(
-    model_name: str,
-    encoder: MVirTed,
-    mask_ratio: float,
-    embed_dim: int,
-    
-    
-    ) -> torch.nn.Module:
-    """Map a model name to Masked Auto Encoder Name"""
-    
-    model_constructors = {
-        MVirTed_t_MAE: SepMViTBERTMAE        
-    }
-    
-    if model_name not in model_constructors:
-        raise ValueError(
-            f"Model {model_name} not recognized. Available models: {', '.join(model_constructors.keys())}"
-        )
-
-    return model_constructors[model_name](encoder=encoder, mask_ratio=mask_ratio, embed_dim=embed_dim)
-
-
 
 
 def avail_models() -> list[str]:
@@ -196,9 +146,6 @@ def norm_vals(model_name: str) -> NormDict:
         MViTv2_S_16x4_e: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         MViTv2_B_32x3: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
         MViTv2_B_32x3_r: NormDict(mean=(0.45, 0.45, 0.45), std=(0.225, 0.225, 0.225)),
-        #seperable mvit
-        MVirTed_t: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
-        MVirTed_t_MAE: NormDict(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225))
     }
 
     if model_name not in norm_dict:
@@ -261,7 +208,6 @@ __all__ = [
     "MViTv1B_basic",
     "MViTv2S_basic",
     "MViTv2S_extended",
-    "MVirTed_t_basic",
     "Resnet2_plus1D_18_basic",
     "Resnet3D_18_basic",
     "S3D_basic",

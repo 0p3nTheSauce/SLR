@@ -1,12 +1,13 @@
-from typing import Optional
 from pathlib import Path
+
 import torch
-from .mvit.slowfast.models.video_model_builder import MViT
-from .mvit.slowfast.utils.parser import load_model_config
+import torch.nn.functional as F
 
 # from .mvit.slowfast.models import head_helper
-import torch.nn as nn
-import torch.nn.functional as F
+from torch import nn
+
+from .mvit.slowfast.models.video_model_builder import MViT
+from .mvit.slowfast.utils.parser import load_model_config
 
 base_conf_path = Path(__file__).parent / "mvit" / "configs"
 base_weights_path = Path(__file__).parent / "mvit" / "weights"
@@ -18,9 +19,6 @@ CONF_PATH_32x3 = base_conf_path / "MVITv2_B_32x3.yaml"
 WEIGHTS_PATH_16x4 = base_weights_path / "MViTv2_S_16x4_k400_f302660347.pyth"
 WEIGHTS_PATH_32x3 = base_weights_path / "MViTv2_B_32x3_k400_f304025456.pyth"
 
-# #Image classification configs and weights
-# CONF_PATH_2D_T = base_conf_path / 'MVITv2_T_2D.yaml'
-# WEIGHTS_PATH_2D_T = base_weights_path / 'MViTv2_T_2D_IN1K_ic.pyth'
 
 """I am aware this is a bit of a ad hco solution"""
 
@@ -31,7 +29,7 @@ class MVITv2_basic(MViT):
         num_classes: int,
         pretrain_path: Path,
         cfg_path: Path,
-        drop_p: Optional[float] = None,
+        drop_p: float | None = None,
     ):
         cfg = load_model_config(str(cfg_path))
         super().__init__(cfg)
@@ -65,7 +63,7 @@ class MVITv2_S_16x4_basic(MVITv2_basic):
     def __init__(
         self,
         num_classes: int,
-        drop_p: Optional[float] = None,
+        drop_p: float | None = None,
         pretrain_path: Path = WEIGHTS_PATH_16x4,
         cfg_path: Path = CONF_PATH_16x4,
     ):
@@ -76,7 +74,7 @@ class MVITv2_S_16x4_extended(MVITv2_basic):
     def __init__(
         self,
         num_classes: int,
-        drop_p: Optional[float] = None,
+        drop_p: float | None = None,
         pretrain_path: Path = WEIGHTS_PATH_16x4,
         cfg_path: Path = CONF_PATH_16x4,
         num_frames: int = 32,
@@ -111,23 +109,17 @@ class MVITv2_B_32x3_basic(MVITv2_basic):
     def __init__(
         self,
         num_classes: int,
-        drop_p: Optional[float] = None,
+        drop_p: float | None = None,
         pretrain_path: Path = WEIGHTS_PATH_32x3,
         cfg_path: Path = CONF_PATH_32x3,
     ):
         super().__init__(num_classes, pretrain_path, cfg_path, drop_p)
 
-
-# class MVITv2_T_2D_basic(MVITv2_basic):
-#     def __init__(self, num_classes: int, drop_p: Optional[float] = None, pretrain_path: Path = WEIGHTS_PATH_2D_T, cfg_path: Path = CONF_PATH_2D_T):
-#         super().__init__(num_classes, pretrain_path, cfg_path, drop_p)
-
-
 class MVITv2_B_32x3_reduced(MVITv2_basic):
     def __init__(
         self,
         num_classes: int,
-        drop_p: Optional[float] = None,
+        drop_p: float | None = None,
         pretrain_path: Path = WEIGHTS_PATH_32x3,
         cfg_path: Path = CONF_PATH_32x3,
         num_frames: int = 16,

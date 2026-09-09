@@ -267,3 +267,16 @@ def _fix_part_temporal(part: str) -> str:
 
 def aug_name_mapper(aug_name: str, part_fixer: Callable[[str], str]) -> str:
     return " ".join(part_fixer(p) for p in aug_name.split("_"))
+
+def get_y_max(subdf: pd.DataFrame,  loss_name: str, aug_types: list[str] | None = None) -> float:
+    """Get shared y_max for consistent plots"""
+    if aug_types is None:
+        aug_types = ['spatial', 'temporal']
+    vals = []
+    for aug_type in aug_types:
+        aug_df = subdf[subdf["type"].isin([aug_type, 'control'])]
+        vals.append(max(aug_df[loss_name]))
+        
+        
+    return max(vals)
+    

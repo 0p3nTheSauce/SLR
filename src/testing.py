@@ -3,19 +3,11 @@ import json
 import re
 from argparse import ArgumentParser
 from pathlib import Path
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
 
 import numpy as np
 import torch
 import tqdm
 from sklearn.metrics import accuracy_score, classification_report
-from torch import Tensor
 from torch.utils.data import DataLoader
 
 from src.configs import (
@@ -28,7 +20,6 @@ from src.configs import (
 from src.models import avail_models, get_model
 from src.run_types import (
     BaseRes,
-    ClassReport,
     CompRes,
     DataInfo,
     MinInfo,
@@ -62,98 +53,6 @@ def cleanup_memory():
         torch.cuda.synchronize()
     gc.collect()
 
-
-#################################### Multiview #################################
-
-
-def sample_multiview(
-    frames: Tensor,
-    target_length: int,
-    num_clips: int = 10,
-    crop_size: int = 224,
-    num_spatial_crops: int = 3,
-) -> Tensor:
-    T, C, H, W = frames.shape
-
-    # If video is shorter than target_length, loop-pad it
-    if T < target_length:
-        repeats = (target_length // T) + 1
-        frames = frames.repeat(repeats, 1, 1, 1)[
-            :target_length
-        ]  # (target_length, C, H, W)
-        T = target_length
-
-    views = []
-
-    for i in range(num_clips):
-        if num_clips == 1:
-            start = (T - target_length) // 2
-        else:
-            start = int(i * (T - target_length) / (num_clips - 1))
-        start = max(0, min(start, T - target_length))  # clamp
-        end = start + target_length - 1  # now always valid
-
-        indices = torch.linspace(start, end, target_length).long()
-        clip = frames[indices]  # (T, C, H, W)
-
-        for crop in _spatial_crops(clip, crop_size, num_spatial_crops, H, W):
-            views.append(crop)
-
-    return torch.stack(views).permute(0, 2, 1, 3, 4)  # (K*M, C, T, H, W)
-
-
-def _spatial_crops(
-    clip: Tensor,
-    crop_size: int,
-    num_crops: int,
-    H: int,
-    W: int,
-) -> list[Tensor]:
-    """
-    Return num_crops spatial crops of a clip.
-    3-crop: left/centre/right along the longer axis
-    5-crop: 3-crop + top-left + bottom-right corners
-    """
-    crops = []
-    short = min(H, W)
-    assert crop_size <= short, f"crop_size {crop_size} > short side {short}"
-
-    if num_crops == 1:
-        # Centre crop only
-        y = (H - crop_size) // 2
-        x = (W - crop_size) // 2
-        crops.append(clip[:, :, y : y + crop_size, x : x + crop_size])
-
-    elif num_crops == 3:
-        # 3 crops along the longer axis
-        if W >= H:  # landscape → left/centre/right
-            xs = [0, (W - crop_size) // 2, W - crop_size]
-            y = (H - crop_size) // 2
-            for x in xs:
-                crops.append(clip[:, :, y : y + crop_size, x : x + crop_size])
-        else:  # portrait → top/centre/bottom
-            ys = [0, (H - crop_size) // 2, H - crop_size]
-            x = (W - crop_size) // 2
-            for y in ys:
-                crops.append(clip[:, :, y : y + crop_size, x : x + crop_size])
-
-    elif num_crops == 5:
-        # 3 crops along longer axis + 2 corners
-        crops = _spatial_crops(clip, crop_size, 3, H, W)
-        if W >= H:
-            crops.append(clip[:, :, 0:crop_size, 0:crop_size])  # top-left
-            crops.append(
-                clip[:, :, H - crop_size : H, W - crop_size : W]
-            )  # bottom-right
-        else:
-            crops.append(clip[:, :, 0:crop_size, 0:crop_size])
-            crops.append(clip[:, :, H - crop_size : H, W - crop_size : W])
-    else:
-        raise ValueError(f"num_crops must be 1, 3, or 5, got {num_crops}")
-
-    return crops
-
-
 ##############################   Individual-run testing   ######################################
 
 
@@ -178,7 +77,7 @@ def test_model(model, test_loader):
         all_targets, all_preds, output_dict=True, zero_division=0
     )
 
-    assert isinstance(report, Dict), "Sklearn machine broke"
+    assert isinstance(report, dict), "Sklearn machine broke"
 
     return accuracy, report, all_preds, all_targets
 
@@ -242,12 +141,8 @@ def test_top_k(model, test_loader, verbose=False, save_path=None):
     top1_per_instance = correct / len(test_loader)
     top5_per_instance = correct_5 / len(test_loader)
     top10_per_instance = correct_10 / len(test_loader)
-    fstr = "top-k average per class acc: {}, {}, {}".format(
-        top1_per_class, top5_per_class, top10_per_class
-    )
-    fstr2 = "top-k per instance acc: {}, {}, {}".format(
-        top1_per_instance, top5_per_instance, top10_per_instance
-    )
+    fstr = f"top-k average per class acc: {top1_per_class}, {top5_per_class}, {top10_per_class}"
+    fstr2 = f"top-k per instance acc: {top1_per_instance}, {top5_per_instance}, {top10_per_instance}"
     print(fstr)
     print(fstr2)
 
@@ -275,8 +170,8 @@ def test_topk_clsrep(
     model: torch.nn.Module,
     test_loader: DataLoader[VideoDataset],
     verbose: bool = False,
-    save_path: Optional[Union[str, Path]] = None,
-) -> Tuple[BaseRes, Dict[str, Dict[str, float]], List[int], List[int]]:
+    save_path: str | Path | None = None,
+) -> tuple[BaseRes, dict[str, dict[str, float]], list[int], list[int]]:
     """Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
 
     Args:
@@ -366,7 +261,7 @@ def test_topk_clsrep(
     cls_report = classification_report(
         all_targets, all_preds, output_dict=True, zero_division=0
     )
-    assert isinstance(cls_report, Dict), "Sklearn machine broke"
+    assert isinstance(cls_report, dict), "Sklearn machine broke"
 
     # per class accuracy
     top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
@@ -375,12 +270,8 @@ def test_topk_clsrep(
     top1_per_instance = correct / len(test_loader)
     top5_per_instance = correct_5 / len(test_loader)
     top10_per_instance = correct_10 / len(test_loader)
-    fstr = "top-k average per class acc: {}, {}, {}".format(
-        top1_per_class, top5_per_class, top10_per_class
-    )
-    fstr2 = "top-k per instance acc: {}, {}, {}".format(
-        top1_per_instance, top5_per_instance, top10_per_instance
-    )
+    fstr = f"top-k average per class acc: {top1_per_class}, {top5_per_class}, {top10_per_class}"
+    fstr2 = f"top-k per instance acc: {top1_per_instance}, {top5_per_instance}, {top10_per_instance}"
     print(fstr)
     print(fstr2)
 
@@ -405,160 +296,6 @@ def test_topk_clsrep(
             json.dump(topk_res, f, indent=2)
 
     return topk_res, cls_report, all_targets, all_preds
-
-
-def test_topk_clsrep_multiview(
-    model: torch.nn.Module,
-    test_loader: DataLoader[VideoDataset],
-    verbose: bool = False,
-    save_path: Optional[Union[str, Path]] = None,
-) -> Tuple[BaseRes, Dict[str, Dict[str, float]], List[int], List[int]]:
-    """Get the top-k accuracies (both per class and per instance) and classification report for a model on a test set.
-
-    Args:
-        model (torch.nn.Module): Initialised model to test.
-        test_loader (DataLoader[VideoDataset]): Initialised dataloader for the test set.
-        seed (Optional[int], optional): Random seed, if not set no seed. Defaults to None.
-        verbose (bool, optional): Verbose output. Defaults to False.
-        save_path (Optional[Union[str, Path]], optional): Optionally save results to json file. Defaults to None.
-
-    Returns:
-        Tuple[Dict[str, Dict[str, float]], Dict[str, Dict[str, float]], List[int], List[int]]: Dictionary of top-k accuracies (per instance and per class), classification report dictionary (sklearn style), all_targets, all_preds.
-    """
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.to(device)
-    model.eval()
-
-    all_preds = []
-    all_targets = []
-
-    correct = 0
-    correct_5 = 0
-    correct_10 = 0
-
-    assert isinstance(test_loader.dataset, VideoDataset), (
-        "This function uses a custom dataset"
-    )
-    num_classes = len(set(test_loader.dataset.classes))
-
-    top1_fp = np.zeros(num_classes, dtype=np.int64)
-    top1_tp = np.zeros(num_classes, dtype=np.int64)
-
-    top5_fp = np.zeros(num_classes, dtype=np.int64)
-    top5_tp = np.zeros(num_classes, dtype=np.int64)
-
-    top10_fp = np.zeros(num_classes, dtype=np.int64)
-    top10_tp = np.zeros(num_classes, dtype=np.int64)
-
-    loss_func = torch.nn.CrossEntropyLoss()
-    running_loss = 0.0
-    total_samples = 0
-
-    with torch.no_grad():
-        for item in tqdm.tqdm(test_loader, desc="Testing"):
-            data, target = item["frames"], item["label_num"]
-            data, target = data.to(device), target.to(device)
-            batch_size = data.size(0)
-            total_samples += batch_size
-
-            # Build views on CPU first, then move
-            frames = data.squeeze(0)  # (T, C, H, W)
-            views = sample_multiview(
-                frames,
-                target_length=32,
-                num_clips=10,
-                crop_size=224,
-                num_spatial_crops=3,
-            ).to(device)  # (K*M, T, C, H, W)
-
-            # Forward all views — batch them to avoid OOM
-            # logits = model(views)
-            # probs  = torch.softmax(logits, dim=-1)
-            # predictions = probs.mean(dim=0)
-            logits_all = model(views)
-            mean_logits = logits_all.mean(dim=0, keepdim=True)  # (1, num_classes)
-            loss = loss_func(mean_logits, target)  # CrossEntropyLoss
-            predictions = torch.softmax(mean_logits, dim=-1)
-
-            # for loss
-            loss = loss_func(predictions, target)
-            running_loss += loss.item() * batch_size
-
-            # for classification report:
-            _, preds = torch.max(predictions, 1)
-            all_preds.extend(preds.cpu().numpy())
-            all_targets.extend(target.cpu().numpy())
-
-            out_labels = np.argsort(predictions.cpu().detach().numpy()[0])
-
-            if target[0].item() in out_labels[-5:]:
-                correct_5 += 1
-                top5_tp[target[0].item()] += 1
-            else:
-                top5_fp[target[0].item()] += 1
-            if target[0].item() in out_labels[-10:]:
-                correct_10 += 1
-                top10_tp[target[0].item()] += 1
-            else:
-                top10_fp[target[0].item()] += 1
-            if torch.argmax(predictions[0]).item() == target[0].item():
-                correct += 1
-                top1_tp[target[0].item()] += 1
-            else:
-                top1_fp[target[0].item()] += 1
-
-            if verbose:
-                print(
-                    f"Video ID: {item['video_id']}\n\
-								Correct 1: {float(correct) / len(test_loader)}\n\
-								Correct 5: {float(correct_5) / len(test_loader)}\n\
-								Correct 10: {float(correct_10) / len(test_loader)}"
-                )
-
-    cls_report = classification_report(
-        all_targets, all_preds, output_dict=True, zero_division=0
-    )
-    assert isinstance(cls_report, Dict), "Sklearn machine broke"
-
-    # per class accuracy
-    top1_per_class = np.mean(top1_tp / (top1_tp + top1_fp))
-    top5_per_class = np.mean(top5_tp / (top5_tp + top5_fp))
-    top10_per_class = np.mean(top10_tp / (top10_tp + top10_fp))
-    top1_per_instance = correct / len(test_loader)
-    top5_per_instance = correct_5 / len(test_loader)
-    top10_per_instance = correct_10 / len(test_loader)
-    fstr = "top-k average per class acc: {}, {}, {}".format(
-        top1_per_class, top5_per_class, top10_per_class
-    )
-    fstr2 = "top-k per instance acc: {}, {}, {}".format(
-        top1_per_instance, top5_per_instance, top10_per_instance
-    )
-    print(fstr)
-    print(fstr2)
-
-    # loss
-    epoch_loss = running_loss / total_samples
-
-    print(f"Averag Loss: {epoch_loss:.2f}")
-
-    topk_res = BaseRes(
-        top_k_average_per_class_acc=TopKRes(
-            top1=float(top1_per_class),
-            top5=float(top5_per_class),
-            top10=float(top10_per_class),
-        ),
-        top_k_per_instance_acc=TopKRes(
-            top1=top1_per_instance, top5=top5_per_instance, top10=top10_per_instance
-        ),
-        average_loss=epoch_loss,
-    )
-    if save_path is not None:
-        with open(save_path, "w") as f:
-            json.dump(topk_res, f, indent=2)
-
-    return topk_res, cls_report, all_targets, all_preds
-
 
 def collect_results(res_p: Path):
     with open(res_p, "r") as f:
@@ -575,7 +312,7 @@ def load_info(dirp: Path, checkname: str):
     return resd
 
 
-def get_last_sampler(conf_list: List[TemporalAugs]):
+def get_last_sampler(conf_list: list[TemporalAugs]):
     samplers = [(i, c) for i, c in enumerate(conf_list) if is_sampler_config(c)]
     return samplers[-1]
 
@@ -587,7 +324,7 @@ def setup_data(
     shuffle: bool = False,  # override for shuffle test
     pin_memory: bool = True,
     # video_length: Optional[int] = None
-) -> Tuple[DataLoader[VideoDataset], int, Optional[List[int]], Optional[float]]:
+) -> tuple[DataLoader[VideoDataset], int, list[int] | None, float | None]:
     test_info = get_wlasl_info(split, set_name=set_name)
 
     # make copy to hand off to get_data_set to avoid shuffle injection in final config
@@ -654,7 +391,7 @@ def test_run(
     disp: bool = False,
     save: bool = True,
     save_img: bool = False,
-) -> Tuple[Union[BaseRes, ShuffRes], Dict[str, Dict[str, float]], List[int], List[int]]:
+) -> tuple[BaseRes | ShuffRes, dict[str, dict[str, float]], list[int], list[int]]:
     """Perform testing of a model according to the provided configuration.
 
     Args:
@@ -823,7 +560,7 @@ def get_cls_rep_path(save_path: Path) -> Path:
 # TODO: can be simplified to take only admin info if each folder keeps a file on what frame rate and image size to test with
 def full_test(
     admin: MinInfo,
-    data: Optional[DataInfo] = None,
+    data: DataInfo | None = None,
     save: bool = True,
     re_test: bool = False,
 ) -> CompRes:
@@ -859,15 +596,15 @@ def full_test(
     if data is None:
         try:
             data = load_test_sizes(save_path.parent)
-        except Exception as e:
+        except Exception:
             print(
                 f"Full test failed to automatically load data info from: {save_path.parent / DATA_FNAME}"
             )
             print("Create the file, or pass as parameter instead")
-            raise e
+            raise
 
     # load checkpoint
-    files = sorted(list(save_path.iterdir()))
+    files = sorted(save_path.iterdir())
     last_check = torch.load(files[-1])
     # extract metrics
     best_val_acc = last_check["best_val_acc"]
@@ -878,16 +615,10 @@ def full_test(
         admin,
         data,
         "test",
-        br_graph=True,
-        cf_matrix=True,
-        heatmap=True,
-        save_img=True,
         save=False,
     )
     # validation set
     val, _, _, _ = test_run(admin, data, "val", save=False)
-    # shuffled frames test set
-    # test_shuff = test_run(admin, data, "test", shuffle=True, save=False)
 
     results = CompRes(
         check_name="best_val",
@@ -897,12 +628,6 @@ def full_test(
         val=val,
         # test_shuff=cast(ShuffRes, test_shuff),
     )
-
-    # class_report = ClassReport(
-    #     cls_report=cls_report,
-    #     all_targets=all_targets,
-    #     all_preds=all_preds
-    # )
 
     class_report = {
         "cls_report": cls_report,
@@ -921,7 +646,7 @@ def full_test(
 
 
 def get_test_parser(
-    prog: Optional[str] = None, desc: str = "Test a model"
+    prog: str | None = None, desc: str = "Test a model"
 ) -> ArgumentParser:
     """Get parser for testing configuration with subparsers for full/partial test modes
 
@@ -1154,11 +879,7 @@ def main():
                 "Please provide -nf/--num_frames and -fs/--frame_size arguments, "
                 "or ensure data_info.json exists in the experiment directory."
             )
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to load data info from {data_info_path}: {e}\n"
-                "You can provide -nf/--num_frames and -fs/--frame_size arguments instead."
-            )
+        
 
     if args.command == "full":
         # Run complete test suite

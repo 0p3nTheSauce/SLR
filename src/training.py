@@ -24,18 +24,13 @@ from src.configs import (
     set_seed,
     take_args,
 )
-from src.models import (  # noqa: F401
-    MVirTed,
-    # MViT_2D_t,
+from src.models import (
     extend_classifier,
-    get_mae_model,
     get_model,
 )
 from src.run_types import (
     OptimizerInfo,
     SchedInfo,
-    is_pretrain_config,
-    is_supervised_config,
 )
 from src.stopping import MaybeStopper, build_early_stopper
 from src.testing import save_test_sizes
@@ -701,11 +696,6 @@ def train_loop(
     dataloaders, num_classes = setup_data(config)
 
     # setup model
-
-    assert is_supervised_config(config.model_params), (
-        "This is a supervised training loop, but model_params is not SupervisedInfo"
-    )
-
     drop_p = config.model_params.drop_p
 
     if config.admin.weight_path:
@@ -817,51 +807,6 @@ def train_loop(
     return {"best_val_acc": best_val_acc, "best_val_loss": best_val_loss}
 
 
-def train_model(
-    model_name: str,
-    config: RunInfo,
-    wandb_run: Run,
-    load: StrPath | None = None,
-    save_every: int = 5,
-    recover: bool = False,
-    event: EventClass | None = None,
-) -> dict[str, float] | None:
-    """Train a model in a supervised or unsupervised manner
-
-    Args:
-        model_name (str): Name of the model to train.
-        config (RunInfo): Configuration for the training run.
-        wandb_run (Run): Wandb run instance for logging and configuration.
-        load (StrPath | None, optional): Path to the model checkpoint to load. Defaults to None.
-        save_every (int, optional): Save the model every n epochs. Defaults to 5.
-        recover (bool, optional): Whether to recover from a previous training run. Defaults to False.
-        event (EventClass | None, optional): Event instance for controlling the training process. Defaults to None.
-
-    Raises:
-        ValueError: If the model parameters type is not supported for training.
-
-    Returns:
-        dict[str, float] | None: Dictionary containing the best validation accuracy and loss, or None if training was not completed.
-    """
-    if is_supervised_config(config.model_params):
-        return train_loop(
-            model_name=model_name,
-            config=config,
-            wandb_run=wandb_run,
-            load=load,
-            save_every=save_every,
-            recover=recover,
-            event=event,
-        )
-    elif is_pretrain_config(config.model_params):
-        raise DeprecationWarning(
-            "Pretraining is no longer supported in this training loop. Please use the pretraining script."
-        )
-    else:
-        raise ValueError(
-            f"Model params type {type(config.model_params)} not supported for training."
-        )
-
 
 def main():
     parser = get_train_parser()
@@ -893,7 +838,11 @@ def main():
     print(f"Run name: {run.name}")  # Human-readable name
     print(f"Run path: {run.path}")  # entity/project/run_id format
 
-    train_model(admin.model, config, run, recover=admin.recover)
+    _results = train_loop(
+            model_name=admin.model,
+            config=config,
+            wandb_run=run,
+        )
     run.finish()
 
 
