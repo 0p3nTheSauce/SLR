@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import (
     Annotated,
@@ -295,7 +296,6 @@ class AugInfo(BaseModel):
 
         return self
 
-
 class DataInfo(BaseModel):
     train_augs: AugInfo | None = None
     test_augs: AugInfo | None = None
@@ -587,11 +587,25 @@ class SummarisedError(Sumarised):
     error: str
 
 
+def _pop(d : dict, keys: list[Any], default=None) -> Any:
+    if len(keys) == 1:
+        return d.pop(keys[0], default)
+    
+    # Navigate to the parent of the target key
+    parent = d
+    for key in keys[:-1]:
+        parent = parent[key]
+
+    return parent.pop(keys[-1], default)
+        
+
 class CleverDict(dict):
+    
     def __init__(self, dict: dict[Any, Any]):
         self.dict = dict
 
-    def __getitem__(self, keys: list[Any]) -> Any:
+    def __getitem__(self, keys: Iterable[Any]) -> Any:
+        #NOTE: not a deepcopy, so exposes internal references
         d = self.dict.copy()
         for key in keys:
             d = d[key]
@@ -618,16 +632,8 @@ class CleverDict(dict):
                 d = {k: self._set_inplace({}, next_key, ks, val)}
         return d
 
-    def pop(self, keys: list[Any], default=None) -> Any:
-        if len(keys) == 1:
-            return self.dict.pop(keys[0], default)
-
-        # Navigate to the parent of the target key
-        parent = self.dict
-        for key in keys[:-1]:
-            parent = parent[key]
-
-        return parent.pop(keys[-1], default)
+    def pop(self, keys: Iterable[Any], default=None) -> Any:
+        return _pop(self.dict, list(keys), default)
 
     def to_dict(self) -> dict[Any, Any]:
         return self.dict.copy()
@@ -635,8 +641,8 @@ class CleverDict(dict):
     def __str__(self) -> str:
         return str(self.dict)
 
-    def __delitem__(self, key):
-        raise NotImplementedError
+    def __delitem__(self, keys: Iterable[Any]):
+        return self.pop(keys)
 
     def __iter__(self):
         yield from self._iter_leaves(self.dict, [])
@@ -647,7 +653,6 @@ class CleverDict(dict):
                 yield from self._iter_leaves(val, path + [key])
         else:
             yield path, d
-
 
 # not ignoring extra keys overrides: Claudes baby
 

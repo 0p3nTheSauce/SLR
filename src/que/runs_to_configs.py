@@ -71,11 +71,18 @@ def _get_save_name(
     else:
         return str(path.with_suffix(".toml"))
 
+def _drop_nested(d : dict, key_set: list[list[str]]) -> dict:
+    from src.run_types import _pop
+    for keys in key_set:
+        _pop(d, keys)
+    return d
+
+
 
 def _run_to_config(
     run: GenExp | dict,
     comments: list[str] | None = None,
-    ignore_sections: list[str] | None = None,
+    ignore_sections: list[list[str]] | None = None,
 ) -> str:
     """Turn a general run into its TOML string representation for the config
     file system. Skips ignored sections, strips None values (TOML has no
@@ -93,16 +100,34 @@ def _run_to_config(
     if comments is None:
         comments = []
     if ignore_sections is None:
-        ignore_sections = ["admin", "wandb", "results"]
+        ignore_sections = [
+            ["admin"],
+            ["wandb"],
+            ["results"],
+            ["data", "train_augs", "norm_dict"],
+            ["data", "train_augs", "strict_size"],
+            ["data", "train_augs", "target_length"],
+            ["data", "train_augs", "frame_size"],
+            
+            ["data", "test_augs", "norm_dict"],
+            ["data", "test_augs", "strict_size"],
+            ["data", "test_augs", "target_length"],
+            ["data", "test_augs", "frame_size"],
+                        
+            ["data", "strict_size"],
+            ["data", "target_length"],
+            ["data", "frame_size"],
+            ["training", "batch_size_equivalent"]
+                
+        ]
     if isinstance(run, GenExp):
         run_info = run.model_dump()
     else:
         run_info = run
 
     filtered = {
-        section_name: _strip_none(section_content)
+        section_name: _strip_none(_drop_nested(section_content, ignore_sections) )
         for section_name, section_content in run_info.items()
-        if section_name not in ignore_sections and section_content
     }
 
     config_str = tomli_w.dumps(filtered)

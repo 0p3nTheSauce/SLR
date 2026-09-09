@@ -101,8 +101,8 @@ def update_runs_json():
     
 
 if __name__ == "__main__":
-    update_runs_json()
-    
+    # update_runs_json()
+    pass
     
     
     

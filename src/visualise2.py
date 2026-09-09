@@ -164,3 +164,5 @@ SPLIT_NAME_MAP: dict[AVAIL_SPLITS, str] = {
 def split_name_mapper(split: AVAIL_SPLITS) -> str:
     """Map split name to plot ready name"""
     return SPLIT_NAME_MAP[split]
+
+# ---------------------------------------------------------------------------
