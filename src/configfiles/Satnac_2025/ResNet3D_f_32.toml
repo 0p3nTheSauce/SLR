@@ -1,6 +1,8 @@
 [training]
-batch_size = 4
-update_per_step = 2
+# batch_size = 4
+# update_per_step = 2
+batch_size = 2
+update_per_step = 4 #edited after first run
 max_epoch = 200
 
 [optimizer]
