@@ -1,9 +1,6 @@
 import json
-import logging
-from collections.abc import Callable
-from logging import Logger
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,26 +8,16 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import patches
 from sklearn.metrics import confusion_matrix
-from torch import Tensor
-from torch.utils.data import DataLoader, Dataset
-from typing_extensions import TypedDict, Unpack
 
-from src.configs import CLASSES_PATH, get_class_list
+from src.configs import CLASSES_PATH
 from src.preprocess import Instance
 
 # locals
-from src.run_types import CentreCropConfig, OG_Sampler
 from src.stats import (
     AVAIL_SETS,
     AVAIL_SPLITS,
     HistoGram,
     instance_stats,
-)
-from src.utils import load_rgb_frames_from_video, plt_display_grid
-from src.video_dataset import (
-    get_transform,
-    get_video_path,
-    get_wlasl_info,
 )
 
 # Set style for better-looking plots
@@ -41,7 +28,7 @@ from src.video_dataset import (
 VERBOSITY = 0
 
 
-visualise_logger = logging.getLogger(__name__)
+
 
 BG_FIGSIZE_3G = (8, 5)
 BG_WiDTH_3G = 0.2
@@ -65,133 +52,6 @@ def set_font_size(size: int = 14) -> None:
 set_font_size()  # Set default font size
 
 
-# Frame visualiser
-
-
-class MiniSetKwargsRequired(TypedDict):
-    cls_idx: int
-    all_sets: dict[str, Any]
-    set_name: AVAIL_SETS
-    split_name: AVAIL_SPLITS
-
-
-class MiniSetKwargs(MiniSetKwargsRequired, total=False):
-    classes: list[str]
-    target_length: int
-    frame_size: int
-    logger: Logger
-
-
-class MiniSet(Dataset):
-    def __init__(
-        self,
-        cls_idx: int,
-        all_sets: dict[str, Any],
-        set_name: AVAIL_SETS,
-        split_name: AVAIL_SPLITS,
-        classes: list[str] | None = None,
-        target_length: int = 16,
-        frame_size: int = 224,
-        logger: Logger = visualise_logger,
-        transform: Callable[[Tensor], Tensor] | None = None,
-    ) -> None:
-
-        if classes is None:
-            classes = get_class_list()
-        else:
-            assert len(classes) != 0, 'No classes provided'
-
-        self.logger = logger
-        self.cls_idx = cls_idx
-        self.set_name = set_name
-        self.split_name = split_name
-        self.classes = classes
-        self.target_length = target_length
-        self.frame_size = frame_size
-
-        if transform is None:
-            self.transform, _, _ = get_transform(
-                temporal_aug=[OG_Sampler(target_length=target_length)],
-                spatial_aug=[CentreCropConfig(frame_size=frame_size)],
-                normalise_to_float=False,
-                permute_time_channel=False,
-            )
-        else:
-            self.transform = transform
-
-        self.set_path_info = get_wlasl_info(split_name, set_name)
-        self.data = all_sets[self.set_name][self.cls_idx]["instances"]
-        self.tot_samples = len(self.data)
-
-    def __getitem__(self, idx):
-        self.logger.info(f"From: {self.split_name}S/{self.set_name}")
-        self.logger.info(f'Example videos for class: "{self.classes[self.cls_idx]}"')
-        self.logger.info(f"Instance: {idx + 1}/{self.tot_samples}")
-
-        next_example = Instance.model_validate(self.data[idx])
-        ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
-
-        self.logger.info(f"Next example video path: {ex_path}")
-
-        return self.transform(
-            load_rgb_frames_from_video(
-                ex_path, next_example.frame_start, next_example.frame_end
-            )
-        )
-
-    def __len__(self):
-        return self.tot_samples
-
-
-class FrameVisualiser:
-    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
-        self.target_frames = kwargs.get("target_length", 16)
-        self.frame_size = kwargs.get('frame_size', 224)
-        self.iter_loader = iter(
-            DataLoader(
-                MiniSet(**kwargs),
-                batch_size=1,
-                shuffle=False,
-                num_workers=4,
-                pin_memory=False,
-            )
-        )
-
-    def __call__(self):
-        frames = next(self.iter_loader)[0]
-        if len(frames.shape) == 5:
-            frames = frames.squeeze(dim=0)
-        if frames.shape[1] != 3:
-            frames = frames.permute(1, 0, 2, 3)  # swap T and C
-        
-        plt_display_grid(frames, self.target_frames)
-        
-class FrameFetcher:
-    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
-        self.frames: Tensor | None = None
-        self.cur_idx : int = 0
-        dataloader = DataLoader(
-                        MiniSet(**kwargs),
-                        batch_size=1,
-                        shuffle=False,
-                        num_workers=4,
-                        pin_memory=False,
-                    )
-        
-        self.iter_loader = iter(
-            dataloader
-        )
-        self.len = len(dataloader)
-
-    def __call__(self) -> Tensor:
-        frames = next(self.iter_loader)[0]
-        self.cur_idx += 1
-        if len(frames.shape) == 5:
-            frames = frames.squeeze(dim=0)
-        if frames.shape[1] != 3:
-            frames = frames.permute(1, 0, 2, 3)  # swap T and C
-        
-        return frames
 
 
 # Standardised plots for results

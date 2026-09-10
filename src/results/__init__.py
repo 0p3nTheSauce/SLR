@@ -6,7 +6,12 @@ from pydantic import BaseModel
 
 # locals
 from src.que.core import CompExpInfo, Que
-from src.que.shell import get_filters_crits_dropkeys, output_filtered_runs
+from src.que.shell import (
+    get_filters_crits_dropkeys,
+    get_filters_drop_keys,
+    output_filtered_runs,
+    unpack_filters,
+)
 
 
 def _safe_get(d: dict | None, k: str) -> Any:
@@ -18,6 +23,55 @@ def match(obj, target):
     d = obj.model_dump() if isinstance(obj, BaseModel) else obj
     return all(_safe_get(d, k) == v for k, v in target.items())
 
+
+def find_runs(
+    filters: dict[str, Any],
+    drop_key_sets: list[list[str]] | None = None,
+    sort_keys: list[list[str]] | None = None,
+    reverse: bool = False,
+    top_n: int | None = None,
+    output_path: str | None = None,
+) -> list[CompExpInfo]:
+    """
+    Find runs using fiters and apply list manipulation
+        
+    Args:
+        filters (dict[str, Any]): Nested dictionary where the leaf is a callable boolean function. 
+        drop_key_sets (list[list[str]] | None, optional): Sets of keys to drop, each list directly indexes a leaf node. Only applies to Json output. Defaults to None.
+        sort_keys (list[list[str]] | None, optional): Keys to sort the runs by. Defaults to None.
+        reverse (bool, optional): Whether to sort in reverse order. Defaults to False.
+        top_n (int | None, optional): Number of top runs to return. Defaults to None.
+        output_path (str | None, optional): Path to output the filtered runs. Defaults to None.
+
+    Returns:
+        list[CompExpInfo]: List of CompExpInfo objects representing the filtered runs.
+    """
+    
+    drop_key_sets = drop_key_sets if drop_key_sets is not None else []
+    file_filter_keys, file_criterions = unpack_filters(filters)
+    que = Que()
+    runs = list(
+        Que.list_manipulation(
+            que.list_runs("old_runs"),
+            sort_keys=sort_keys,
+            reverse=reverse,
+            filter_keys=file_filter_keys,
+            criterions=file_criterions,
+        )
+    )
+
+    # retrieve top n if specified
+    if top_n is not None:
+        runs = runs[:top_n]
+
+    if output_path:
+        output_filtered_runs(
+            runs=runs,
+            output_path=output_path,
+            file_drop_key_sets=drop_key_sets,
+        )
+
+    return [CompExpInfo.model_validate(run) for run in runs]
 
 def fetch_runs(
     filters_path: Path,
@@ -39,32 +93,15 @@ def fetch_runs(
     Returns:
         list[CompExpInfo]: List of CompExpInfo objects representing the filtered runs.
     """
-    file_filter_keys, file_criterions, file_drop_key_sets = get_filters_crits_dropkeys(
-        filters_path
+    file_filters, file_drop_key_sets = get_filters_drop_keys(filters_path)
+    return find_runs(
+        file_filters,
+        file_drop_key_sets,
+        sort_keys,
+        reverse,
+        top_n,
+        output_path
     )
-    que = Que()
-    runs = list(
-        Que.list_manipulation(
-            que.list_runs("old_runs"),
-            sort_keys=sort_keys,
-            reverse=reverse,
-            filter_keys=file_filter_keys,
-            criterions=file_criterions,
-        )
-    )
-
-    # retrieve top n if specified
-    if top_n is not None:
-        runs = runs[:top_n]
-
-    if output_path:
-        output_filtered_runs(
-            runs=runs,
-            output_path=output_path,
-            file_drop_key_sets=file_drop_key_sets,
-        )
-
-    return [CompExpInfo.model_validate(run) for run in runs]
 
 
 def load_runs(runs_path: Path) -> list[CompExpInfo]:

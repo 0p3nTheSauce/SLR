@@ -92,7 +92,7 @@ def get_filters_drop_keys(filters_path: Path) -> tuple[dict, list[list[str]]]:
     return module.filters, module.drop_keys
 
 
-def _unpack_filters(
+def unpack_filters(
     filters: dict,
 ) -> tuple[list[list[str]], list[Callable[[Any], bool]]]:
     """Recursively flatten a nested dict. The ouput is a list of key sets which directly index a value, and a
@@ -120,7 +120,7 @@ def _unpack_filters(
             continue
 
         elif isinstance(value, dict):
-            sub_key_sets, crits = _unpack_filters(value)
+            sub_key_sets, crits = unpack_filters(value)
             for sublist in sub_key_sets:
                 filter_key_sets.append(key_set + sublist)
 
@@ -158,7 +158,7 @@ def _drop_keys(d: dict, keys: list[Any]) -> dict:
 def get_filters_crits_dropkeys(filters_path: Path):
     """Load filtering spec from file path in format expected by find"""
     file_filters, file_drop_key_sets = get_filters_drop_keys(filters_path)
-    file_filter_keys, file_criterions = _unpack_filters(file_filters)
+    file_filter_keys, file_criterions = unpack_filters(file_filters)
     return file_filter_keys, file_criterions, file_drop_key_sets
 
 

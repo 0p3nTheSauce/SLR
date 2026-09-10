@@ -10,13 +10,30 @@ Usage:
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import logging
+from collections.abc import Callable, Sequence
+from logging import Logger
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from numpy.typing import ArrayLike
+from torch import Tensor
+from torch.utils.data import DataLoader, Dataset
+from typing_extensions import TypedDict, Unpack
 
-from src.run_types import AVAIL_SPLITS
+from src.configs import get_class_list
+from src.preprocess import Instance
+
+# locals
+from src.run_types import AVAIL_SETS, AVAIL_SPLITS, CentreCropConfig, OG_Sampler
+from src.utils import load_rgb_frames_from_video, plt_display_grid
+from src.video_dataset import (
+    get_transform,
+    get_video_path,
+    get_wlasl_info,
+)
 
 # ---------------------------------------------------------------------------
 # Colour definitions
@@ -30,6 +47,19 @@ CONTROL_COLORS = {
 }
 
 DEFAULT_ACCENT = "#0072B2"  # used for every non-control bar
+
+# Okabe-Ito colourblind-safe qualitative palette, used for multi-line charts
+# (e.g. comparing several training/validation curves in one figure).
+LINE_PALETTE = [
+    "#0072B2",  # blue
+    "#D55E00",  # vermillion
+    "#009E73",  # green
+    "#E69F00",  # orange
+    "#CC79A7",  # pink
+    "#56B4E9",  # sky blue
+    "#F0E442",  # yellow
+    "#000000",  # black
+]
 
 
 def suggest_palette(
@@ -148,6 +178,67 @@ def plot_bar_chart(
     fig.tight_layout()
     return fig, ax
 
+
+def plot_loss_curves(
+    df: pd.DataFrame,
+    step_col: str = "Step",
+    columns: Sequence[str] | None = None,
+    palette: Sequence[str] | None = None,
+    legend_labels: dict[str, str] | None = None,
+    title: str | None = None,
+    xlabel: str = "Step",
+    ylabel: str = "Validation Loss",
+    figsize: tuple[float, float] = (8, 4.5),
+    linewidth: float = 1.8,
+    ax=None,
+):
+    """
+    Plot one line per series against a shared step/x column, with consistent
+    thesis styling. Intended for comparing training/validation curves across
+    multiple runs or configs (e.g. best_val_loss.csv).
+
+    df: a dataframe with a step column and one column per series. Series
+        columns may contain NaNs where that run didn't log at a given step
+        (e.g. runs logging on offset step counts) -- NaNs are dropped on a
+        per-series basis so each line stays continuous.
+    step_col: name of the column to use as the x-axis (default "Step").
+    columns: which columns to plot as series. Defaults to every column
+        other than step_col.
+    palette: list of colours, one per series. Defaults to LINE_PALETTE,
+        cycling if there are more series than palette entries.
+    legend_labels: optional mapping from column name to display label, for
+        renaming series in the legend without renaming the dataframe columns.
+    """
+    if columns is None:
+        columns = [c for c in df.columns if c != step_col]
+    n = len(columns)
+
+    if palette is None:
+        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n)]
+    elif len(palette) != n:
+        raise ValueError(f"palette has {len(palette)} colours but there are {n} series.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    for color, col in zip(palette, columns):
+        series = df[[step_col, col]].dropna()
+        label = legend_labels.get(col, col) if legend_labels else col
+        ax.plot(series[step_col], series[col], color=color, linewidth=linewidth, label=label)
+
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.legend()
+
+    fig.tight_layout()
+    return fig, ax
+
+
 SPLIT_NAME_MAP: dict[AVAIL_SPLITS, str] = {
     'asl100' : 'WLASL-100',
     'asl300' : 'WLASL-300',
@@ -166,3 +257,131 @@ def split_name_mapper(split: AVAIL_SPLITS) -> str:
     return SPLIT_NAME_MAP[split]
 
 # ---------------------------------------------------------------------------
+# Frame visualiser
+# ---------------------------------------------------------------------------
+
+class MiniSetKwargsRequired(TypedDict):
+    cls_idx: int
+    all_sets: dict[str, Any]
+    set_name: AVAIL_SETS
+    split_name: AVAIL_SPLITS
+
+
+class MiniSetKwargs(MiniSetKwargsRequired, total=False):
+    classes: list[str]
+    target_length: int
+    frame_size: int
+    logger: Logger
+
+visualise_logger = logging.getLogger(__name__)
+
+class MiniSet(Dataset):
+    def __init__(
+        self,
+        cls_idx: int,
+        all_sets: dict[str, Any],
+        set_name: AVAIL_SETS,
+        split_name: AVAIL_SPLITS,
+        classes: list[str] | None = None,
+        target_length: int = 16,
+        frame_size: int = 224,
+        logger: Logger = visualise_logger,
+        transform: Callable[[Tensor], Tensor] | None = None,
+    ) -> None:
+
+        if classes is None:
+            classes = get_class_list()
+        else:
+            assert len(classes) != 0, 'No classes provided'
+
+        self.logger = logger
+        self.cls_idx = cls_idx
+        self.set_name = set_name
+        self.split_name = split_name
+        self.classes = classes
+        self.target_length = target_length
+        self.frame_size = frame_size
+
+        if transform is None:
+            self.transform, _, _ = get_transform(
+                temporal_aug=[OG_Sampler(target_length=target_length)],
+                spatial_aug=[CentreCropConfig(frame_size=frame_size)],
+                normalise_to_float=False,
+                permute_time_channel=False,
+            )
+        else:
+            self.transform = transform
+
+        self.set_path_info = get_wlasl_info(split_name, set_name)
+        self.data = all_sets[self.set_name][self.cls_idx]["instances"]
+        self.tot_samples = len(self.data)
+
+    def __getitem__(self, idx):
+        self.logger.info(f"From: {self.split_name}S/{self.set_name}")
+        self.logger.info(f'Example videos for class: "{self.classes[self.cls_idx]}"')
+        self.logger.info(f"Instance: {idx + 1}/{self.tot_samples}")
+
+        next_example = Instance.model_validate(self.data[idx])
+        ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
+
+        self.logger.info(f"Next example video path: {ex_path}")
+
+        return self.transform(
+            load_rgb_frames_from_video(
+                ex_path, next_example.frame_start, next_example.frame_end
+            )
+        )
+
+    def __len__(self):
+        return self.tot_samples
+
+
+class FrameVisualiser:
+    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
+        self.target_frames = kwargs.get("target_length", 16)
+        self.frame_size = kwargs.get('frame_size', 224)
+        self.iter_loader = iter(
+            DataLoader(
+                MiniSet(**kwargs),
+                batch_size=1,
+                shuffle=False,
+                num_workers=4,
+                pin_memory=False,
+            )
+        )
+
+    def __call__(self):
+        frames = next(self.iter_loader)[0]
+        if len(frames.shape) == 5:
+            frames = frames.squeeze(dim=0)
+        if frames.shape[1] != 3:
+            frames = frames.permute(1, 0, 2, 3)  # swap T and C
+        
+        plt_display_grid(frames, self.target_frames)
+        
+class FrameFetcher:
+    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
+        self.frames: Tensor | None = None
+        self.cur_idx : int = 0
+        dataloader = DataLoader(
+                        MiniSet(**kwargs),
+                        batch_size=1,
+                        shuffle=False,
+                        num_workers=4,
+                        pin_memory=False,
+                    )
+        
+        self.iter_loader = iter(
+            dataloader
+        )
+        self.len = len(dataloader)
+
+    def __call__(self) -> Tensor:
+        frames = next(self.iter_loader)[0]
+        self.cur_idx += 1
+        if len(frames.shape) == 5:
+            frames = frames.squeeze(dim=0)
+        if frames.shape[1] != 3:
+            frames = frames.permute(1, 0, 2, 3)  # swap T and C
+        
+        return frames
