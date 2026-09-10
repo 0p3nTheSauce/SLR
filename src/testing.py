@@ -591,7 +591,8 @@ def full_test(
     # dont retest if exists
     if res_path.exists() and not re_test:
         return load_comp_res(res_path)
-
+    
+   
     # optionall load data
     if data is None:
         try:
@@ -636,6 +637,9 @@ def full_test(
     }
 
     if save:
+        #results folder must exist
+        res_path.parent.mkdir(parents=True, exist_ok=True)
+        
         with open(res_path, "w") as f:
             json.dump(results.model_dump(), f, indent=4)
         with open(cls_rep_path, "w") as f:
