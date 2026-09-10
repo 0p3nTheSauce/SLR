@@ -44,17 +44,16 @@ parameters:
     distribution: uniform
     min: 0
     max: 0.5
-  #Data
-  target_length:
-    values: [16, 32] 
+
 
   # --- fixed ---
   update_per_step: {value: 1}
   frame_size: {value: 224}
   batch_size: {value: 8}
   max_epoch: {value: 200}
-  patience: {value: 10}
-  min_delta: {value: 0.001}
+  patience: {value: 15}
+  min_delta: {value: 0.01}
+  target_length: {value: 32}
 
 # Only consumed by CLI/subprocess-mode agents (`wandb agent <sweep_id>`).
 # Worker._sweep_train also used program/command to load model, split 
@@ -73,4 +72,4 @@ command:
 #setting a baseline with no augs, or scheduler.
 #testing new sweep config loading setup, where base_config and sweep_key_map are loaded from base.py
 
-#defined with id: i6g6do1w
+#defined with id: n4brjkmn
