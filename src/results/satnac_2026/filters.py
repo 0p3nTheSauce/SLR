@@ -2,8 +2,8 @@ import json
 
 from src.results import find_runs, match, same_augs
 
-runs = find_runs({"admin": {"wandb": {"run_id" : lambda x : x == 'j8v7g110'}}})
-if len(runs) >= 1:
+runs = find_runs({"wandb": {"run_id" : lambda x : x == 'j8v7g110'}})
+if len(runs) > 1:
     admins = [run.admin.model_dump() for run in runs]    
     raise ValueError(f'More than one spec run found: {json.dumps(admins, indent=4)}')
 elif len(runs) == 0:
