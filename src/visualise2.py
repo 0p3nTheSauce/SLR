@@ -254,7 +254,7 @@ def plot_topk_bar_chart(
 
     if title:
         ax.set_title(title)
-    ax.legend()
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
 
     fig.tight_layout()
     return fig, ax
