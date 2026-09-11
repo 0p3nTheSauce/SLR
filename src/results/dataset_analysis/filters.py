@@ -1,7 +1,8 @@
 from src.results import find_runs, match, same_augs
 
-run = find_runs({"admin": {"split": lambda x: x == "asl100_worst"}})[0]
-
+runs = find_runs({"admin": {"split": lambda x: x == "asl100_worst"}})
+assert(len(runs) == 1), f'More than one spec run found: {len(runs)}'
+run = runs[0]
 # example_runs_p = Path('./wlasl_100_worst.json')
 # assert example_runs_p.exists()
 # run = load_runs(example_runs_p)[0]

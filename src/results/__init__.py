@@ -50,7 +50,11 @@ def same_augs(augs1: list[T], augs2: list[T]) -> bool:
     """
     if len(augs1) != len(augs2):
         return False
-    return all(a == b for a, b in zip(augs1, augs2))
+
+    def _norm(a: T) -> Any:
+        return a.model_dump() if isinstance(a, BaseModel) else a
+
+    return all(_norm(a) == _norm(b) for a, b in zip(augs1, augs2))
 
 
 def find_runs(
