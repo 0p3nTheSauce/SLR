@@ -25,8 +25,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -181,8 +180,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -339,8 +337,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -499,8 +496,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -659,8 +655,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -819,8 +814,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -979,8 +973,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -1139,8 +1132,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -1299,8 +1291,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -1459,8 +1450,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -1619,8 +1609,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -1779,8 +1768,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -1939,8 +1927,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -2099,8 +2086,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -2259,8 +2245,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -2419,8 +2404,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -2579,8 +2563,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -2739,8 +2722,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -2899,8 +2881,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -3059,8 +3040,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -3219,8 +3199,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -3379,8 +3358,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -3539,8 +3517,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -3699,8 +3676,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -3859,8 +3835,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4019,8 +3994,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4179,8 +4153,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4339,8 +4312,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4499,8 +4471,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4659,8 +4630,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4819,8 +4789,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -4979,8 +4948,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -5139,8 +5107,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -5299,8 +5266,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -5459,8 +5425,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -5619,8 +5584,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
@@ -5779,8 +5743,7 @@
             "classifier_weight_decay": 0.001
         },
         "model_params": {
-            "drop_p": 0.5,
-            "type": "supervised"
+            "drop_p": 0.5
         },
         "data": {
             "train_augs": {
