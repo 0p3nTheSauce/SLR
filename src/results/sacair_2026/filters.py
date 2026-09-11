@@ -1,7 +1,5 @@
 from pydantic import BaseModel
 
-from src.run_types import CUTOFF_9_NAMES
-
 
 def match(obj, target):
     d = obj.model_dump() if isinstance(obj, BaseModel) else obj

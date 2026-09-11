@@ -63,6 +63,7 @@ LINE_PALETTE = [
     "#000000",  # black
 ]
 VALUE_FMT = "%.2f"
+LOSS_FMT = "%.3f"
 FIGSIZE = (8, 4.5)
 
 def suggest_palette(
@@ -184,10 +185,9 @@ def plot_bar_chart(
     return fig, ax
 
 
-def plot_topk_bar_chart(
+def plot_grouped_bar_chart(
     x: ArrayLike,
-    df: pd.DataFrame,
-    metrics: Sequence[str] | None = None,
+    ys: dict[str, ArrayLike],
     palette: Sequence[str] | None = None,
     legend_labels: dict[str, str] | None = None,
     title: str | None = None,
@@ -201,32 +201,33 @@ def plot_topk_bar_chart(
     ax=None,
 ):
     """
-    Plot a grouped bar chart comparing several metrics across categories,
-    with consistent thesis styling. Intended for e.g. comparing top-1/top-5/
-    top-10 accuracy across dataset splits or model configs.
+    Plot a grouped bar chart comparing several series across categories, with
+    consistent thesis styling. Intended for e.g. comparing top-1/top-5/top-10
+    accuracy across dataset splits or model configs, or a per-class metric
+    (e.g. f1-score) across dataset splits.
 
-    x: category labels, one group of bars per entry (e.g. dataset splits).
-    df: dataframe with one column per metric, rows aligned to x.
-    metrics: which columns of df to plot as bars within each group. Defaults
-        to every column in df.
-    palette: list of colours, one per metric. Defaults to LINE_PALETTE,
-        cycling if there are more metrics than palette entries.
-    legend_labels: optional mapping from column name to display label, for
-        renaming metrics in the legend without renaming the dataframe columns.
+    x: category labels, one group of bars per entry (e.g. dataset splits, or
+        glosses -- see suggest_palette() for many-category colouring).
+    ys: mapping from series name to values aligned to x (e.g. {"Top-1":
+        df["Top-1"], "Top-5": df["Top-5"]}, or one entry per dataset split
+        when comparing a per-class metric across splits).
+    palette: list of colours, one per series. Defaults to LINE_PALETTE,
+        cycling if there are more series than palette entries.
+    legend_labels: optional mapping from series name to display label, for
+        renaming series in the legend without renaming keys of `ys`.
     show_values: if True (default), annotate each bar with its value.
     value_fmt: printf-style format string for the value labels.
     """
     categories = np.asarray(x).tolist()
     n = len(categories)
 
-    if metrics is None:
-        metrics = list(df.columns)
-    n_metrics = len(metrics)
+    series_names = list(ys.keys())
+    n_series = len(series_names)
 
     if palette is None:
-        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n_metrics)]
-    elif len(palette) != n_metrics:
-        raise ValueError(f"palette has {len(palette)} colours but there are {n_metrics} metrics.")
+        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n_series)]
+    elif len(palette) != n_series:
+        raise ValueError(f"palette has {len(palette)} colours but there are {n_series} series.")
 
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
@@ -235,9 +236,9 @@ def plot_topk_bar_chart(
 
     x_pos = np.arange(n)
 
-    for i, metric in enumerate(metrics):
-        label = legend_labels.get(metric, metric) if legend_labels else metric
-        values = np.asarray(df[metric]).tolist()
+    for i, name in enumerate(series_names):
+        label = legend_labels.get(name, name) if legend_labels else name
+        values = np.asarray(ys[name]).tolist()
         container = ax.bar(x_pos + i * width, values, width, label=label, color=palette[i])
         if show_values:
             ax.bar_label(container, fmt=value_fmt, padding=3)
@@ -247,95 +248,12 @@ def plot_topk_bar_chart(
         ax.set_xlabel(xlabel)
     if ylabel:
         ax.set_ylabel(ylabel)
-    ax.set_xticks(x_pos + width * (n_metrics - 1) / 2)
+    ax.set_xticks(x_pos + width * (n_series - 1) / 2)
     ax.set_xticklabels(categories)
     plt.setp(ax.get_xticklabels(), rotation=rotation, ha="right")
     if show_values:
-        ax.set_ylim(0, np.asarray(df[metrics]).max() * 1.15)  # headroom for labels
-
-    if title:
-        ax.set_title(title)
-    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
-
-    fig.tight_layout()
-    return fig, ax
-
-
-def plot_grouped_metric_bar_chart(
-    df: pd.DataFrame,
-    category_col: str,
-    group_col: str,
-    metric_col: str,
-    palette: Sequence[str] | None = None,
-    legend_labels: dict[str, str] | None = None,
-    title: str | None = None,
-    xlabel: str | None = None,
-    ylabel: str | None = None,
-    figsize: tuple[float, float] = FIGSIZE,
-    width: float = 0.2,
-    rotation: int = 90,
-    show_values: bool = False,
-    value_fmt: str = VALUE_FMT,
-    ax=None,
-):
-    """
-    Plot a grouped bar chart of a metric across categories, with one group of
-    bars per category and one bar per group value, with consistent thesis
-    styling. Intended for long-format data such as a per-class classification
-    report compared across dataset splits (e.g. one row per gloss/split pair,
-    with an f1-score column).
-
-    Unlike plot_topk_bar_chart (one column per group), here the grouping
-    variable is the *value* of a column, so groups don't need to be known
-    ahead of time and categories missing a given group are skipped for that
-    bar.
-
-    df: long-format dataframe with one row per (category, group) pair.
-    category_col: column defining the x-axis categories (e.g. "label_name").
-    group_col: column whose unique values define the bars within each group
-        (e.g. "split").
-    metric_col: column with the values to plot (e.g. "f1-score").
-    palette: list of colours, one per group value. Defaults to LINE_PALETTE,
-        cycling if there are more groups than palette entries.
-    legend_labels: optional mapping from group value to display label, for
-        renaming groups in the legend without renaming the underlying data.
-    show_values: if True, annotate each bar with its value. Off by default
-        since this chart is typically used with many categories.
-    value_fmt: printf-style format string for the value labels.
-    """
-    categories = df[category_col].unique().tolist()
-    groups = df[group_col].unique().tolist()
-    n = len(categories)
-    n_groups = len(groups)
-
-    if palette is None:
-        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n_groups)]
-    elif len(palette) != n_groups:
-        raise ValueError(f"palette has {len(palette)} colours but there are {n_groups} groups.")
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-    else:
-        fig = ax.figure
-
-    x_pos = np.arange(n)
-
-    for i, group in enumerate(groups):
-        subset = df[df[group_col] == group].set_index(category_col).reindex(categories)
-        label = legend_labels.get(group, group) if legend_labels else group
-        values = np.asarray(subset[metric_col]).tolist()
-        container = ax.bar(x_pos + i * width, values, width, label=label, color=palette[i])
-        if show_values:
-            ax.bar_label(container, fmt=value_fmt, padding=3)
-
-    ax.grid(axis="y", linestyle="--", alpha=0.3)
-    if xlabel:
-        ax.set_xlabel(xlabel)
-    if ylabel:
-        ax.set_ylabel(ylabel)
-    ax.set_xticks(x_pos + width * (n_groups - 1) / 2)
-    ax.set_xticklabels(categories)
-    plt.setp(ax.get_xticklabels(), rotation=rotation, ha="right")
+        max_val = max(np.nanmax(np.asarray(v, dtype=float)) for v in ys.values())
+        ax.set_ylim(0, max_val * 1.15)  # headroom for labels
 
     if title:
         ax.set_title(title)
@@ -346,9 +264,8 @@ def plot_grouped_metric_bar_chart(
 
 
 def plot_loss_curves(
-    df: pd.DataFrame,
-    step_col: str = "Step",
-    columns: Sequence[str] | None = None,
+    x: ArrayLike,
+    ys: dict[str, ArrayLike],
     palette: Sequence[str] | None = None,
     legend_labels: dict[str, str] | None = None,
     title: str | None = None,
@@ -359,25 +276,23 @@ def plot_loss_curves(
     ax=None,
 ):
     """
-    Plot one line per series against a shared step/x column, with consistent
+    Plot one line per series against a shared step/x axis, with consistent
     thesis styling. Intended for comparing training/validation curves across
     multiple runs or configs (e.g. best_val_loss.csv).
 
-    df: a dataframe with a step column and one column per series. Series
-        columns may contain NaNs where that run didn't log at a given step
-        (e.g. runs logging on offset step counts) -- NaNs are dropped on a
-        per-series basis so each line stays continuous.
-    step_col: name of the column to use as the x-axis (default "Step").
-    columns: which columns to plot as series. Defaults to every column
-        other than step_col.
+    x: shared step/x-axis values (e.g. df["Step"]).
+    ys: mapping from series name to values aligned to x (e.g. {"MViTv2-B":
+        df["MViTv2-B"], "MViTv2-S": df["MViTv2-S"]}). Values may contain NaNs
+        where that run didn't log at a given step (e.g. runs logging on
+        offset step counts) -- NaNs are dropped on a per-series basis so each
+        line stays continuous.
     palette: list of colours, one per series. Defaults to LINE_PALETTE,
         cycling if there are more series than palette entries.
-    legend_labels: optional mapping from column name to display label, for
-        renaming series in the legend without renaming the dataframe columns.
+    legend_labels: optional mapping from series name to display label, for
+        renaming series in the legend without renaming keys of `ys`.
     """
-    if columns is None:
-        columns = [c for c in df.columns if c != step_col]
-    n = len(columns)
+    series_names = list(ys.keys())
+    n = len(series_names)
 
     if palette is None:
         palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n)]
@@ -389,10 +304,12 @@ def plot_loss_curves(
     else:
         fig = ax.figure
 
-    for color, col in zip(palette, columns):
-        series = df[[step_col, col]].dropna()
-        label = legend_labels.get(col, col) if legend_labels else col
-        ax.plot(series[step_col], series[col], color=color, linewidth=linewidth, label=label)
+    x_arr = np.asarray(x)
+    for color, name in zip(palette, series_names):
+        values = np.asarray(ys[name])
+        mask = ~pd.isna(values)
+        label = legend_labels.get(name, name) if legend_labels else name
+        ax.plot(x_arr[mask], values[mask], color=color, linewidth=linewidth, label=label)
 
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     if xlabel:
@@ -416,7 +333,7 @@ def save_fig(
     """
     Save a figure to disk, creating parent directories as needed.
 
-    fig: the figure to save (e.g. returned by plot_bar_chart, plot_topk_bar_chart,
+    fig: the figure to save (e.g. returned by plot_bar_chart, plot_grouped_bar_chart,
         plot_loss_curves).
     path: destination file path, e.g. "outputs/my_plot.pdf".
     dpi: passed to fig.savefig. Defaults to None, which falls back to the

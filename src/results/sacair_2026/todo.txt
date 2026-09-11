@@ -1,0 +1,2 @@
+benchmark.json needs to capture with MVitv2_B_32x3_r 
+by running benchmark.py with appropriate params
