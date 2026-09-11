@@ -62,7 +62,8 @@ LINE_PALETTE = [
     "#F0E442",  # yellow
     "#000000",  # black
 ]
-
+VALUE_FMT = "%.2f"
+FIGSIZE = (8, 4.5)
 
 def suggest_palette(
     categories: Sequence[str],
@@ -122,10 +123,10 @@ def plot_bar_chart(
     title: str | None = None,
     xlabel: str | None = None,
     ylabel: str | None = None,
-    figsize: tuple[float, float] = (8, 4.5),
+    figsize: tuple[float, float] = FIGSIZE,
     rotation: int = 45,
     show_values: bool = True,
-    value_fmt: str = "%.3f",
+    value_fmt: str = VALUE_FMT,
     ax=None,
 ):
     """
@@ -192,11 +193,11 @@ def plot_topk_bar_chart(
     title: str | None = None,
     xlabel: str | None = None,
     ylabel: str | None = None,
-    figsize: tuple[float, float] = (8, 5),
+    figsize: tuple[float, float] = FIGSIZE,
     width: float = 0.2,
     rotation: int = 45,
     show_values: bool = True,
-    value_fmt: str = "%.3f",
+    value_fmt: str = VALUE_FMT,
     ax=None,
 ):
     """
@@ -269,7 +270,7 @@ def plot_loss_curves(
     title: str | None = None,
     xlabel: str | None = None,
     ylabel: str | None = None,
-    figsize: tuple[float, float] = (8, 4.5),
+    figsize: tuple[float, float] = FIGSIZE,
     linewidth: float = 1.8,
     ax=None,
 ):
