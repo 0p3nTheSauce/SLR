@@ -24,3 +24,4 @@ src/que/experiments
 ./.vscode/
 slr.egg-info/
 src/results/dataset_analysis/outputs/
+src/results/outputs/

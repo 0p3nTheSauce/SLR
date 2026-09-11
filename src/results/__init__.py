@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
@@ -12,6 +12,7 @@ from src.que.shell import (
     output_filtered_runs,
     unpack_filters,
 )
+from src.run_types import TypeAlias
 
 
 def _safe_get(d: dict | None, k: str) -> Any:
@@ -19,9 +20,37 @@ def _safe_get(d: dict | None, k: str) -> Any:
     """
     return d.get(k) if d is not None else None
 
-def match(obj, target):
-    d = obj.model_dump() if isinstance(obj, BaseModel) else obj
-    return all(_safe_get(d, k) == v for k, v in target.items())
+RunInst : TypeAlias = BaseModel | dict | None
+
+
+def match(obj : RunInst, target : RunInst) -> bool:
+    o = obj.model_dump() if isinstance(obj, BaseModel) else obj
+    t = target.model_dump() if isinstance(target, BaseModel) else target
+    
+    if o is None:
+        return t is None
+    elif t is None:
+        return o is None
+    
+    return all(_safe_get(o, k) == v for k, v in t.items())
+
+
+T = TypeVar("T")
+
+
+def same_augs(augs1: list[T], augs2: list[T]) -> bool:
+    """Checks that augs1 transform is the same as augs2.
+
+    Args:
+        augs1 (list[T]): Augmentations from first source
+        augs2 (list[T]): Augmentations from second source
+
+    Returns:
+        bool: Wether the first and second source contain the same augmentations in the same order.
+    """
+    if len(augs1) != len(augs2):
+        return False
+    return all(a == b for a, b in zip(augs1, augs2))
 
 
 def find_runs(

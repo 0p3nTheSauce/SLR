@@ -47,6 +47,7 @@ LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
 RAW_DIR = WLASL_ROOT / "WLASL2000"
 SPLIT_DIR = WLASL_ROOT / "splits"
 RESULTS_DIR = SRC_ROOT / 'results'
+RESULTS_OUTPUTS = RESULTS_DIR / 'outputs'
 # Misc
 SEED = 42
 

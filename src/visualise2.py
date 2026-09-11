@@ -13,11 +13,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Sequence
 from logging import Logger
+from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.figure import Figure
 from numpy.typing import ArrayLike
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
@@ -110,6 +112,8 @@ def set_thesis_style() -> None:
 # Chart function
 # ---------------------------------------------------------------------------
 
+
+
 def plot_bar_chart(
     x: ArrayLike,
     y: ArrayLike,
@@ -179,6 +183,83 @@ def plot_bar_chart(
     return fig, ax
 
 
+def plot_topk_bar_chart(
+    x: ArrayLike,
+    df: pd.DataFrame,
+    metrics: Sequence[str] | None = None,
+    palette: Sequence[str] | None = None,
+    legend_labels: dict[str, str] | None = None,
+    title: str | None = None,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    figsize: tuple[float, float] = (8, 5),
+    width: float = 0.2,
+    rotation: int = 45,
+    show_values: bool = True,
+    value_fmt: str = "%.3f",
+    ax=None,
+):
+    """
+    Plot a grouped bar chart comparing several metrics across categories,
+    with consistent thesis styling. Intended for e.g. comparing top-1/top-5/
+    top-10 accuracy across dataset splits or model configs.
+
+    x: category labels, one group of bars per entry (e.g. dataset splits).
+    df: dataframe with one column per metric, rows aligned to x.
+    metrics: which columns of df to plot as bars within each group. Defaults
+        to every column in df.
+    palette: list of colours, one per metric. Defaults to LINE_PALETTE,
+        cycling if there are more metrics than palette entries.
+    legend_labels: optional mapping from column name to display label, for
+        renaming metrics in the legend without renaming the dataframe columns.
+    show_values: if True (default), annotate each bar with its value.
+    value_fmt: printf-style format string for the value labels.
+    """
+    categories = np.asarray(x).tolist()
+    n = len(categories)
+
+    if metrics is None:
+        metrics = list(df.columns)
+    n_metrics = len(metrics)
+
+    if palette is None:
+        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n_metrics)]
+    elif len(palette) != n_metrics:
+        raise ValueError(f"palette has {len(palette)} colours but there are {n_metrics} metrics.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    x_pos = np.arange(n)
+
+    for i, metric in enumerate(metrics):
+        label = legend_labels.get(metric, metric) if legend_labels else metric
+        values = np.asarray(df[metric]).tolist()
+        container = ax.bar(x_pos + i * width, values, width, label=label, color=palette[i])
+        if show_values:
+            ax.bar_label(container, fmt=value_fmt, padding=3)
+
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    ax.set_xticks(x_pos + width * (n_metrics - 1) / 2)
+    ax.set_xticklabels(categories)
+    plt.setp(ax.get_xticklabels(), rotation=rotation, ha="right")
+    if show_values:
+        ax.set_ylim(0, np.asarray(df[metrics]).max() * 1.15)  # headroom for labels
+
+    if title:
+        ax.set_title(title)
+    ax.legend()
+
+    fig.tight_layout()
+    return fig, ax
+
+
 def plot_loss_curves(
     df: pd.DataFrame,
     step_col: str = "Step",
@@ -186,8 +267,8 @@ def plot_loss_curves(
     palette: Sequence[str] | None = None,
     legend_labels: dict[str, str] | None = None,
     title: str | None = None,
-    xlabel: str = "Step",
-    ylabel: str = "Validation Loss",
+    xlabel: str | None = None,
+    ylabel: str | None = None,
     figsize: tuple[float, float] = (8, 4.5),
     linewidth: float = 1.8,
     ax=None,
@@ -229,8 +310,10 @@ def plot_loss_curves(
         ax.plot(series[step_col], series[col], color=color, linewidth=linewidth, label=label)
 
     ax.grid(axis="y", linestyle="--", alpha=0.3)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
     if title:
         ax.set_title(title)
     ax.legend()
@@ -238,6 +321,40 @@ def plot_loss_curves(
     fig.tight_layout()
     return fig, ax
 
+
+def save_fig(
+    fig: Figure,
+    path: str | Path,
+    dpi: int | None = None,
+    bbox_inches: str | None = "tight",
+) -> Path:
+    """
+    Save a figure to disk, creating parent directories as needed.
+
+    fig: the figure to save (e.g. returned by plot_bar_chart, plot_topk_bar_chart,
+        plot_loss_curves).
+    path: destination file path, e.g. "outputs/my_plot.pdf".
+    dpi: passed to fig.savefig. Defaults to None, which falls back to the
+        "savefig.dpi" rcParam (300, set by set_thesis_style).
+    bbox_inches: passed to fig.savefig. Defaults to "tight" so labels and
+        legends outside the axes aren't clipped, matching set_thesis_style's
+        "savefig.bbox" rcParam.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    savefig_kwargs: dict[str, Any] = {"bbox_inches": bbox_inches}
+    if dpi is not None:
+        savefig_kwargs["dpi"] = dpi
+
+    fig.savefig(path, **savefig_kwargs)
+    return path
+
+
+
+# ---------------------------------------------------------------------------
+# Name mapping
+# ---------------------------------------------------------------------------
 
 SPLIT_NAME_MAP: dict[AVAIL_SPLITS, str] = {
     'asl100' : 'WLASL-100',
