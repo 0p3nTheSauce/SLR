@@ -23,6 +23,8 @@ conda activate wlasl
 #alternatively if no GPU available 
 # conda env create -f wlasl_cpu.yml 
 # conda activate wlasl_cpu
+# note: wlasl_cpu is CPU-only and does not include the MViT/slowfast model
+# dependencies -- use it for non-MViT models, notebooks, and plotting only.
 
 # add as package:
 pip install -e .
