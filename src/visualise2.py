@@ -64,6 +64,7 @@ LINE_PALETTE = [
 ]
 VALUE_FMT = "%.2f"
 LOSS_FMT = "%.3f"
+COUNT_FMT = "%d"
 FIGSIZE = (8, 4.5)
 
 def suggest_palette(
@@ -254,6 +255,95 @@ def plot_grouped_bar_chart(
     if show_values:
         max_val = max(np.nanmax(np.asarray(v, dtype=float)) for v in ys.values())
         ax.set_ylim(0, max_val * 1.15)  # headroom for labels
+
+    if title:
+        ax.set_title(title)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
+
+    fig.tight_layout()
+    return fig, ax
+
+
+def plot_stacked_bar_chart(
+    x: ArrayLike,
+    ys: dict[str, ArrayLike],
+    palette: Sequence[str] | None = None,
+    legend_labels: dict[str, str] | None = None,
+    title: str | None = None,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
+    figsize: tuple[float, float] = FIGSIZE,
+    width: float = 0.5,
+    rotation: int = 45,
+    show_values: bool = True,
+    value_fmt: str = COUNT_FMT,
+    label_color: str = "white",
+    ax=None,
+):
+    """
+    Plot a stacked bar chart comparing several series across categories, with
+    consistent thesis styling. Intended for e.g. comparing total instance
+    counts per split, broken down by dataset subset (train/test/val).
+
+    x: category labels (e.g. dataset splits).
+    ys: mapping from series name to values aligned to x (e.g. {"train":
+        [...], "test": [...], "val": [...]}), stacked in insertion order.
+    palette: list of colours, one per series. Defaults to LINE_PALETTE,
+        cycling if there are more series than palette entries.
+    legend_labels: optional mapping from series name to display label, for
+        renaming series in the legend without renaming keys of `ys`.
+    show_values: if True (default), annotate each stacked segment with its
+        value, centred within the segment.
+    value_fmt: printf-style format string for the in-segment value labels.
+        Defaults to COUNT_FMT ("%d"), suited to instance/sample counts.
+    label_color: text colour for the in-bar value labels (default white,
+        suited to the darker LINE_PALETTE colours).
+    """
+    categories = np.asarray(x).tolist()
+    n = len(categories)
+
+    series_names = list(ys.keys())
+    n_series = len(series_names)
+
+    if palette is None:
+        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(n_series)]
+    elif len(palette) != n_series:
+        raise ValueError(f"palette has {len(palette)} colours but there are {n_series} series.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    x_pos = np.arange(n)
+    bottoms = np.zeros(n)
+
+    for i, name in enumerate(series_names):
+        label = legend_labels.get(name, name) if legend_labels else name
+        values = np.asarray(ys[name], dtype=float)
+        container = ax.bar(x_pos, values, width, bottom=bottoms, label=label, color=palette[i])
+        if show_values:
+            for bar, val, bot in zip(container, values, bottoms):
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bot + val / 2,
+                    value_fmt % val,
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    color=label_color,
+                    fontweight="bold",
+                )
+        bottoms += values
+
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    ax.set_xticks(x_pos)
+    ax.set_xticklabels(categories)
+    plt.setp(ax.get_xticklabels(), rotation=rotation, ha="right")
 
     if title:
         ax.set_title(title)
