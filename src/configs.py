@@ -252,6 +252,7 @@ def load_config(admin: AdminInfo, retro_support: bool = False) -> RunInfo:
 
 ###################### Path utilities ###############################
 
+# TODO: These break when considering sweep config paths
 
 def get_next_expno(split: str, model: str, runs_path: str | Path = RUNS_PATH) -> int:
     model_dir = Path(runs_path) / split / model

@@ -392,24 +392,23 @@ def test_run(
     save: bool = True,
     save_img: bool = False,
 ) -> tuple[BaseRes | ShuffRes, dict[str, dict[str, float]], list[int], list[int]]:
-    """Perform testing of a model according to the provided configuration.
+    """Test a model on one test set, on one split. 
 
     Args:
-        config (Dict[str, Any]): Run config file.
-        perm (Optional[torch.Tensor], optional): Permutation, if shuffeling frames, otherwise no shuffle. Defaults to None.
-        test_val (bool, optional): Test on the val set. Defaults to False.
-        test_test (bool, optional): Test on the test set. Defaults to True.
-        check (str, optional): Checkpoint name. Defaults to "best.pth".
-        br_graph (bool, optional): Create bar graph. Defaults to False.
-        cf_matrix (bool, optional): Create confusion matrix. Defaults to False.
-        heatmap (bool, optional): Create heatmap. Defaults to False.
+        admin (MinInfo): Information needed to load model weights. 
+        data (DataInfo): Information needed to locate data and apply transforms. 
+        set_name (AVAIL_SETS): Which set to test on.
+        shuffle (bool, optional): Whether to shuffle the frames. Defaults to False.
+        check (str, optional): Name of checkpoint. Defaults to "best.pth".
+        br_graph (bool, optional): Plot bar graph. Defaults to False.
+        cf_matrix (bool, optional): Plot confusion matrix. Defaults to False.
+        heatmap (bool, optional): Plot heatmap. Defaults to False.
         disp (bool, optional): Display plots. Defaults to False.
         save (bool, optional): Save results. Defaults to True.
-        save_img (bool, optional): Save plots. Defaults to False.
-        re_test (bool, optional): Test even if results already saved. Defaults to False.
+        save_img (bool, optional): Save images. Defaults to False.
 
     Returns:
-        Optional[Dict[str, Any]]: Results if correct parameters.
+        tuple[BaseRes | ShuffRes, dict[str, dict[str, float]], list[int], list[int]]: results (top-k + loss), cls_report, all_targets, all_preds 
     """
 
     set_seed(admin.seed)
@@ -880,8 +879,8 @@ def main():
         except FileNotFoundError:
             raise FileNotFoundError(
                 f"Could not find {data_info_path}. "
-                "Please provide -nf/--num_frames and -fs/--frame_size arguments, "
-                "or ensure data_info.json exists in the experiment directory."
+                # "Please provide -nf/--num_frames and -fs/--frame_size arguments, "
+                # "or ensure data_info.json exists in the experiment directory."
             )
         
 

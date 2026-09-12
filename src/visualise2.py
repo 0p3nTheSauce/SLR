@@ -19,8 +19,10 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
 from numpy.typing import ArrayLike
+from scipy import stats
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from typing_extensions import TypedDict, Unpack
@@ -412,6 +414,77 @@ def plot_loss_curves(
 
     fig.tight_layout()
     return fig, ax
+
+
+def plot_metric_correlation(
+    x: ArrayLike,
+    y: ArrayLike,
+    title: str | None = None,
+    xlabel: str | None = None,
+    ylabel: str = "F1 score",
+    figsize: tuple[float, float] = FIGSIZE,
+    color: str = DEFAULT_ACCENT,
+    fit_color: str = LINE_PALETTE[1],
+    shade_by_density: bool = True,
+    ax=None,
+):
+    """
+    Scatter a metric (e.g. per-gloss F1 score) against another variable
+    (e.g. per-gloss instance/signer count), with a linear trend line
+    annotated with Kendall's tau, with consistent thesis styling. Intended
+    for e.g. correlating per-class recognition performance with dataset
+    statistics.
+
+    x: values for the x-axis (e.g. per-gloss instance or signer counts).
+    y: metric values aligned to x (e.g. per-gloss F1 scores).
+    shade_by_density: if True (default), points sharing an exact (x, y)
+        coordinate are shaded darker, via a white-to-`color` ramp -- useful
+        when many categories (e.g. glosses) collide on the same point. If
+        False, every point is drawn in `color` at a flat alpha.
+    fit_color: colour of the linear-fit line. Defaults to the vermillion
+        entry of LINE_PALETTE for contrast against `color`.
+
+    Returns (fig, ax, tau, p_value) -- tau/p_value from scipy's Kendall's
+    tau, so callers can report them alongside the figure.
+    """
+    x_arr = np.asarray(x, dtype=float)
+    y_arr = np.asarray(y, dtype=float)
+
+    tau, p_value = stats.kendalltau(x_arr, y_arr)
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    if shade_by_density:
+        coord_df = pd.DataFrame({"x": x_arr, "y": y_arr})
+        point_counts = coord_df.groupby(["x", "y"])["x"].transform("size").to_numpy(dtype=float)
+        norm_counts = point_counts / point_counts.max()
+        norm_counts = 0.4 + 0.6 * norm_counts  # remap to [0.4, 1.0] instead of [0, 1.0]
+        cmap = LinearSegmentedColormap.from_list("metric_correlation", ["#FFFFFF", color])
+        ax.scatter(x_arr, y_arr, c=norm_counts, cmap=cmap, vmin=0, vmax=1, s=60, edgecolors="none")
+    else:
+        ax.scatter(x_arr, y_arr, color=color, alpha=0.6, edgecolors="white", linewidths=0.4, s=60)
+
+    coeffs = np.polyfit(x_arr, y_arr, deg=1)
+    x_line = np.linspace(x_arr.min(), x_arr.max(), 100)
+    y_line = np.polyval(coeffs, x_line)
+    ax.plot(
+        x_line, y_line, color=fit_color, linewidth=1.8,
+        label=f"Linear fit (Kendall $\\tau$ = {tau:.3f}, p = {p_value:.3e})",
+    )
+
+    ax.grid(linestyle="--", alpha=0.3)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    if title:
+        ax.set_title(title)
+    ax.legend(loc="upper left")
+
+    fig.tight_layout()
+    return fig, ax, tau, p_value
 
 
 def save_fig(
