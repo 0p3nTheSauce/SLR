@@ -259,7 +259,10 @@ def get_next_expno(split: str, model: str, runs_path: str | Path = RUNS_PATH) ->
     if not (model_dir.exists() and model_dir.is_dir()):
         return 0
     model_exps = sorted(model_dir.glob("exp*"))
-    return int(model_exps[-1].name[-3:])
+    if len(model_exps) > 0:
+        return int(model_exps[-1].name[-3:])
+    else:
+        return 0
 
 
 def get_model_exp_dir(
