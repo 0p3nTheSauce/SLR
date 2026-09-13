@@ -39,7 +39,7 @@ cd ../..
 
 #preprocess data
 cd src
-python -m preprocess all -ve -lc 9
+python -m preprocess all -ve # add -lc 9 to remove samples with <= 9 frames
 ```
 
 Most models pull their pretrained weights automatically the first time they're constructed, but a
