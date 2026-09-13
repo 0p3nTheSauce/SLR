@@ -23,6 +23,8 @@ conda activate wlasl
 #alternatively if no GPU available 
 # conda env create -f wlasl_cpu.yml 
 # conda activate wlasl_cpu
+# note: wlasl_cpu is CPU-only and does not include the MViT/slowfast model
+# dependencies -- use it for non-MViT models, notebooks, and plotting only.
 
 # add as package:
 pip install -e .
@@ -39,6 +41,11 @@ cd ../..
 cd src
 python preprocess.py all -ve
 ```
+
+Most models pull their pretrained weights automatically the first time they're constructed, but a
+few (the slowfast-based `MViTv2_S_16x4`/`MViTv2_B_32x3` variants) require manually downloading a
+checkpoint file first — see [src/models/README.md](src/models/README.md) for which models need
+this and how to fetch them.
 
 ## Usage
 <details>

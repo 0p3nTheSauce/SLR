@@ -429,6 +429,8 @@ def cv_save(frames: np.ndarray, output: str | Path):
     ################# Plot based #########################
 
 
+################## MATPLOT based ###################
+
 def plt_display(
     frames: torch.Tensor,
     num: int,

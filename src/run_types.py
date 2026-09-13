@@ -365,7 +365,7 @@ class StopperState(EarlyStopperInfo):
 
 class MinInfo(BaseModel):
     model: str
-    dataset: str
+    dataset: str = "WLASL"
     split: AVAIL_SPLITS
     save_path: str
     seed: int = SEED

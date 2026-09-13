@@ -8,7 +8,6 @@ from functools import partial
 from ..utils import logging as logging
 import torch
 import torch.nn as nn
-from detectron2.layers import ROIAlign
 
 from .attention import MultiScaleBlock
 from .batchnorm_helper import (
@@ -75,6 +74,8 @@ class ResNetRoIHead(nn.Module):
             correct neighbors; It makes negligible differences to the model's
             performance if ROIAlign is used together with conv layers.
         """
+        from detectron2.layers import ROIAlign  # only user of detectron2 in this codebase
+
         super(ResNetRoIHead, self).__init__()
         assert len({len(pool_size), len(dim_in)}) == 1, (
             "pathway dimensions are not consistent."
