@@ -42,6 +42,11 @@ cd src
 python preprocess.py all -ve
 ```
 
+Most models pull their pretrained weights automatically the first time they're constructed, but a
+few (the slowfast-based `MViTv2_S_16x4`/`MViTv2_B_32x3` variants) require manually downloading a
+checkpoint file first — see [src/models/README.md](src/models/README.md) for which models need
+this and how to fetch them.
+
 ## Usage
 <details>
 

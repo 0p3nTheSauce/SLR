@@ -130,18 +130,20 @@ plus `mvirted_mae.py`/`sep_mvit_bert.py`/`sepmay.py`). Investigation to prune th
 - Cleaned up orphaned `__pycache__` artifacts left over from the earlier file deletions
   (`mvit/detectron2_cp/__pycache__/*`, etc.) and removed the now-empty `detectron2_cp/` directory.
 
-**Two pre-existing, unrelated issues surfaced during this investigation (not fixed — out of
-scope for the env cleanup, flagging for awareness):**
+**One pre-existing, unrelated issue surfaced during this investigation, since fixed (2026-09-13):**
 
-1. `og_mvit.py`'s `CONF_PATH_16x4`/`CONF_PATH_32x3` point to
-   `mvit/configs/MVITv2_S_16x4.yaml`/`MVITv2_B_32x3.yaml`, which no longer exist (only
-   `MVIT_B_16x4_CONV.yaml`/`MVIT_B_32x3_CONV.yaml` remain under `mvit/configs/`). Constructing any
-   of the `MViTv2_S_16x4*`/`MViTv2_B_32x3*` models currently raises `FileNotFoundError` — this
-   predates the env cleanup (reproduced identically on the pre-cleanup code). Note this is about
-   the **config yaml** (a small tracked file, deleted from git — a real bug on both machines), not
-   the pretrained weights (which are expected to be absent on the local machine — see
-   [Development setup](#development-setup-two-machines) above).
-2. `src/benchmark.py` unconditionally `import pynvml` and calls `pynvml.nvmlInit()` at module
+1. ~~`og_mvit.py`'s `CONF_PATH_16x4`/`CONF_PATH_32x3` point to
+   `mvit/configs/MVITv2_S_16x4.yaml`/`MVITv2_B_32x3.yaml`, which no longer exist~~ — these two
+   config files were actually deleted by the same commit (`532a648`, "removed pretraining setup")
+   that did the detectron2-related pretraining removal, alongside the truly-unused 2D/test configs
+   (`MVITv2_B_2D.yaml`, `MVITv2_L_40x3_test.yaml`, `MVITv2_S_2D.yaml`, `MVITv2_T_2D.yaml`) — but
+   unlike those, `MVITv2_S_16x4.yaml`/`MVITv2_B_32x3.yaml` are still required by the active
+   `MViTv2_S_16x4*`/`MViTv2_B_32x3*` classes in `og_mvit.py`. Restored both from `532a648^`.
+
+**Still-outstanding, unrelated issue flagged for awareness (not fixed — out of scope for the env
+cleanup):**
+
+1. `src/benchmark.py` unconditionally `import pynvml` and calls `pynvml.nvmlInit()` at module
    level, but `nvidia-ml-py` (which provides `pynvml`) is not installed in the live `wlasl` env —
    `import src.benchmark` currently fails. Also not installed: `fairscale`, `fastapi`, `starlette`,
    `uvicorn`, `sweeps`, `ninja`, `jsonref`, `tomli-w` (all previously listed in the old
