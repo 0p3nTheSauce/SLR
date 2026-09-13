@@ -272,29 +272,17 @@ class VideoDatasetKwargs(TypedDict, total=False):
 def get_data_set(
     set_info: DataSetInfo, data_info: DataInfo, **kwargs: Unpack[VideoDatasetKwargs]
 ) -> tuple[VideoDataset, list[int] | None, float | None]:
-    """
-    Get the training, val or test set. Optionally, load frames unchanged.
+    """Load a video dataset
 
-    :param set_info: Dictionary containing information to load the dataset.
-    :type set_info: DataSetInfo
-    :param norm_dict: Dictionary containing mean and standard deviation. If None, don't apply normalisation.
-    :type norm_dict: Optional[NormDict]
-    :param frame_size: Length of Square frame. If None, no cropping applied.
-    :type frame_size: int
-    :param num_frames: Number of frames.
-    :type num_frames: int
-    :param shuffle: Whether to shuffle frames. Defaults to False.
-    :type shuffle: bool
-    :param resize_by_diagonal: Resize frame so person bounding box diagonal equals target_diagonal (in this case 256). (as per wlasl)
-    :type resize_by_diagonal: bool
-    :param cropping: Strategy to crop frames. Cut out the:
-        - Bounding box (minimum of person)
-        - Centre (frame size)
-        - Random (frame size)
-        - Default Random for train and Centre for testing/validation (frame size)
-    :type cropping: Literal['Bbox', 'Centre', 'Random', 'Default']
-    :return: dataset, permutation and shannon entropy
-    :rtype: Tuple[VideoDataset, List[int] | None, float | None]
+    Args:
+        set_info (DataSetInfo): location information
+        data_info (DataInfo): transforms
+
+    Raises:
+        ValueError: If no augmentation provided
+
+    Returns:
+        tuple[VideoDataset, list[int] | None, float | None]: dataset, perm, sh_e
     """
 
     aug_info = (

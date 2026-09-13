@@ -531,9 +531,9 @@ def preprocess_split(
     ]:
         print_v(f"For split: {subset}", verbose)
 
-        cached = [inst for inst in instances if inst.video_id in cache]
+        cached_ids = [inst.video_id for inst in instances if inst.video_id in cache]
         uncached = [inst for inst in instances if inst.video_id not in cache]
-        print_v(f"Reusing {len(cached)} cached / fixing {len(uncached)} new", verbose)
+        print_v(f"Reusing {len(cached_ids)} cached / fixing {len(uncached)} new", verbose)
 
         newly_fixed = _apply_fixes(
             instances=uncached,
@@ -546,7 +546,7 @@ def preprocess_split(
             verbose=verbose,
         )
 
-        processed = [inst.model_copy() for inst in cached] + newly_fixed
+        processed = [cache[video_id].model_copy() for video_id in cached_ids] + newly_fixed
 
         for inst in newly_fixed:
             cache[inst.video_id] = inst
