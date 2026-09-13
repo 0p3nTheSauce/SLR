@@ -39,7 +39,7 @@ cd ../..
 
 #preprocess data
 cd src
-python preprocess.py all -ve
+python -m preprocess all -ve -lc 9
 ```
 
 Most models pull their pretrained weights automatically the first time they're constructed, but a
@@ -55,9 +55,9 @@ this and how to fetch them.
 Training and testing have the following **arguments** in common:
 
 - `MODEL_NAME`: 
-    One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S, Swin3D_B, MViTv2_S, MViTv2_S_e, MViTv1_B, MViTv2_S_16x4, MViTv2_B_32x3, MVirTed_t, MVirTed_t_MAE 
+    One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S, Swin3D_B, MViTv2_S, MViTv2_S_e, MViTv1_B, MViTv2_S_16x4, MViTv2_S_16x4_e MViTv2_B_32x3, MViTv2_B_32x3_r
 - `SPLIT`: 
-    The ASL split, one of: asl100, asl300, asl1000, asl2000
+    The ASL split, one of: asl100, asl300, asl1000, asl2000 or variations. 
 - `EXP_NO`: 
     is the experiment number (e.g. 4)
 
