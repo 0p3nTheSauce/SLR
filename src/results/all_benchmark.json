@@ -9586,6 +9586,1234 @@
         "mem_total_mb": 12288.0
       },
       "error": "OOM"
+    },
+    "MViTv2_B_32x3_r__train__nf16__fsz224__bs1__it100__tr5__fullstep1": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 1,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 319.5115859375,
+          "std": 0.7904544591989573
+        },
+        "throughput_batches_per_s": {
+          "mean": 3.1297922342285243,
+          "std": 0.0077177338335563655
+        },
+        "throughput_samples_per_s": {
+          "mean": 3.1297922342285243,
+          "std": 0.0077177338335563655
+        },
+        "gpu_utilisation_percent": {
+          "mean": 98.73138487128635,
+          "std": 0.11087747083947205
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 2598.79443359375,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          320.92103515624996,
+          319.073515625,
+          319.13914062500004,
+          319.175078125,
+          319.24916015625
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 457.82700000000006,
+          "profiler_cpu_latency_ms": 457.662287,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__train__nf16__fsz224__bs2__it100__tr5__fullstep1": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 2,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 613.3818828125,
+          "std": 0.12515023747355983
+        },
+        "throughput_batches_per_s": {
+          "mean": 1.6303057871986502,
+          "std": 0.0003327203343946002
+        },
+        "throughput_samples_per_s": {
+          "mean": 3.2606115743973003,
+          "std": 0.0006654406687892005
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99.39967320261438,
+          "std": 0.019172384071665896
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 4759.6025390625,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          613.1614453125001,
+          613.4150781249999,
+          613.4332421874999,
+          613.4731250000001,
+          613.4265234374999
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 744.9988000000001,
+          "profiler_cpu_latency_ms": 744.8654342,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__train__nf16__fsz224__bs4__it100__tr5__fullstep1": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 4,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 1174.98734375,
+          "std": 0.0947262161720507
+        },
+        "throughput_batches_per_s": {
+          "mean": 0.8510730013553351,
+          "std": 6.861676737233421e-05
+        },
+        "throughput_samples_per_s": {
+          "mean": 3.4042920054213406,
+          "std": 0.00027446706948933684
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99.83216769641017,
+          "std": 0.002320266793369949
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 9070.115234375,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          1174.83875,
+          1175.0590625,
+          1174.9462500000002,
+          1175.0430468749998,
+          1175.049609375
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 1304.3856,
+          "profiler_cpu_latency_ms": 1304.2788154,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__train__nf16__fsz224__bs8__it100__tr5__fullstep1": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 8,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "error": "OOM"
+    },
+    "MViTv2_B_32x3_r__infer__nf16__fsz224__bs1__it100__tr5": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 1,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 76.2533759765625,
+          "std": 0.1983735408164374
+        },
+        "throughput_batches_per_s": {
+          "mean": 13.114244457382288,
+          "std": 0.034110290670698894
+        },
+        "throughput_samples_per_s": {
+          "mean": 13.114244457382288,
+          "std": 0.034110290670698894
+        },
+        "gpu_utilisation_percent": {
+          "mean": 98,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 98,
+        "peak_memory_mb": {
+          "mean": 532.39453125,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          76.01685546875001,
+          76.13193359374999,
+          76.2027587890625,
+          76.439130859375,
+          76.47620117187499
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 111.3392,
+          "profiler_cpu_latency_ms": 111.2166706,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__infer__nf16__fsz224__bs2__it100__tr5": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 2,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 147.14300390625,
+          "std": 0.14880824152570504
+        },
+        "throughput_batches_per_s": {
+          "mean": 6.796115293359703,
+          "std": 0.006880988545856062
+        },
+        "throughput_samples_per_s": {
+          "mean": 13.592230586719406,
+          "std": 0.013761977091712124
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 99,
+        "peak_memory_mb": {
+          "mean": 845.19775390625,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          146.885615234375,
+          147.144130859375,
+          147.21143554687498,
+          147.238017578125,
+          147.2358203125
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 180.9646,
+          "profiler_cpu_latency_ms": 180.6874056,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__infer__nf16__fsz224__bs4__it100__tr5": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 4,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 288.79172265625,
+          "std": 0.05649810058641671
+        },
+        "throughput_batches_per_s": {
+          "mean": 3.462703229262668,
+          "std": 0.0006775919307361054
+        },
+        "throughput_samples_per_s": {
+          "mean": 13.850812917050671,
+          "std": 0.0027103677229444218
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99.50675909878683,
+          "std": 0.03782374070200906
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 1476.77392578125,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          288.6926171875,
+          288.826328125,
+          288.82175781250004,
+          288.82019531249995,
+          288.79771484375
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 321.2994,
+          "profiler_cpu_latency_ms": 320.73146280000003,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__infer__nf16__fsz224__bs8__it100__tr5": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 8,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 567.216078125,
+          "std": 0.08340736833767093
+        },
+        "throughput_batches_per_s": {
+          "mean": 1.762996600176961,
+          "std": 0.00025927092821681854
+        },
+        "throughput_samples_per_s": {
+          "mean": 14.103972801415688,
+          "std": 0.0020741674257345483
+        },
+        "gpu_utilisation_percent": {
+          "mean": 100,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 2742.11767578125,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          567.0846484375,
+          567.2705078125,
+          567.290546875,
+          567.185390625,
+          567.249296875
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 599.6522,
+          "profiler_cpu_latency_ms": 598.446578,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__infer__nf16__fsz224__bs16__it100__tr5": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 16,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 1126.5831249999999,
+          "std": 0.19140791612803681
+        },
+        "throughput_batches_per_s": {
+          "mean": 0.8876398029642889,
+          "std": 0.0001508420694637439
+        },
+        "throughput_samples_per_s": {
+          "mean": 14.202236847428622,
+          "std": 0.0024134731114199026
+        },
+        "gpu_utilisation_percent": {
+          "mean": 100,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 5272.06640625,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          1126.2482812499998,
+          1126.700234375,
+          1126.690078125,
+          1126.678125,
+          1126.59890625
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 1159.6106,
+          "profiler_cpu_latency_ms": 1157.1185522,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_B_32x3_r__infer__nf16__fsz224__bs32__it100__tr5": {
+      "arch": "MViTv2_B_32x3_r",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 32,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T15:30:37.029472+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": false,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 810,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "error": "OOM"
+    },
+    "MViTv2_S_16x4__train__nf16__fsz224__bs1__it100__tr5__fullstep1": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 1,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 224.06684765625,
+          "std": 0.03849875827125005
+        },
+        "throughput_batches_per_s": {
+          "mean": 4.462953953612387,
+          "std": 0.0007669379034864289
+        },
+        "throughput_samples_per_s": {
+          "mean": 4.462953953612387,
+          "std": 0.0007669379034864289
+        },
+        "gpu_utilisation_percent": {
+          "mean": 98.79350930808565,
+          "std": 0.05385171311753895
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 1800.724609375,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          224.00283203125,
+          224.06263671874999,
+          224.07732421875002,
+          224.09150390625,
+          224.09994140625
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 313.91880000000003,
+          "profiler_cpu_latency_ms": 313.5603244,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__train__nf16__fsz224__bs2__it100__tr5__fullstep1": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 2,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 430.00437500000004,
+          "std": 0.07765196145572008
+        },
+        "throughput_batches_per_s": {
+          "mean": 2.325557794835102,
+          "std": 0.0004200545264013152
+        },
+        "throughput_samples_per_s": {
+          "mean": 4.651115589670204,
+          "std": 0.0008401090528026304
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99.58158508158508,
+          "std": 0.01648267555213734
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 3293.90771484375,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          429.8670703125,
+          430.05859375,
+          430.02804687500003,
+          430.035,
+          430.0331640625
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 517.0122,
+          "profiler_cpu_latency_ms": 516.6498672,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__train__nf16__fsz224__bs4__it100__tr5__fullstep1": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 4,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 826.653296875,
+          "std": 0.09924219088255692
+        },
+        "throughput_batches_per_s": {
+          "mean": 1.2096969978977106,
+          "std": 0.00014524987208351447
+        },
+        "throughput_samples_per_s": {
+          "mean": 4.838787991590842,
+          "std": 0.0005809994883340579
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99.84046507525223,
+          "std": 0.0032737594789637816
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 6223.94677734375,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          826.47765625,
+          826.71859375,
+          826.702109375,
+          826.6859375,
+          826.6821874999999
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 912.673,
+          "profiler_cpu_latency_ms": 912.3637379999998,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__train__nf16__fsz224__bs8__it100__tr5__fullstep1": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 8,
+        "iterations": 100,
+        "trials": 5,
+        "full_step": true
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "error": "OOM"
+    },
+    "MViTv2_S_16x4__infer__nf16__fsz224__bs1__it100__tr5": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 1,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 53.9924111328125,
+          "std": 0.07785952249536467
+        },
+        "throughput_batches_per_s": {
+          "mean": 18.52115215791044,
+          "std": 0.02668210071964862
+        },
+        "throughput_samples_per_s": {
+          "mean": 18.52115215791044,
+          "std": 0.02668210071964862
+        },
+        "gpu_utilisation_percent": {
+          "mean": 98,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 98,
+        "peak_memory_mb": {
+          "mean": 468.8330078125,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          53.9099755859375,
+          53.9493994140625,
+          53.9858447265625,
+          53.999912109375,
+          54.116923828125
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 77.61240000000001,
+          "profiler_cpu_latency_ms": 77.4888524,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__infer__nf16__fsz224__bs2__it100__tr5": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 2,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 103.653814453125,
+          "std": 0.1477719387348563
+        },
+        "throughput_batches_per_s": {
+          "mean": 9.647514023831189,
+          "std": 0.013775962228527118
+        },
+        "throughput_samples_per_s": {
+          "mean": 19.295028047662377,
+          "std": 0.027551924457054237
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 99,
+        "peak_memory_mb": {
+          "mean": 780.8095703125,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          103.398798828125,
+          103.65432617187498,
+          103.718662109375,
+          103.74080078125,
+          103.75648437500001
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 126.16839999999999,
+          "profiler_cpu_latency_ms": 125.8829916,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__infer__nf16__fsz224__bs4__it100__tr5": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 4,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 203.5999140625,
+          "std": 0.051734215950712197
+        },
+        "throughput_batches_per_s": {
+          "mean": 4.911593682466449,
+          "std": 0.0012482089318394305
+        },
+        "throughput_samples_per_s": {
+          "mean": 19.646374729865794,
+          "std": 0.004992835727357722
+        },
+        "gpu_utilisation_percent": {
+          "mean": 99.56461916461916,
+          "std": 0.055769084851540744
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 1412.76708984375,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          203.51812500000003,
+          203.6117578125,
+          203.66013671874998,
+          203.61482421875,
+          203.5947265625
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 225.3756,
+          "profiler_cpu_latency_ms": 224.7916174,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__infer__nf16__fsz224__bs8__it100__tr5": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 8,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 399.870578125,
+          "std": 0.00812112099414367
+        },
+        "throughput_batches_per_s": {
+          "mean": 2.5008091493477647,
+          "std": 5.079042464024169e-05
+        },
+        "throughput_samples_per_s": {
+          "mean": 20.006473194782117,
+          "std": 0.00040632339712193353
+        },
+        "gpu_utilisation_percent": {
+          "mean": 100,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 2679.05322265625,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          399.85796874999994,
+          399.8715234375,
+          399.868984375,
+          399.8798046875,
+          399.87460937500003
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 421.6974,
+          "profiler_cpu_latency_ms": 420.4841912,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__infer__nf16__fsz224__bs16__it100__tr5": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 16,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "results": {
+        "n_trials": 5,
+        "latency_ms": {
+          "mean": 796.131421875,
+          "std": 0.12727211606758695
+        },
+        "throughput_batches_per_s": {
+          "mean": 1.256074051309206,
+          "std": 0.00020084023940983767
+        },
+        "throughput_samples_per_s": {
+          "mean": 20.097184820947295,
+          "std": 0.0032134438305574027
+        },
+        "gpu_utilisation_percent": {
+          "mean": 100,
+          "std": 0.0
+        },
+        "gpu_utilisation_peak_percent": 100,
+        "peak_memory_mb": {
+          "mean": 5208.5048828125,
+          "std": 0.0
+        },
+        "raw_trial_latencies_ms": [
+          795.90671875,
+          796.220234375,
+          796.18875,
+          796.175234375,
+          796.1661718749999
+        ],
+        "profiler_comparison": {
+          "profiler_latency_ms": 818.5550000000001,
+          "profiler_cpu_latency_ms": 816.0523894,
+          "iterations": 5
+        }
+      }
+    },
+    "MViTv2_S_16x4__infer__nf16__fsz224__bs32__it100__tr5": {
+      "arch": "MViTv2_S_16x4",
+      "config": {
+        "num_frames": 16,
+        "frame_size": 224,
+        "batch_size": 32,
+        "iterations": 100,
+        "trials": 5
+      },
+      "metadata": {
+        "timestamp_utc": "2026-09-13T16:46:49.825190+00:00",
+        "git_commit": "f70b6a5e6491eeb94a5c2303ced872089a8ed1e5",
+        "git_dirty": true,
+        "torch_version": "2.5.1",
+        "cuda_version": "12.4",
+        "cudnn_version": 90101,
+        "cudnn_benchmark_enabled": true,
+        "python_version": "3.10.18",
+        "gpu_name": "NVIDIA GeForce RTX 3060",
+        "driver_version": "595.84",
+        "gpu_clocks": {
+          "sm_clock_mhz": 1905,
+          "mem_clock_mhz": 5001,
+          "sm_clock_max_mhz": 2100,
+          "sm_clock_ratio_of_max": 0.9071428571428571
+        },
+        "hostname": "luke-PPB660M-C"
+      },
+      "gpu_info": {
+        "mem_total_mb": 12288.0
+      },
+      "error": "OOM"
     }
   }
 }
