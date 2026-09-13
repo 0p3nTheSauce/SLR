@@ -1,0 +1,1 @@
+Simply need to migrate [eda_performers](../saicist/eda_performers.ipynb) to this new directory, with the updated conventions. 

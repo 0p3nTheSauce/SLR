@@ -1,0 +1,2 @@
+
+[class_viewer](class_viewer.ipynb), [num_instance_splits](./num_instance_splits.ipynb) and [view_dataset_by_admin_info](./view_dataset_by_admin_info.ipynb) are currently the most up to date. [reproduce_f1_correlation](./reproduce_f1_correlation.ipynb) needs to be rewritten as a generice notebook like [class_viewer](./class_viewer.ipynb) and have the AI chatbot prompts removed. [wlasl_stats_set_level](./wlasl_stats_set_level.ipynb) is the least up to date, requiring a full review and update of outdated code including new plotting from [visualise2](../../visualise2.py).

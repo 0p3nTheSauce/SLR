@@ -1,0 +1,1 @@
+Was waiting for reruns of training to complete, but now ready to be run again. Still needs to migrate the [Utilisation](../satnac_2025/Utilisation.ipynb) notebook. [filters](./filters.py) may also be updated based on taste but should be fine.
