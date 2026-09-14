@@ -32,7 +32,7 @@ PROJECT_BASE = "WLASL"
 LABEL_SUFFIX = "fixed_frange_bboxes.json"
 
 NUM_INSTANCES_SUFFIX = "num_instances.json"
-WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
+WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_cutoff_9_004.json"
 ZFILL = 3
 CONFIG_FILETYPE = ".toml"
 #Directories
