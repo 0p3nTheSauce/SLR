@@ -11,10 +11,11 @@ Usage:
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from logging import Logger
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +23,7 @@ import pandas as pd
 import torch
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 from numpy.typing import ArrayLike
 from scipy import stats
 from torch import Tensor
@@ -525,6 +527,140 @@ def save_fig(
     fig.savefig(path, **savefig_kwargs)
     return path
 
+
+# ---------------------------------------------------------------------------
+# BBox visualisation
+# ---------------------------------------------------------------------------
+
+AverageMethod = Literal["mean", "median"]
+
+
+def _average_bboxes(instances: Sequence[Instance], method: AverageMethod) -> list[Instance]:
+    """Collapse instances to one per class, with a mean/median-averaged bbox."""
+    groups: dict[str, list[Instance]] = defaultdict(list)
+    for inst in instances:
+        groups[inst.label_name].append(inst)
+
+    avg_fn = np.mean if method == "mean" else np.median
+    averaged = []
+    for insts in groups.values():
+        boxes = np.array([inst.bbox for inst in insts], dtype=float)
+        avg_box = avg_fn(boxes, axis=0).round().astype(int).tolist()
+        averaged.append(insts[0].model_copy(update={"bbox": avg_box}))
+    return averaged
+
+
+def plot_bboxes_on_canvas(
+    instances: Sequence[Instance],
+    average: bool = True,
+    method: AverageMethod = "mean",
+    title: str | None = None,
+    figsize: tuple[float, float] = FIGSIZE,
+    frame_size: tuple[int, int] = (256, 256),
+    ax=None,
+):
+    """
+    Draw each class's bounding box outline on a blank video-frame-sized
+    canvas, one colour per class, with consistent thesis styling. Intended
+    for spotting how consistent/central the cropped signer region is across
+    classes in a split/set.
+
+    instances: bboxes to draw, one per class if `average` (the common case --
+        drawing every raw instance bbox is only useful for debugging a single
+        class's bbox spread).
+    average: if True (default), collapse `instances` to one bbox per class
+        first, via `method` ("mean" or "median" of the class's bboxes).
+    frame_size: (width, height) of the canvas the boxes are drawn on --
+        matches the video frame size the bboxes were computed against
+        (WLASL precut clips are 256x256).
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.figure
+
+    width, height = frame_size
+    ax.set_xlim(0, width)
+    ax.set_ylim(0, height)
+    ax.invert_yaxis()  # image coordinates: y increases downward
+
+    if average:
+        instances = _average_bboxes(instances, method)
+
+    unique_labels = sorted({inst.label_name for inst in instances})
+    cmap = plt.get_cmap("tab20", len(unique_labels))
+    colour_map = {label: cmap(i) for i, label in enumerate(unique_labels)}
+
+    for inst in instances:
+        x1, y1, x2, y2 = inst.bbox
+        colour = colour_map[inst.label_name]
+        ax.add_patch(
+            Rectangle(
+                (x1, y1), x2 - x1, y2 - y1,
+                linewidth=1, edgecolor=colour, facecolor=(*colour[:3], 0.05),
+            )
+        )
+
+    if title:
+        ax.set_title(title)
+
+    fig.tight_layout()
+    return fig, ax
+
+
+def plot_dimension_distributions(
+    instances: Sequence[Instance],
+    bins: int = 30,
+    title: str | None = None,
+    figsize: tuple[float, float] = (10, 4.5),
+    ax=None,
+):
+    """
+    Plot histograms of bbox width and height across a set of instances, each
+    annotated with mean/median/quartile lines, with consistent thesis
+    styling. Intended for sanity-checking how much bbox dimensions vary
+    within a dataset split/set.
+
+    Returns (fig, axes) -- axes is a length-2 array (width, height), unlike
+    other visualise2 charts, since this plot is inherently two histograms
+    side by side.
+    """
+    widths = [inst.bbox[2] - inst.bbox[0] for inst in instances]
+    heights = [inst.bbox[3] - inst.bbox[1] for inst in instances]
+
+    if ax is None:
+        fig, axes = plt.subplots(1, 2, figsize=figsize)
+    else:
+        fig = ax[0].figure
+        axes = ax
+
+    stat_lines: list[tuple[str, Callable[[ArrayLike], float], str]] = [
+        ("mean", np.mean, "red"),
+        ("median", np.median, "blue"),
+        ("lower quartile", lambda v: np.percentile(v, 25), "brown"),
+        ("upper quartile", lambda v: np.percentile(v, 75), "brown"),
+    ]
+
+    for cur_ax, data, label, colour in zip(
+        axes, [widths, heights], ["Width (px)", "Height (px)"], LINE_PALETTE[:2]
+    ):
+        cur_ax.hist(data, bins=bins, color=colour, edgecolor="white")
+        for stat_name, stat_fn, line_colour in stat_lines:
+            stat_val = stat_fn(data)
+            cur_ax.axvline(
+                stat_val, color=line_colour, linestyle="--",
+                label=f"{stat_name}: {stat_val:.1f} (px)",
+            )
+        cur_ax.set_xlabel(label)
+        cur_ax.set_ylabel("Count")
+        cur_ax.grid(axis="y", linestyle="--", alpha=0.3)
+        cur_ax.legend()
+
+    if title:
+        fig.suptitle(title)
+
+    fig.tight_layout()
+    return fig, axes
 
 
 # ---------------------------------------------------------------------------

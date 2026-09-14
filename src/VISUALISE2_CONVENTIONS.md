@@ -73,5 +73,7 @@ Reuse `VALUE_FMT` (`"%.2f"`), `LOSS_FMT` (`"%.3f"`), `COUNT_FMT` (`"%d"`), and `
 | `save_fig` | Save any of the above figures | Creates parent dirs; use instead of `fig.savefig` directly |
 | `suggest_palette` | Generate a per-category colour list for `plot_bar_chart` | Recognises `"baseline"`/`"no_aug"` as controls |
 | `split_name_mapper` | Map a raw split key (`"asl100_cutoff_9"`) to its display name (`"WLASL-100"`) | Backed by `SPLIT_NAME_MAP` |
+| `plot_bboxes_on_canvas` | Per-class average (or raw) bbox outlines on a blank frame-sized canvas | One colour per class via `tab20`; not a `suggest_palette` case (too many categories) |
+| `plot_dimension_distributions` | Bbox width/height histograms with mean/median/quartile lines | Returns `(fig, axes)` with `axes` a length-2 array -- the one exception to the single-`ax` return convention |
 
 Update this table whenever a function is added, renamed, or its purpose changes.
