@@ -53,7 +53,7 @@ data = (
             ),
             "spatial_aug": lambda x: len(x) == 1 and match(x[0], centreCrop),
         },
-    },
+    }
 )
 
 acc_cuttoff = 10
