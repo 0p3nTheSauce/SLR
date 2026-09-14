@@ -20,6 +20,54 @@ This means code changes here can only be verified by import/construction checks 
 testing, not by actually running training or loading pretrained weights — that has to happen on
 the server.
 
+## Code quality bar & workflow expectations
+
+The user is actively working to keep this a clean, strictly-typed, well-organised repo, and
+cares a lot about code quality — not just "does it run." Hold new/edited code to this bar:
+
+- **Strict typing, zero linter warnings.** Ruff (and type checking) should report nothing on
+  code you touch. Prefer precise types (e.g. `Literal` over bare `str` for closed sets of names)
+  over `Any`/untyped escape hatches.
+- **Documented, but not over-commented.** Public functions/classes get docstrings explaining
+  non-obvious behaviour, inputs/outputs, and gotchas — but avoid restating what the code already
+  says. This mirrors the top-level house style (see the "Default to writing no comments" rule),
+  applied here specifically to docstrings on shared/reusable code.
+- **Simple, single-purpose functions.** Don't overload one function with multiple responsibilities
+  or too many branchy parameters; split when a function is trying to do more than one job.
+- **Reuse over reinvention.** Before writing new code, check for an existing helper/convention
+  elsewhere in the repo (e.g. `visualise2.py` plotting helpers, `FrameFetcher`/`FrameVisualiser`
+  patterns) and use/extend it rather than duplicating logic.
+- **Upgrade legacy/quick-and-dirty code when touched.** Parts of this repo were built under time
+  pressure (quick solutions, skipped docs, suboptimal approaches) and never revisited. When you're
+  working in or near such code, flag it for review rather than silently leaving it, and where it's
+  in scope, take the opportunity to bring it up to current convention instead of just patching
+  around it.
+
+### TODO tracking — read and maintain these
+
+The repo tracks outstanding work as plain-text/markdown TODO files scattered by area, rather than
+one central list. **Check these before starting related work, and keep them current**: when you
+complete or invalidate an item, remove/update it; when you spot a new problem area while doing
+other work (dead code, drifted docs, a hacky workaround, a missing test), add a TODO for it in the
+relevant file (or create one) instead of letting it go unrecorded. Known TODO files as of
+2026-09-14:
+
+- `src/todo` — misc repo-wide TODOs (e.g. switch model-name `str` params to `Literal`; redo old
+  plots with the new `visualise2.py` conventions).
+- `src/que/todo` — Que system TODOs, broken out by subsystem (Que core, Shell, Daemon, Worker,
+  Server).
+- `src/results/TODO.md` — top-level note on `results/` sequencing (e.g. "benchmarking is
+  finished, those notebooks can be updated, then fix the other todos").
+- `src/results/bottom_worst_splits/TODO.md`, `src/results/dataset_analysis/TODO.md`,
+  `src/results/sacair_2026/TODO.md`, `src/results/saicist/TODO.md`,
+  `src/results/satnac_2025/TODO.md`, `src/results/satnac_2025_refactor/TODO.md`,
+  `src/results/satnac_2026/TODO.md`, `src/results/stats/TODO.md` — per-directory notebook TODOs
+  (see also the [Notebooks in `src/results` need updating](#notebooks-in-srcresults-need-updating)
+  section below, which gives the standard checklist for clearing one of these).
+
+Note: these are named `TODO.md` (or extensionless `todo`) in practice, not `todo.txt` — fix
+references below if you find more drift between this doc and the real filenames.
+
 ## Repository structure
 
 ### `src/` top-level modules
@@ -152,22 +200,23 @@ cleanup):**
 
 ## Notebooks in `src/results` need updating
 
-Several directories under `src/results` contain a `todo.txt` left as a reminder that the
-notebooks there need work:
+Several directories under `src/results` contain a `TODO.md` left as a reminder that the
+notebooks there need work (see the full, current TODO-file list in
+[Code quality bar & workflow expectations](#code-quality-bar--workflow-expectations) above):
 
-- `src/results/augmentation_demos/todo.txt`
-- `src/results/dataset_analysis/todo.txt`
-- `src/results/stats/todo.txt`
-- `src/results/satnac_2025_refactor/todo.txt`
-- `src/results/satnac_2025/todo.txt`
-- `src/results/saicist/todo.txt`
-- `src/results/sacair_2026/todo.txt`
+- `src/results/dataset_analysis/TODO.md`
+- `src/results/stats/TODO.md`
+- `src/results/satnac_2025_refactor/TODO.md`
+- `src/results/satnac_2025/TODO.md`
+- `src/results/saicist/TODO.md`
+- `src/results/sacair_2026/TODO.md`
+- `src/results/bottom_worst_splits/TODO.md`
 
 For each notebook flagged this way:
 
 1. **Strict typing.** Ruff must report zero warnings on the notebook.
 2. **Fix broken code.** Before writing new code, check whether an equivalent notebook/script
-   already exists in a `src/results` directory that does *not* have a `todo.txt` (e.g.
+   already exists in a `src/results` directory that does *not* have a `TODO.md` (e.g.
    `src/results/satnac_2026`, `src/results/aug_comparison`) — these represent the current
    working convention and should be used as reference/example code rather than reinventing
    the fix from scratch.
