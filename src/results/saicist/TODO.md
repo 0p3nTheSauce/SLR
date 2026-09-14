@@ -1,1 +1,0 @@
-Most of the valuable information hase been extracted from this directory, and moved to the refactored [satnac_2026](../satnac_2026/) directory. The last remaining notebook for conversion is [eda_performers](./eda_performers.ipynb). 
