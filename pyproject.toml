@@ -9,3 +9,9 @@ version = "0.1.0"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "requires_weights: needs real pretrained checkpoint files on disk (auto-skipped if absent)",
+]
