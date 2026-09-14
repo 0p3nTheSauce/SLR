@@ -2,7 +2,6 @@ from pydantic import BaseModel
 
 # TODO: 1. this file hardcodes filter params directly; could switch to the
 # dynamically-loaded-from-example-run path instead, as satnac_2026/filters.py does.
-# TODO: 2. added "data" : data key value pairs comment. validate everythign still works
 
 def match(obj, target):
     d = obj.model_dump() if isinstance(obj, BaseModel) else obj
@@ -79,7 +78,7 @@ filters = {
     "admin": {"model": lambda x: x not in ignore_models,
             #   "split": lambda x: x in CUTOFF_9_NAMES},
     },
-    # "data" : data
+    "data" : data
 }
 
 drop_keys = [] #no drop keys means runs can be imported with typing

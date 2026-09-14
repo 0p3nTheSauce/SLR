@@ -78,6 +78,7 @@ filters = {
     "admin": {
         # "model": lambda x: x not in ignore_models,
         "split": lambda x: x in CUTOFF_9_NAMES},
+    "data" : data
 }
 
 drop_keys = [] #no drop keys means runs can be imported with typing
