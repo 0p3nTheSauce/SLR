@@ -7,15 +7,35 @@ import pytest
 matplotlib.use("Agg")
 
 import src.visualise2 as v2
+from src.preprocess import Instance
 from src.run_types import AdminInfo
 from src.visualise2 import (
     CONTROL_COLORS,
     DEFAULT_ACCENT,
     SPLIT_NAME_MAP,
+    plot_bboxes_on_canvas,
+    plot_dimension_distributions,
     save_fig,
     split_name_mapper,
     suggest_palette,
 )
+
+
+def _instance(bbox: list[int], label_name: str) -> Instance:
+    return Instance(
+        bbox=bbox,
+        frame_end=10,
+        frame_start=0,
+        instance_id=0,
+        signer_id=1,
+        source="src",
+        split="train",
+        url="",
+        variation_id=0,
+        video_id="v1",
+        label_num=0,
+        label_name=label_name,
+    )
 
 
 class TestSplitNameMapper:
@@ -117,6 +137,51 @@ class TestInfer:
         assert setup_data_calls == [("test", "asl100", "data-info-sentinel")]
         assert get_model_calls == [("S3D", 10, 0.0)]
         fake_model.load_state_dict.assert_called_once_with(fake_state_dict)
+
+
+class TestPlotBboxesOnCanvas:
+    def test_averages_per_class_by_default(self) -> None:
+        import matplotlib.pyplot as plt
+
+        instances = [
+            _instance([0, 0, 10, 10], "book"),
+            _instance([10, 10, 30, 30], "book"),
+            _instance([100, 100, 120, 120], "dog"),
+        ]
+
+        fig, ax = plot_bboxes_on_canvas(instances)
+
+        # one rectangle patch per distinct class once averaged, not per instance
+        assert len(ax.patches) == 2
+        plt.close(fig)
+
+    def test_average_false_draws_every_instance(self) -> None:
+        import matplotlib.pyplot as plt
+
+        instances = [
+            _instance([0, 0, 10, 10], "book"),
+            _instance([10, 10, 30, 30], "book"),
+        ]
+
+        fig, ax = plot_bboxes_on_canvas(instances, average=False)
+
+        assert len(ax.patches) == 2
+        plt.close(fig)
+
+
+class TestPlotDimensionDistributions:
+    def test_returns_two_axes_for_width_and_height(self) -> None:
+        import matplotlib.pyplot as plt
+
+        instances = [
+            _instance([0, 0, 10, 20], "book"),
+            _instance([0, 0, 15, 25], "book"),
+        ]
+
+        fig, axes = plot_dimension_distributions(instances)
+
+        assert len(axes) == 2
+        plt.close(fig)
 
 
 def test_split_name_map_only_maps_known_avail_splits() -> None:

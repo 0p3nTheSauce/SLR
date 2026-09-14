@@ -1,1 +1,0 @@
-Essentially all these notebooks need to be condensed as their is a lot of overlap. They are also all out of date, and don't follow any of the newer conventions. Could posentially be dropped/merged into something like [wlasl_stats_set_level](../dataset_analysis/wlasl_stats_set_level.ipynb). 

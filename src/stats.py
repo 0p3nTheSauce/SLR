@@ -65,7 +65,7 @@ def get_n(
 ) -> dict:
 	return {
 		k: v
-		for k, v in list(sorted(distribution.items(), key=key))[
+		for k, v in sorted(distribution.items(), key=key)[
 			start_index : start_index + n : step
 		]
 	}
@@ -405,8 +405,32 @@ def create_instances_table(per_set_stats: dict[AVAIL_SETS, set_stats]) -> pd.Dat
         })
 
     return pd.DataFrame(rows)
-    
 
+
+def create_split_summary_table(split: split_stats) -> pd.DataFrame:
+    """Per-set (train/val/test) instance/signer/class counts for one split, ready for `.to_latex()`."""
+    rows = []
+    for set_name, s in split["per_set_stats"].items():
+        rows.append({
+            "Set": set_name,
+            "Instances": s["num_instances"],
+            "Signers": s["num_signers"],
+            "Classes": len(s["per_instance_stats"]),
+        })
+    return pd.DataFrame(rows)
+
+
+def create_class_stats_table(subset: set_stats) -> pd.DataFrame:
+    """Per-gloss instance/signer/variation counts for one set, ready for `.to_latex()`."""
+    rows = []
+    for gloss, cstats in subset["per_instance_stats"].items():
+        rows.append({
+            "Gloss": gloss,
+            "Instances": cstats["num_instances"],
+            "Signers": len(cstats["signers_distribution"]),
+            "Variations": len(cstats["variation_distribution"]),
+        })
+    return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":
