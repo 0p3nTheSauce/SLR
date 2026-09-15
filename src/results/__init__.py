@@ -298,16 +298,15 @@ def load_json(stash_path: Path) -> Any:
     with open(stash_path, 'r') as f:
         return json.load(f)
 
-def stash_from_saved(original_save_path: Path) -> Path:
-    """Load pre-run results from the runs directory to the stashed directory"""
+def stash_from_saved(original_save_path: Path, checkpoint_num: int | str | None = None) -> Path:
+    """Copy a result already computed under the runs/ directory straight into the stash,
+    without re-running inference."""
     results_dir = original_save_path.parent
 
     exp_dir = results_dir.parent
     model_dir = exp_dir.parent
     split_dir = model_dir.parent
-    
-    return stash_json(
-        load_json(original_save_path),
-        get_stash_path(split_dir.name, model_dir.name, exp_dir.name),
-        )
+
+    stub = get_out_stub(split_dir.name, model_dir.name, exp_dir.name, checkpoint_num)
+    return stash_json(load_json(original_save_path), get_stash_path(stub))
 
