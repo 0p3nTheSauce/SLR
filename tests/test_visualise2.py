@@ -8,7 +8,7 @@ matplotlib.use("Agg")
 
 import src.visualise2 as v2
 from src.preprocess import Instance
-from src.run_types import AdminInfo
+from src.run_types import MinInfo
 from src.visualise2 import (
     CONTROL_COLORS,
     DEFAULT_ACCENT,
@@ -88,26 +88,25 @@ class TestInfer:
         # real, so this checks the wiring (right args flow to the right
         # calls) with every collaborator mocked, rather than gating on
         # weights/dataset availability like a true smoke test would.
-        admin = AdminInfo(
+        admin = MinInfo(
             model="S3D",
             split="asl100",
             save_path=str(tmp_path),
-            exp_no="000",
-            recover=False,
-            config_path="unused.toml",
         )
-        fake_config = MagicMock(data="data-info-sentinel")
+        fake_data = "data-info-sentinel"
         fake_loader = MagicMock()
         fake_model = MagicMock()
         fake_state_dict = {"sentinel": True}
         expected_result = ("topk_res", "cls_report", [1], [2])
 
-        load_config_calls = []
+        load_test_sizes_calls = []
         setup_data_calls = []
         get_model_calls = []
 
         monkeypatch.setattr(
-            v2, "load_config", lambda a: (load_config_calls.append(a), fake_config)[1]
+            v2,
+            "load_test_sizes",
+            lambda save_dir: (load_test_sizes_calls.append(save_dir), fake_data)[1],
         )
         monkeypatch.setattr(
             v2,
@@ -133,7 +132,7 @@ class TestInfer:
         result = v2.infer(admin, "test", "asl100", check_name="best.pth")
 
         assert result == expected_result
-        assert load_config_calls == [admin]
+        assert load_test_sizes_calls == [tmp_path.parent]
         assert setup_data_calls == [("test", "asl100", "data-info-sentinel")]
         assert get_model_calls == [("S3D", 10, 0.0)]
         fake_model.load_state_dict.assert_called_once_with(fake_state_dict)

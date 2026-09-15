@@ -1,7 +1,7 @@
 import gc
 import json
 import re
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import numpy as np
@@ -293,7 +293,7 @@ def test_topk_clsrep(
     )
     if save_path is not None:
         with open(save_path, "w") as f:
-            json.dump(topk_res, f, indent=2)
+            json.dump(topk_res.model_dump(), f, indent=2)
 
     return topk_res, cls_report, all_targets, all_preds
 
@@ -391,12 +391,13 @@ def test_run(
     disp: bool = False,
     save: bool = True,
     save_img: bool = False,
+    out_dir: Path | None = None,
 ) -> tuple[BaseRes | ShuffRes, dict[str, dict[str, float]], list[int], list[int]]:
-    """Test a model on one test set, on one split. 
+    """Test a model on one test set, on one split.
 
     Args:
-        admin (MinInfo): Information needed to load model weights. 
-        data (DataInfo): Information needed to locate data and apply transforms. 
+        admin (MinInfo): Information needed to load model weights.
+        data (DataInfo): Information needed to locate data and apply transforms.
         set_name (AVAIL_SETS): Which set to test on.
         shuffle (bool, optional): Whether to shuffle the frames. Defaults to False.
         check (str, optional): Name of checkpoint. Defaults to "best.pth".
@@ -406,9 +407,11 @@ def test_run(
         disp (bool, optional): Display plots. Defaults to False.
         save (bool, optional): Save results. Defaults to True.
         save_img (bool, optional): Save images. Defaults to False.
+        out_dir (Path | None, optional): Write outputs here instead of the
+            directory derived from admin.save_path. Defaults to None.
 
     Returns:
-        tuple[BaseRes | ShuffRes, dict[str, dict[str, float]], list[int], list[int]]: results (top-k + loss), cls_report, all_targets, all_preds 
+        tuple[BaseRes | ShuffRes, dict[str, dict[str, float]], list[int], list[int]]: results (top-k + loss), cls_report, all_targets, all_preds
     """
 
     set_seed(admin.seed)
@@ -419,10 +422,10 @@ def test_run(
 
     save_path = Path(admin.save_path)
 
-    output = checkpoint_dir_to_result_dir(save_path)
+    output = out_dir if out_dir is not None else checkpoint_dir_to_result_dir(save_path)
 
     if save or save_img:
-        output.mkdir(exist_ok=True)
+        output.mkdir(parents=True, exist_ok=True)
 
     dloader, num_classes, m_permt, m_sh_et = setup_data(
         set_name=set_name,
@@ -472,7 +475,7 @@ def test_run(
 
     if save:
         with open(save2, "w") as f:
-            json.dump(results, f, indent=4)
+            json.dump(results.model_dump(), f, indent=4)
 
     if heatmap:
         fname = check_path.name.replace(".pth", f"_{set_name}-heatmap.png")
@@ -520,21 +523,32 @@ def save_test_sizes(data_specs: DataInfo, save_dir: Path):
         json.dump(data_specs.model_dump(), f, indent=4)
 
 
+def load_data_info(path: Path) -> DataInfo:
+    """Load a `DataInfo` directly from a `data_info.json`-shaped file.
+
+    Args:
+        path (Path): Path to the JSON file itself (not its containing directory).
+
+    Returns:
+        DataInfo: The frame size/num_frames/augs this file describes.
+    """
+    with open(path, "r") as f:
+        info = json.load(f)
+
+    return DataInfo.model_validate(info)
+
+
 def load_test_sizes(save_dir: Path) -> DataInfo:
     """Load the frame size and number of frames for convenient testing. This function needs
     Filename symmetry with save_test_sizes
 
     Args:
-        data_path (Path): Path to data_info.json ()
+        save_dir (Path): Experiment directory containing data_info.json
 
     Returns:
-        DataInfo: _description_
+        DataInfo: The frame size/num_frames/augs this run trained with.
     """
-    fname = save_dir / DATA_FNAME
-    with open(fname, "r") as f:
-        info = json.load(f)
-
-    return DataInfo.model_validate(info)
+    return load_data_info(save_dir / DATA_FNAME)
 
 
 def load_comp_res(save_path: Path) -> CompRes:
@@ -562,6 +576,7 @@ def full_test(
     data: DataInfo | None = None,
     save: bool = True,
     re_test: bool = False,
+    out_dir: Path | None = None,
 ) -> CompRes:
     # - The shuffled results additionally contain the permutation used, and it's shannon entropy
     """Complete test, which includes:
@@ -574,6 +589,8 @@ def full_test(
         data (Optional[DataInfo], optional): Dictionary containing frame_size and num_frames, can be loaded automatically if data_info.json file exists. Defaults to None.
         save (bool, optional): Whether to save. Defaults to True.
         re_test (bool, optional): Re-test even if files exist. Defaults to False.
+        out_dir (Path | None, optional): Write outputs here instead of the
+            directory derived from admin.save_path. Defaults to None.
 
     Raises:
         Exception: If there is an error loading data from data_info.json
@@ -584,8 +601,12 @@ def full_test(
     save_path = Path(admin.save_path)
 
     # output
-    res_path = get_res_path(save_path)
-    cls_rep_path = get_cls_rep_path(save_path)
+    if out_dir is not None:
+        res_path = out_dir / "best_val_loss.json"
+        cls_rep_path = out_dir / "cls_rep_all_targets_preds.json"
+    else:
+        res_path = get_res_path(save_path)
+        cls_rep_path = get_cls_rep_path(save_path)
 
     # dont retest if exists
     if res_path.exists() and not re_test:
@@ -660,39 +681,53 @@ def get_test_parser(
     Returns:
                                     ArgumentParser: Parser which takes testing arguments
     """
-    parser = ArgumentParser(description=desc, prog=prog)
     models_available = avail_models()
     splits_available = get_avail_splits()
 
-    # Create subparsers for 'full' and 'partial' commands
-    subparsers = parser.add_subparsers(dest="command", help="Test mode", required=True)
-
-    # ============ FULL TEST SUBPARSER ============
-    full_parser = subparsers.add_parser(
-        "full",
-        help="Run full test suite (test, val, and shuffled test with all visualizations)",
-    )
-    full_parser.add_argument(
+    # Shared between 'full' and 'partial': identify which run to test, either
+    # a regular experiment (exp_no) or a sweep trial (sweep + run_id).
+    common = ArgumentParser(add_help=False)
+    common.add_argument(
         "model",
         type=str,
         choices=models_available,
         help=f"Model name from one of the implemented models: {models_available}",
     )
-    full_parser.add_argument(
+    common.add_argument(
         "split",
         type=str,
         choices=splits_available,
         help=f"The class split, one of: {', '.join(splits_available)}",
     )
-    full_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
-    full_parser.add_argument(
+    common.add_argument(
+        "exp_no",
+        type=int,
+        nargs="?",
+        default=None,
+        help="Experiment number (e.g. 10). Omit when identifying a sweep trial with --sweep/--run_id instead.",
+    )
+    common.add_argument(
+        "-sw",
+        "--sweep",
+        type=str,
+        default=None,
+        help="Sweep id, to test a sweep trial instead of a regular experiment (requires --run_id)",
+    )
+    common.add_argument(
+        "-ri",
+        "--run_id",
+        type=str,
+        default=None,
+        help="Sweep trial's wandb run id (requires --sweep)",
+    )
+    common.add_argument(
         "-cp_d_n",
         "--checkpoint_dir_no",
         type=int,
         help="Checkpoint directory number (e.g. 10). Useful if multiple checkpoint directories",
         default=None,
     )
-    full_parser.add_argument(
+    common.add_argument(
         "-ds",
         "--dataset",
         type=str,
@@ -700,19 +735,38 @@ def get_test_parser(
         help="Dataset name",
         default="WLASL",
     )
-    full_parser.add_argument(
-        "-nf",
-        "--num_frames",
-        type=int,
-        help="Number of frames (overrides data_info.json if provided)",
+    common.add_argument(
+        "-wp",
+        "--weight_path",
+        type=str,
         default=None,
+        help="Checkpoint directory, overriding exp_no/--sweep+--run_id entirely (manual override, e.g. for a checkpoint outside the runs/ convention)",
     )
-    full_parser.add_argument(
-        "-fs",
-        "--frame_size",
-        type=int,
-        help="Frame size (overrides data_info.json if provided)",
+    common.add_argument(
+        "-dp",
+        "--data_path",
+        type=str,
         default=None,
+        help="Path to a data_info.json-shaped file, overriding the one normally read from the experiment directory",
+    )
+    common.add_argument(
+        "-op",
+        "--out_path",
+        type=str,
+        default=None,
+        help="Directory to write results to, overriding the one normally derived from the checkpoint directory",
+    )
+
+    parser = ArgumentParser(description=desc, prog=prog)
+
+    # Create subparsers for 'full' and 'partial' commands
+    subparsers = parser.add_subparsers(dest="command", help="Test mode", required=True)
+
+    # ============ FULL TEST SUBPARSER ============
+    full_parser = subparsers.add_parser(
+        "full",
+        parents=[common],
+        help="Run full test suite (test, val, and shuffled test with all visualizations)",
     )
     full_parser.add_argument(
         "-se", "--save", action="store_true", help="Save the outputs of the test"
@@ -723,56 +777,16 @@ def get_test_parser(
 
     # ============ PARTIAL TEST SUBPARSER ============
     partial_parser = subparsers.add_parser(
-        "partial", help="Run partial test on a specific set with custom options"
+        "partial",
+        parents=[common],
+        help="Run partial test on a specific set with custom options",
     )
 
-    partial_parser.add_argument(
-        "model",
-        type=str,
-        choices=models_available,
-        help=f"Model name from one of the implemented models: {models_available}",
-    )
-    partial_parser.add_argument(
-        "split",
-        type=str,
-        choices=splits_available,
-        help=f"The class split, one of: {', '.join(splits_available)}",
-    )
-    partial_parser.add_argument("exp_no", type=int, help="Experiment number (e.g. 10)")
-    partial_parser.add_argument(
-        "-cp_d_n",
-        "--checkpoint_dir_no",
-        type=int,
-        help="Checkpoint directory number (e.g. 10). Useful if multiple checkpoint directories",
-        default=None,
-    )
     partial_parser.add_argument(
         "set_name",
         type=str,
         choices=["test", "val", "train"],
         help="Which set to test on",
-    )
-    partial_parser.add_argument(
-        "-ds",
-        "--dataset",
-        type=str,
-        choices=["WLASL"],
-        help="Dataset name",
-        default="WLASL",
-    )
-    partial_parser.add_argument(
-        "-nf",
-        "--num_frames",
-        type=int,
-        help="Number of frames (overrides data_info.json if provided)",
-        default=None,
-    )
-    partial_parser.add_argument(
-        "-fs",
-        "--frame_size",
-        type=int,
-        help="Frame size (overrides data_info.json if provided)",
-        default=None,
     )
     partial_parser.add_argument(
         "-sf",
@@ -812,16 +826,45 @@ def get_test_parser(
     return parser
 
 
+def _resolve_save_path(args: Namespace) -> Path:
+    """Resolve the checkpoint directory to test, from exactly one of: a
+    regular experiment (`exp_no`), a sweep trial (`sweep` + `run_id`), or a
+    direct manual override (`weight_path`).
+
+    Sweep trials don't live under the sequential `exp{NNN}` numbering
+    (see `get_model_exp_dir`) -- they get their own directory, namespaced by
+    sweep id and wandb run id, via `get_sweep_exp_dir`. `weight_path` bypasses
+    both schemes entirely, for a checkpoint that doesn't live under the
+    `runs/` convention at all.
+    """
+    if args.weight_path is not None:
+        if args.exp_no is not None or args.sweep is not None or args.run_id is not None:
+            raise ValueError("--weight_path cannot be combined with exp_no/--sweep/--run_id")
+        if args.checkpoint_dir_no is not None:
+            raise ValueError("--checkpoint_dir_no has no effect when --weight_path is given directly")
+        return Path(args.weight_path)
+
+    if args.sweep is not None or args.run_id is not None:
+        from src.sweeping import get_sweep_exp_dir
+
+        if args.sweep is None or args.run_id is None:
+            raise ValueError("--sweep and --run_id must be provided together")
+        if args.exp_no is not None:
+            raise ValueError("exp_no cannot be combined with --sweep/--run_id")
+        output = get_sweep_exp_dir(args.split, args.model, args.sweep, args.run_id)
+        return get_model_checkpoint_dir(output, args.checkpoint_dir_no)
+
+    if args.exp_no is None:
+        raise ValueError("Either exp_no, --sweep/--run_id, or --weight_path must be provided")
+    output = get_model_exp_dir(split=args.split, model=args.model, exp_no=args.exp_no)
+    return get_model_checkpoint_dir(output, args.checkpoint_dir_no)
+
+
 def main():
     parser = get_test_parser()
     args = parser.parse_args()
 
-    output = get_model_exp_dir(
-        split=args.split,
-        model=args.model,
-        exp_no=args.exp_no,
-    )
-    save_path = get_model_checkpoint_dir(output, args.checkpoint_dir_no)
+    save_path = _resolve_save_path(args)
 
     if (
         not save_path.exists()
@@ -829,7 +872,7 @@ def main():
         or len(list(save_path.iterdir())) == 0
     ):
         raise ValueError(
-            f"Invalid output: {output}, must exist and be a directory that is not empty"
+            f"Invalid save path: {save_path}, must exist and be a directory that is not empty"
         )
 
     args.save_path = str(save_path)
@@ -842,52 +885,25 @@ def main():
         save_path=args.save_path,
     )
 
-    # Load or create DataInfo
-    data_info_path = output / DATA_FNAME
-
-    # Try to load data_info.json, or use provided arguments
-    if args.num_frames is not None and args.frame_size is not None:
-        # augs = _make_aug_info(None, args.model, args.set_name)
-        # # Use provided arguments
-        # data = DataInfo(
-        #     num_frames=args.num_frames,
-        #     frame_size=args.frame_size,
-        #     train_augs=augs if args.set_name == "train" else None,
-        #     test_augs=augs if args.set_name != "train" else None,
-        # )
-        # print(
-        #     f"Using provided data parameters: num_frames={args.num_frames}, frame_size={args.frame_size}"
-        # )
-        raise Warning("This feature is currently not fixed")
+    if args.data_path is not None:
+        data_info_path = Path(args.data_path)
+        data = load_data_info(data_info_path)
     else:
-        # Try to load from data_info.json
+        data_info_path = save_path.parent / DATA_FNAME
         try:
-            data = load_test_sizes(output)
-            print(f"Loaded data info from {data_info_path}")
-            # print(f"num_frames={data.num_frames}, frame_size={data.frame_size}")
-
-            # Allow partial override
-            if args.num_frames is not None:
-                raise Warning("This feature is currently not fixed")
-                data.num_frames = args.num_frames
-                print(f"Overriding num_frames: {args.num_frames}")
-            if args.frame_size is not None:
-                raise Warning("This feature is currently not fixed")
-                data.frame_size = args.frame_size
-                print(f"Overriding frame_size: {args.frame_size}")
-
+            data = load_test_sizes(save_path.parent)
         except FileNotFoundError:
-            raise FileNotFoundError(
-                f"Could not find {data_info_path}. "
-                # "Please provide -nf/--num_frames and -fs/--frame_size arguments, "
-                # "or ensure data_info.json exists in the experiment directory."
-            )
-        
+            raise FileNotFoundError(f"Could not find {data_info_path}.")
+    print(f"Loaded data info from {data_info_path}")
+
+    out_dir = Path(args.out_path) if args.out_path is not None else None
 
     if args.command == "full":
         # Run complete test suite
         print("Running full test suite...")
-        results = full_test(admin, data=data, save=args.save, re_test=args.re_test)
+        results = full_test(
+            admin, data=data, save=args.save, re_test=args.re_test, out_dir=out_dir
+        )
         print(json.dumps(results.model_dump(), indent=4))
     elif args.command == "partial":
         # Run partial test with specified parameters
@@ -903,6 +919,7 @@ def main():
             heatmap=args.heatmap,
             disp=args.display,
             save=args.save,
+            out_dir=out_dir,
         )
         print(json.dumps(results.model_dump(), indent=4))
 

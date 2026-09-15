@@ -30,7 +30,7 @@ from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
 from typing_extensions import TypedDict, Unpack
 
-from src.configs import get_class_list, load_config
+from src.configs import get_class_list
 from src.models import get_model
 from src.preprocess import Instance
 
@@ -38,12 +38,12 @@ from src.preprocess import Instance
 from src.run_types import (
     AVAIL_SETS,
     AVAIL_SPLITS,
-    AdminInfo,
     BaseRes,
     CentreCropConfig,
+    MinInfo,
     OG_Sampler,
 )
-from src.testing import setup_data, test_topk_clsrep
+from src.testing import load_test_sizes, setup_data, test_topk_clsrep
 from src.utils import load_rgb_frames_from_video, plt_display_grid
 from src.video_dataset import (
     get_transform,
@@ -840,33 +840,43 @@ class FrameFetcher:
 # ---------------------------------------------------------------------------
 
 def infer(
-    admin: AdminInfo,
+    admin: MinInfo,
     set_name: AVAIL_SETS,
     split_name: AVAIL_SPLITS,
     check_name: str = "best.pth",
 ) -> tuple[BaseRes, dict[str, dict[str, float]], list[int], list[int]]:
     """
     Load a trained model from its checkpoint and run it over one dataset set,
-    in the spirit of FrameFetcher/FrameVisualiser: bundles the config/model/
+    in the spirit of FrameFetcher/FrameVisualiser: bundles the data/model/
     checkpoint plumbing behind one call instead of repeating it per notebook.
 
-    admin: identifies which run's config and checkpoint directory to load
-        (admin.save_path / check_name).
+    admin: identifies which run's checkpoint directory to load
+        (admin.save_path / check_name). Only `MinInfo` (not the full
+        `AdminInfo`) is needed -- see below.
     set_name/split_name: which dataset set to build the test loader for --
         kept separate from admin.split since a checkpoint from one split can
         be evaluated against another (e.g. a subset derived from it).
     check_name: checkpoint filename within admin.save_path. Defaults to
         "best.pth", the convention testing.py writes to.
 
+    Data is loaded via `load_test_sizes` from the `data_info.json` that
+    `train_loop` writes next to every run's checkpoints (regular or sweep
+    trial) -- NOT by re-parsing `admin.config_path`. For a sweep trial,
+    `config_path` points at the shared, untuned base sweep config rather
+    than that trial's resolved hyperparameters, so re-parsing it would
+    silently build the wrong `DataInfo`; `data_info.json` always holds what
+    the run actually trained with.
+
     Returns (topk_res, cls_report, all_targets, all_preds), matching
     test_topk_clsrep's return shape so existing downstream code (e.g.
     sorting cls_report by per-gloss f1-score) can be reused as-is.
     """
-    config = load_config(admin)
-    test_loader, num_classes, _, _ = setup_data(set_name, split_name, config.data)
+    save_path = Path(admin.save_path)
+    data = load_test_sizes(save_path.parent)
+    test_loader, num_classes, _, _ = setup_data(set_name, split_name, data)
 
     model = get_model(admin.model, num_classes, 0.0)
-    checkpoint = torch.load(Path(admin.save_path) / check_name)
+    checkpoint = torch.load(save_path / check_name)
     model.load_state_dict(checkpoint)
 
     return test_topk_clsrep(model=model, test_loader=test_loader)
