@@ -1,3 +1,49 @@
+"""Shared helpers for the `src/results` analysis notebooks/scripts.
+
+Wraps the `Que` run-history system (`src.que.core`, `src.que.shell`) with the
+query/load/stash conveniences used across `src/results/*`:
+
+- `find_runs`/`fetch_runs`/`search_old_runs` query finished runs out of the `Que`'s
+  `old_runs` history, filtering/sorting/limiting them (`fetch_runs` reads its filters
+  from a `filters.py` file; `find_runs` takes them directly).
+- `load_runs` reads back a previously-saved JSON list of runs (e.g. via
+  `output_path`/`output_filtered_runs`).
+- `get_out_stub`/`get_stash_path`/`get_asset_path`/`stash_json`/`load_json`/
+  `stash_from_saved` implement the local "stash" (raw JSON) vs "asset" (figures, LaTeX)
+  saving convention for notebooks — see below.
+- `match`/`same_augs` are equality helpers for comparing `RunInst`/augmentation configs.
+
+`CompExpInfo`, `get_filters_drop_keys`, `output_filtered_runs`, `Que` and
+`unpack_filters` are re-exported here so callers only need `src.results`, not the
+underlying `src.que` submodules.
+
+---
+
+### When it comes to saving files in Notebooks:
+
+1. By convention, when a notebook is run once, heavy running code should stash it's results
+then the call sight must be commented out. A call site which loads the stashed results
+is left uncommented, for future notebook runs
+
+2. Additionally, certain items should be dumped into the results/outputs directory and thus
+not tracked by git. These are generally large files that can be generated quickly by
+the notebook, such as Figures. This serves a secondary purpose of localising all diagrams
+so they can be extracted for the thesis. 
+---
+**Naming Convention:**
+
+Stash
+- Results (JSON) in a local subdirectory
+- Allows for offline running of notebooks after they are run once
+- Used by the notebook
+
+Asset
+- Figures, LaTeX etc. 
+- Produced by the notebook, but has no impact on running the notebook
+- Used in the thesis
+
+"""
+
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -12,7 +58,29 @@ from src.que.shell import (
     output_filtered_runs,
     unpack_filters,
 )
-from src.run_types import TypeAlias
+from src.run_types import RESULTS_OUTPUTS, TypeAlias
+
+__all__ = [
+    "STASH_DIR_NAME",
+    "CompExpInfo",
+    "Que",
+    "RunInst",
+    "fetch_runs",
+    "find_runs",
+    "get_asset_path",
+    "get_filters_drop_keys",
+    "get_out_stub",
+    "get_stash_path",
+    "load_json",
+    "load_runs",
+    "match",
+    "output_filtered_runs",
+    "same_augs",
+    "search_old_runs",
+    "stash_from_saved",
+    "stash_json",
+    "unpack_filters",
+]
 
 
 def _safe_get(d: dict | None, k: str) -> Any:
@@ -184,3 +252,49 @@ def load_runs(runs_path: Path) -> list[CompExpInfo]:
     """
     with open(runs_path, "r") as f:
         return [CompExpInfo.model_validate(r) for r in json.load(f)]
+
+# ----------------------------------------------------------------------
+# Stash and Assest saving and loading
+# ----------------------------------------------------------------------
+
+STASH_DIR_NAME : str = 'stashed_results'
+
+def get_out_stub(split : str, model : str, exp : str, checkpoint_num: int | str | None = None) -> str:
+    checknum = str(checkpoint_num) + '_' if checkpoint_num is not None else ''
+    return f"{split}_{model}_{exp}_{checknum}"
+
+def get_asset_path(metric_descriptor: str, stub: str, file_suffix: str, asset_dir: Path = RESULTS_OUTPUTS) -> Path:
+    """Get the path for the asset to be saved to"""
+    return (asset_dir / f'{metric_descriptor}_{stub}').with_suffix(file_suffix)
+
+def get_stash_path(stub : str, base_name: str = "results", local_stash_dir_name: str = STASH_DIR_NAME) -> Path:
+    """Get the path to the results json file"""
+    return Path(local_stash_dir_name) / f"{stub}{base_name}.json"
+
+def stash_json(results : Any, stash_path: Path, make: bool = True, indent: int | str | None  = None) -> Path:
+    """Stash the results, make if necessary"""
+    if make:
+        stash_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(stash_path, 'w') as f:
+        json.dump(results, f, indent=indent)
+        
+    return stash_path 
+        
+def load_json(stash_path: Path) -> Any:
+    """Load stashed results"""
+    with open(stash_path, 'r') as f:
+        return json.load(f)
+
+def stash_from_saved(original_save_path: Path) -> Path:
+    """Load pre-run results from the runs directory to the stashed directory"""
+    results_dir = original_save_path.parent
+
+    exp_dir = results_dir.parent
+    model_dir = exp_dir.parent
+    split_dir = model_dir.parent
+    
+    return stash_json(
+        load_json(original_save_path),
+        get_stash_path(split_dir.name, model_dir.name, exp_dir.name),
+        )
+
