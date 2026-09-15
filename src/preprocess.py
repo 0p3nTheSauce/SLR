@@ -293,69 +293,6 @@ def fix_bad_bboxes(
     return clean_instances
 
 
-def fix_bad_bboxes_og(
-    raw_path: Path,
-    instances: list[Instance],
-    log_dir: Path,
-    remove_policy: Literal["strict", "reset"] = "strict",
-    file_extension: str = "bad_bboxes.json",
-) -> list[Instance]:
-    """Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video."""
-    model = YOLO("yolov8n.pt")  # Load a pre-trained YOLO model
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    bad_instances: list[BadInstance] = []
-    clean_instances: list[Instance] = []
-
-    for instance in tqdm.tqdm(instances, desc="Fixing bounding boxes"):
-        vid_path = raw_path / f"{instance.video_id}.mp4"
-        frames = load_rgb_frames_from_video(
-            str(vid_path), instance.frame_start, instance.frame_end
-        )
-        frames = frames.float() / 255.0
-
-        results = model(frames, device=device, verbose=False)
-        bboxes = []
-        for result in results:
-            person_bboxes = result.boxes.xyxy[result.boxes.cls == 0]
-            if len(person_bboxes) > 0:
-                bboxes.extend(person_bboxes.tolist())
-
-        if not bboxes:
-            message = f"No bounding boxes found for video {instance.video_id}."
-            if remove_policy == "strict":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Removing instance.")
-                )
-                continue
-            elif remove_policy == "reset_bbox":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Using whole frame.")
-                )
-                largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
-            else:
-                raise ValueError(f"Invalid remove_policy: {remove_policy}")
-        else:
-            largest_bbox = get_largest_bbox(bboxes)
-            assert largest_bbox is not None, "largest_bbox can not be None here"
-
-        # Round the coordinates to integers and update the Pydantic model
-        largest_bbox = [round(coord) for coord in largest_bbox]
-        instance.bbox = largest_bbox
-        clean_instances.append(instance)
-
-    log_path = log_dir / f"{remove_policy}_{file_extension}"
-
-    output_bad(
-        bad_instances=bad_instances,
-        remove_policy=remove_policy,
-        log_path=log_path,
-        fixing_description="bounding boxes",
-    )
-
-    return clean_instances
-
-
 def remove_short_samples(
     instances: list[Instance],
     log_dir: Path,
@@ -422,17 +359,40 @@ SetIdInst: TypeAlias = dict[str, dict[str, Instance]]
 StrictValues: TypeAlias = Literal["strict", "reset"]
 
 
-def load_instance_cache(cache_path: Path) -> dict[str, Instance]:
+class CacheEntry(BaseModel):
+    """A cached instance plus whether bbox-fixing was applied to it.
+
+    Needed because `do_bboxes` can differ between runs that otherwise share a cache
+    (e.g. a `--no_bbox` run followed by a normal one): without this marker, an instance
+    cached with its raw/unfixed placeholder bbox would be indistinguishable from one
+    that was actually bbox-fixed, and would be reused as-is forever.
+    """
+
+    instance: Instance
+    bboxes_fixed: bool
+
+
+def load_instance_cache(cache_path: Path) -> dict[str, CacheEntry]:
     if not cache_path.exists():
         return {}
     with open(cache_path, "r") as f:
         raw = json.load(f)
-    return {item["video_id"]: Instance.model_validate(item) for item in raw}
+    try:
+        return {
+            item["instance"]["video_id"]: CacheEntry.model_validate(item)
+            for item in raw
+        }
+    except (KeyError, ValidationError):
+        print(
+            f"Cache at {cache_path} is in an old/incompatible format; ignoring it and "
+            "rebuilding from scratch."
+        )
+        return {}
 
 
-def save_instance_cache(cache_path: Path, cache: dict[str, Instance]) -> None:
+def save_instance_cache(cache_path: Path, cache: dict[str, CacheEntry]) -> None:
     with open(cache_path, "w") as f:
-        json.dump([inst.model_dump() for inst in cache.values()], f, indent=2)
+        json.dump([entry.model_dump() for entry in cache.values()], f, indent=2)
 
 
 def _apply_fixes(
@@ -494,6 +454,11 @@ def preprocess_split(
     as-is. If False, ignores the cache for reads and reprocesses every
     instance from scratch (still writing results back to the cache for later
     runs).
+
+    A cached instance is only reused as-is if it matches this run's `do_bboxes`
+    requirement: an instance cached from a `do_bboxes=False` run (raw/unfixed bbox)
+    is bbox-fixed (not reprocessed from scratch) before being reused by a
+    `do_bboxes=True` run.
     """
 
     if not check_paths(split_path, raw_path, output_base, verbose):
@@ -531,9 +496,39 @@ def preprocess_split(
     ]:
         print_v(f"For split: {subset}", verbose)
 
-        cached_ids = [inst.video_id for inst in instances if inst.video_id in cache]
         uncached = [inst for inst in instances if inst.video_id not in cache]
-        print_v(f"Reusing {len(cached_ids)} cached / fixing {len(uncached)} new", verbose)
+        reusable_ids = [
+            inst.video_id
+            for inst in instances
+            if inst.video_id in cache
+            and (not do_bboxes or cache[inst.video_id].bboxes_fixed)
+        ]
+        bbox_only_ids = [
+            inst.video_id
+            for inst in instances
+            if inst.video_id in cache
+            and do_bboxes
+            and not cache[inst.video_id].bboxes_fixed
+        ]
+        print_v(
+            f"Reusing {len(reusable_ids)} cached / re-fixing bboxes for "
+            f"{len(bbox_only_ids)} cached / fixing {len(uncached)} new",
+            verbose,
+        )
+
+        reused = [cache[video_id].instance.model_copy() for video_id in reusable_ids]
+
+        bbox_fixed = (
+            fix_bad_bboxes(
+                raw_path=raw_path,
+                instances=[cache[vid].instance.model_copy() for vid in bbox_only_ids],
+                log_dir=output_dir,
+                remove_policy=strictness[1],
+                file_extension=f"bad_bboxes_{subset}.json",
+            )
+            if bbox_only_ids
+            else []
+        )
 
         newly_fixed = _apply_fixes(
             instances=uncached,
@@ -546,10 +541,12 @@ def preprocess_split(
             verbose=verbose,
         )
 
-        processed = [cache[video_id].model_copy() for video_id in cached_ids] + newly_fixed
+        processed = reused + bbox_fixed + newly_fixed
 
         for inst in newly_fixed:
-            cache[inst.video_id] = inst
+            cache[inst.video_id] = CacheEntry(instance=inst, bboxes_fixed=do_bboxes)
+        for inst in bbox_fixed:
+            cache[inst.video_id] = CacheEntry(instance=inst, bboxes_fixed=True)
 
         print_v("Saving results", verbose)
         inst_path = output_dir / f"{subset}_{file_extension}"
