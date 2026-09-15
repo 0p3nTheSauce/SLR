@@ -179,7 +179,7 @@ def plot_bar_chart(
         if ylabel:
             ax.set_xlabel(ylabel)
         if show_values:
-            ax.bar_label(container, fmt=value_fmt, padding=3)
+            ax.bar_label(container, fmt=value_fmt, padding=3, fontsize=plt.rcParams["ytick.labelsize"])
             ax.set_xlim(0, max(values) * 1.15)  # headroom for labels
     else:
         container = ax.bar(categories, values, color=palette)
@@ -190,7 +190,7 @@ def plot_bar_chart(
             ax.set_ylabel(ylabel)
         plt.setp(ax.get_xticklabels(), rotation=rotation, ha="right")
         if show_values:
-            ax.bar_label(container, fmt=value_fmt, padding=3)
+            ax.bar_label(container, fmt=value_fmt, padding=3, fontsize=plt.rcParams["xtick.labelsize"])
             ax.set_ylim(0, max(values) * 1.15)  # headroom for labels
 
     if title:
@@ -256,7 +256,7 @@ def plot_grouped_bar_chart(
         values = np.asarray(ys[name]).tolist()
         container = ax.bar(x_pos + i * width, values, width, label=label, color=palette[i])
         if show_values:
-            ax.bar_label(container, fmt=value_fmt, padding=3)
+            ax.bar_label(container, fmt=value_fmt, padding=3, fontsize=plt.rcParams["xtick.labelsize"])
 
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     if xlabel:
@@ -292,6 +292,7 @@ def plot_stacked_bar_chart(
     show_values: bool = True,
     value_fmt: str = COUNT_FMT,
     label_color: str = "white",
+    min_label_frac: float = 0.03,
     ax=None,
 ):
     """
@@ -312,6 +313,10 @@ def plot_stacked_bar_chart(
         Defaults to COUNT_FMT ("%d"), suited to instance/sample counts.
     label_color: text colour for the in-bar value labels (default white,
         suited to the darker LINE_PALETTE colours).
+    min_label_frac: segments shorter than this fraction of the tallest
+        stacked bar have their value label omitted, since it wouldn't fit
+        within the segment (e.g. a small split's bars are much shorter than
+        the largest split's when several splits share one y-axis).
     """
     categories = np.asarray(x).tolist()
     n = len(categories)
@@ -332,12 +337,18 @@ def plot_stacked_bar_chart(
     x_pos = np.arange(n)
     bottoms = np.zeros(n)
 
+    all_values = {name: np.asarray(ys[name], dtype=float) for name in series_names}
+    totals = sum(all_values.values())
+    label_threshold = min_label_frac * totals.max()
+
     for i, name in enumerate(series_names):
         label = legend_labels.get(name, name) if legend_labels else name
-        values = np.asarray(ys[name], dtype=float)
+        values = all_values[name]
         container = ax.bar(x_pos, values, width, bottom=bottoms, label=label, color=palette[i])
         if show_values:
             for bar, val, bot in zip(container, values, bottoms):
+                if val < label_threshold:
+                    continue
                 ax.text(
                     bar.get_x() + bar.get_width() / 2,
                     bot + val / 2,
