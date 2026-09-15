@@ -555,7 +555,7 @@ def plot_bboxes_on_canvas(
     average: bool = True,
     method: AverageMethod = "mean",
     title: str | None = None,
-    figsize: tuple[float, float] = FIGSIZE,
+    figsize: tuple[float, float] | None = None,
     frame_size: tuple[int, int] = (256, 256),
     ax=None,
 ):
@@ -570,18 +570,27 @@ def plot_bboxes_on_canvas(
         class's bbox spread).
     average: if True (default), collapse `instances` to one bbox per class
         first, via `method` ("mean" or "median" of the class's bboxes).
+    figsize: defaults to a size matching `frame_size`'s aspect ratio (square
+        for the default 256x256 canvas), unlike other visualise2 charts which
+        default to the wide FIGSIZE -- a non-square canvas here would distort
+        the drawn boxes.
     frame_size: (width, height) of the canvas the boxes are drawn on --
         matches the video frame size the bboxes were computed against
         (WLASL precut clips are 256x256).
     """
+    width, height = frame_size
+    if figsize is None:
+        side = FIGSIZE[1]
+        figsize = (side * width / height, side)
+
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
     else:
         fig = ax.figure
 
-    width, height = frame_size
     ax.set_xlim(0, width)
     ax.set_ylim(0, height)
+    ax.set_aspect("equal")
     ax.invert_yaxis()  # image coordinates: y increases downward
 
     if average:
