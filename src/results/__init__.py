@@ -67,6 +67,7 @@ __all__ = [
     "RunInst",
     "fetch_runs",
     "find_runs",
+    "format_exp_label",
     "get_asset_path",
     "get_filters_drop_keys",
     "get_out_stub",
@@ -258,6 +259,18 @@ def load_runs(runs_path: Path) -> list[CompExpInfo]:
 # ----------------------------------------------------------------------
 
 STASH_DIR_NAME : str = 'stashed_results'
+
+def format_exp_label(exp_no: str) -> str:
+    """Format an `exp_no` for use in stash/asset filenames.
+
+    Regular experiments are zero-padded sequential numbers (e.g. `"000"`) and
+    get an `"exp"` prefix to match the `exp{NNN}` directory convention. Sweep
+    trials store a wandb run id (not numeric) in `exp_no` instead and are
+    left as-is, since they don't live under that convention at all (see
+    `sweeping.get_sweep_exp_dir`).
+    """
+    return f"exp{exp_no}" if exp_no.isdigit() else exp_no
+
 
 def get_out_stub(split : str, model : str, exp : str, checkpoint_num: int | str | None = None) -> str:
     checknum = str(checkpoint_num) + '_' if checkpoint_num is not None else ''

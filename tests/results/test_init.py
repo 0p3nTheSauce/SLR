@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from src.results import match, same_augs
+from src.results import format_exp_label, match, same_augs
 
 
 class _Aug(BaseModel):
@@ -50,3 +50,12 @@ class TestSameAugs:
 
     def test_empty_lists_are_equal(self) -> None:
         assert same_augs([], [])
+
+
+class TestFormatExpLabel:
+    def test_numeric_exp_no_gets_exp_prefix(self) -> None:
+        assert format_exp_label("000") == "exp000"
+        assert format_exp_label("12") == "exp12"
+
+    def test_sweep_run_id_left_as_is(self) -> None:
+        assert format_exp_label("3f8a1b2c") == "3f8a1b2c"
