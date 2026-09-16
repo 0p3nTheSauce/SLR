@@ -1,0 +1,73 @@
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 200
+
+[optimizer]
+eps = 6.033353570111244e-06
+backbone_init_lr = 0.0005159395420782625
+backbone_weight_decay = 0.005031443262153033
+classifier_init_lr = 6.031915228458252e-05
+classifier_weight_decay = 0.00012660220694027114
+
+[model_params]
+drop_p = 0.17208729098357062
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 2, type = "chunked" },
+]
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.22009433852679688
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 3
+magnitude = 7
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+[scheduler]
+type = "CosineAnnealingWarmRestarts"
+t0 = 20
+tmult = 2
+eta_min = 0.0
+
+[scheduler.warm_up]
+start_factor = 0.007788291595455784
+end_factor = 1.0
+warmup_epochs = 5
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 20
+min_delta = 0.01
+
+
+# optimizer
+# model
+# scheduler (WarmRestartInfo)
+# training
+# temporal aug -- now maps to both train and test
+# spatial aug -- now maps to both train and test
+# early stopping
+# created by script
