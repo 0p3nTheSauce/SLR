@@ -24,3 +24,7 @@
 Only `3D CNNs` are run with 32 frames. The models run are:
 - ***3D CNN:*** `R3D_18`, `R(2+1)D_18`, `S3D`
 - ***ViT:*** `Swin3D-T`, `Swin3D-S`, `Swin3D-B`, `MViTv1_B`, `MViTv2_S`
+
+The results can be seen in [satnac_2025/results.ipynb](../../results/satnac_2025/results.ipynb).
+
+The runs can be viewed on [Wandb](https://wandb.ai/ljgoodall2001-rhodes-university/SATNAC_2025).
