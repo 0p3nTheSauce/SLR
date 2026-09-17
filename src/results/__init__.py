@@ -28,7 +28,7 @@ is left uncommented, for future notebook runs
 2. Additionally, certain items should be dumped into the results/outputs directory and thus
 not tracked by git. These are generally large files that can be generated quickly by
 the notebook, such as Figures. This serves a secondary purpose of localising all diagrams
-so they can be extracted for the thesis. 
+so they can be extracted for the thesis.
 ---
 **Naming Convention:**
 
@@ -38,7 +38,7 @@ Stash
 - Used by the notebook
 
 Asset
-- Figures, LaTeX etc. 
+- Figures, LaTeX etc.
 - Produced by the notebook, but has no impact on running the notebook
 - Used in the thesis
 
@@ -85,22 +85,22 @@ __all__ = [
 
 
 def _safe_get(d: dict | None, k: str) -> Any:
-    """Safely get a value from a dictionary, returning None if the dictionary is None.
-    """
+    """Safely get a value from a dictionary, returning None if the dictionary is None."""
     return d.get(k) if d is not None else None
 
-RunInst : TypeAlias = BaseModel | dict | None
+
+RunInst: TypeAlias = BaseModel | dict | None
 
 
-def match(obj : RunInst, target : RunInst) -> bool:
+def match(obj: RunInst, target: RunInst) -> bool:
     o = obj.model_dump() if isinstance(obj, BaseModel) else obj
     t = target.model_dump() if isinstance(target, BaseModel) else target
-    
+
     if o is None:
         return t is None
     elif t is None:
         return o is None
-    
+
     return all(_safe_get(o, k) == v for k, v in t.items())
 
 
@@ -125,8 +125,9 @@ def same_augs(augs1: list[T], augs2: list[T]) -> bool:
 
     return all(_norm(a) == _norm(b) for a, b in zip(augs1, augs2))
 
+
 def search_old_runs(
-    filter_key_sets : list[list[str]],
+    filter_key_sets: list[list[str]],
     criterions: list[Callable[[Any], bool]],
     *,
     drop_key_sets: list[list[str]] | None = None,
@@ -135,10 +136,10 @@ def search_old_runs(
     top_n: int | None = None,
     output_path: str | None = None,
 ) -> list[CompExpInfo]:
-    """Pass arguments directly to Que.list_manipulation. Optionally take top_n and output_path. 
+    """Pass arguments directly to Que.list_manipulation. Optionally take top_n and output_path.
 
     Args:
-        filter_key_sets (list[list[str]]): Each list[str] directly indexes a leaf. 
+        filter_key_sets (list[list[str]]): Each list[str] directly indexes a leaf.
         criterions (list[Callable[[Any], bool]]): Each criterion corresponds to a list[str] filter key set.
         drop_key_sets (list[list[str]] | None, optional): Sets of keys to drop, each list directly indexes a leaf node. Only applies to Json output. Defaults to None.
         sort_keys (list[list[str]] | None, optional): Keys to sort the runs by. Defaults to None.
@@ -174,6 +175,7 @@ def search_old_runs(
 
     return [CompExpInfo.model_validate(run) for run in runs]
 
+
 def find_runs(
     filters: dict[str, Any],
     *,
@@ -185,9 +187,9 @@ def find_runs(
 ) -> list[CompExpInfo]:
     """
     Find runs using fiters and apply list manipulation
-        
+
     Args:
-        filters (dict[str, Any]): Nested dictionary where the leaf is a callable boolean function. 
+        filters (dict[str, Any]): Nested dictionary where the leaf is a callable boolean function.
         drop_key_sets (list[list[str]] | None, optional): Sets of keys to drop, each list directly indexes a leaf node. Only applies to Json output. Defaults to None.
         sort_keys (list[list[str]] | None, optional): Keys to sort the runs by. Defaults to None.
         reverse (bool, optional): Whether to sort in reverse order. Defaults to False.
@@ -197,7 +199,7 @@ def find_runs(
     Returns:
         list[CompExpInfo]: List of CompExpInfo objects representing the filtered runs.
     """
-    
+
     drop_key_sets = drop_key_sets if drop_key_sets is not None else []
     file_filter_keys, file_criterions = unpack_filters(filters)
     return search_old_runs(
@@ -209,6 +211,7 @@ def find_runs(
         top_n=top_n,
         output_path=output_path,
     )
+
 
 def fetch_runs(
     filters_path: Path,
@@ -254,11 +257,13 @@ def load_runs(runs_path: Path) -> list[CompExpInfo]:
     with open(runs_path, "r") as f:
         return [CompExpInfo.model_validate(r) for r in json.load(f)]
 
+
 # ----------------------------------------------------------------------
 # Stash and Assest saving and loading
 # ----------------------------------------------------------------------
 
-STASH_DIR_NAME : str = 'stashed_results'
+STASH_DIR_NAME: str = "stashed_results"
+
 
 def format_exp_label(exp_no: str) -> str:
     """Format an `exp_no` for use in stash/asset filenames.
@@ -272,33 +277,65 @@ def format_exp_label(exp_no: str) -> str:
     return f"exp{exp_no}" if exp_no.isdigit() else exp_no
 
 
-def get_out_stub(split : str, model : str, exp : str, checkpoint_num: int | str | None = None) -> str:
-    checknum = str(checkpoint_num) + '_' if checkpoint_num is not None else ''
+def get_out_stub(
+    split: str, model: str, exp: str, checkpoint_num: int | str | None = None
+) -> str:
+    checknum = str(checkpoint_num) + "_" if checkpoint_num is not None else ""
     return f"{split}_{model}_{exp}_{checknum}"
 
-def get_asset_path(metric_descriptor: str, stub: str, file_suffix: str, asset_dir: Path = RESULTS_OUTPUTS) -> Path:
-    """Get the path for the asset to be saved to"""
-    return (asset_dir / f'{metric_descriptor}_{stub}').with_suffix(file_suffix)
 
-def get_stash_path(stub : str, base_name: str = "results", local_stash_dir_name: str = STASH_DIR_NAME) -> Path:
+def get_asset_path(
+    metric_descriptor: str,
+    stub: str,
+    project_name: str,
+    file_suffix: str = ".pdf",
+    asset_dir: Path = RESULTS_OUTPUTS,
+) -> Path:
+    """Generate a consistent file path for `assets`.
+
+    Args:
+        metric_descriptor (str): What is this chart measuring? (e.g. `corr_signers`).
+        stub (str): Where did the results come from? (use `get_out_stub`).
+        project_name (str): What is the directory name the notebook is running in? (e.g. `satnac_2026`).
+        file_suffix (str, optional): For `with_suffix`. Defaults to ".pdf".
+        asset_dir (Path, optional): Where is the top level asset directory?. Defaults to RESULTS_OUTPUTS.
+
+    Returns:
+        Path: Descriptive path.
+    """
+    return (asset_dir / project_name / f"{metric_descriptor}_{stub}").with_suffix(
+        file_suffix
+    )
+
+
+def get_stash_path(
+    stub: str, base_name: str = "results", local_stash_dir_name: str = STASH_DIR_NAME
+) -> Path:
     """Get the path to the results json file"""
     return Path(local_stash_dir_name) / f"{stub}{base_name}.json"
 
-def stash_json(results : Any, stash_path: Path, make: bool = True, indent: int | str | None  = None) -> Path:
+
+def stash_json(
+    results: Any, stash_path: Path, make: bool = True, indent: int | str | None = None
+) -> Path:
     """Stash the results, make if necessary"""
     if make:
         stash_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(stash_path, 'w') as f:
+    with open(stash_path, "w") as f:
         json.dump(results, f, indent=indent)
-        
-    return stash_path 
-        
+
+    return stash_path
+
+
 def load_json(stash_path: Path) -> Any:
     """Load stashed results"""
-    with open(stash_path, 'r') as f:
+    with open(stash_path, "r") as f:
         return json.load(f)
 
-def stash_from_saved(original_save_path: Path, checkpoint_num: int | str | None = None) -> Path:
+
+def stash_from_saved(
+    original_save_path: Path, checkpoint_num: int | str | None = None
+) -> tuple[Path, str]:
     """Copy a result already computed under the runs/ directory straight into the stash,
     without re-running inference."""
     results_dir = original_save_path.parent
@@ -308,5 +345,4 @@ def stash_from_saved(original_save_path: Path, checkpoint_num: int | str | None 
     split_dir = model_dir.parent
 
     stub = get_out_stub(split_dir.name, model_dir.name, exp_dir.name, checkpoint_num)
-    return stash_json(load_json(original_save_path), get_stash_path(stub))
-
+    return stash_json(load_json(original_save_path), get_stash_path(stub)), stub
