@@ -14,7 +14,6 @@ import torch
 from pydantic import ValidationError
 
 import wandb
-from run_types import RunInfo
 from src.que.core import (
     CUR_RUN,
     SERVER_LOG_PATH,
@@ -29,13 +28,27 @@ from src.que.core import (
     connect_manager,
     sweep_info_validate,
 )
-from src.run_types import WandbInfo
+from src.run_types import RunInfo, WandbInfo
 from src.sweeping import create_sweep_run
 
 # locals
 from src.testing import full_test
 from src.training import _setup_wandb, train_loop
 from src.utils import gpu_manager
+
+
+def _is_wandb_injected_stop(exc: Exception) -> bool:
+    """Heuristic for wandb's Hyperband/early-terminate stop signal.
+
+    wandb kills an in-process sweep trial (no subprocess to terminate) via
+    ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, Exception) -- see
+    wandb/agents/pyagent.py's _terminate_thread. That raises the bare `Exception`
+    class with no args wherever the thread happens to be executing. A base
+    `Exception` with an empty message is not otherwise raised anywhere in this
+    codebase (see src/que/todo), so this is a reliable-in-practice signature,
+    not a certainty.
+    """
+    return type(exc) is Exception and not exc.args
 
 
 class LoggerWriter(io.TextIOBase):
@@ -160,6 +173,17 @@ class Worker:
         self.server_logger.info(f"Run name: {run.name}")  # Human-readable name
         self.server_logger.info(f"Run path: {run.path}")  # entity/project/run_id format
 
+        # NOTE (see src/que/todo, Server section): print() output during train_loop
+        # only reaches this redirect target, never wandb's own console capture --
+        # confirmed empirically, not just a block-scoping issue. wandb patches the
+        # *write method* of whichever object is sys.stdout at first `import wandb`
+        # (wandb/sdk/lib/console_capture.py), once, permanently, before this
+        # redirect ever runs. Reassigning sys.stdout to self.log_adapter here means
+        # print() calls sys.stdout.write() on our object instead, which never
+        # touches wandb's patched object -- no amount of restructuring these
+        # `with` blocks changes that. A real fix has to either stop reassigning
+        # sys.stdout during training, or additionally register self.log_adapter's
+        # write via wandb.sdk.lib.console_capture.capture_stdout(...) directly.
         with redirect_stdout(self.log_adapter):
             train_loop(
                 admin.model,
@@ -220,10 +244,22 @@ class Worker:
 
     def _sweep_train(self) -> None:
         """Callback passed to wandb.agent(function=...). Runs in-process, in
-        the thread the agent invokes it on -- NOT a separate process, so
-        there's no subprocess for the agent to kill if wandb's backend later
-        decides to early-stop this trial (hyperband caveat discussed
-        separately; not handled here yet).
+        the thread the agent invokes it on -- NOT a separate process, so when
+        wandb's backend decides to early-stop this trial (e.g. hyperband), it
+        has no subprocess to kill and instead injects a bare exception into
+        this thread (see _is_wandb_injected_stop). That case is detected and
+        logged below rather than fixed at the root -- running each trial in
+        an actual subprocess would sidestep the injected-exception mechanism
+        entirely, but that's a bigger change than this handles.
+
+        wandb's own agent thread (pyagent.py's _run_job) swallows *any*
+        exception raised here unconditionally and never re-raises, so this is
+        also the only place that can detect and record a genuine training
+        crash for a sweep trial -- by the time control returns to
+        Worker.sweep(), wandb has already discarded it. Non-wandb-stop
+        exceptions are stashed to fail_runs directly below, which also empties
+        cur_run so Worker.start()'s post-sweep dispatch correctly skips
+        testing instead of testing a possibly-checkpointless run.
 
         Unlike _train, there's no que injection step beforehand: create_sweep_run
         builds the RunInfo directly from this trial's sweep-sampled hyperparameters,
@@ -257,15 +293,35 @@ class Worker:
         self.server_logger.info(f"Run name: {run.name}")
         self.server_logger.info(f"Run path: {run.path}")
 
+        # NOTE (see src/que/todo, Server section): this redirect means wandb's own
+        # console capture never sees train_loop's print() output -- see _train's
+        # matching comment for the actual mechanism (it's not a block-scoping bug).
         with redirect_stdout(self.log_adapter):
-            train_loop(
-                config.admin.model,
-                config,
-                run,
-                recover=False,
-                event=self.stop_event,
-            )
-            run.finish(exit_code=0)
+            try:
+                train_loop(
+                    config.admin.model,
+                    config,
+                    run,
+                    recover=False,
+                    event=self.stop_event,
+                )
+            except Exception as e:  # noqa: BLE001
+                if _is_wandb_injected_stop(e):
+                    self.server_logger.info(
+                        f"Sweep trial {run.id} was stopped early by wandb (e.g. hyperband "
+                        "early-terminate); continuing to testing with the last saved checkpoint"
+                    )
+                else:
+                    # Raising here is a no-op: wandb's own agent thread (pyagent.py's
+                    # _run_job) swallows any exception from this function unconditionally
+                    # and never re-raises it, so Worker.sweep()'s except-Exception block
+                    # never sees it either. Recording the failure has to happen here, or
+                    # not at all.
+                    self._fail(e, "Sweep trial failed due to an error")
+                    self.que.stash_failed_run(self.build_exception_info(e))
+                    self.que.save_state()
+            else:
+                run.finish(exit_code=0)
 
         self.server_logger.info("_sweep_train method completed successfully")
 
@@ -357,6 +413,12 @@ class Worker:
             self.state['working_pid'] = None
             raise
         except Exception as e:
+            # NOTE: this never actually fires for an exception raised inside
+            # _sweep_train's train_loop() call -- wandb's own agent thread
+            # swallows those unconditionally (see _sweep_train's docstring),
+            # which is why that method stashes failures to fail_runs itself.
+            # This only catches things raised outside the wandb-managed
+            # thread, e.g. sweep_info_validate above.
             self._fail(e, "Sweep trial failed due to an error")
             self.que.stash_failed_run(str(e))
             self.que.save_state()

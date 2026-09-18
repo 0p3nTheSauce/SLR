@@ -12,12 +12,56 @@ Daemon:
     that the process started successfully)
 
 
-Worker: 
+Worker:
 - add sweeping functionality
 - if GPU is busy on startup, gets stuck, needs server process to be restarted
+- [DONE 2026-09-18] silent-swallow visibility gap in _sweep_train: wandb's hyperband/
+    early-terminate stops a sweep trial by injecting a bare, message-less `Exception` into
+    the training thread (ctypes.pythonapi.PyThreadState_SetAsyncExc, in wandb's own
+    pyagent.py _terminate_thread), which wandb's own `_run_job` then swallows internally
+    (calls wandb.finish(exit_code=1), doesn't re-raise) -- so it never reached
+    Worker.sweep()'s except Exception, and the trial fell through to testing/old_runs with
+    zero log trace that it had been cut short (this outcome is actually desired, since
+    earlier-epoch checkpoints are still usable, but it was happening by accident). Fixed by
+    _is_wandb_injected_stop() + a try/except around the train_loop() call in _sweep_train
+    that detects this specific signature and logs it explicitly, instead of relying on
+    wandb's internal swallow. Test: tests/que/test_worker.py.
+- [DONE 2026-09-18] genuine crash during a sweep trial's train_loop() was ALSO invisible,
+    not just the hyperband case above: wandb's own agent thread (pyagent.py's _run_job)
+    swallows *any* exception from _sweep_train unconditionally, not just the injected
+    hyperband one -- confirmed live on the debug sweep (a real shape-mismatch RuntimeError
+    fell straight through to testing against an empty checkpoints dir). Worker.sweep()'s
+    except Exception / stash_failed_run was dead code for this. Fixed by handling the
+    non-wandb-stop branch directly inside _sweep_train's except block: stash to fail_runs +
+    log there (mirrors Worker.train()'s existing pattern), which also empties cur_run so
+    Worker.start()'s existing len_loc('cur_run')==1 dispatch correctly skips testing.
+    Verified end-to-end with a forced-crash debug sweep trial (fail_runs gained the entry,
+    cur_run emptied, test() correctly skipped).
+- broader: train/sweep/test's outer `except Exception` blocks (worker.py's _fail path)
+    still blindly stash/report every non-QueException the same way -- e.g. no distinction
+    between a real crash and GPU OOM. Need to distinguish exception types explicitly instead
+    of blanket `except Exception` + str(e) throughout worker.py/training.py. See also
+    src/TODO.md's repo-wide blind-except audit item.
 
 Server:
-- redirect wandb output to log file
+- wandb's own per-run "Logs" tab / local output.log has been empty for a long time --
+    NOT a block-scoping bug in the `redirect_stdout(self.log_adapter)` calls in
+    _train/_sweep_train (tried merging the setup/training blocks into one continuous
+    redirect on 2026-09-18; verified on a live debug-sweep trial that this made no
+    difference -- output.log stayed empty, reverted). Real mechanism: wandb's
+    wandb/sdk/lib/console_capture.py patches the *write method* of whichever object is
+    sys.stdout at the first `import wandb` in the process, once, permanently ("not
+    possible to unpatch or repatch" per its own docstring). Our redirect_stdout(...)
+    reassigns the sys.stdout *name* to self.log_adapter during training, so print()
+    calls self.log_adapter.write() directly and never touch wandb's patched object at
+    all -- no restructuring of our `with` blocks changes that. Real fix needs to either
+    (a) not reassign sys.stdout during training at all (which likely means moving
+    training.py's print()-based step/epoch logging to a real logger, removing the need
+    for redirect_stdout here in the first place -- training.py's bare print() calls are
+    the underlying quick-and-dirty pattern), or (b) additionally register
+    self.log_adapter's write via wandb.sdk.lib.console_capture.capture_stdout(...)
+    directly so both wandb's capture and our own log file see the same writes (couples
+    us to a wandb-internal module path, so needs a version-pin/compat note if taken).
 - redirect testing output to log file
 
 
