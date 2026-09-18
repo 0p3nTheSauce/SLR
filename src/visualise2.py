@@ -493,6 +493,8 @@ def plot_metric_correlation(
     color: str = DEFAULT_ACCENT,
     fit_color: str = LINE_PALETTE[1],
     shade_by_density: bool = True,
+    y_clip: tuple[float, float] | None = None,
+    legend_top_y: float | None = None,
     ax=None,
 ):
     """
@@ -510,6 +512,14 @@ def plot_metric_correlation(
         False, every point is drawn in `color` at a flat alpha.
     fit_color: colour of the linear-fit line. Defaults to the vermillion
         entry of LINE_PALETTE for contrast against `color`.
+    y_clip: if given, clamps the linear-fit line to this (min, max) range
+        (e.g. (0, 1) for a bounded metric like F1 score) so extrapolation
+        can't draw it outside the metric's valid range. Does not affect the
+        scattered points themselves.
+    legend_top_y: if given, the legend (bottom-right corner of the axes) is
+        raised so its top edge aligns with this y-axis data value, instead
+        of sitting flush against the bottom of the axes -- useful to clear
+        a cluster of low-value points near the bottom-right corner.
 
     Returns (fig, ax, tau, p_value) -- tau/p_value from scipy's Kendall's
     tau, so callers can report them alongside the figure.
@@ -535,7 +545,18 @@ def plot_metric_correlation(
         ax.scatter(x_arr, y_arr, color=color, alpha=0.6, edgecolors="white", linewidths=0.4, s=60)
 
     coeffs = np.polyfit(x_arr, y_arr, deg=1)
-    x_line = np.linspace(x_arr.min(), x_arr.max(), 100)
+    slope, intercept = coeffs
+    x_min, x_max = x_arr.min(), x_arr.max()
+    if y_clip is not None and slope != 0:
+        # Truncate the x-range at whichever clip bound the line reaches first,
+        # rather than clamping y -- clamping y instead would draw a flat
+        # horizontal segment past the crossing point.
+        x_at_lo = (y_clip[0] - intercept) / slope
+        x_at_hi = (y_clip[1] - intercept) / slope
+        x_at_lo, x_at_hi = sorted((x_at_lo, x_at_hi))
+        x_min = max(x_min, x_at_lo)
+        x_max = min(x_max, x_at_hi)
+    x_line = np.linspace(x_min, x_max, 100)
     y_line = np.polyval(coeffs, x_line)
     ax.plot(
         x_line, y_line, color=fit_color, linewidth=1.8,
@@ -548,7 +569,17 @@ def plot_metric_correlation(
     ax.set_ylabel(ylabel)
     if title:
         ax.set_title(title)
-    ax.legend(loc="upper left")
+    # Deliberate deviation from the outside-axes legend convention used elsewhere in this
+    # module: scatter correlation plots leave a corner opposite the trend largely empty, so
+    # an in-axes legend there avoids occluding points without wasting horizontal space on an
+    # outside legend. Check the rendered figure when reusing this for a differently-shaped
+    # trend -- "lower right" only stays clear for a positive x/y correlation.
+    if legend_top_y is not None:
+        y_lo, y_hi = ax.get_ylim()
+        top_frac = (legend_top_y - y_lo) / (y_hi - y_lo)
+        ax.legend(loc="upper right", bbox_to_anchor=(1, top_frac))
+    else:
+        ax.legend(loc="lower right")
 
     fig.tight_layout()
     return fig, ax, tau, p_value
