@@ -58,14 +58,18 @@ Reuse `VALUE_FMT` (`"%.2f"`), `LOSS_FMT` (`"%.3f"`), `COUNT_FMT` (`"%d"`), and `
 - Grid: dashed line, `alpha=0.3`. Restrict to the axis with meaningful variation for bar-style
   charts (`axis="y"` for vertical bars, `axis="x"` for `horizontal=True`); scatter/correlation
   charts grid both axes.
-- Legend: default `loc="upper left"`. For grouped/stacked bar charts where the legend could overlap
-  many bars, place it outside via `bbox_to_anchor=(1.02, 1), borderaxespad=0.0`.
+- Legend: default `loc="upper left"`. **The legend must never occlude a bar/line/marker** — after
+  placing it, check the rendered figure (not just the code) for overlap. If the default corner
+  overlaps data, try another `loc` corner first; if no corner is clear (e.g. grouped/stacked bar
+  charts with many bars, or a bar that spans the full plot height), place it outside via
+  `bbox_to_anchor=(1.02, 1), borderaxespad=0.0`.
 
 ## Function catalog
 
 | Function | Use for | Notes |
 |---|---|---|
 | `plot_bar_chart` | Single-series bar chart (e.g. config vs. test loss) | `horizontal=True` for long category labels |
+| `add_iqr_lines` | Overlay mean±std and lower/upper quartile lines on a `plot_bar_chart` axes (e.g. variance across seeds) | Computes stats from raw values; calls `ax.legend(...)` itself, placed outside the axes |
 | `plot_grouped_bar_chart` | Multiple series per category (e.g. top-1/5/10 acc per split) | |
 | `plot_stacked_bar_chart` | Series summing to a per-category total (e.g. train/test/val instance counts) | `value_fmt` defaults to `COUNT_FMT` |
 | `plot_loss_curves` | One line per series over a shared x-axis (e.g. train/val loss curves) | NaNs dropped per-series so lines stay continuous |

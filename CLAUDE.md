@@ -232,5 +232,6 @@ For each notebook flagged this way:
 [`src/visualise2.py`](src/visualise2.py). New/updated plotting code should target
 `visualise2.py`'s conventions, not `visualise.py`. Before adding or changing a plotting function
 there, read [`src/VISUALISE2_CONVENTIONS.md`](src/VISUALISE2_CONVENTIONS.md) — it documents the
-signature/return/colour/styling conventions and the current function catalog, so they don't need
-to be re-derived from the source each time.
+signature/return/colour/styling conventions (including legend placement — **the legend must never
+occlude a bar/line/marker**, check the rendered figure, not just the code) and the current function
+catalog, so they don't need to be re-derived from the source each time.

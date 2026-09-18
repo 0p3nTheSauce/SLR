@@ -200,6 +200,50 @@ def plot_bar_chart(
     return fig, ax
 
 
+def add_iqr_lines(
+    ax,
+    values: ArrayLike,
+    value_fmt: str = VALUE_FMT,
+    horizontal: bool = False,
+    mean_color: str = "black",
+    quartile_color: str = "brown",
+) -> None:
+    """
+    Overlay mean +/- std and lower/upper quartile reference lines on an
+    existing bar chart axes (e.g. the `ax` returned by plot_bar_chart), with
+    the legend placed outside the axes so it never occludes the bars (see
+    VISUALISE2_CONVENTIONS.md).
+
+    values: the data the bars represent (e.g. df["Test Loss"]) -- mean/std/
+        quartiles are computed from this, not read back from the bars.
+    horizontal: must match the `horizontal` passed to plot_bar_chart -- lines
+        are drawn with axhline when False (vertical bars, value on the
+        y-axis) or axvline when True (horizontal bars, value on the x-axis).
+    """
+    values_arr = np.asarray(values, dtype=float)
+    mean = values_arr.mean()
+    std = values_arr.std(ddof=1)
+    q1 = np.percentile(values_arr, 25)
+    q3 = np.percentile(values_arr, 75)
+
+    line_fn = ax.axvline if horizontal else ax.axhline
+
+    line_fn(
+        mean, color=mean_color, linestyle="--", linewidth=1,
+        label=f"Mean: {value_fmt % mean} $\\pm$ {value_fmt % std}",
+    )
+    line_fn(
+        q1, color=quartile_color, linestyle="--", linewidth=1,
+        label=f"Lower quartile: {value_fmt % q1}",
+    )
+    line_fn(
+        q3, color=quartile_color, linestyle="--", linewidth=1,
+        label=f"Upper quartile: {value_fmt % q3}",
+    )
+
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
+
+
 def plot_grouped_bar_chart(
     x: ArrayLike,
     ys: dict[str, ArrayLike],
