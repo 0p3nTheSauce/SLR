@@ -79,5 +79,6 @@ Reuse `VALUE_FMT` (`"%.2f"`), `LOSS_FMT` (`"%.3f"`), `COUNT_FMT` (`"%d"`), and `
 | `split_name_mapper` | Map a raw split key (`"asl100_cutoff_9"`) to its display name (`"WLASL-100"`) | Backed by `SPLIT_NAME_MAP` |
 | `plot_bboxes_on_canvas` | Per-class average (or raw) bbox outlines on a blank frame-sized canvas | One colour per class via `tab20`; not a `suggest_palette` case (too many categories) |
 | `plot_dimension_distributions` | Bbox width/height histograms with mean/median/quartile lines | Returns `(fig, axes)` with `axes` a length-2 array -- the one exception to the single-`ax` return convention |
+| `plot_frame_grid` | Grid of evenly-sampled video frames (e.g. example clips, per-gloss prediction/misprediction comparisons) | Returns `(fig, axes)` with `axes` a 2D (rows x cols) array -- another exception to the single-`ax` return convention, since it's inherently a grid of subplots; no `ax` parameter for the same reason. Supersedes `utils.plt_display_grid` for new code -- that function predates this convention and lacks the `save_fig`-friendly `(fig, axes)` return (it saves directly via its own `output` param instead) |
 
 Update this table whenever a function is added, renamed, or its purpose changes.

@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import math
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from logging import Logger
@@ -44,7 +45,7 @@ from src.run_types import (
     OG_Sampler,
 )
 from src.testing import load_test_sizes, setup_data, test_topk_clsrep
-from src.utils import load_rgb_frames_from_video, plt_display_grid
+from src.utils import load_rgb_frames_from_video
 from src.video_dataset import (
     get_transform,
     get_video_path,
@@ -383,7 +384,7 @@ def plot_stacked_bar_chart(
 
     all_values = {name: np.asarray(ys[name], dtype=float) for name in series_names}
     totals = sum(all_values.values())
-    label_threshold = min_label_frac * totals.max()
+    label_threshold = min_label_frac * totals.max() #type: ignore
 
     for i, name in enumerate(series_names):
         label = legend_labels.get(name, name) if legend_labels else name
@@ -729,11 +730,11 @@ def plot_dimension_distributions(
         fig = ax[0].figure
         axes = ax
 
-    stat_lines: list[tuple[str, Callable[[ArrayLike], float], str]] = [
+    stat_lines: list[tuple[str, Callable[[ArrayLike], float], str]] = [ # type: ignore 
         ("mean", np.mean, "red"),
         ("median", np.median, "blue"),
-        ("lower quartile", lambda v: np.percentile(v, 25), "brown"),
-        ("upper quartile", lambda v: np.percentile(v, 75), "brown"),
+        ("lower quartile", lambda v: np.percentile(v, 25), "brown"), # type: ignore
+        ("upper quartile", lambda v: np.percentile(v, 75), "brown"), # type: ignore
     ]
 
     for cur_ax, data, label, colour in zip(
@@ -859,6 +860,68 @@ class MiniSet(Dataset):
         return self.tot_samples
 
 
+def plot_frame_grid(
+    frames: Tensor,
+    num: int,
+    size: tuple[float, float] = (5.0, 5.0),
+    adapt: bool = False,
+    cols: int = 8,
+    title: str | None = None,
+):
+    """
+    Arrange an evenly-sampled subset of video frames into a grid, with
+    consistent thesis styling. Intended for showing/saving example clips
+    (e.g. FrameVisualiser, or per-gloss prediction/misprediction frame grids).
+
+    frames: (T, C, H, W) tensor, RGB channel order.
+    num: number of frames to show, evenly sampled across `frames`. Must be >= 1.
+    size: (width, height) in inches per grid cell.
+    adapt: if True, scale `size` from the frames' actual resolution instead of
+        using `size` as given -- useful when frame_size differs from the
+        256x256 this default was tuned against.
+    cols: max frames per row; unused cells in the last row are hidden.
+
+    Returns (fig, axes) -- axes is a 2D array (rows x cols), the same
+    exception to the single-`ax` return convention as
+    plot_dimension_distributions, since this is inherently a grid of
+    subplots rather than one axes to hand back or accept.
+    """
+    if num < 1:
+        raise ValueError("num must be >= 1")
+
+    if adapt:
+        factor = 5 / 256
+        w, h = frames.shape[2], frames.shape[3]
+        size = (w * factor, h * factor)
+
+    num_frames = len(frames)
+    step = 1 if num_frames <= num else num_frames // num
+    sampled = frames[::step][:num]
+
+    rows = math.ceil(len(sampled) / cols)
+    fig, axes = plt.subplots(
+        rows, cols, figsize=(size[0] * cols, size[1] * rows), squeeze=False,
+    )
+
+    for i, frame in enumerate(sampled):
+        np_frame = frame.permute(1, 2, 0).cpu().numpy()
+        np_frame = (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
+        ax = axes[i // cols][i % cols]
+        ax.imshow(np_frame)
+        ax.axis("off")
+
+    # Hide any unused cells in the last row
+    for j in range(len(sampled), rows * cols):
+        axes[j // cols][j % cols].set_visible(False)
+
+    plt.subplots_adjust(wspace=0.02, hspace=0.02)
+    if title:
+        fig.suptitle(title)
+
+    fig.tight_layout()
+    return fig, axes
+
+
 class FrameVisualiser:
     def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
         self.target_frames = kwargs.get("target_length", 16)
@@ -879,9 +942,10 @@ class FrameVisualiser:
             frames = frames.squeeze(dim=0)
         if frames.shape[1] != 3:
             frames = frames.permute(1, 0, 2, 3)  # swap T and C
-        
-        plt_display_grid(frames, self.target_frames)
-        
+
+        plot_frame_grid(frames, self.target_frames)
+
+
 class FrameFetcher:
     def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
         self.frames: Tensor | None = None

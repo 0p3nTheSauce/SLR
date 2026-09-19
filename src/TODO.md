@@ -5,3 +5,12 @@ Misc TODOs:
   Exception from wandb's own hyperband/early-terminate thread-kill mechanism currently gets
   either silently swallowed or reported indistinguishably from a real crash, depending on
   which layer it surfaces at.
+- `visualise2.plot_frame_grid` now exists as the convention-following (returns `(fig, axes)`,
+  saved via `save_fig`) replacement for the legacy `utils.plt_display_grid` (which saves
+  directly via its own `output` param, and doesn't mkdir the parent dir first -- unlike
+  `save_fig`). `src/results/satnac_2026/eda_performers.ipynb` and `visualise2.FrameVisualiser`
+  have been migrated; still on the old `utils.plt_display_grid` directly:
+  `src/results/dataset_analysis/{view_dataset_by_admin_info,class_viewer}.ipynb`,
+  `src/results/augmentation_demos/{autoaugment,cropping_norms,randaugment}.ipynb`,
+  `src/results/bottom_worst_splits/{100_worst,100_fewest}.ipynb`. Migrate opportunistically
+  when next touching one of these rather than as a standalone sweep.
