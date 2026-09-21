@@ -1,0 +1,68 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_loss
+  goal: minimize
+entity: ljgoodall2001-rhodes-university
+project: Sweeps
+
+early_terminate:
+  type: hyperband
+  min_iter: 15
+  eta: 3
+
+# Parameters as suggested by Aria
+parameters:
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 5e-6
+    max: 1e-2
+
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 5e-7
+    max: 1e-3
+
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 5e-7
+    max: 5e-2
+
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 5e-7
+    max: 1e-1
+
+  eps:
+    distribution: log_uniform_values
+    min: 5e-6
+    max: 1e-1
+
+  drop_p:
+    distribution: uniform
+    min: 0.05
+    max: 0.85
+
+  hflip_p:
+    distribution: uniform
+    min: 0.03
+    max: 0.50
+
+  # --- fixed ---
+  update_per_step: {value: 1}
+  frame_size: {value: 224}
+  batch_size: {value: 8}
+  max_epoch: {value: 200}
+  patience: {value: 15}
+  min_delta: {value: 0.01}
+  target_length: {value: 32}
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - S3D
+  - asl100_cutoff_9
+  - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp006/base.py
+
+# Not run yet
