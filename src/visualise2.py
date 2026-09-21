@@ -914,11 +914,15 @@ def plot_frame_grid(
     for j in range(len(sampled), rows * cols):
         axes[j // cols][j % cols].set_visible(False)
 
-    plt.subplots_adjust(wspace=0.02, hspace=0.02)
+    # All axes have axis("off") -- no tick/axis labels for tight_layout to
+    # account for -- so subplots_adjust with explicit margins is used
+    # directly instead, leaving room at the top only when there's a title.
     if title:
         fig.suptitle(title)
+        fig.subplots_adjust(left=0.005, right=0.995, top=0.92, bottom=0.005, wspace=0.02, hspace=0.02)
+    else:
+        fig.subplots_adjust(left=0.005, right=0.995, top=0.995, bottom=0.005, wspace=0.02, hspace=0.02)
 
-    fig.tight_layout()
     return fig, axes
 
 
