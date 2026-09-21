@@ -1,6 +1,924 @@
 {
-    "to_run": [],
-    "cur_run": [],
+    "to_run": [
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl300_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/MViTv2_S_e/exp001/checkpoints",
+                "seed": 42,
+                "exp_no": "001",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/NewRes/MViTv2_S_e_vaq635f1.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/MViTv2_S_16x4_e/sweep_imootel6/vaq635f1/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 2.0283092206015985e-06,
+                "backbone_init_lr": 0.00020500428310895295,
+                "backbone_weight_decay": 0.0005081077454495684,
+                "classifier_init_lr": 0.000883476887507909,
+                "classifier_weight_decay": 0.0004472201512928868
+            },
+            "model_params": {
+                "drop_p": 0.27757920392425955
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.07761593328956828
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 11,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": {
+                    "start_factor": 0.007963848084594997,
+                    "end_factor": 1.0,
+                    "warmup_epochs": 5
+                },
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 17,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 20,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "NewBest",
+                "tags": [],
+                "run_id": null,
+                "sweep_id": null
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl300_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/S3D/exp049/checkpoints",
+                "seed": 42,
+                "exp_no": "049",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/NewRes/S3D_13idpda6.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl100/S3D/sweep_qsh82m4w/13idpda6/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 2.0283092206015985e-06,
+                "backbone_init_lr": 0.00020500428310895295,
+                "backbone_weight_decay": 0.0005081077454495684,
+                "classifier_init_lr": 0.000883476887507909,
+                "classifier_weight_decay": 0.0004472201512928868
+            },
+            "model_params": {
+                "drop_p": 0.27757920392425955
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.07761593328956828
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 11,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": {
+                    "start_factor": 0.007963848084594997,
+                    "end_factor": 1.0,
+                    "warmup_epochs": 5
+                },
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 17,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 20,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "NewBest",
+                "tags": [],
+                "run_id": null,
+                "sweep_id": null
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl1000_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/MViTv2_S_e/exp001/checkpoints",
+                "seed": 42,
+                "exp_no": "001",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/NewRes/MViTv2_S_e_vaq635f1.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/MViTv2_S_e/exp001/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 2.0283092206015985e-06,
+                "backbone_init_lr": 0.00020500428310895295,
+                "backbone_weight_decay": 0.0005081077454495684,
+                "classifier_init_lr": 0.000883476887507909,
+                "classifier_weight_decay": 0.0004472201512928868
+            },
+            "model_params": {
+                "drop_p": 0.27757920392425955
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.07761593328956828
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 11,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": {
+                    "start_factor": 0.007963848084594997,
+                    "end_factor": 1.0,
+                    "warmup_epochs": 5
+                },
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 17,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 20,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "NewBest",
+                "tags": [],
+                "run_id": null,
+                "sweep_id": null
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl1000_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/S3D/exp050/checkpoints",
+                "seed": 42,
+                "exp_no": "050",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/NewRes/S3D_13idpda6.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl300_cutoff_9/S3D/exp049/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 2.0283092206015985e-06,
+                "backbone_init_lr": 0.00020500428310895295,
+                "backbone_weight_decay": 0.0005081077454495684,
+                "classifier_init_lr": 0.000883476887507909,
+                "classifier_weight_decay": 0.0004472201512928868
+            },
+            "model_params": {
+                "drop_p": 0.27757920392425955
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.07761593328956828
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 11,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": {
+                    "start_factor": 0.007963848084594997,
+                    "end_factor": 1.0,
+                    "warmup_epochs": 5
+                },
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 17,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 20,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "NewBest",
+                "tags": [],
+                "run_id": null,
+                "sweep_id": null
+            }
+        },
+        {
+            "admin": {
+                "model": "MViTv2_S_e",
+                "dataset": "WLASL",
+                "split": "asl2000_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl2000_cutoff_9/MViTv2_S_e/exp001/checkpoints",
+                "seed": 42,
+                "exp_no": "001",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/NewRes/MViTv2_S_e_vaq635f1.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/MViTv2_S_e/exp001/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 2.0283092206015985e-06,
+                "backbone_init_lr": 0.00020500428310895295,
+                "backbone_weight_decay": 0.0005081077454495684,
+                "classifier_init_lr": 0.000883476887507909,
+                "classifier_weight_decay": 0.0004472201512928868
+            },
+            "model_params": {
+                "drop_p": 0.27757920392425955
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.07761593328956828
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 11,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.45,
+                            0.45,
+                            0.45
+                        ],
+                        "std": [
+                            0.225,
+                            0.225,
+                            0.225
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": {
+                    "start_factor": 0.007963848084594997,
+                    "end_factor": 1.0,
+                    "warmup_epochs": 5
+                },
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 17,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 20,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "NewBest",
+                "tags": [],
+                "run_id": null,
+                "sweep_id": null
+            }
+        },
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl2000_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl2000_cutoff_9/S3D/exp051/checkpoints",
+                "seed": 42,
+                "exp_no": "051",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/NewRes/S3D_13idpda6.toml",
+                "weight_path": "/home/luke/Code/SLR/src/runs/asl1000_cutoff_9/S3D/exp050/checkpoints/best.pth"
+            },
+            "training": {
+                "batch_size": 2,
+                "update_per_step": 4,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 2.0283092206015985e-06,
+                "backbone_init_lr": 0.00020500428310895295,
+                "backbone_weight_decay": 0.0005081077454495684,
+                "classifier_init_lr": 0.000883476887507909,
+                "classifier_weight_decay": 0.0004472201512928868
+            },
+            "model_params": {
+                "drop_p": 0.27757920392425955
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "chunked"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.07761593328956828
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        },
+                        {
+                            "type": "RANDAUGMENT",
+                            "num_ops": 3,
+                            "magnitude": 11,
+                            "num_magnitude_bins": 31,
+                            "interpolation": "bilinear"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": {
+                "warm_up": {
+                    "start_factor": 0.007963848084594997,
+                    "end_factor": 1.0,
+                    "warmup_epochs": 5
+                },
+                "type": "CosineAnnealingWarmRestarts",
+                "t0": 17,
+                "tmult": 1,
+                "eta_min": 0.0
+            },
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 20,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "NewBest",
+                "tags": [],
+                "run_id": null,
+                "sweep_id": null
+            }
+        }
+    ],
+    "cur_run": [
+        {
+            "admin": {
+                "model": "S3D",
+                "dataset": "WLASL",
+                "split": "asl100_cutoff_9",
+                "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/sweep_9efnzegw/kfj0qjf5/checkpoints",
+                "seed": 42,
+                "exp_no": "kfj0qjf5",
+                "recover": false,
+                "config_path": "/home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp006/base.py",
+                "weight_path": null
+            },
+            "training": {
+                "batch_size": 8,
+                "update_per_step": 1,
+                "max_epoch": 200,
+                "batch_size_equivalent": 8
+            },
+            "optimizer": {
+                "eps": 0.00010566380377083051,
+                "backbone_init_lr": 0.0005931379599726363,
+                "backbone_weight_decay": 0.0004992198999607957,
+                "classifier_init_lr": 4.948271382263832e-06,
+                "classifier_weight_decay": 0.00469245702968717
+            },
+            "model_params": {
+                "drop_p": 0.05716486890618047
+            },
+            "data": {
+                "train_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "type": "HORIZONTAL_FLIP",
+                            "p": 0.30900825355390793
+                        },
+                        {
+                            "frame_size": 224,
+                            "type": "Random_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "test_augs": {
+                    "normalise": true,
+                    "norm_dict": {
+                        "mean": [
+                            0.43216,
+                            0.394666,
+                            0.37645
+                        ],
+                        "std": [
+                            0.22803,
+                            0.22145,
+                            0.216989
+                        ]
+                    },
+                    "temporal_aug": [
+                        {
+                            "target_length": 32,
+                            "max_wobble": 0,
+                            "type": "uniform"
+                        }
+                    ],
+                    "spatial_aug": [
+                        {
+                            "frame_size": 224,
+                            "type": "Centre_crop"
+                        }
+                    ],
+                    "strict_size": true,
+                    "target_length": 32,
+                    "frame_size": 224
+                },
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "scheduler": null,
+            "stopping": {
+                "type": "early_stopper",
+                "metric": "loss",
+                "phase": "val",
+                "mode": "min",
+                "patience": 15,
+                "min_delta": 0.01
+            },
+            "wandb": {
+                "entity": "ljgoodall2001-rhodes-university",
+                "project": "Sweeps",
+                "tags": [
+                    "sweep"
+                ],
+                "run_id": "kfj0qjf5",
+                "sweep_id": "9efnzegw"
+            }
+        }
+    ],
     "old_runs": [
         {
             "admin": {
