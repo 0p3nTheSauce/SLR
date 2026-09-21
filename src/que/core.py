@@ -16,6 +16,7 @@ from logging import Logger
 from multiprocessing.managers import BaseManager, DictProxy
 from pathlib import Path
 from typing import (
+    Annotated,
     Any,
     Literal,
     Protocol,
@@ -23,7 +24,7 @@ from typing import (
     TypeGuard,
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, TypeAdapter
 from typing_extensions import TypedDict, Unpack
 
 # locals
@@ -1091,28 +1092,18 @@ Worker_tasks: TypeAlias = Literal["inactive", "training", "testing"]
 
 # Maintained TypedDict for dictproxy in basemanager
 class WorkerStateDict(TypedDict):
-    task: Worker_tasks
-    current_run_id: str | None
-    working_pid: int | None
-    exception: str | None
-    # sweep_id: str | None
+    task: Annotated[Worker_tasks, Field(default="inactive")]
+    current_run_id: Annotated[str | None, Field(default=None)]
+    working_pid: Annotated[int | None, Field(default=None)]
+    exception: Annotated[str | None, Field(default=None)]
+
+
+_worker_state_adapter = TypeAdapter(WorkerStateDict)
 
 
 def worker_state_validate(obj: Any) -> WorkerStateDict:
-    class WorkerState(BaseModel):
-        task: Worker_tasks = "inactive"
-        current_run_id: str | None = None
-        working_pid: int | None = None
-        exception: str | None = None
-        sweep_id: str | None = None
-
-    d = WorkerState.model_validate(obj)
-    return {
-        "task": d.task,
-        "current_run_id": d.current_run_id,
-        "exception": d.exception,
-        "working_pid": d.working_pid,
-    }
+    """Validate/default `obj` (a dict, JSON payload, or manager `DictProxy`) as a `WorkerStateDict`."""
+    return _worker_state_adapter.validate_python(obj)
 
 
 class SweepInfo(TypedDict):
@@ -1123,48 +1114,46 @@ class SweepInfo(TypedDict):
     dataset: str
     split: AVAIL_SPLITS
     base_config: str
+    max_runs: int | None
+
+
+_sweep_info_adapter = TypeAdapter(SweepInfo)
 
 
 def sweep_info_validate(obj: Any) -> SweepInfo:
-    class SweepState(BaseModel):
-        sweep_id: str = ""
-        sweep_project: str = ""
-        sweep_entity: str = ""
-        model: str = ""
-        dataset: str = ""
-        split: AVAIL_SPLITS = "asl100"
-        base_config: str = ""
+    """Validate `obj` (a dict, JSON payload, or manager `DictProxy`) as a fully-populated `SweepInfo`.
 
-    d = SweepState.model_validate(obj)
-    return {
-        "sweep_id": d.sweep_id,
-        "sweep_project": d.sweep_project,
-        "sweep_entity": d.sweep_entity,
-        "model": d.model,
-        "dataset": d.dataset,
-        "split": d.split,
-        "base_config": d.base_config,
-    }
+    Unlike `worker_state_validate`/`daemon_state_validate`, there is no partial/defaulted form of a
+    `SweepInfo` -- "no sweep configured" is represented one level up as `SweepInfo | None`/`| dict`,
+    so every field here is required.
+    """
+    return _sweep_info_adapter.validate_python(obj)
 
 
 class DaemonStateDict(TypedDict):
-    awake: bool
-    stop_on_fail: bool
-    supervisor_pid: int | None
+    awake: Annotated[bool, Field(default=False)]
+    stop_on_fail: Annotated[bool, Field(default=True)]
+    supervisor_pid: Annotated[int | None, Field(default=None)]
+
+
+_daemon_state_adapter = TypeAdapter(DaemonStateDict)
 
 
 def daemon_state_validate(obj: Any) -> DaemonStateDict:
-    class DaemonState(BaseModel):
-        awake: bool = False
-        stop_on_fail: bool = True
-        supervisor_pid: int | None = None
+    """Validate/default `obj` (a dict, JSON payload, or manager `DictProxy`) as a `DaemonStateDict`."""
+    return _daemon_state_adapter.validate_python(obj)
 
-    d = DaemonState.model_validate(obj)
-    return {
-        "awake": d.awake,
-        "stop_on_fail": d.stop_on_fail,
-        "supervisor_pid": d.supervisor_pid,
-    }
+
+class SweepProgressDict(TypedDict):
+    completed_runs: Annotated[int, Field(default=0)]
+
+
+_sweep_progress_adapter = TypeAdapter(SweepProgressDict)
+
+
+def sweep_progress_validate(obj: Any) -> SweepProgressDict:
+    """Validate/default `obj` (a dict, JSON payload, or manager `DictProxy`) as a `SweepProgressDict`."""
+    return _sweep_progress_adapter.validate_python(obj)
 
 
 class ServerState(BaseModel):
@@ -1172,6 +1161,7 @@ class ServerState(BaseModel):
     sweep: SweepInfo | dict = {}
     daemon_state: DaemonStateDict = daemon_state_validate({})
     worker_state: WorkerStateDict = worker_state_validate({})
+    sweep_progress: SweepProgressDict = sweep_progress_validate({})
 
 
 def read_server_state(state_path: Path | str = SERVER_STATE_PATH) -> ServerState:
@@ -1231,6 +1221,7 @@ class QueManagerProtocol(Protocol):
     def get_sweep(self) -> SweepInfo | dict: ...
     def get_daemon_state(self) -> DaemonStateDict: ...
     def get_worker_state(self) -> WorkerStateDict: ...
+    def get_sweep_progress(self) -> SweepProgressDict: ...
     def get_server_context(self) -> ServerContextProtocol: ...
 
 
@@ -1246,6 +1237,7 @@ def connect_manager(
     QueManager.register("get_sweep", proxytype=DictProxy)
     QueManager.register("get_worker_state", proxytype=DictProxy)
     QueManager.register("get_daemon_state", proxytype=DictProxy)
+    QueManager.register("get_sweep_progress", proxytype=DictProxy)
     QueManager.register("get_daemon")
     QueManager.register("get_server_context")
 

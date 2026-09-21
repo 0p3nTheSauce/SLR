@@ -23,7 +23,9 @@ from src.que.core import (
     CompExpInfo,
     Que,
     QueException,
+    ServerContextProtocol,
     SweepInfo,  # now also carries model/split/dataset -- see note below
+    SweepProgressDict,
     WorkerStateDict,
     connect_manager,
     sweep_info_validate,
@@ -82,6 +84,8 @@ class Worker:
         self.state = state
         self.do_traceback = do_traceback
         self.sweep_info: SweepInfo | None = None
+        self.sweep_progress: SweepProgressDict | None = None
+        self.server_context: ServerContextProtocol | None = None
         self.server_logger.info("Worker initialized")
 
 
@@ -391,6 +395,25 @@ class Worker:
             self.cleanup()
             self.state['task'] = "inactive"
 
+    def _register_sweep_trial_completion(self, sweep_info: SweepInfo) -> None:
+        """Increment the shared completed-trial counter and stop the sweep if max_runs is
+        reached. Called right after wandb.agent(..., count=1) returns, so it counts every
+        attempted trial (success, failure, or wandb hyperband early-stop) exactly once --
+        _sweep_train runs exactly once per call regardless of outcome, and wandb's agent
+        thread swallows any exception it raises internally rather than propagating it here.
+        """
+        assert self.sweep_progress is not None and self.server_context is not None
+        completed = self.sweep_progress['completed_runs'] + 1
+        self.sweep_progress['completed_runs'] = completed
+
+        max_runs = sweep_info["max_runs"]
+        if max_runs is not None and completed >= max_runs:
+            self.training_logger.info(
+                f"Sweep {sweep_info['sweep_id']} reached max_runs={max_runs} "
+                f"({completed} trials completed); clearing sweep."
+            )
+            self.server_context.set_sweep({})
+
     def sweep(self, sweep_info: SweepInfo) -> None:
         self.sweep_info = sweep_info
         try:
@@ -404,6 +427,7 @@ class Worker:
                 function=self._sweep_train,
                 count=1,
             )
+            self._register_sweep_trial_completion(sweep_info)
         except (QueException, ValidationError) as e:
             self._fail(e, f"{type(e).__name__} — cannot continue")
             raise
@@ -457,7 +481,9 @@ class Worker:
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
-        
+        self.sweep_progress = manager.get_sweep_progress()
+        self.server_context = manager.get_server_context()
+
         #update state
         self.state['working_pid'] = os.getpid()
         self.state['exception'] = None

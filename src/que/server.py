@@ -25,8 +25,10 @@ from src.que.core import (
     QueManager,
     ServerState,
     SweepInfo,
+    SweepProgressDict,
     WorkerStateDict,
     read_server_state,
+    sweep_progress_validate,
     # Process_states
     timestamp_path,
 )
@@ -64,29 +66,28 @@ class ServerContext:
         signal.signal(signal.SIGINT, self._handle_shutdown)
 
         # logging
-        que_logger, daemon_logger, server_logger, worker_logger = (
-            self._setup_logging()
-        )
+        que_logger, daemon_logger, server_logger, worker_logger = self._setup_logging()
         self.server_logger = server_logger
         self.server_logger.info(self.seperator("Server starting up"))
-        
 
         # Events for controlling Daemon and Worker
         self.stop_worker_event = Event()
         self.stop_daemon_event = Event()
 
-
         # Classes
-        self.sweep : dict = {}
+        self.sweep: dict = {}
+        self.sweep_progress: SweepProgressDict = sweep_progress_validate({})
         self.que = Que(logger=que_logger)
         self.worker = Worker(
-            server_logger=worker_logger, que=self.que, stop_event=self.stop_worker_event,
+            server_logger=worker_logger,
+            que=self.que,
+            stop_event=self.stop_worker_event,
             state=WorkerStateDict(
-            task='inactive',
-            current_run_id=None,
-            working_pid=None,
-            exception=None,
-        )
+                task="inactive",
+                current_run_id=None,
+                working_pid=None,
+                exception=None,
+            ),
         )
         self.daemon = Daemon(
             worker=self.worker,
@@ -94,10 +95,10 @@ class ServerContext:
             stop_daemon_event=self.stop_daemon_event,
             stop_worker_event=self.stop_worker_event,
             state=DaemonStateDict(
-            awake=awake,
-            stop_on_fail=stop_on_fail,
-            supervisor_pid=None,
-        )
+                awake=awake,
+                stop_on_fail=stop_on_fail,
+                supervisor_pid=None,
+            ),
         )
         self.load_state()
 
@@ -143,13 +144,17 @@ class ServerContext:
 
             if self.save_on_shutdown:
                 self.server_logger.info("Saving server state...")
-                self.daemon.state['awake'] = False #if being stopped by signal, probably don't want to be awake when restarted
-                self.server_pid = None #similarly, we have no need to save an old pid
+                self.daemon.state["awake"] = (
+                    False  # if being stopped by signal, probably don't want to be awake when restarted
+                )
+                self.server_pid = None  # similarly, we have no need to save an old pid
                 self.save_state()
-            
+
             self.server_logger.info("Graceful shutdown complete")
         except Exception:
-            self.server_logger.exception("Error during shutdown",)
+            self.server_logger.exception(
+                "Error during shutdown",
+            )
         finally:
             sys.exit(0)
 
@@ -159,16 +164,18 @@ class ServerContext:
             sweep=self.sweep,
             daemon_state=self.daemon.get_state(),
             worker_state=self.worker.get_state(),
+            sweep_progress=self.sweep_progress,
         )
 
     def set_sweep(self, sweep: SweepInfo | dict) -> None:
-        """Sets the sweep information for the server context.
+        """Sets the sweep information for the server context, resetting the completed-trial counter.
 
         Args:
             sweep (SweepInfo | dict): Sweep information to set.
         """
         self.sweep.clear()
         self.sweep.update(sweep)
+        self.sweep_progress["completed_runs"] = 0
 
     def toggle_stop_on_fail(self) -> None:
         self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]
@@ -187,9 +194,10 @@ class ServerContext:
             worker (WorkerStateDict | None, optional): Worker state to set. Defaults to None.
         """
         if server is not None:
-            #do not reset server_pid after loading
+            # do not reset server_pid after loading
             self.sweep.clear()
             self.sweep.update(server.sweep)
+            self.sweep_progress["completed_runs"] = server.sweep_progress["completed_runs"]
             self.daemon.set_state(server.daemon_state)
             self.worker.set_state(server.worker_state)
         if daemon is not None:
@@ -197,9 +205,7 @@ class ServerContext:
         if worker is not None:
             self.worker.set_state(worker)
 
-    def save_state(
-        self, out_path: str | Path | None = None, timestamp: bool = False
-    ):
+    def save_state(self, out_path: str | Path | None = None, timestamp: bool = False):
         if out_path is None:
             out_path = self.state_path
         elif Path(out_path).exists() and not timestamp:
@@ -226,13 +232,13 @@ class ServerContext:
             state = read_server_state(self.state_path)
 
             # do not override start up stop on fail
-            state.daemon_state["stop_on_fail"] = self.daemon.state["stop_on_fail"]  
+            state.daemon_state["stop_on_fail"] = self.daemon.state["stop_on_fail"]
             self._set_state(state)
             self.server_logger.info(f"Loaded state from: {self.state_path}")
         except Exception as e:
             self.server_logger.warning(
                 f"Ran into an error when loading state: {e}\nloading abandoned",
-                exc_info=True
+                exc_info=True,
             )
 
 
@@ -274,7 +280,7 @@ def setup_manager(stop_on_fail: bool = True):
         "get_worker",
         callable=lambda: context.worker,
     )
-    
+
     QueManager.register(
         "get_worker_state",
         callable=lambda: context.worker.state,
@@ -284,6 +290,12 @@ def setup_manager(stop_on_fail: bool = True):
     QueManager.register(
         "get_sweep",
         callable=lambda: context.sweep,
+        proxytype=DictProxy,
+    )
+
+    QueManager.register(
+        "get_sweep_progress",
+        callable=lambda: context.sweep_progress,
         proxytype=DictProxy,
     )
 
@@ -309,26 +321,33 @@ def get_server_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--authkey",
         type=str,
-        default='abracadabra', #for testing, should be changed back to None for production
+        default="abracadabra",  # for testing, should be changed back to None for production
         help="Authentication key for connecting to the manager (default: None, will prompt for password)",
     )
     parser.add_argument(
         "--stop_on_fail",
-        '-f',
+        "-f",
         action="store_true",
         help="Stop daemon if a run fails (default: False)",
     )
 
     return parser
 
-def start_server(stop_on_fail: bool = True, address: tuple[str, int] = ("localhost", 50000), authkey: bytes = b"abracadabra"):
+
+def start_server(
+    stop_on_fail: bool = True,
+    address: tuple[str, int] = ("localhost", 50000),
+    authkey: bytes = b"abracadabra",
+):
     setup_manager(stop_on_fail=stop_on_fail)
 
     # Note: We bind to localhost for security, change to 0.0.0.0 to expose externally
     m = QueManager(address=address, authkey=authkey)
     s = m.get_server()
 
-    print(f"Object Server started on {address[0]}:{address[1]} with authkey: {authkey.decode()}")
+    print(
+        f"Object Server started on {address[0]}:{address[1]} with authkey: {authkey.decode()}"
+    )
 
     try:
         s.serve_forever()
@@ -339,6 +358,9 @@ def start_server(stop_on_fail: bool = True, address: tuple[str, int] = ("localho
 if __name__ == "__main__":
     parser = get_server_parser()
     args = parser.parse_args()
-    
-    
-    start_server(stop_on_fail=args.stop_on_fail, address=(args.host, args.port_server), authkey=args.authkey.encode())
+
+    start_server(
+        stop_on_fail=args.stop_on_fail,
+        address=(args.host, args.port_server),
+        authkey=args.authkey.encode(),
+    )

@@ -10,10 +10,18 @@ Shell:
 Daemon:
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
     that the process started successfully)
+- [DONE 2026-09-22] supervise()'s loop passed `dict(sweep).copy() if sweep is not None else None`
+    to Worker.start() -- but `sweep` is a DictProxy fetched once before the loop, so it is never
+    actually `None`, even when the underlying dict is empty. This meant an empty/no-op sweep
+    ({}) was always passed through as a truthy-looking dict, so Worker.start() (which checks
+    `sweep_info is not None`) would try to run a sweep trial with no sweep configured, hit
+    sweep_info_validate()'s ValidationError, crash the worker subprocess, and (with the default
+    stop_on_fail=True) stop the whole supervisor -- surfaced while adding the max_runs cap, whose
+    stop mechanism (clearing the sweep once the cap is hit) triggers exactly this case. Fixed by
+    checking the materialized dict's truthiness instead of the proxy handle's identity.
 
 
 Worker:
-- add sweeping functionality
 - if GPU is busy on startup, gets stuck, needs server process to be restarted
 - [DONE 2026-09-18] silent-swallow visibility gap in _sweep_train: wandb's hyperband/
     early-terminate stops a sweep trial by injecting a bare, message-less `Exception` into

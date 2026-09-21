@@ -1090,7 +1090,6 @@ class QueShell(cmdLib.Cmd):
 
     def do_daemon(self, arg):
         """Interact with the worker"""
-        from src.run_types import PROJECT_BASE
         from src.sweeping import (
             SweepConfigError,
             args_from_existing_sweep,
@@ -1161,6 +1160,7 @@ class QueShell(cmdLib.Cmd):
                         dataset=sweep_args.dataset,
                         split=sweep_args.split,
                         base_config=str(sweep_args.config_path),
+                        max_runs=parsed_args.max_runs,
                     )
                     self.server_context.set_sweep(sweep_info)
                     # save sweep metadata to a JSON file in the base_config's folder, for future reference
@@ -1232,6 +1232,11 @@ class QueShell(cmdLib.Cmd):
             daemon_table.add_row("Model:", f"{sweep_state['model']}")
             daemon_table.add_row("Dataset:", f"{sweep_state['dataset']}")
             daemon_table.add_row("Split:", f"{sweep_state['split']}")
+
+            max_runs = sweep_state.get("max_runs")
+            completed = status.sweep_progress["completed_runs"]
+            progress = f"{completed}/{max_runs}" if max_runs is not None else f"{completed} (unlimited)"
+            daemon_table.add_row("Progress:", progress)
 
         table.add_row("Daemon", daemon_table)
 
@@ -1826,7 +1831,6 @@ class QueShell(cmdLib.Cmd):
 
     def _get_daemon_parser(self) -> argparse.ArgumentParser:
         from configs import PROJECT_BASE
-        from models import avail_models
 
         parser = argparse.ArgumentParser(
             description="Interact with the worker process", prog="daemon"
@@ -1901,6 +1905,13 @@ class QueShell(cmdLib.Cmd):
             default=ENTITY,
             help="Wandb entity, defualts to (default: %(default)s)",
         )
+        set_sweep_parser.add_argument(
+            "--max_runs",
+            "-mr",
+            type=int,
+            default=None,
+            help="Maximum number of sweep trials to run before the sweep automatically stops (default: unlimited)",
+        )
         # clear sweep
         subparsers.add_parser("clear_sweep", help="Clear daemon sweep parameters")
 
@@ -1970,7 +1981,7 @@ class QueShell(cmdLib.Cmd):
         return parser
 
     def _get_wandb_parser(self) -> argparse.ArgumentParser:
-        from configs import ENTITY, PROJECT_BASE, get_avail_splits
+        from configs import ENTITY, PROJECT_BASE
 
         likely_projects = [
             f"{PROJECT_BASE}-{split[3:]}" for split in get_avail_splits()
