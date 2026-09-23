@@ -917,7 +917,10 @@ class Que:
         runs: ExpQue,
         index: int = 0,
     ) -> None:
-        """Insert runs by index. Uses 0 as default if runs is empty, and repeats last index up to lenght of runs"""
+        """Insert runs by index. Uses 0 as default if runs is empty, and repeats last index up to lenght of runs.
+        `NOTE:` This method is unsafe and will drop runs if there is an error.  
+        
+        """
         with log_and_raise(self.logger, "place_runs"):
             for idx, run in enumerate(runs):
                 self._set_run(loc, idx + index, run)
