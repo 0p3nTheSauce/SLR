@@ -55,6 +55,14 @@ Worker:
     Worker.start()'s existing len_loc('cur_run')==1 dispatch correctly skips testing.
     Verified end-to-end with a forced-crash debug sweep trial (fail_runs gained the entry,
     cur_run emptied, test() correctly skipped).
+- [DONE 2026-09-24] a crashed sweep trial never triggered stop_on_fail: wandb.agent swallows
+    every exception from _sweep_train (confirmed in wandb 0.25.0 pyagent._run_job), so the
+    worker exited 0 after stashing it. Worse, failures in create_sweep_run/_inject_sweep_config
+    (outside the old train_loop try) weren't recorded at all -- a broken base_config looped
+    silently, burning wandb trials and counting towards max_runs. Fixed: _sweep_train records
+    any non-hyperband failure in `_trial_error` and Worker.sweep() re-raises it as
+    SweepTrialFailed after wandb.agent returns; failed trials are no longer counted. Also
+    sweep()'s outer except no longer masks errors with QueEmpty by stashing an empty cur_run.
 - broader: train/sweep/test's outer `except Exception` blocks (worker.py's _fail path)
     still blindly stash/report every non-QueException the same way -- e.g. no distinction
     between a real crash and GPU OOM. Need to distinguish exception types explicitly instead
