@@ -245,7 +245,7 @@ class TestSetMaxRuns:
     ) -> None:
         out = harness.run("daemon", "set_max_runs 60")
         assert context.sweep["max_runs"] == 60
-        assert "50 → 60 (48 completed)" in out
+        assert "50 → 60 (progress: 48/60)" in out
         [entry] = json.loads((tmp_path / "sweep_meta.json").read_text())
         assert entry | {"recorded": None} == {
             "recorded": None,
@@ -261,8 +261,15 @@ class TestSetMaxRuns:
         assert context.sweep["max_runs"] is None
         assert "50 → unlimited" in out
 
-    @pytest.mark.parametrize("arg", ["", "60 -u"])
-    def test_requires_exactly_one_of_value_or_unlimited(
+    def test_cap_at_completed_reports_complete(
+        self, harness: ShellHarness, context: FakeServerContext
+    ) -> None:
+        out = harness.run("daemon", "set_max_runs 48")
+        assert context.sweep["max_runs"] == 48
+        assert "(progress: 48/48 (complete))" in out
+
+    @pytest.mark.parametrize("arg", ["", "60 -u", "0", "-3"])
+    def test_rejects_missing_conflicting_or_non_positive(
         self, harness: ShellHarness, context: FakeServerContext, arg: str
     ) -> None:
         harness.run("daemon", f"set_max_runs {arg}")

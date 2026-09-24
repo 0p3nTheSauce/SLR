@@ -7,20 +7,36 @@ import time
 from logging import Logger
 from multiprocessing import Process
 from multiprocessing.synchronize import Event as EventClass
-from typing import Literal
+from typing import Any, Literal, cast
 
 # locals
 from src.que.core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
     DaemonStateDict,
+    SweepInfo,
     connect_manager,
+    is_sweep_complete,
 )
 from src.que.worker import Worker
 
 
 def generate_run_id(length: int = 8) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
+
+
+def sweep_to_hand_off(
+    sweep: dict[str, Any], completed_runs: int, to_run_len: int
+) -> SweepInfo | None:
+    """The sweep the Worker should run a trial of next, or None if it should train from the Que.
+
+    Runs waiting in to_run take priority over the sweep, and a complete sweep (see
+    is_sweep_complete) isn't handed out. `sweep` is the materialised shared sweep dict (empty when
+    none is set); it's validated by the Worker, not here.
+    """
+    if not sweep or to_run_len > 0 or is_sweep_complete(sweep["max_runs"], completed_runs):
+        return None
+    return cast(SweepInfo, sweep)
 
 
 class Daemon:
@@ -37,6 +53,7 @@ class Daemon:
         self.stop_worker_event = stop_worker_event
         self.stop_daemon_event = stop_daemon_event
         self.worker_process: Process | None = None
+        self._logged_complete: tuple[str, int | None] | None = None
         self.supervisor_process: Process | None = None
         self.logger.info("Daemon initialized")
         self.set_state(state)
@@ -106,6 +123,20 @@ class Daemon:
         return True
 
 
+    def _next_sweep(
+        self, sweep: dict[str, Any], completed_runs: int, to_run_len: int
+    ) -> SweepInfo | None:
+        """sweep_to_hand_off, logging (once per sweep/cap) when the sweep is complete."""
+        if sweep and is_sweep_complete(sweep["max_runs"], completed_runs):
+            key = (sweep["sweep_id"], sweep["max_runs"])
+            if self._logged_complete != key:
+                self._logged_complete = key
+                self.logger.info(
+                    f"Sweep {key[0]} complete ({completed_runs}/{key[1]}); no longer handing "
+                    "it to the worker. Raise it with `daemon set_max_runs` to resume."
+                )
+        return sweep_to_hand_off(sweep, completed_runs, to_run_len)
+
     def supervise(
         self,
         recover_run: bool = False,
@@ -115,17 +146,23 @@ class Daemon:
         The worker process is started and monitored here. After it completes successfully, it is restarted.
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
 
+        Before each launch the shared sweep, its progress and to_run are re-read to decide whether
+        the worker gets a sweep trial or a Que run (see sweep_to_hand_off), so edits made via the
+        shell (e.g. `daemon set_max_runs`) apply from the next worker on.
+
         Args:
             recover_run (bool, optional): Wether to recover the last failed run. Defaults to False.
-            sweep_id (Optional[str], optional): Wether to initialise a sweep. Defaults to None.
+            retries (int, optional): Consecutive supervisor-loop errors tolerated before exiting.
+                Defaults to 5.
         """
         # Initialise shared state through proxy
         manager = connect_manager()
         self.state = manager.get_daemon_state()
+        self.que = manager.get_que()
         sweep = manager.get_sweep()
+        sweep_progress = manager.get_sweep_progress()
         # handle automatic recovery
         if recover_run:
-            self.que = manager.get_que()
             self.que.recover_run()
 
         self._reattach_server_logger()
@@ -136,10 +173,10 @@ class Daemon:
         while not self.stop_daemon_event.is_set():
         
             try:
-                sweep_dict = dict(sweep)
-                self.worker_process = Process(
-                    target=self.worker.start, args=(sweep_dict if sweep_dict else None,)
+                sweep_info = self._next_sweep(
+                    dict(sweep), sweep_progress["completed_runs"], self.que.len_loc("to_run")
                 )
+                self.worker_process = Process(target=self.worker.start, args=(sweep_info,))
                 self.worker_process.start()
                 worker_pid = self.worker_process.pid
                 self.logger.info(f"Worker started with PID: {worker_pid}")

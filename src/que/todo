@@ -35,6 +35,15 @@ Daemon:
     stop mechanism (clearing the sweep once the cap is hit) triggers exactly this case. Fixed by
     checking the materialized dict's truthiness instead of the proxy handle's identity.
 
+- when there is no work (to_run empty and no sweep to hand off -- none set, or complete) the
+    supervisor still launches a worker, which hits an empty Que and exits non-zero, so
+    stop_on_fail decides whether it stops or restart-loops every second. sweep_to_hand_off
+    already knows there's no sweep work; have the Daemon idle (poll) or exit cleanly instead.
+- sweep progress (completed_runs) lives only in the server state file. Record each finished
+    trial in the base_config folder's sweep_meta.json (next to the creation/set_max_runs
+    entries) so progress can be reloaded from it, e.g. when re-attaching to a sweep via
+    set_sweep --sweep_id. Needs a decision on which machine writes it: the shell writes the
+    existing entries and may run remotely over the SSH tunnel, but trials finish on the server.
 
 Worker:
 - if GPU is busy on startup, gets stuck, needs server process to be restarted

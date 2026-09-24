@@ -51,6 +51,7 @@ from src.que.core import (
     ServerState,
     SweepInfo,
     connect_manager,
+    is_sweep_complete,
     sweep_info_validate,
 )
 
@@ -373,6 +374,19 @@ def record_max_runs_change(
 
 def _fmt_max_runs(max_runs: int | None) -> str:
     return "unlimited" if max_runs is None else str(max_runs)
+
+
+def _fmt_sweep_progress(max_runs: int | None, completed_runs: int) -> str:
+    progress = f"{completed_runs}/{_fmt_max_runs(max_runs)}"
+    return f"{progress} (complete)" if is_sweep_complete(max_runs, completed_runs) else progress
+
+
+def positive_int(value: str) -> int:
+    """argparse `type` for an int >= 1."""
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, got {n}")
+    return n
 
 
 # --------------------------------------------------------------------------
@@ -1226,7 +1240,8 @@ class QueShell(cmdLib.Cmd):
                     )
                     self.console.print(
                         f"[bold green]✓ Sweep max runs: {_fmt_max_runs(previous)} → "
-                        f"{_fmt_max_runs(max_runs)} ({completed} completed)[/bold green]"
+                        f"{_fmt_max_runs(max_runs)} "
+                        f"(progress: {_fmt_sweep_progress(max_runs, completed)})[/bold green]"
                     )
 
             elif parsed_args.command == "clear_sweep":
@@ -1296,9 +1311,11 @@ class QueShell(cmdLib.Cmd):
             daemon_table.add_row("Dataset:", f"{sweep_state['dataset']}")
             daemon_table.add_row("Split:", f"{sweep_state['split']}")
 
-            completed = status.sweep_progress["completed_runs"]
             daemon_table.add_row(
-                "Progress:", f"{completed}/{_fmt_max_runs(sweep_state.get('max_runs'))}"
+                "Progress:",
+                _fmt_sweep_progress(
+                    sweep_state.get("max_runs"), status.sweep_progress["completed_runs"]
+                ),
             )
 
         table.add_row("Daemon", daemon_table)
@@ -1977,9 +1994,9 @@ class QueShell(cmdLib.Cmd):
         set_sweep_parser.add_argument(
             "--max_runs",
             "-mr",
-            type=int,
+            type=positive_int,
             default=None,
-            help="Maximum number of sweep trials to run before the sweep automatically stops (default: unlimited)",
+            help="Maximum number of sweep trials to run before the sweep is complete (default: unlimited)",
         )
         # set max runs
         set_max_runs_parser = subparsers.add_parser(
@@ -1989,9 +2006,10 @@ class QueShell(cmdLib.Cmd):
         set_max_runs_group = set_max_runs_parser.add_mutually_exclusive_group(required=True)
         set_max_runs_group.add_argument(
             "max_runs",
-            type=int,
+            type=positive_int,
             nargs="?",
-            help="New maximum number of trials; must exceed the trials already completed",
+            help="New maximum number of trials; at or below the trials already completed marks "
+            "the sweep complete (the running trial still finishes)",
         )
         set_max_runs_group.add_argument(
             "--unlimited", "-u", action="store_true", help="Remove the trial cap"
