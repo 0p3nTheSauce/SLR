@@ -904,6 +904,7 @@ class Que:
         keys: list[str],
         value: Any,
         do_eval: bool = False,
+        # **kwargs: Unpack[ListManipulationKwargs]
     ) -> None:
         """Edit a single field (by key path) in a queued run.
 
@@ -911,7 +912,10 @@ class Que:
         the appropriate pydantic model — so all field validators still run.
         """
         with log_and_raise(self.logger, "edit"):
-            run = self.peak_run(loc, idx)
+            #take one index
+            # original_index = self.select_indexes(self._fetch_state(loc), [idx], **kwargs)[0] 
+            original_index = idx 
+            run = self.peak_run(loc, original_index)
             val = ast.literal_eval(value) if do_eval else value
 
             run_dict = run.model_dump()
@@ -926,8 +930,8 @@ class Que:
 
             new_run = strict_validate(run_type, run_dict)
 
-            _ = self._pop_run(loc, idx)
-            self._set_run(loc, idx, new_run)
+            _ = self._pop_run(loc, original_index)
+            self._set_run(loc, original_index, new_run)
 
     # Indirect indexing
 
@@ -948,6 +952,19 @@ class Que:
         """Select runs by index after applying list manipulations."""
         runs = self.list_runs(loc, **kwargs)
         return [runs[i] for i in indexes]
+
+
+    @classmethod
+    def select_indexes(
+        cls,
+        runs: Sequence[GenExp],
+        indexes: list[int],
+        **kwargs: Unpack[ListManipulationKwargs],
+    ) -> list[int]:
+        """Select runs by index after applying list manipulations."""
+        idxs, _ = cls.indexed_list_manipulation(runs, **kwargs)
+        return [idxs[i] for i in indexes]
+
 
     def place_runs(
         self,

@@ -812,9 +812,24 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.unwrap_exception("Edit successful", "Edit failed"):
+            
+            filter_key_sets, criterions, _drop_key_sets = self._merge_filters(parsed_args)
+            
+            #NOTE: Filtering must be passed to select_indexes: 
+            # - not list_runs (preserve idxs)
+            # - nor edit_run (lambda isnt json serializable)
+            original_index = Que.select_indexes(
+                self.que.list_runs(parsed_args.location), 
+                [parsed_args.index],
+                filter_keys=filter_key_sets,
+                criterions=criterions,
+                sort_keys=parsed_args.sort_keys,
+                reverse=parsed_args.reverse,
+                )[0] # take one index
+            
             self.que.edit_run(
                 parsed_args.location,
-                parsed_args.index,
+                original_index, #pass int location through socket
                 parsed_args.edit_keys,
                 parsed_args.value,
                 parsed_args.do_eval,
@@ -888,6 +903,28 @@ class QueShell(cmdLib.Cmd):
 
         self.console.print(table)
 
+    def _merge_filters(self, parsed_args):
+        if parsed_args.input_path:
+            file_filter_keys, file_criterions, file_drop_key_sets = (
+                get_filters_crits_dropkeys(parsed_args.input_path)
+            )
+        else:
+            (
+                file_filter_keys,
+                file_criterions,
+                file_drop_key_sets,
+            ) = [], [], []
+            
+        return (
+            parsed_args.filter_keys + file_filter_keys, 
+            [
+                parse_criterion(_join_criterion_tokens(crit))
+                for crit in parsed_args.criterion
+            ] + file_criterions,
+            file_drop_key_sets
+            )
+            
+
     def do_list(self, arg):
         """Display runs in a table"""
         with (
@@ -897,17 +934,8 @@ class QueShell(cmdLib.Cmd):
             parsed_args = self._parse_args_or_cancel("list", arg)
             if parsed_args is None:
                 return
-
-            if parsed_args.input_path:
-                file_filter_keys, file_criterions, file_drop_key_sets = (
-                    get_filters_crits_dropkeys(parsed_args.input_path)
-                )
-            else:
-                (
-                    file_filter_keys,
-                    file_criterions,
-                    file_drop_key_sets,
-                ) = [], [], []
+                
+            filter_key_sets, criterions, drop_key_sets = self._merge_filters(parsed_args)
 
             runs = None
 
@@ -918,12 +946,9 @@ class QueShell(cmdLib.Cmd):
                     ),
                     sort_keys=parsed_args.sort_keys,
                     reverse=parsed_args.reverse,
-                    filter_keys=parsed_args.filter_keys + file_filter_keys,
-                    criterions=[
-                        parse_criterion(_join_criterion_tokens(crit))
-                        for crit in parsed_args.criterion
-                    ]
-                    + file_criterions,
+                    filter_keys=filter_key_sets,
+                    criterions=criterions
+                
                 )
             )
 
@@ -938,7 +963,7 @@ class QueShell(cmdLib.Cmd):
                 output_filtered_runs(
                     runs=runs,
                     output_path=parsed_args.output_path,
-                    file_drop_key_sets=file_drop_key_sets,
+                    file_drop_key_sets=drop_key_sets,
                 )
 
             self._print_list(
@@ -1767,9 +1792,12 @@ class QueShell(cmdLib.Cmd):
             "-ek",
             nargs="+",
             type=str,
+            required=True,
             help="list of keys to edit within the run",
         )
         self._add_value_args(parser)
+        self._add_input_file_arg(parser, help="Path to filters.py")
+        self._add_list_manipulation_args(parser)
 
         return parser
 
