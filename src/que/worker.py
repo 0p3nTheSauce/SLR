@@ -53,6 +53,19 @@ def _is_wandb_injected_stop(exc: Exception) -> bool:
     return type(exc) is Exception and not exc.args
 
 
+class SweepTrialFailed(Exception):
+    """A sweep trial crashed inside wandb.agent's callback.
+
+    wandb's agent swallows any exception from the callback (see Worker._sweep_train), so the
+    original is recorded there and re-raised as this from Worker.sweep() once wandb.agent returns
+    -- making the worker process exit non-zero so the Daemon's stop_on_fail applies, the same as
+    a crash in Worker.train(). The original exception is chained as `__cause__`.
+    """
+
+    def __init__(self, sweep_id: str):
+        super().__init__(f"Sweep {sweep_id} trial failed")
+
+
 class LoggerWriter(io.TextIOBase):
     def __init__(self, logger: logging.Logger, level: int = logging.INFO):
         self.logger = logger
@@ -84,6 +97,7 @@ class Worker:
         self.state = state
         self.do_traceback = do_traceback
         self.sweep_info: SweepInfo | None = None
+        self._trial_error: Exception | None = None
         self.sweep_progress: SweepProgressDict | None = None
         self.server_context: ServerContextProtocol | None = None
         self.server_logger.info("Worker initialized")
@@ -257,29 +271,50 @@ class Worker:
         entirely, but that's a bigger change than this handles.
 
         wandb's own agent thread (pyagent.py's _run_job) swallows *any*
-        exception raised here unconditionally and never re-raises, so this is
-        also the only place that can detect and record a genuine training
-        crash for a sweep trial -- by the time control returns to
-        Worker.sweep(), wandb has already discarded it. Non-wandb-stop
-        exceptions are stashed to fail_runs directly below, which also empties
-        cur_run so Worker.start()'s post-sweep dispatch correctly skips
-        testing instead of testing a possibly-checkpointless run.
-
-        Unlike _train, there's no que injection step beforehand: create_sweep_run
-        builds the RunInfo directly from this trial's sweep-sampled hyperparameters,
-        so there's nothing sitting in TO_RUN for this run.
+        exception raised here unconditionally and never re-raises, so every
+        other failure -- in create_sweep_run, the que injection, or training --
+        is handled here: recorded in worker state, stashed to fail_runs if the
+        run already reached cur_run (which also makes Worker.start() skip
+        testing), and saved to `_trial_error` for Worker.sweep() to re-raise
+        once wandb.agent returns.
         """
-        assert self.sweep_info is not None, "_sweep_train called without sweep_info set"
-
         if not gpu_manager.wait_for_completion(
             check_interval=10,
             logger=self.server_logger,
             event=self.stop_event,
         ):
+            # only returns False when stopped (stop event / Ctrl+C), so not a failure
             self.server_logger.info("GPU not available, exiting")
             return
         else:
             self.server_logger.info("GPU is available")
+
+        try:
+            self._run_sweep_trial()
+        except Exception as e:  # noqa: BLE001
+            if _is_wandb_injected_stop(e):
+                self.server_logger.info(
+                    f"Sweep trial {self.state['current_run_id']} was stopped early by wandb (e.g. hyperband "
+                    "early-terminate); continuing to testing with the last saved checkpoint"
+                )
+                return
+            self._fail(e, "Sweep trial failed due to an error")
+            if self.que.len_loc(CUR_RUN) == 1:
+                self.que.stash_failed_run(self.build_exception_info(e))
+                self.que.save_state()
+            self._trial_error = e
+            return
+
+        self.server_logger.info("_sweep_train method completed successfully")
+
+    def _run_sweep_trial(self) -> None:
+        """Build, register and train one sweep trial (the body of _sweep_train).
+
+        Unlike _train, there's no que injection step beforehand: create_sweep_run
+        builds the RunInfo directly from this trial's sweep-sampled hyperparameters,
+        so there's nothing sitting in TO_RUN for this run.
+        """
+        assert self.sweep_info is not None, "_run_sweep_trial called without sweep_info set"
 
         with redirect_stdout(self.log_adapter):
             config, run = create_sweep_run(
@@ -301,33 +336,14 @@ class Worker:
         # console capture never sees train_loop's print() output -- see _train's
         # matching comment for the actual mechanism (it's not a block-scoping bug).
         with redirect_stdout(self.log_adapter):
-            try:
-                train_loop(
-                    config.admin.model,
-                    config,
-                    run,
-                    recover=False,
-                    event=self.stop_event,
-                )
-            except Exception as e:  # noqa: BLE001
-                if _is_wandb_injected_stop(e):
-                    self.server_logger.info(
-                        f"Sweep trial {run.id} was stopped early by wandb (e.g. hyperband "
-                        "early-terminate); continuing to testing with the last saved checkpoint"
-                    )
-                else:
-                    # Raising here is a no-op: wandb's own agent thread (pyagent.py's
-                    # _run_job) swallows any exception from this function unconditionally
-                    # and never re-raises it, so Worker.sweep()'s except-Exception block
-                    # never sees it either. Recording the failure has to happen here, or
-                    # not at all.
-                    self._fail(e, "Sweep trial failed due to an error")
-                    self.que.stash_failed_run(self.build_exception_info(e))
-                    self.que.save_state()
-            else:
-                run.finish(exit_code=0)
-
-        self.server_logger.info("_sweep_train method completed successfully")
+            train_loop(
+                config.admin.model,
+                config,
+                run,
+                recover=False,
+                event=self.stop_event,
+            )
+        run.finish(exit_code=0)
 
     def _reset_state(self):
         self.set_state(
@@ -397,10 +413,9 @@ class Worker:
 
     def _register_sweep_trial_completion(self, sweep_info: SweepInfo) -> None:
         """Increment the shared completed-trial counter and stop the sweep if max_runs is
-        reached. Called right after wandb.agent(..., count=1) returns, so it counts every
-        attempted trial (success, failure, or wandb hyperband early-stop) exactly once --
-        _sweep_train runs exactly once per call regardless of outcome, and wandb's agent
-        thread swallows any exception it raises internally rather than propagating it here.
+        reached. Called right after wandb.agent(..., count=1) returns, only for trials that
+        finished (naturally or via a wandb hyperband early-stop) -- a failed trial makes
+        Worker.sweep() raise SweepTrialFailed instead, so it isn't counted.
         """
         assert self.sweep_progress is not None and self.server_context is not None
         completed = self.sweep_progress['completed_runs'] + 1
@@ -415,7 +430,14 @@ class Worker:
             self.server_context.set_sweep({})
 
     def sweep(self, sweep_info: SweepInfo) -> None:
+        """Run one sweep trial via wandb.agent.
+
+        Raises:
+            SweepTrialFailed: If the trial failed inside wandb.agent's callback (which wandb
+                itself swallows -- see _sweep_train), so the worker exits non-zero.
+        """
         self.sweep_info = sweep_info
+        self._trial_error = None
         try:
             sweep_info_validate(sweep_info)
             self.training_logger.info(f"Starting sweep trial: {sweep_info['sweep_id']}")
@@ -427,7 +449,8 @@ class Worker:
                 function=self._sweep_train,
                 count=1,
             )
-            self._register_sweep_trial_completion(sweep_info)
+            if self._trial_error is None:
+                self._register_sweep_trial_completion(sweep_info)
         except (QueException, ValidationError) as e:
             self._fail(e, f"{type(e).__name__} — cannot continue")
             raise
@@ -437,19 +460,20 @@ class Worker:
             self.state['working_pid'] = None
             raise
         except Exception as e:
-            # NOTE: this never actually fires for an exception raised inside
-            # _sweep_train's train_loop() call -- wandb's own agent thread
-            # swallows those unconditionally (see _sweep_train's docstring),
-            # which is why that method stashes failures to fail_runs itself.
-            # This only catches things raised outside the wandb-managed
-            # thread, e.g. sweep_info_validate above.
+            # Only for things raised outside wandb's callback thread (e.g. wandb.agent
+            # itself); failures inside it are handled by _sweep_train and re-raised below.
             self._fail(e, "Sweep trial failed due to an error")
-            self.que.stash_failed_run(str(e))
-            self.que.save_state()
+            if self.que.len_loc(CUR_RUN) == 1:
+                self.que.stash_failed_run(str(e))
+                self.que.save_state()
             raise
         finally:
             self.cleanup()
             self.state['task'] = "inactive"
+
+        # outside the try, so the handlers above don't re-record an already-recorded failure
+        if self._trial_error is not None:
+            raise SweepTrialFailed(sweep_info["sweep_id"]) from self._trial_error
 
     def test(self) -> None:
         try:
