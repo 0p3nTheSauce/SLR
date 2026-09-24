@@ -1,4 +1,5 @@
 import io
+import json
 import sys
 import types
 from pathlib import Path
@@ -8,6 +9,7 @@ import pytest
 from rich.console import Console
 
 from src.que import shell as shell_module
+from src.que.core import ServerState
 from src.que.shell import QueShell, get_filters_drop_keys, unpack_filters
 
 
@@ -199,3 +201,69 @@ class TestIndirectIndexing:
         out = harness.run("to_config", "to_run 3 -f model -c x == S3D")
         assert written == [RUNS[4]]
         assert "after filtering" in out
+
+
+class FakeServerContext:
+    """Mimics ServerContext.set_sweep_max_runs/get_state for the set_max_runs command."""
+
+    def __init__(self, base_config: Path) -> None:
+        self.sweep: dict[str, Any] = {
+            "sweep_id": "abc",
+            "sweep_project": "p",
+            "sweep_entity": "e",
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100",
+            "base_config": str(base_config),
+            "max_runs": 50,
+        }
+        self.completed = 48
+
+    def set_sweep_max_runs(self, max_runs: int | None) -> int | None:
+        previous = self.sweep["max_runs"]
+        self.sweep["max_runs"] = max_runs
+        return previous
+
+    def get_state(self) -> ServerState:
+        return ServerState(sweep=self.sweep, sweep_progress={"completed_runs": self.completed})  # type: ignore[arg-type]
+
+
+class TestSetMaxRuns:
+    @pytest.fixture
+    def context(
+        self, harness: ShellHarness, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> FakeServerContext:
+        # _get_daemon_parser does a bare `from configs import ...`, which only resolves with
+        # src/ on the path (as setup.sh's `python -m que.shell` from src/ provides).
+        monkeypatch.syspath_prepend(str(Path(__file__).parents[2] / "src"))
+        context = FakeServerContext(tmp_path / "base.py")
+        harness.shell.server_context = context  # type: ignore[assignment]
+        return context
+
+    def test_sets_cap_and_records_metadata(
+        self, harness: ShellHarness, context: FakeServerContext, tmp_path: Path
+    ) -> None:
+        out = harness.run("daemon", "set_max_runs 60")
+        assert context.sweep["max_runs"] == 60
+        assert "50 → 60 (48 completed)" in out
+        [entry] = json.loads((tmp_path / "sweep_meta.json").read_text())
+        assert entry | {"recorded": None} == {
+            "recorded": None,
+            "event": "set_max_runs",
+            "sweep_id": "abc",
+            "previous_max_runs": 50,
+            "max_runs": 60,
+            "completed_runs": 48,
+        }
+
+    def test_unlimited(self, harness: ShellHarness, context: FakeServerContext) -> None:
+        out = harness.run("daemon", "set_max_runs -u")
+        assert context.sweep["max_runs"] is None
+        assert "50 → unlimited" in out
+
+    @pytest.mark.parametrize("arg", ["", "60 -u"])
+    def test_requires_exactly_one_of_value_or_unlimited(
+        self, harness: ShellHarness, context: FakeServerContext, arg: str
+    ) -> None:
+        harness.run("daemon", f"set_max_runs {arg}")
+        assert context.sweep["max_runs"] == 50

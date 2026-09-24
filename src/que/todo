@@ -1,6 +1,11 @@
 
 Que:
 - add flag to check if changes were made before saving 
+- core.py/shell.py mix `from src.configs import ...` with bare `from configs import ...` /
+    `from utils import ...` (lazy imports inside methods). The bare form only resolves because
+    setup.sh launches `python -m que.shell`/`que.server` from inside src/; it breaks under pytest
+    from the repo root (tests/que/test_shell.py's TestSetMaxRuns has to prepend src/ to sys.path),
+    and can load the same module twice under two names. Switch them all to `src.`-prefixed imports.
 
 Shell:
 - add more flexibility to run summarisation

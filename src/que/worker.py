@@ -84,6 +84,7 @@ class Worker:
         self.state = state
         self.do_traceback = do_traceback
         self.sweep_info: SweepInfo | None = None
+        self.live_sweep: SweepInfo | dict | None = None
         self.sweep_progress: SweepProgressDict | None = None
         self.server_context: ServerContextProtocol | None = None
         self.server_logger.info("Worker initialized")
@@ -401,15 +402,30 @@ class Worker:
         attempted trial (success, failure, or wandb hyperband early-stop) exactly once --
         _sweep_train runs exactly once per call regardless of outcome, and wandb's agent
         thread swallows any exception it raises internally rather than propagating it here.
+
+        The cap is read from the live shared sweep rather than `sweep_info` (the snapshot this
+        trial started with), so `daemon set_max_runs` also applies to the trial in flight. A
+        trial whose sweep was cleared or replaced while it ran isn't counted.
         """
-        assert self.sweep_progress is not None and self.server_context is not None
+        assert (
+            self.sweep_progress is not None
+            and self.server_context is not None
+            and self.live_sweep is not None
+        )
+        sweep_id = sweep_info["sweep_id"]
+        if self.live_sweep.get("sweep_id") != sweep_id:
+            self.training_logger.info(
+                f"Sweep {sweep_id} was cleared or replaced during this trial; not counting it."
+            )
+            return
+
         completed = self.sweep_progress['completed_runs'] + 1
         self.sweep_progress['completed_runs'] = completed
 
-        max_runs = sweep_info["max_runs"]
+        max_runs = self.live_sweep["max_runs"]
         if max_runs is not None and completed >= max_runs:
             self.training_logger.info(
-                f"Sweep {sweep_info['sweep_id']} reached max_runs={max_runs} "
+                f"Sweep {sweep_id} reached max_runs={max_runs} "
                 f"({completed} trials completed); clearing sweep."
             )
             self.server_context.set_sweep({})
@@ -482,6 +498,7 @@ class Worker:
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
         self.sweep_progress = manager.get_sweep_progress()
+        self.live_sweep = manager.get_sweep()
         self.server_context = manager.get_server_context()
 
         #update state

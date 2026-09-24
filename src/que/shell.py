@@ -51,6 +51,7 @@ from src.que.core import (
     ServerState,
     SweepInfo,
     connect_manager,
+    sweep_info_validate,
 )
 
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
@@ -319,6 +320,24 @@ def create_sweep(sweep_path: Path, project: str, entity: str):
 DEFAULT_SWEEP_META_FILENAME = "sweep_meta.json"
 
 
+def _append_sweep_metadata(
+    base_config: str, entry: dict[str, Any], filename: str = DEFAULT_SWEEP_META_FILENAME
+) -> None:
+    """Append a timestamped `entry` to the JSON list in `base_config`'s folder."""
+    import json
+    import time
+
+    meta_path = Path(base_config).parent / filename
+
+    entries = []
+    if meta_path.exists():
+        entries = json.loads(meta_path.read_text())
+
+    entries.append({"recorded": time.strftime("%Y-%m-%d %H:%M:%S")} | entry)
+
+    meta_path.write_text(json.dumps(entries, indent=2))
+
+
 def record_sweep_metadata(
     sweep_info: SweepInfo,
     filename: str = DEFAULT_SWEEP_META_FILENAME,
@@ -329,25 +348,31 @@ def record_sweep_metadata(
     (e.g. re-run, or attached to an existing sweep via sweep_id), so this
     always appends rather than overwrites.
     """
-    import json
-    import time
-    from pathlib import Path
+    _append_sweep_metadata(sweep_info["base_config"], dict(sweep_info), filename)
 
-    folder = Path(sweep_info["base_config"]).parent
-    meta_path = folder / filename
 
-    entries = []
-    if meta_path.exists():
-        entries = json.loads(meta_path.read_text())
-
-    entries.append(
+def record_max_runs_change(
+    sweep_info: SweepInfo,
+    previous: int | None,
+    completed_runs: int,
+    filename: str = DEFAULT_SWEEP_META_FILENAME,
+) -> None:
+    """Append a `set_max_runs` event to the sweep's metadata file (see record_sweep_metadata)."""
+    _append_sweep_metadata(
+        sweep_info["base_config"],
         {
-            "recorded": time.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        | sweep_info
+            "event": "set_max_runs",
+            "sweep_id": sweep_info["sweep_id"],
+            "previous_max_runs": previous,
+            "max_runs": sweep_info["max_runs"],
+            "completed_runs": completed_runs,
+        },
+        filename,
     )
 
-    meta_path.write_text(json.dumps(entries, indent=2))
+
+def _fmt_max_runs(max_runs: int | None) -> str:
+    return "unlimited" if max_runs is None else str(max_runs)
 
 
 # --------------------------------------------------------------------------
@@ -1190,6 +1215,20 @@ class QueShell(cmdLib.Cmd):
                     # save sweep metadata to a JSON file in the base_config's folder, for future reference
                     record_sweep_metadata(sweep_info)
 
+            elif parsed_args.command == "set_max_runs":
+                with self.unwrap_exception("", "Failed to set max runs"):
+                    max_runs = None if parsed_args.unlimited else parsed_args.max_runs
+                    previous = self.server_context.set_sweep_max_runs(max_runs)
+                    status = self.server_context.get_state()
+                    completed = status.sweep_progress["completed_runs"]
+                    record_max_runs_change(
+                        sweep_info_validate(status.sweep), previous, completed
+                    )
+                    self.console.print(
+                        f"[bold green]✓ Sweep max runs: {_fmt_max_runs(previous)} → "
+                        f"{_fmt_max_runs(max_runs)} ({completed} completed)[/bold green]"
+                    )
+
             elif parsed_args.command == "clear_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
                     self.server_context.set_sweep({})
@@ -1257,14 +1296,10 @@ class QueShell(cmdLib.Cmd):
             daemon_table.add_row("Dataset:", f"{sweep_state['dataset']}")
             daemon_table.add_row("Split:", f"{sweep_state['split']}")
 
-            max_runs = sweep_state.get("max_runs")
             completed = status.sweep_progress["completed_runs"]
-            progress = (
-                f"{completed}/{max_runs}"
-                if max_runs is not None
-                else f"{completed} (unlimited)"
+            daemon_table.add_row(
+                "Progress:", f"{completed}/{_fmt_max_runs(sweep_state.get('max_runs'))}"
             )
-            daemon_table.add_row("Progress:", progress)
 
         table.add_row("Daemon", daemon_table)
 
@@ -1945,6 +1980,21 @@ class QueShell(cmdLib.Cmd):
             type=int,
             default=None,
             help="Maximum number of sweep trials to run before the sweep automatically stops (default: unlimited)",
+        )
+        # set max runs
+        set_max_runs_parser = subparsers.add_parser(
+            "set_max_runs",
+            help="Change the active sweep's max_runs without resetting its progress",
+        )
+        set_max_runs_group = set_max_runs_parser.add_mutually_exclusive_group(required=True)
+        set_max_runs_group.add_argument(
+            "max_runs",
+            type=int,
+            nargs="?",
+            help="New maximum number of trials; must exceed the trials already completed",
+        )
+        set_max_runs_group.add_argument(
+            "--unlimited", "-u", action="store_true", help="Remove the trial cap"
         )
         # clear sweep
         subparsers.add_parser("clear_sweep", help="Clear daemon sweep parameters")

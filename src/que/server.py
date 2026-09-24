@@ -21,6 +21,8 @@ from src.que.core import (
     SERVER_STATE_PATH,
     WORKER_NAME,
     DaemonStateDict,
+    MaxRunsTooLow,
+    NoSweepSet,
     Que,
     QueManager,
     ServerState,
@@ -176,6 +178,31 @@ class ServerContext:
         self.sweep.clear()
         self.sweep.update(sweep)
         self.sweep_progress["completed_runs"] = 0
+
+    def set_sweep_max_runs(self, max_runs: int | None) -> int | None:
+        """Change the active sweep's trial cap without resetting its completed-trial counter.
+
+        Takes effect for the trial currently running too, since the Worker reads the live cap
+        when a trial completes.
+
+        Args:
+            max_runs (int | None): New cap, or None for unlimited.
+
+        Raises:
+            NoSweepSet: If no sweep is set.
+            MaxRunsTooLow: If `max_runs` would not allow another trial to run.
+
+        Returns:
+            int | None: The previous cap.
+        """
+        if not self.sweep:
+            raise NoSweepSet()
+        completed = self.sweep_progress["completed_runs"]
+        if max_runs is not None and max_runs <= completed:
+            raise MaxRunsTooLow(max_runs, completed)
+        previous: int | None = self.sweep["max_runs"]
+        self.sweep["max_runs"] = max_runs
+        return previous
 
     def toggle_stop_on_fail(self) -> None:
         self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]

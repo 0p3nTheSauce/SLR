@@ -227,6 +227,40 @@ class QueBusy(QueException):
         return (self.__class__, (self.message,))
 
 
+class NoSweepSet(QueException):
+    def __init__(self, message: str = "No sweep is currently set"):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return self.message
+
+    def __reduce__(self):
+        return (self.__class__, (self.message,))
+
+
+class MaxRunsTooLow(QueException):
+    """A new sweep max_runs that would not allow another trial to run.
+
+    The cap is only checked after a trial completes, so a value <= completed_runs would not stop
+    the sweep -- the next trial would still start. Stopping now is `clear_sweep`'s job.
+    """
+
+    def __init__(self, max_runs: int, completed_runs: int):
+        self.max_runs = max_runs
+        self.completed_runs = completed_runs
+        self.message = (
+            f"max_runs={max_runs} must be greater than the {completed_runs} trials already "
+            "completed (use clear_sweep to stop the sweep now)"
+        )
+        super().__init__(self.message)
+
+    def __str__(self):
+        return self.message
+
+    def __reduce__(self):
+        return (self.__class__, (self.max_runs, self.completed_runs))
+
 # ---------------------------------------------------------------------------
 # Kwargs
 # ---------------------------------------------------------------------------
@@ -1258,6 +1292,7 @@ class ServerContextProtocol(Protocol):
     def load_state(self) -> None: ...
     def get_state(self) -> ServerState: ...
     def set_sweep(self, sweep: SweepInfo | dict) -> None: ...
+    def set_sweep_max_runs(self, max_runs: int | None) -> int | None: ...
     def toggle_stop_on_fail(self) -> None: ...
 
     # def set_state(
