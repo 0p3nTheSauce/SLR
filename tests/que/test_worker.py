@@ -87,7 +87,7 @@ class SweepHarness:
         self.monkeypatch = monkeypatch
         self.que = que
         self.state: dict[str, Any] = {"exception": None, "current_run_id": None}
-        self.progress = {"completed_runs": 0}
+        self.registered: list[str] = []
         self.worker = Worker(
             server_logger=_silent_logger("test_worker_server"),
             que=que,  # type: ignore[arg-type]
@@ -96,8 +96,9 @@ class SweepHarness:
         )
         self.worker.training_logger = _silent_logger("test_worker_training")
         self.worker.log_adapter = LoggerWriter(_silent_logger("test_worker_training"))
-        self.worker.sweep_progress = self.progress  # type: ignore[assignment]
-        self.worker.server_context = SimpleNamespace(set_sweep=lambda s: None)  # type: ignore[assignment]
+        self.worker.server_context = SimpleNamespace(  # type: ignore[assignment]
+            register_sweep_trial=lambda sweep_id: self.registered.append(sweep_id) or 1
+        )
 
         monkeypatch.setattr(Worker, "cleanup", lambda self: None)
         monkeypatch.setattr(worker_module.gpu_manager, "wait_for_completion", lambda **kw: True)
@@ -127,14 +128,14 @@ class TestSweepTrialOutcomes:
     def test_success_is_counted_and_does_not_raise(self, harness: SweepHarness) -> None:
         harness.worker.sweep(SWEEP_INFO)
         assert len(harness.que.cur_run) == 1
-        assert harness.progress["completed_runs"] == 1
+        assert harness.registered == ["abc"]
         assert harness.state["exception"] is None
 
     def test_hyperband_stop_is_counted_and_does_not_raise(self, harness: SweepHarness) -> None:
         harness.set_train(lambda *a, **kw: raise_(Exception()))
         harness.worker.sweep(SWEEP_INFO)
         assert len(harness.que.cur_run) == 1  # kept for testing
-        assert harness.progress["completed_runs"] == 1
+        assert harness.registered == ["abc"]
         assert harness.state["exception"] is None
 
     def test_training_crash_raises_and_stashes(self, harness: SweepHarness) -> None:
@@ -145,7 +146,7 @@ class TestSweepTrialOutcomes:
         assert harness.que.cur_run == []
         assert harness.que.fail_runs == ["boom"]
         assert harness.state["exception"] == "boom"
-        assert harness.progress["completed_runs"] == 0
+        assert harness.registered == []
 
     def test_create_sweep_run_crash_raises_without_stash(self, harness: SweepHarness) -> None:
         harness.set_create(lambda **kw: raise_(ValueError("bad config")))
@@ -153,14 +154,14 @@ class TestSweepTrialOutcomes:
             harness.worker.sweep(SWEEP_INFO)
         assert harness.que.fail_runs == []
         assert harness.state["exception"] == "bad config"
-        assert harness.progress["completed_runs"] == 0
+        assert harness.registered == []
 
     def test_inject_crash_raises_without_stash(self, monkeypatch: pytest.MonkeyPatch) -> None:
         harness = SweepHarness(monkeypatch, FakeQue(add_error=QueBusy()))
         with pytest.raises(SweepTrialFailed):
             harness.worker.sweep(SWEEP_INFO)
         assert harness.que.fail_runs == []
-        assert harness.progress["completed_runs"] == 0
+        assert harness.registered == []
 
     def test_agent_error_outside_callback_is_not_masked(self, harness: SweepHarness) -> None:
         """With cur_run empty, stashing used to raise QueEmpty over the real error."""
@@ -177,4 +178,14 @@ class TestSweepTrialOutcomes:
             harness.worker.sweep(SWEEP_INFO)
         harness.set_train(lambda *a, **kw: None)
         harness.worker.sweep(SWEEP_INFO)
-        assert harness.progress["completed_runs"] == 1
+        assert harness.registered == ["abc"]
+
+
+    def test_gpu_wait_stop_is_not_counted(self, harness: SweepHarness) -> None:
+        """wait_for_completion only returns False when stopping, so it's neither a trial nor a failure."""
+        harness.monkeypatch.setattr(
+            worker_module.gpu_manager, "wait_for_completion", lambda **kw: False
+        )
+        harness.worker.sweep(SWEEP_INFO)
+        assert harness.registered == []
+        assert harness.state["exception"] is None

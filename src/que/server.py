@@ -21,6 +21,7 @@ from src.que.core import (
     SERVER_STATE_PATH,
     WORKER_NAME,
     DaemonStateDict,
+    NoSweepSet,
     Que,
     QueManager,
     ServerState,
@@ -176,6 +177,48 @@ class ServerContext:
         self.sweep.clear()
         self.sweep.update(sweep)
         self.sweep_progress["completed_runs"] = 0
+
+    def set_sweep_max_runs(self, max_runs: int | None) -> int | None:
+        """Change the active sweep's trial cap without resetting its completed-trial counter.
+
+        The Daemon checks the cap before handing out each trial, so the change applies from the
+        next trial on. A cap at or below the completed count marks the sweep complete (the
+        running trial, if any, still finishes); raising it again resumes the sweep.
+
+        Args:
+            max_runs (int | None): New cap, or None for unlimited.
+
+        Raises:
+            NoSweepSet: If no sweep is set.
+            ValueError: If `max_runs` is less than 1.
+
+        Returns:
+            int | None: The previous cap.
+        """
+        if not self.sweep:
+            raise NoSweepSet()
+        if max_runs is not None and max_runs < 1:
+            raise ValueError(f"max_runs must be at least 1, got {max_runs}")
+        previous: int | None = self.sweep["max_runs"]
+        self.sweep["max_runs"] = max_runs
+        return previous
+
+    def register_sweep_trial(self, sweep_id: str) -> int | None:
+        """Count one finished trial of `sweep_id` towards the active sweep's progress.
+
+        Called by the Worker when a trial finishes. A trial whose sweep was cleared or replaced
+        while it ran isn't counted.
+
+        Returns:
+            int | None: The new completed-trial count, or None if the trial wasn't counted.
+        """
+        if self.sweep.get("sweep_id") != sweep_id:
+            self.server_logger.warning(
+                f"Sweep {sweep_id} was cleared or replaced during its trial; not counting it."
+            )
+            return None
+        self.sweep_progress["completed_runs"] += 1
+        return self.sweep_progress["completed_runs"]
 
     def toggle_stop_on_fail(self) -> None:
         self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]

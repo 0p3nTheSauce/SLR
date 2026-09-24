@@ -227,6 +227,18 @@ class QueBusy(QueException):
         return (self.__class__, (self.message,))
 
 
+class NoSweepSet(QueException):
+    def __init__(self, message: str = "No sweep is currently set"):
+        self.message = message
+        super().__init__(self.message)
+
+    def __str__(self):
+        return self.message
+
+    def __reduce__(self):
+        return (self.__class__, (self.message,))
+
+
 # ---------------------------------------------------------------------------
 # Kwargs
 # ---------------------------------------------------------------------------
@@ -1185,6 +1197,12 @@ def sweep_info_validate(obj: Any) -> SweepInfo:
     return _sweep_info_adapter.validate_python(obj)
 
 
+def is_sweep_complete(max_runs: int | None, completed_runs: int) -> bool:
+    """Whether a sweep has run all its trials. A complete sweep stays set (so raising max_runs
+    resumes it); the Daemon just stops handing it to the Worker."""
+    return max_runs is not None and completed_runs >= max_runs
+
+
 class DaemonStateDict(TypedDict):
     awake: Annotated[bool, Field(default=False)]
     stop_on_fail: Annotated[bool, Field(default=True)]
@@ -1258,6 +1276,8 @@ class ServerContextProtocol(Protocol):
     def load_state(self) -> None: ...
     def get_state(self) -> ServerState: ...
     def set_sweep(self, sweep: SweepInfo | dict) -> None: ...
+    def set_sweep_max_runs(self, max_runs: int | None) -> int | None: ...
+    def register_sweep_trial(self, sweep_id: str) -> int | None: ...
     def toggle_stop_on_fail(self) -> None: ...
 
     # def set_state(
