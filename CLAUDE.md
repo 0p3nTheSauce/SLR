@@ -20,6 +20,23 @@ This means code changes here can only be verified by import/construction checks 
 testing, not by actually running training or loading pretrained weights — that has to happen on
 the server.
 
+## Testing
+
+The pytest suite lives in `tests/` (configured via `[tool.pytest.ini_options]` in
+`pyproject.toml`), with subdirectories mirroring `src/` (e.g. `tests/que/`). Run it with the
+**`wlasl` env**: `~/miniconda3/envs/wlasl/bin/python -m pytest`. It can't be collected under
+`wlasl_cpu` — `tests/conftest.py` imports `src.models.og_mvit`, which needs MViT deps
+(`simplejson` etc.) that `wlasl_cpu` deliberately omits.
+
+- Tests needing real pretrained weights are marked `requires_weights` and are auto-skipped on this
+  machine (see `conftest.py`), so the full suite should pass locally.
+- Importing `src.que.core` configures the root logger to write to the real `src/que/Server.log`.
+  Tests that construct a `Que` should pass a non-propagating logger and a `tmp_path` runs file
+  (see `tests/que/test_core.py`) so they don't pollute it.
+- `QueShell` can be built in tests with a fake server by stubbing `_show_banner`,
+  `_setup_history` and `tmux_manager` (see the `harness` fixture in `tests/que/test_shell.py`) —
+  this avoids touching the real `~/.que_shell_history`.
+
 ## Code quality bar & workflow expectations
 
 The user is actively working to keep this a clean, strictly-typed, well-organised repo, and
@@ -92,8 +109,8 @@ references below if you find more drift between this doc and the real filenames.
   tied to the original WLASL JSON format).
 - `utils.py` — Grab-bag of shared utilities: GPU memory manager, video-frame loading, misc.
 - `visualise.py` / `visualise2.py` — see [below](#srcvisualisepy---srcvisualise2py).
-- `debug.py` — Ad-hoc manual debug scripts for the Que system; not a formal test suite (there is
-  no `tests/` dir or pytest config anywhere in the repo).
+- `debug.py` — Ad-hoc manual debug scripts (as is `que/debug.py`); not a formal test suite — see
+  [Testing](#testing) for the real one.
 
 ### `src/` subdirectories
 
