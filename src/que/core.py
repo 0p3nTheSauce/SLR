@@ -175,18 +175,26 @@ class QueEmpty(QueException):
 
 
 class QueIdxOOR(QueException):
-    def __init__(self, loc: QueLocation, idx: int, leng: int):
+    """Index out of range for a location.
+
+    `filtered` marks that `leng` is the length of a filtered view of `loc`, not of
+    `loc` itself, so the message doesn't misreport the location's real size.
+    """
+
+    def __init__(self, loc: QueLocation, idx: int, leng: int, filtered: bool = False):
         self.loc = loc
         self.idx = idx
         self.length = leng
-        self.message = f"Index {idx} is out of range for {loc} (length: {leng})"
+        self.filtered = filtered
+        view = f"{loc} after filtering" if filtered else loc
+        self.message = f"Index {idx} is out of range for {view} (length: {leng})"
         super().__init__(self.message)
 
     def __str__(self):
         return self.message
 
     def __reduce__(self):
-        return (self.__class__, (self.loc, self.idx, self.length))
+        return (self.__class__, (self.loc, self.idx, self.length, self.filtered))
 
 
 class QueIdxOORR(QueException):
@@ -491,7 +499,7 @@ class Que:
             out_path = self.runs_path
         else:
             out_path = Path(out_path)
-            
+
         if out_path.exists() and not timestamp:
             self.logger.warning(f"Overwriting existing state file: {out_path}")
 
@@ -534,7 +542,6 @@ class Que:
 
     def set_cur_run(self, run: ExpInfo) -> None:
         self._set_run(CUR_RUN, 0, run)
-        
 
     def stash_next_run(self) -> str:
         next_run = self._pop_run(TO_RUN, 0)
@@ -619,15 +626,20 @@ class Que:
 
     @classmethod
     def _filter_indexed_runs(
-        cls, og_indexes : list[int], to_search: ExpQue, keys: list[str], criterion: Callable[[Any], bool]
+        cls,
+        og_indexes: list[int],
+        to_search: ExpQue,
+        keys: list[str],
+        criterion: Callable[[Any], bool],
     ) -> tuple[list[int], list[GenExp]]:
+        """Keep the runs (and their paired original indexes) whose value at `keys`
+        satisfies `criterion`. Missing keys are passed to `criterion` as None."""
         idxs, runs = [], []
         for i, run in zip(og_indexes, to_search):
             if criterion(cls.get_nested_or_none(run, keys)):
                 idxs.append(i)
                 runs.append(run)
         return idxs, runs
-    
 
     @classmethod
     def indexed_list_manipulation(
@@ -660,10 +672,10 @@ class Que:
             filter_keys = []
         if sort_keys is None:
             sort_keys = []
-        
-        #Preserved indexes
+
+        # Preserved indexes
         original_indexes = list(range(len(runs)))
-            
+
         # Filter
         if len(filter_keys) != len(criterions):
             raise ValueError("filter_key sets and criterions must be equal in length")
@@ -673,18 +685,17 @@ class Que:
                     break
 
                 original_indexes, runs = cls._filter_indexed_runs(
-                    original_indexes,
-                    [r for r in runs],
-                    filter_key_set,
-                    crit
+                    original_indexes, list(runs), filter_key_set, crit
                 )
-                
+
         # Sort
-        if len(sort_keys) > 0:    
+        if len(sort_keys) > 0:
             idx_runs = sorted(
                 zip(original_indexes, runs),
-                key=lambda x: tuple(Que.get_nested(x[1], sort_key_set) for sort_key_set in sort_keys),
-                reverse=reverse,   
+                key=lambda x: tuple(
+                    Que.get_nested(x[1], sort_key_set) for sort_key_set in sort_keys
+                ),
+                reverse=reverse,
             )
             return [x[0] for x in idx_runs], [x[1] for x in idx_runs]
         elif reverse:
@@ -713,9 +724,7 @@ class Que:
         Returns:
             list[GenExp]: Filtered and/or sorted runs
         """
-        # set defaults
         return cls.indexed_list_manipulation(runs, **kwargs)[1]
-
 
     # -----------------------------------------------------------------------
     # Queue features
@@ -743,8 +752,17 @@ class Que:
                 self.to_run.append(exp_info)
             elif loc == CUR_RUN:
                 if len(self.cur_run) != 0:
-                    self.logger.error("Cannot add to cur_run: already occupied, added to fail_runs instead")
-                    self.fail_runs.append(FailedExp.model_validate({**exp_info.model_dump(), "error": "Attempted to add to cur_run but it was already occupied"}))
+                    self.logger.error(
+                        "Cannot add to cur_run: already occupied, added to fail_runs instead"
+                    )
+                    self.fail_runs.append(
+                        FailedExp.model_validate(
+                            {
+                                **exp_info.model_dump(),
+                                "error": "Attempted to add to cur_run but it was already occupied",
+                            }
+                        )
+                    )
                     raise QueBusy
                 self.cur_run.append(exp_info)
             else:
@@ -904,7 +922,6 @@ class Que:
         keys: list[str],
         value: Any,
         do_eval: bool = False,
-        # **kwargs: Unpack[ListManipulationKwargs]
     ) -> None:
         """Edit a single field (by key path) in a queued run.
 
@@ -912,10 +929,7 @@ class Que:
         the appropriate pydantic model — so all field validators still run.
         """
         with log_and_raise(self.logger, "edit"):
-            #take one index
-            # original_index = self.select_indexes(self._fetch_state(loc), [idx], **kwargs)[0] 
-            original_index = idx 
-            run = self.peak_run(loc, original_index)
+            run = self.peak_run(loc, idx)
             val = ast.literal_eval(value) if do_eval else value
 
             run_dict = run.model_dump()
@@ -930,8 +944,8 @@ class Que:
 
             new_run = strict_validate(run_type, run_dict)
 
-            _ = self._pop_run(loc, original_index)
-            self._set_run(loc, original_index, new_run)
+            _ = self._pop_run(loc, idx)
+            self._set_run(loc, idx, new_run)
 
     # Indirect indexing
 
@@ -950,21 +964,29 @@ class Que:
         **kwargs: Unpack[ListManipulationKwargs],
     ) -> ExpQue:
         """Select runs by index after applying list manipulations."""
-        runs = self.list_runs(loc, **kwargs)
-        return [runs[i] for i in indexes]
-
+        runs = self._fetch_state(loc)
+        return [runs[i] for i in self.select_indexes(loc, runs, indexes, **kwargs)]
 
     @classmethod
     def select_indexes(
         cls,
+        loc: QueLocation,
         runs: Sequence[GenExp],
         indexes: list[int],
         **kwargs: Unpack[ListManipulationKwargs],
     ) -> list[int]:
-        """Select runs by index after applying list manipulations."""
-        idxs, _ = cls.indexed_list_manipulation(runs, **kwargs)
-        return [idxs[i] for i in indexes]
+        """Map indexes into the manipulated (filtered/sorted) view of `runs` back to
+        indexes into `runs` itself.
 
+        `loc` is only used to label errors. Raises QueIdxOOR if any index falls
+        outside the manipulated view.
+        """
+        idxs, _ = cls.indexed_list_manipulation(runs, **kwargs)
+        filtered = bool(kwargs.get("filter_keys"))
+        for i in indexes:
+            if not -len(idxs) <= i < len(idxs):
+                raise QueIdxOOR(loc, i, len(idxs), filtered)
+        return [idxs[i] for i in indexes]
 
     def place_runs(
         self,
@@ -973,8 +995,8 @@ class Que:
         index: int = 0,
     ) -> None:
         """Insert runs by index. Uses 0 as default if runs is empty, and repeats last index up to lenght of runs.
-        `NOTE:` This method is unsafe and will drop runs if there is an error.  
-        
+        `NOTE:` This method is unsafe and will drop runs if there is an error.
+
         """
         with log_and_raise(self.logger, "place_runs"):
             for idx, run in enumerate(runs):
@@ -1098,53 +1120,6 @@ class Que:
             self.place_runs(n_loc, runs, index=n_idx)
 
     # Meta features
-
-    @classmethod
-    def _find_runs(
-        cls, og_indexes : list[int], to_search: ExpQue, keys: list[str], criterion: Callable[[Any], bool]
-    ) -> tuple[list[int], list[GenExp]]:
-        idxs, runs = [], []
-        for i, run in zip(og_indexes, to_search):
-            if criterion(cls.get_nested_or_none(run, keys)):
-                idxs.append(i)
-                runs.append(run)
-        return idxs, runs
-
-    @classmethod
-    def filter_runs(
-        cls,
-        runs: ExpQue,
-        key_set: list[list[str]],
-        criterions: list[Callable[[Any], bool]],
-        sort_keys: list[list[str]],
-        reverse: bool = False,
-    ) -> tuple[list[int], ExpQue]:
-        
-        
-        assert len(key_set) == len(criterions), (
-            f"key_set length {len(key_set)} != criterions length {len(criterions)}"
-        )
-        # runs: list[GenExp] = list(self._fetch_state(loc))  
-        idxs: list[int] = list(range(len(runs)))
-        
-        #Filter
-        for k_lst, crit in zip(key_set, criterions):
-            if len(runs) == 0:
-                break
-            idxs, runs = cls._find_runs(idxs, runs, k_lst, crit)  
-            
-        #Sort
-        if len(sort_keys) > 0:    
-            idx_runs = sorted(
-                zip(idxs, runs),
-                key=lambda x: tuple(Que.get_nested(x[1], sort_key_set) for sort_key_set in sort_keys),
-                reverse=reverse,   
-            )
-            return [x[0] for x in idx_runs], [x[1] for x in idx_runs]
-        elif reverse:
-            return list(reversed(idxs)), list(reversed(runs))
-        else:
-            return idxs, runs
 
     def update_runs(self, key_set: list[str], transform: Callable[[Any], Any]) -> None:
         """Apply a transform to a nested field across every run in every location."""

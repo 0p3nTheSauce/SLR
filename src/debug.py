@@ -118,113 +118,6 @@ def time_instance_typegaurd():
     #Conclusion: The type guard check is very fast, and does not add significant overhead to loading the data. 
 
 
-def test_find_loc_runs():
-    logger = _get_basic_logger()
-    
-    
-    q = Que(logger)
-    key_set = [
-        ['admin', 'exp_no'],
-        ['admin', 'model'],
-        ['training', "batch_size_equivalent"],
-        ["optimizer", "eps"],
-        ["optimizer", "backbone_init_lr"],
-        ["optimizer", "backbone_weight_decay"],
-        ["optimizer", "classifier_init_lr"],
-        ["optimizer", "classifier_weight_decay"],
-        ["model_params", "drop_p"],
-        ["data", "num_frames"],
-        ["data", "frame_size"],
-        ["scheduler", "type"],
-        ["scheduler", "t0"],
-        ["scheduler", "tmult"],
-        ["scheduler", "eta_min"],
-    ]
-    criterions = [
-        lambda x: (x != '007') and (x != '046') ,
-        lambda x: x == 'S3D' or x == 'MViTv2_S',
-        lambda x: x == 8,
-        lambda x: x == 1e-05,
-        lambda x: x == 0.0001,
-        lambda x: x == 0.001,
-        lambda x: x == 0.001,
-        lambda x: x == 0.001,
-        lambda x: x == 0.5,
-        lambda x: x == 16,
-        lambda x: x == 224,
-        lambda x: x == "CosineAnnealingWarmRestarts",
-        lambda x: x == 10,
-        lambda x: x == 1,
-        lambda x: x == 0,
-    ]
-    _, runs = q.find_loc_runs('old_runs', key_set, criterions)
-    print(len(runs))
-    all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
-    for run in runs:
-        split_name = run.admin.split
-        model_name = run.admin.model
-        exp_no = run.admin.exp_no
-        cur_split = all_exps[split_name]
-        if model_name in cur_split:
-            all_exps[split_name][model_name].append(exp_no)
-        else:
-            all_exps[split_name][model_name] = [exp_no]
-      
-    with open('./results/wlasl_saicist.json', 'w') as f:
-        json.dump(all_exps,f,indent=2)
-        
-
-def test_find_S3D_runs():
-    logger = _get_basic_logger()
-    
-    
-    q = Que(logger)
-    key_set = [
-        ['admin', 'model'],
-        ['training', "batch_size_equivalent"],
-        ["optimizer", "eps"],
-        ["optimizer", "backbone_init_lr"],
-        ["optimizer", "backbone_weight_decay"],
-        ["optimizer", "classifier_init_lr"],
-        ["optimizer", "classifier_weight_decay"],
-        ["model_params", "drop_p"],
-        ["data", "num_frames"],
-        ["data", "frame_size"],
-    #     ["scheduler", "type"],
-    #     ["scheduler", "t0"],
-    #     ["scheduler", "tmult"],
-    #     ["scheduler", "eta_min"],
-    ]
-    criterions = [
-        lambda x: x == 'S3D',
-        lambda x: x == 8,
-        lambda x: x == 1e-05,
-        lambda x: x == 0.0001,
-        lambda x: x == 0.001,
-        lambda x: x == 0.001,
-        lambda x: x == 0.001,
-        lambda x: x == 0.5,
-        lambda x: x == 32,
-        lambda x: x == 224,
-        # lambda x: x == "CosineAnnealingWarmRestarts",
-        # lambda x: x == 10,
-        # lambda x: x == 1,
-        # lambda x: x == 0,
-    ]
-    idxs, runs = q.find_loc_runs('old_runs', key_set, criterions)
-    print(len(runs))
-    all_exps = {'asl100':{}, 'asl300':{}, 'asl1000':{}, 'asl2000':{}}
-    for run in runs:
-        all_exps[run.admin.split][run.admin.model] = [run.admin.exp_no]
-    
-    
-    with open('./S3D_32_SAICIST.json', 'w') as f:
-        json.dump(all_exps,f,indent=2)
-    print(json.dumps(all_exps, indent=4))
-    print(idxs)
-
-        
-
 def test_set_nested():
     a = {a:b for a, b in zip('abcdef', range(5))}
     b = a.copy()
@@ -412,8 +305,6 @@ if __name__ == '__main__':
     # test_clear()
     # test_instance_typegaurd()
     # time_instance_typegaurd()
-    # test_find_loc_runs()
-    # test_find_S3D_runs()
     
     # test_extend_classifier()
     # test_get_next_expno()

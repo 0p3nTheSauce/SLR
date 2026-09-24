@@ -13,7 +13,7 @@ import time
 import traceback
 import webbrowser
 from ast import literal_eval
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
@@ -647,19 +647,21 @@ class QueShell(cmdLib.Cmd):
         with self.console.status("[bold green]Creating...", spinner="dots"):
             try:
                 from configs import take_args
-                        
+
                 args = shlex.split(arg)
                 maybe_args = take_args(sup_args=args)
-            except (SystemExit):
-                self.console.print("[yellow]Create cancelled (incorrect arguments)[/yellow]")
+            except SystemExit:
+                self.console.print(
+                    "[yellow]Create cancelled (incorrect arguments)[/yellow]"
+                )
                 return
-            except Exception as e: # noqa: BLE001
+            except Exception as e:  # noqa: BLE001
                 self.console.print(f"[red]Create cancelled (error: {e})[/red]")
                 return
-            
+
             with self.unwrap_exception(
                 "Run created successfully", "Failed to create new run"
-            ):    
+            ):
                 if isinstance(maybe_args, tuple):
                     admin_info, wandb_info = maybe_args
                 else:
@@ -812,24 +814,16 @@ class QueShell(cmdLib.Cmd):
             return
 
         with self.unwrap_exception("Edit successful", "Edit failed"):
-            
-            filter_key_sets, criterions, _drop_key_sets = self._merge_filters(parsed_args)
-            
-            #NOTE: Filtering must be passed to select_indexes: 
-            # - not list_runs (preserve idxs)
-            # - nor edit_run (lambda isnt json serializable)
-            original_index = Que.select_indexes(
-                self.que.list_runs(parsed_args.location), 
+            (original_index,) = self._select_indexes(
+                parsed_args,
+                parsed_args.location,
+                self.que.list_runs(parsed_args.location),
                 [parsed_args.index],
-                filter_keys=filter_key_sets,
-                criterions=criterions,
-                sort_keys=parsed_args.sort_keys,
-                reverse=parsed_args.reverse,
-                )[0] # take one index
-            
+            )
+
             self.que.edit_run(
                 parsed_args.location,
-                original_index, #pass int location through socket
+                original_index,
                 parsed_args.edit_keys,
                 parsed_args.value,
                 parsed_args.do_eval,
@@ -903,7 +897,15 @@ class QueShell(cmdLib.Cmd):
 
         self.console.print(table)
 
-    def _merge_filters(self, parsed_args):
+    def _merge_filters(
+        self, parsed_args: argparse.Namespace
+    ) -> tuple[list[list[str]], list[Callable[[Any], bool]], list[list[str]]]:
+        """Combine CLI filters (-f/-c) with those loaded from --input_path.
+
+        Returns:
+            (filter key sets, criterions, drop key sets). Drop key sets only come
+            from the input file.
+        """
         if parsed_args.input_path:
             file_filter_keys, file_criterions, file_drop_key_sets = (
                 get_filters_crits_dropkeys(parsed_args.input_path)
@@ -914,16 +916,40 @@ class QueShell(cmdLib.Cmd):
                 file_criterions,
                 file_drop_key_sets,
             ) = [], [], []
-            
+
         return (
-            parsed_args.filter_keys + file_filter_keys, 
+            parsed_args.filter_keys + file_filter_keys,
             [
                 parse_criterion(_join_criterion_tokens(crit))
                 for crit in parsed_args.criterion
-            ] + file_criterions,
-            file_drop_key_sets
-            )
-            
+            ]
+            + file_criterions,
+            file_drop_key_sets,
+        )
+
+    def _select_indexes(
+        self,
+        parsed_args: argparse.Namespace,
+        loc: QueLocation,
+        runs: Sequence[GenExp],
+        indexes: list[int],
+    ) -> list[int]:
+        """Map indexes into the view of `runs` described by parsed_args' list
+        manipulation args (filters, sort, reverse) back to indexes into `runs`.
+
+        Filtering is resolved client-side because the criterion lambdas can't be
+        pickled across the manager connection.
+        """
+        filter_key_sets, criterions, _ = self._merge_filters(parsed_args)
+        return Que.select_indexes(
+            loc,
+            runs,
+            indexes,
+            filter_keys=filter_key_sets,
+            criterions=criterions,
+            sort_keys=parsed_args.sort_keys,
+            reverse=parsed_args.reverse,
+        )
 
     def do_list(self, arg):
         """Display runs in a table"""
@@ -934,8 +960,10 @@ class QueShell(cmdLib.Cmd):
             parsed_args = self._parse_args_or_cancel("list", arg)
             if parsed_args is None:
                 return
-                
-            filter_key_sets, criterions, drop_key_sets = self._merge_filters(parsed_args)
+
+            filter_key_sets, criterions, drop_key_sets = self._merge_filters(
+                parsed_args
+            )
 
             runs = None
 
@@ -947,8 +975,7 @@ class QueShell(cmdLib.Cmd):
                     sort_keys=parsed_args.sort_keys,
                     reverse=parsed_args.reverse,
                     filter_keys=filter_key_sets,
-                    criterions=criterions
-                
+                    criterions=criterions,
                 )
             )
 
@@ -983,20 +1010,11 @@ class QueShell(cmdLib.Cmd):
             self.console.status("[bold green]Importing...", spinner="dots"),
             self.unwrap_exception("", "Display failed"),
         ):
-            run = list(
-                Que.list_manipulation(
-                    self.que.list_runs(
-                        parsed_args.location,
-                    ),
-                    sort_keys=parsed_args.sort_keys,
-                    reverse=parsed_args.reverse,
-                    filter_keys=parsed_args.filter_keys,
-                    criterions=[
-                        parse_criterion(_join_criterion_tokens(crit))
-                        for crit in parsed_args.criterion
-                    ],
-                )
-            )[parsed_args.index]
+            runs = self.que.list_runs(parsed_args.location)
+            (original_index,) = self._select_indexes(
+                parsed_args, parsed_args.location, runs, [parsed_args.index]
+            )
+            run = runs[original_index]
 
             title = f"Run {parsed_args.index} in {parsed_args.location}"
 
@@ -1035,25 +1053,20 @@ class QueShell(cmdLib.Cmd):
             o_idxs = list(map(int, parsed_args.o_indexes))
 
         with self.unwrap_exception("Copy successful", "Copy failed"):
-            runs = Que.list_manipulation(
-                self.que.list_runs(
-                    parsed_args.o_location,
-                ),
-                sort_keys=parsed_args.sort_keys,
-                reverse=parsed_args.reverse,
-                filter_keys=parsed_args.filter_keys,
-                criterions=[
-                    parse_criterion(_join_criterion_tokens(crit))
-                    for crit in parsed_args.criterion
-                ],
-            )
+            all_runs = self.que.list_runs(parsed_args.o_location)
+            runs = [
+                all_runs[i]
+                for i in self._select_indexes(
+                    parsed_args, parsed_args.o_location, all_runs, o_idxs
+                )
+            ]
 
             if parsed_args.clean_slate:
                 runs = [Que._clean_slate(run, enum_chck=True) for run in runs]
 
             self.que.place_runs(
                 parsed_args.n_location,
-                [runs[i] for i in o_idxs],
+                runs,
                 index=parsed_args.n_index,
             )
 
@@ -1072,23 +1085,13 @@ class QueShell(cmdLib.Cmd):
         ):
             from src.que.runs_to_configs import write_config_file
 
-            run = list(
-                Que.list_manipulation(
-                    self.que.list_runs(
-                        parsed_args.location,
-                    ),
-                    sort_keys=parsed_args.sort_keys,
-                    reverse=parsed_args.reverse,
-                    filter_keys=parsed_args.filter_keys,
-                    criterions=[
-                        parse_criterion(_join_criterion_tokens(crit))
-                        for crit in parsed_args.criterion
-                    ],
-                )
-            )[parsed_args.index]
+            runs = self.que.list_runs(parsed_args.location)
+            (original_index,) = self._select_indexes(
+                parsed_args, parsed_args.location, runs, [parsed_args.index]
+            )
 
             write_config_file(
-                run,
+                runs[original_index],
                 output=parsed_args.output_path,
             )
 
@@ -1142,12 +1145,8 @@ class QueShell(cmdLib.Cmd):
                     )
             elif parsed_args.command == "set_sweep":
                 with self.unwrap_exception("Wandb sweep set", "Failed to set sweep"):
-                    
-
                     if parsed_args.sweep_path is not None:
-                        sweep_args = args_from_sweep_yaml(
-                            parsed_args.sweep_path
-                        )
+                        sweep_args = args_from_sweep_yaml(parsed_args.sweep_path)
                     else:
                         sweep_args = args_from_existing_sweep(
                             parsed_args.sweep_id,
@@ -1260,7 +1259,11 @@ class QueShell(cmdLib.Cmd):
 
             max_runs = sweep_state.get("max_runs")
             completed = status.sweep_progress["completed_runs"]
-            progress = f"{completed}/{max_runs}" if max_runs is not None else f"{completed} (unlimited)"
+            progress = (
+                f"{completed}/{max_runs}"
+                if max_runs is not None
+                else f"{completed} (unlimited)"
+            )
             daemon_table.add_row("Progress:", progress)
 
         table.add_row("Daemon", daemon_table)
@@ -1823,6 +1826,7 @@ class QueShell(cmdLib.Cmd):
         self._add_location_arg(parser)
         self._add_index_arg(parser)
         self._add_display_keys_arg(parser)
+        self._add_input_file_arg(parser, help="Path to filters.py")
         self._add_list_manipulation_args(parser)
         return parser
 
@@ -1834,6 +1838,7 @@ class QueShell(cmdLib.Cmd):
         self._add_location_arg(parser)
         self._add_index_arg(parser)
         self._add_output_file_arg(parser, help="Path to output config file")
+        self._add_input_file_arg(parser, help="Path to filters.py")
         self._add_list_manipulation_args(parser)
         return parser
 
@@ -1852,6 +1857,7 @@ class QueShell(cmdLib.Cmd):
         )
         parser.add_argument("-ni", "--n_index", type=int, default=0, help="New index")
 
+        self._add_input_file_arg(parser, help="Path to filters.py")
         self._add_list_manipulation_args(parser)
         return parser
 
