@@ -1,7 +1,9 @@
 import copy
 
 from src.configfiles.sweeps.S3D.exp004.base import base_config as _exp004_base_config
-from src.configfiles.sweeps.S3D.exp004.base import sweep_key_map as _exp004_sweep_key_map
+from src.configfiles.sweeps.S3D.exp004.base import (
+    sweep_key_map as _exp004_sweep_key_map,
+)
 
 # exp004's augmentation pipeline (chunked temporal, centre crop, RandAugment), with its
 # warm-restart scheduler swapped for warmup + a single cosine annealing cycle.
