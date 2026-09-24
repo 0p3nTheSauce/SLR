@@ -6,6 +6,16 @@ Shell:
 - add more flexibility to run summarisation
 - add a flag to turn into debugging mode. Check debugging mode in unwrap_exception
 - fix argument parsing short flags
+- nargs="+" options swallow following positionals: e.g. `edit to_run 0 -ek acc 0.99` fails
+    with "required: value" because -ek/--edit_keys consumes 0.99; the value has to be written
+    before the flag (`edit to_run 0 0.99 -ek acc`). -c/--criterion has the same problem, so it
+    must come last. Affects any parser mixing nargs="+" options with trailing positionals.
+- indirect indexing is racy: edit/display/copy/to_config resolve the filtered/sorted index
+    against a client-side snapshot (list_runs), then act on the server by original index in a
+    separate call. If the queue changes in between (e.g. the worker pops to_run[0]), edit_run
+    silently edits a different run (it re-validates fine, so nothing flags it). Possible fix:
+    pass the expected run to edit_run and raise if peak_run(loc, idx) differs (note
+    debug.any_dups -- content comparison only works if runs are unique).
 
 Daemon:
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting

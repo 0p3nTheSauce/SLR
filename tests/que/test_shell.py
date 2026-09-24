@@ -1,8 +1,14 @@
+import io
+import sys
+import types
 from pathlib import Path
+from typing import Any
 
 import pytest
+from rich.console import Console
 
-from src.que.shell import get_filters_drop_keys, unpack_filters
+from src.que import shell as shell_module
+from src.que.shell import QueShell, get_filters_drop_keys, unpack_filters
 
 
 class TestUnpackFilters:
@@ -47,3 +53,149 @@ class TestGetFiltersDropKeys:
 
         with pytest.raises(AttributeError):
             get_filters_drop_keys(filters_file)
+
+
+# Plain dicts stand in for runs (see tests/que/test_core.py).
+RUNS: list[Any] = [
+    {"model": "S3D", "acc": 0.5},
+    {"model": "R3D", "acc": 0.9},
+    {"model": "S3D", "acc": 0.7},
+    {"model": "MVIT", "acc": 0.1},
+    {"model": "S3D", "acc": 0.2},
+]
+S3D_BY_ACC = "-s acc -f model -c x == S3D"  # filtered+sorted view: orig [4, 0, 2]
+
+
+class FakeQue:
+    """Records the mutating calls the shell sends to the Que proxy."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[Any, ...]] = []
+
+    def list_runs(self, loc: str) -> list[Any]:
+        return list(RUNS)
+
+    def edit_run(self, *args: Any) -> None:
+        self.calls.append(("edit", *args))
+
+    def place_runs(self, loc: str, runs: list[Any], index: int = 0) -> None:
+        self.calls.append(("place", loc, runs, index))
+
+
+class FakeServer:
+    def __init__(self) -> None:
+        self.que = FakeQue()
+
+    def get_que(self) -> FakeQue:
+        return self.que
+
+    def get_daemon(self) -> None: ...
+    def get_worker(self) -> None: ...
+    def get_server_context(self) -> None: ...
+
+
+class ShellHarness:
+    def __init__(self, shell: QueShell, que: FakeQue, out: io.StringIO) -> None:
+        self.shell = shell
+        self.que = que
+        self.out = out
+
+    def run(self, cmd: str, arg: str) -> str:
+        """Run `do_<cmd>(arg)` and return the console output."""
+        self.que.calls.clear()
+        self.out.seek(0)
+        self.out.truncate()
+        getattr(self.shell, f"do_{cmd}")(arg)
+        return self.out.getvalue()
+
+
+@pytest.fixture
+def harness(monkeypatch: pytest.MonkeyPatch) -> ShellHarness:
+    # Skip the constructor's side effects: banner, the real ~/.que_shell_history
+    # (plus its atexit save hook) and tmux.
+    monkeypatch.setattr(QueShell, "_show_banner", lambda self: None)
+    monkeypatch.setattr(QueShell, "_setup_history", lambda self: None)
+    monkeypatch.setattr(shell_module, "tmux_manager", lambda: None)
+    server = FakeServer()
+    shell = QueShell(server)  # type: ignore[arg-type]
+    out = io.StringIO()
+    shell.console = Console(file=out, width=300)
+    return ShellHarness(shell, server.que, out)
+
+
+@pytest.fixture
+def s3d_filters(tmp_path: Path) -> Path:
+    filters_file = tmp_path / "filters.py"
+    filters_file.write_text(
+        "filters = {'model': lambda x: x == 'S3D'}\ndrop_keys = []\n"
+    )
+    return filters_file
+
+
+class TestIndirectIndexing:
+    """edit/display/copy/to_config index into the filtered/sorted view, but must
+    act on the matching run in the underlying location."""
+
+    def test_edit_maps_to_original_index(self, harness: ShellHarness) -> None:
+        harness.run("edit", f"to_run 1 0.99 -de -ek acc {S3D_BY_ACC}")
+        assert harness.que.calls == [("edit", "to_run", 0, ["acc"], "0.99", True)]
+
+    def test_edit_negative_index_with_reverse(self, harness: ShellHarness) -> None:
+        harness.run("edit", "to_run -1 0.99 -r -ek acc")
+        assert [c[2] for c in harness.que.calls] == [0]
+
+    def test_edit_merges_file_and_cli_filters(
+        self, harness: ShellHarness, s3d_filters: Path
+    ) -> None:
+        harness.run("edit", f"to_run 0 1 -ek acc -ip {s3d_filters} -f acc -c x > 0.6")
+        assert [c[2] for c in harness.que.calls] == [2]
+
+    def test_edit_out_of_range(self, harness: ShellHarness) -> None:
+        out = harness.run("edit", "to_run 3 0.99 -ek acc -f model -c x == S3D")
+        assert harness.que.calls == []
+        assert "Index 3 is out of range for to_run after filtering (length: 3)" in out
+
+    def test_display_picks_from_view(self, harness: ShellHarness) -> None:
+        out = harness.run("display", f"to_run 2 {S3D_BY_ACC}")
+        assert '"acc": 0.7' in out
+
+    def test_display_with_filter_file(
+        self, harness: ShellHarness, s3d_filters: Path
+    ) -> None:
+        out = harness.run("display", f"to_run -1 -ip {s3d_filters} -s acc")
+        assert '"acc": 0.7' in out
+
+    def test_display_out_of_range(self, harness: ShellHarness) -> None:
+        out = harness.run("display", "to_run 7")
+        assert "Index 7 is out of range for to_run (length: 5)" in out
+
+    def test_copy_places_runs_from_view(self, harness: ShellHarness) -> None:
+        harness.run("copy", f"to_run old_runs -i 0 2 {S3D_BY_ACC}")
+        assert harness.que.calls == [("place", "old_runs", [RUNS[4], RUNS[2]], 0)]
+
+    def test_copy_with_filter_file(
+        self, harness: ShellHarness, s3d_filters: Path
+    ) -> None:
+        harness.run("copy", f"to_run old_runs -i 0 -ip {s3d_filters} -r")
+        assert harness.que.calls == [("place", "old_runs", [RUNS[4]], 0)]
+
+    def test_copy_out_of_range_places_nothing(self, harness: ShellHarness) -> None:
+        out = harness.run("copy", "to_run old_runs -i 0 5 -f model -c x == S3D")
+        assert harness.que.calls == []
+        assert "Index 5 is out of range" in out
+
+    def test_to_config_writes_run_from_view(
+        self, harness: ShellHarness, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        written: list[Any] = []
+        fake_module = types.SimpleNamespace(
+            write_config_file=lambda run, output=None: written.append(run)
+        )
+        monkeypatch.setitem(sys.modules, "src.que.runs_to_configs", fake_module)
+
+        harness.run("to_config", f"to_run 0 {S3D_BY_ACC}")
+        assert written == [RUNS[4]]
+
+        out = harness.run("to_config", "to_run 3 -f model -c x == S3D")
+        assert written == [RUNS[4]]
+        assert "after filtering" in out
