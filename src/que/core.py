@@ -618,13 +618,85 @@ class Que:
             return None
 
     @classmethod
-    def list_manipulation(
+    def _filter_indexed_runs(
+        cls, og_indexes : list[int], to_search: ExpQue, keys: list[str], criterion: Callable[[Any], bool]
+    ) -> tuple[list[int], list[GenExp]]:
+        idxs, runs = [], []
+        for i, run in zip(og_indexes, to_search):
+            if criterion(cls.get_nested_or_none(run, keys)):
+                idxs.append(i)
+                runs.append(run)
+        return idxs, runs
+    
+
+    @classmethod
+    def indexed_list_manipulation(
         cls,
         runs: Sequence[GenExp],
         sort_keys: list[list[str]] | None = None,
         reverse: bool = False,
         filter_keys: list[list[str]] | None = None,
         criterions: list[Callable[[Any], bool]] | None = None,
+    ) -> tuple[list[int], Sequence[GenExp]]:
+        """Apply common list manipulation operations
+
+        Args:
+            runs (Sequence[GenExp]): exp configs from any location
+            sort_keys (list[list[str]] | None, optional): List of key sets (indexing into Dict) to sort by. Defaults to None.
+            reverse (bool, optional): Reverse after sort. Defaults to False.
+            filter_keys (list[list[str]] | None, optional): List of key sets (indexing into Dict) to filter by. Must match criterions. Defaults to None.
+            criterions (list[Callable[[Any], bool]] | None, optional): List of criterion to match against the values indexed by filter_keys. Defaults to None.
+
+        Raises:
+            ValueError: If filter keys are not paired with criterions
+
+        Returns:
+            tuple[list[int], Sequence[GenExp]]: original indexes, Filtered and/or sorted runs
+        """
+        # Set defaults
+        if criterions is None:
+            criterions = []
+        if filter_keys is None:
+            filter_keys = []
+        if sort_keys is None:
+            sort_keys = []
+        
+        #Preserved indexes
+        original_indexes = list(range(len(runs)))
+            
+        # Filter
+        if len(filter_keys) != len(criterions):
+            raise ValueError("filter_key sets and criterions must be equal in length")
+        elif len(filter_keys) > 0:
+            for filter_key_set, crit in zip(filter_keys, criterions):
+                if len(runs) == 0:
+                    break
+
+                original_indexes, runs = cls._filter_indexed_runs(
+                    original_indexes,
+                    [r for r in runs],
+                    filter_key_set,
+                    crit
+                )
+                
+        # Sort
+        if len(sort_keys) > 0:    
+            idx_runs = sorted(
+                zip(original_indexes, runs),
+                key=lambda x: tuple(Que.get_nested(x[1], sort_key_set) for sort_key_set in sort_keys),
+                reverse=reverse,   
+            )
+            return [x[0] for x in idx_runs], [x[1] for x in idx_runs]
+        elif reverse:
+            return list(reversed(original_indexes)), list(reversed(runs))
+        else:
+            return original_indexes, runs
+
+    @classmethod
+    def list_manipulation(
+        cls,
+        runs: Sequence[GenExp],
+        **kwargs: Unpack[ListManipulationKwargs],
     ) -> Sequence[GenExp]:
         """Apply common list manipulation operations
 
@@ -639,45 +711,11 @@ class Que:
             ValueError: If filter keys are not paired with criterions
 
         Returns:
-            list[GenExp]: Filtered and or sorted runs
+            list[GenExp]: Filtered and/or sorted runs
         """
         # set defaults
-        if criterions is None:
-            criterions = []
-        if filter_keys is None:
-            filter_keys = []
-        if sort_keys is None:
-            sort_keys = []
-        # filter
-        if len(filter_keys) != len(criterions):
-            raise ValueError("filter_key sets and criterions must be equal in length")
-        elif len(filter_keys) > 0:
-            for filter_key_set, crit in zip(filter_keys, criterions):
-                if len(runs) == 0:
-                    break
+        return cls.indexed_list_manipulation(runs, **kwargs)[1]
 
-                runs = [
-                    run
-                    for run in runs
-                    if crit(Que.get_nested_or_none(run, filter_key_set))
-                ]
-        # sort
-        if len(sort_keys) > 0:
-            return sorted(
-                runs,
-                key=lambda x: tuple(
-                    Que.get_nested(x, sort_key_set) for sort_key_set in sort_keys
-                ),
-                reverse=reverse,
-            )
-        elif reverse:
-            return list(reversed(runs))
-
-        return runs
-
-    def get_val(self, run: GenExp, keys: list[str]) -> Any:
-        with log_and_raise(self.logger, "get_nested"):
-            return self.get_nested(run, keys)
 
     # -----------------------------------------------------------------------
     # Queue features
@@ -1044,30 +1082,52 @@ class Que:
 
     # Meta features
 
-    def find_runs(
-        self, to_search: ExpQue, keys: list[str], criterion: Callable[[Any], bool]
+    @classmethod
+    def _find_runs(
+        cls, og_indexes : list[int], to_search: ExpQue, keys: list[str], criterion: Callable[[Any], bool]
     ) -> tuple[list[int], list[GenExp]]:
         idxs, runs = [], []
-        for i, run in enumerate(to_search):
-            if criterion(self.get_val(run, keys)):
+        for i, run in zip(og_indexes, to_search):
+            if criterion(cls.get_nested_or_none(run, keys)):
                 idxs.append(i)
                 runs.append(run)
-        return idxs, runs  # type: ignore[return-value]
+        return idxs, runs
 
-    def find_loc_runs(
-        self,
-        loc: QueLocation,
+    @classmethod
+    def filter_runs(
+        cls,
+        runs: ExpQue,
         key_set: list[list[str]],
         criterions: list[Callable[[Any], bool]],
-    ) -> tuple[list[int], list[GenExp]]:
+        sort_keys: list[list[str]],
+        reverse: bool = False,
+    ) -> tuple[list[int], ExpQue]:
+        
+        
         assert len(key_set) == len(criterions), (
             f"key_set length {len(key_set)} != criterions length {len(criterions)}"
         )
-        runs: list[GenExp] = list(self._fetch_state(loc))  # type: ignore[arg-type]
-        idxs: list[int] = []
+        # runs: list[GenExp] = list(self._fetch_state(loc))  
+        idxs: list[int] = list(range(len(runs)))
+        
+        #Filter
         for k_lst, crit in zip(key_set, criterions):
-            idxs, runs = self.find_runs(runs, k_lst, crit)  # type: ignore[arg-type]
-        return idxs, runs
+            if len(runs) == 0:
+                break
+            idxs, runs = cls._find_runs(idxs, runs, k_lst, crit)  
+            
+        #Sort
+        if len(sort_keys) > 0:    
+            idx_runs = sorted(
+                zip(idxs, runs),
+                key=lambda x: tuple(Que.get_nested(x[1], sort_key_set) for sort_key_set in sort_keys),
+                reverse=reverse,   
+            )
+            return [x[0] for x in idx_runs], [x[1] for x in idx_runs]
+        elif reverse:
+            return list(reversed(idxs)), list(reversed(runs))
+        else:
+            return idxs, runs
 
     def update_runs(self, key_set: list[str], transform: Callable[[Any], Any]) -> None:
         """Apply a transform to a nested field across every run in every location."""

@@ -1,21 +1,15 @@
 import json
 import logging
 import sys
-from pathlib import Path
 
 # from .server import connect_manager
 # from que.shell import QueShell
-from src.que.core import CUR_RUN, FAIL_RUNS, OLD_RUNS, TO_RUN, Que
+from src.que.core import QUE_LOCATIONS, GenExp, Que
 from src.run_types import (
-    RUNS_PATH,
     CompExpInfo,
     ExpInfo,
     FailedExp,
 )
-
-KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
-
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -45,16 +39,16 @@ def update_runs_json_template():
     with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
         all_runs = json.load(f)
 
-    for loc in KEYS:
+    for loc in QUE_LOCATIONS:
         que_list = all_runs[loc]
         new_quelist = []
         for run in que_list:
             # ---
             # edit run here
             # ---
-            if loc in KEYS[:2]:
+            if loc in QUE_LOCATIONS[:2]:
                 run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
+            elif loc == QUE_LOCATIONS[2]:
                 run = CompExpInfo.model_validate(run).model_dump()
             else:
                 run = FailedExp.model_validate(run).model_dump()
@@ -71,7 +65,7 @@ def update_runs_json():
     with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
         all_runs = json.load(f)
 
-    for loc in KEYS:
+    for loc in QUE_LOCATIONS:
         que_list = all_runs[loc]
         new_quelist = []
         for run in que_list:
@@ -82,9 +76,9 @@ def update_runs_json():
             
             
             # ---
-            if loc in KEYS[:2]:
+            if loc in QUE_LOCATIONS[:2]:
                 run = ExpInfo.model_validate(run).model_dump()
-            elif loc == KEYS[2]:
+            elif loc == QUE_LOCATIONS[2]:
                 run = CompExpInfo.model_validate(run).model_dump()
             else:
                 run = FailedExp.model_validate(run).model_dump()
@@ -97,12 +91,29 @@ def update_runs_json():
         json.dump(all_runs, f, indent=4)
 
 
+def get_all_runs(q: Que) -> list[GenExp]:
+    runs = []
+    for loc in QUE_LOCATIONS:
+        runs.extend(q.list_runs(loc)) # type: ignore
+    return runs
+
+def any_dups() -> bool:
+    """Return True if any two runs across all Que locations serialise identically."""
+    seen: set[str] = set()
+    for run in get_all_runs(Que()):
+        str_run = run.model_dump_json()
+        if str_run in seen:
+            return True
+        seen.add(str_run)
+    return False
+    
+        
     
     
 
 if __name__ == "__main__":
     # update_runs_json()
-    pass
+    print(any_dups())
     
     
     
