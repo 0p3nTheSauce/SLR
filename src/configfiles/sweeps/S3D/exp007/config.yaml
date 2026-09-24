@@ -1,0 +1,89 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_loss
+  goal: minimize
+entity: ljgoodall2001-rhodes-university
+project: Sweeps
+
+# No early_terminate: hyperband cut most exp005/exp006 trials at epoch 15, before slow
+# starters (e.g. large-eps trials) reached their best. Early stopping (patience) remains.
+
+parameters:
+  # --- tuned ---
+  #Optimizer params
+  eps:
+    distribution: log_uniform_values
+    min: 0.000001
+    max: 0.1 # up from exp004's 1e-3, to test exp005's large-eps regime with warmup
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 0.00003
+    max: 0.005 # covers exp004's top trials (1e-4 - 4.5e-4) and exp005's large-eps ones (~1e-3)
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 0.000001
+    max: 0.005
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.3 # exp004's best trial was near its 0.1 bound
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 0.000005
+    max: 0.1
+  #model params
+  drop_p:
+    distribution: uniform
+    min: 0.1
+    max: 0.8 # exp004's top trials reached its 0.7 bound
+  #Scheduler params
+  tmax:
+    distribution: int_uniform
+    min: 20
+    max: 80 # exp004's best t0 was 35; the seed runs peaked at the end of a 20 epoch cycle
+  warmup_epochs:
+    values: [2, 5, 8] # no exp004 top-5 trial used 0
+  start_factor:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.5
+  #Augmentation params
+  hflip_p:
+    distribution: uniform
+    min: 0.1
+    max: 0.5 # higher was better in exp004
+  max_wobble:
+    distribution: int_uniform
+    min: 0
+    max: 8
+  magnitude:
+    distribution: int_uniform
+    min: 1
+    max: 15 # exp004's best trial used its lower bound of 3
+  num_ops:
+    values: [1, 2, 3, 4, 6]
+
+  # --- fixed ---
+  eta_min: {value: 0}
+  end_factor: {value: 1.0}
+  batch_size: {value: 8}
+  update_per_step: {value: 1}
+  frame_size: {value: 224}
+  target_length: {value: 32}
+  num_magnitude_bins: {value: 31}
+  max_epoch: {value: 200}
+  patience: {value: 20}
+  min_delta: {value: 0.01}
+
+# Only consumed by CLI/subprocess-mode agents (`wandb agent <sweep_id>`).
+command:
+  - ${env}
+  - python
+  - ${program}
+  - S3D
+  - asl100_cutoff_9
+  - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp007/base.py
+
+# Not run yet.
+# Created with id: u8yashg8

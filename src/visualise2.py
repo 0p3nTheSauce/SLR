@@ -496,6 +496,7 @@ def plot_metric_correlation(
     shade_by_density: bool = True,
     y_clip: tuple[float, float] | None = None,
     legend_top_y: float | None = None,
+    log_x: bool = False,
     ax=None,
 ):
     """
@@ -521,6 +522,9 @@ def plot_metric_correlation(
         raised so its top edge aligns with this y-axis data value, instead
         of sitting flush against the bottom of the axes -- useful to clear
         a cluster of low-value points near the bottom-right corner.
+    log_x: if True, draw the x-axis on a log scale and fit the trend line
+        against log10(x) (e.g. for log-uniform sweep hyperparameters such as
+        learning rates). Kendall's tau is rank-based, so it is unaffected.
 
     Returns (fig, ax, tau, p_value) -- tau/p_value from scipy's Kendall's
     tau, so callers can report them alongside the figure.
@@ -545,9 +549,12 @@ def plot_metric_correlation(
     else:
         ax.scatter(x_arr, y_arr, color=color, alpha=0.6, edgecolors="white", linewidths=0.4, s=60)
 
-    coeffs = np.polyfit(x_arr, y_arr, deg=1)
+    # Fit (and truncate the fit range) in log10 space when log_x, mapping back
+    # to data space only to draw the line.
+    x_fit = np.log10(x_arr) if log_x else x_arr
+    coeffs = np.polyfit(x_fit, y_arr, deg=1)
     slope, intercept = coeffs
-    x_min, x_max = x_arr.min(), x_arr.max()
+    x_min, x_max = x_fit.min(), x_fit.max()
     if y_clip is not None and slope != 0:
         # Truncate the x-range at whichever clip bound the line reaches first,
         # rather than clamping y -- clamping y instead would draw a flat
@@ -559,6 +566,9 @@ def plot_metric_correlation(
         x_max = min(x_max, x_at_hi)
     x_line = np.linspace(x_min, x_max, 100)
     y_line = np.polyval(coeffs, x_line)
+    if log_x:
+        x_line = 10**x_line
+        ax.set_xscale("log")
     ax.plot(
         x_line, y_line, color=fit_color, linewidth=1.8,
         label=f"Linear fit (Kendall $\\tau$ = {tau:.3f}, p = {p_value:.3e})",

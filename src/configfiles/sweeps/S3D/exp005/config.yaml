@@ -68,8 +68,8 @@ command:
   - /home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp005/base.py
   
 
-#Not run yet.
+
 #setting a baseline with no augs, or scheduler.
 #testing new sweep config loading setup, where base_config and sweep_key_map are loaded from base.py
 
-#defined with id: n4brjkmn
+#run  with id: n4brjkmn

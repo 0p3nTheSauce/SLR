@@ -141,6 +141,10 @@ references below if you find more drift between this doc and the real filenames.
   - `sacair_2026` — benchmark + results notebooks, CSV.
   - `stats` — dataset-stat notebooks.
   - `augmentation_demos` — illustrative notebooks, one per augmentation type.
+  - `seed_comparison` — variance of one config across 10 seeds (see
+    `configfiles/SeedComparison/`).
+  - `sweeping` — `suggest_sweep.ipynb`: compares wandb sweeps' Que trials and suggests the next
+    sweep's parameter ranges (helpers in `sweeping/helpers.py`).
   - `dataset_analysis` — exploratory notebooks (class viewer, worst/fewest instances, F1
     correlation).
   - `outputs` — final rendered `.tex`/`.pdf` figures/tables, organised by venue subfolder.

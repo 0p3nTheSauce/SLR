@@ -14,3 +14,12 @@ Misc TODOs:
   `src/results/augmentation_demos/{autoaugment,cropping_norms,randaugment}.ipynb`,
   `src/results/bottom_worst_splits/{100_worst,100_fewest}.ipynb`. Migrate opportunistically
   when next touching one of these rather than as a standalone sweep.
+- `CompRes` (src/run_types.py) doesn't record epochs trained or the epoch of the best val loss,
+  so `results/sweeping/suggest_sweep.ipynb` can't show where hyperband/early stopping cut trials
+  short from the Que alone (wandb's `Epoch` summary has it). Consider adding both.
+- `CosineAnnealingLR` (training.get_scheduler) is periodic in PyTorch: after warmup + `tmax`
+  epochs the LR climbs back up. S3D sweep 7 relies on patience to stop runs first. Consider
+  ending training at warmup + `tmax`, or holding the LR at `eta_min` afterwards.
+- `results/seed_comparison/results.ipynb` only covers the `S3D_13idpda6.toml` seed runs (its
+  filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs
+  once they finish.

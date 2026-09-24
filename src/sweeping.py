@@ -182,15 +182,45 @@ def _find_unresolved(d: Any, path: str = "") -> list[str]:
     return unresolved
 
 
-def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any], sweep_key_map: dict[str, str]) -> dict[str, Any]:
+def _get_nested(d: Any, keys: list[str]) -> Any:
+    """Read the value at a dotted/selector path inside a nested dict/list (the
+    read counterpart of `_set_nested`). Raises KeyError/IndexError if the path
+    doesn't resolve."""
+    child = d[_resolve_list_index(d, keys[0])] if isinstance(d, list) else d[keys[0]]
+    return _get_nested(child, keys[1:]) if len(keys) > 1 else child
+
+
+SweepKeyMap = dict[str, str | list[str]]
+"""Flat sweep parameter name -> one dotted target path, or several paths that all
+receive the same sampled value (e.g. `frame_size` -> train and test crops)."""
+
+
+def _as_target_list(dotted_or_list: str | list[str]) -> list[str]:
+    return [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
+
+
+def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any], sweep_key_map: SweepKeyMap) -> dict[str, Any]:
     """Mutate `raw` in place, applying each wandb.config key via SWEEP_KEY_MAP
     (or, if absent from the map, as a literal dotted path)."""
     for key, value in wandb_config.items():
-        dotted_or_list = sweep_key_map.get(key, key)
-        dotted_keys = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
-        for dotted_key in dotted_keys:
+        for dotted_key in _as_target_list(sweep_key_map.get(key, key)):
             _set_nested(raw, dotted_key.split("."), value)
     return raw
+
+
+def extract_sweep_values(config: dict[str, Any], sweep_key_map: SweepKeyMap, names: list[str]) -> dict[str, Any]:
+    """Recover a trial's flat sweep values from its nested run config -- the
+    inverse of `apply_sweep_overrides`, e.g. for analysing finished trials
+    from the Que rather than from wandb.
+
+    Names absent from the map are read as literal dotted paths, matching
+    `apply_sweep_overrides`. Names with several targets were all set to the
+    same sampled value, so only the first target is read.
+    """
+    return {
+        name: _get_nested(config, _as_target_list(sweep_key_map.get(name, name))[0].split("."))
+        for name in names
+    }
 
 
 def validate_sweep_key_map(config_path: Path) -> None:
@@ -202,17 +232,14 @@ def validate_sweep_key_map(config_path: Path) -> None:
     raw = attributes[BASE_CONFIG_ATTR]
     key_map = attributes[SWEEP_KEY_MAP_ATTR]
     for name, dotted_or_list in key_map.items():
-        dotted_list = [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
-        for dotted in dotted_list:
-            d = raw
-            for k in dotted.split("."):
-                try:
-                    d = d[_resolve_list_index(d, k)] if isinstance(d, list) else d[k]
-                except (KeyError, IndexError) as e:
-                    raise SweepConfigError(
-                        f"SWEEP_KEY_MAP[{name!r}] -> {dotted!r} does not resolve "
-                        f"against the base config skeleton: {e}"
-                    ) from None
+        for dotted in _as_target_list(dotted_or_list):
+            try:
+                _get_nested(raw, dotted.split("."))
+            except (KeyError, IndexError) as e:
+                raise SweepConfigError(
+                    f"SWEEP_KEY_MAP[{name!r}] -> {dotted!r} does not resolve "
+                    f"against the base config skeleton: {e}"
+                ) from None
 
 def validate_resolved(config: dict[str, Any]) -> None:
     """Raise if any skeleton placeholder was never overwritten by a sweep

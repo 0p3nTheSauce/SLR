@@ -1,0 +1,13 @@
+[
+  {
+    "recorded": "2026-09-24 22:25:33",
+    "sweep_id": "u8yashg8",
+    "sweep_project": "Sweeps",
+    "sweep_entity": "ljgoodall2001-rhodes-university",
+    "model": "S3D",
+    "dataset": "WLASL",
+    "split": "asl100_cutoff_9",
+    "base_config": "/home/luke/Code/SLR/src/configfiles/sweeps/S3D/exp007/base.py",
+    "max_runs": 50
+  }
+]

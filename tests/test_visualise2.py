@@ -15,6 +15,7 @@ from src.visualise2 import (
     SPLIT_NAME_MAP,
     plot_bboxes_on_canvas,
     plot_dimension_distributions,
+    plot_metric_correlation,
     save_fig,
     split_name_mapper,
     suggest_palette,
@@ -187,3 +188,15 @@ def test_split_name_map_only_maps_known_avail_splits() -> None:
     # Every value should be a non-empty display name; guards against typos
     # silently mapping a split to an empty/placeholder string.
     assert all(isinstance(v, str) and v for v in SPLIT_NAME_MAP.values())
+
+
+def test_plot_metric_correlation_log_x() -> None:
+    x = [1e-5, 1e-4, 1e-3, 1e-2]
+    y = [4.0, 3.0, 2.0, 1.0]
+    _, ax, tau, _ = plot_metric_correlation(x, y, log_x=True)
+    assert ax.get_xscale() == "log"
+    assert tau == pytest.approx(-1.0)
+    # linear in log10(x), so the fit line passes exactly through the points
+    line_x, line_y = ax.get_lines()[0].get_data()
+    assert line_x[0] == pytest.approx(1e-5) and line_x[-1] == pytest.approx(1e-2)
+    assert line_y[0] == pytest.approx(4.0) and line_y[-1] == pytest.approx(1.0)

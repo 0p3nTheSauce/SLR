@@ -1,0 +1,45 @@
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 200
+
+[optimizer]
+eps = 0.07935007122167449
+backbone_init_lr = 0.0013741893094626253
+backbone_weight_decay = 2.2962962541564985e-05
+classifier_init_lr = 3.0381194460015736e-06
+classifier_weight_decay = 0.011334646576702044
+
+[model_params]
+drop_p = 0.4521934091372405
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { type = "HORIZONTAL_FLIP", p = 0.24358328436236576 },
+    { frame_size = 224, type = "Random_crop" },
+]
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
+
+
+# Test loading sweep directly from base.py are the root of the S3D sweeps
+# created by script
