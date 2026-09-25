@@ -42,6 +42,10 @@ cd src
 python -m preprocess all -ve # add -lc 9 to remove samples with <= 9 frames
 ```
 
+Each split's output directory gets a `preprocess_log.json` recording every instance that was reset
+or removed, and why, with per-set counts. Fixed instances are cached in `instance_cache.json` so
+later splits skip the slow YOLO bbox step. Pass `--no_cache` to reprocess everything from scratch.
+
 Most models pull their pretrained weights automatically the first time they're constructed, but a
 few (the slowfast-based `MViTv2_S_16x4`/`MViTv2_B_32x3` variants) require manually downloading a
 checkpoint file first — see [src/models/README.md](src/models/README.md) for which models need

@@ -19,6 +19,7 @@ Naming convention:
 
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import (
@@ -146,23 +147,29 @@ def reverse_preproc_format(
 	preproc_instances: list[Instance],
 	classes: list[str] | None = None,
 ) -> list[preproc_class_dict]:
-	"""Convert from flat preprocessed format to original class seperated format"""
-	num_classes = len({inst.label_num for inst in preproc_instances})
-	lst_ppcd = [preproc_class_dict(gloss="empty", instances=[])] * num_classes
+	"""Convert from flat preprocessed format to original class seperated format.
+
+	The result is indexed by `label_num` and runs up to the largest label present, so a
+	class with no instances in this set still gets an (empty) slot. Its gloss is taken
+	from `classes`, which is therefore required if any label below the maximum is absent.
+	"""
+	by_label: dict[int, list[Instance]] = defaultdict(list)
+	names: dict[int, str] = {}
 	for pp_inst in preproc_instances:
-		label_num = pp_inst.label_num
-		entry = lst_ppcd[label_num]
-		if entry["gloss"] == "empty":
-			if hasattr(pp_inst, "label_name"):
-				# if "label_name" in pp_inst:
-				gloss = pp_inst.label_name
-			elif classes is not None:
-				gloss = classes[pp_inst.label_num]
-			else:
-				raise ValueError("instance does not contain the key: label_name")
-			lst_ppcd[label_num] = preproc_class_dict(gloss=gloss, instances=[pp_inst])
+		by_label[pp_inst.label_num].append(pp_inst)
+		names[pp_inst.label_num] = pp_inst.label_name
+
+	lst_ppcd: list[preproc_class_dict] = []
+	for label_num in range(max(by_label, default=-1) + 1):
+		if label_num in names:
+			gloss = names[label_num]
+		elif classes is not None:
+			gloss = classes[label_num]
 		else:
-			lst_ppcd[label_num]["instances"].append(pp_inst)
+			raise ValueError(
+				f"No instances with label_num {label_num}, and no `classes` to name it from"
+			)
+		lst_ppcd.append(preproc_class_dict(gloss=gloss, instances=by_label[label_num]))
 
 	return lst_ppcd
 
