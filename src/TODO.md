@@ -23,3 +23,15 @@ Misc TODOs:
 - `results/seed_comparison/results.ipynb` only covers the `S3D_13idpda6.toml` seed runs (its
   filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs
   once they finish.
+- `stats.reverse_preproc_format` uses the gloss name `"empty"` as its "slot not filled yet"
+  sentinel, but WLASL has a real gloss called `empty`, so each new `empty` instance replaces the
+  slot and only the last one per set survives (asl2000 loads as 21089 instead of 21095). It also
+  builds slots with `[dict] * num_classes` (one shared dict) and sizes the list by the number of
+  *distinct* labels, which raises IndexError for a set that is missing a class. Rewrite it to key
+  by `label_num` with a real sentinel (or `defaultdict`), and add a test.
+- `preprocess.py` remove-policy strings don't agree: the CLI passes `"reset"`, but
+  `fix_bad_frame_range` checks `"reset_frames"` (so resets happen but are never logged) and
+  `fix_bad_bboxes` checks `"reset_bbox"` (so `"reset"` with no detected person raises
+  ValueError). Videos that can't be opened are always dropped, whatever the policy.
+  `remove_short_samples` still runs with `--length_cutoff 0` and drops samples with <= 0 frames.
+  Switch to one `Literal` for the policy.
