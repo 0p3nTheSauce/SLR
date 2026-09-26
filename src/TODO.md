@@ -23,16 +23,6 @@ Misc TODOs:
 - `results/seed_comparison/results.ipynb` only covers the `S3D_13idpda6.toml` seed runs (its
   filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs
   once they finish.
-- Preprocessing rework (branch `fix/preprocess-logging`) needs verifying against the real labels
-  once nothing is training. A dry run on a *copy* of the cache already reproduced all six
-  asl2000/asl2000_cutoff_9 label files exactly, without running YOLO. Still to do:
-  (1) rerun `python -m preprocess all` (and `-lc 9`) so the real `instance_cache.json` migrates
-  to the new format (296 frame-range resets rebuilt from the raw split) and each split gets a
-  `preprocess_log.json`;
-  (2) diff the regenerated `*_fixed_frange_bboxes.json` against the current ones (they should be
-  identical) and delete the old per-stage logs (`cutoff_9_removed_short_samples_*.json`);
-  (3) at some point, run once with `--no_cache` into a scratch output dir, to check that a clean
-  YOLO rebuild matches the cached bboxes, and to get logs that don't rely on the cache migration.
 - `preprocess.fix_bad_frame_range` accepts `end <= start + num_frames`, so an end frame past the
   end of the video is kept whenever start > 0. WLASL's `frame_start` is 1-indexed, but the code
   treats it as 0-indexed. Left unchanged on purpose, because changing it would change the labels
