@@ -1,5 +1,6 @@
 import json
 from argparse import ArgumentParser
+from collections import Counter
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, TypeGuard
 
@@ -53,18 +54,73 @@ class WLASLClass(BaseModel):
     instances: list[RawInstance]
 
 
-class BadInstance(Instance):
-    """Adds reason to an instance that was discarded/modified from the dataset"""
+RemovePolicy: TypeAlias = Literal["strict", "reset"]
+"""How a fixer handles a bad instance: "strict" removes it, "reset" falls back to the
+whole video (frame range) or whole frame (bbox). Both are logged."""
 
+FixStage: TypeAlias = Literal["unreadable", "frame_range", "bbox", "length"]
+FixAction: TypeAlias = Literal["removed", "reset"]
+
+
+class FixRecord(BaseModel):
+    """One change preprocessing made to an instance."""
+
+    stage: FixStage
+    action: FixAction
     reason: str
 
 
-class ErrLog(BaseModel):
-    """Format for storing bad instances"""
+class CacheEntry(BaseModel):
+    """An instance plus its preprocessing history. This is both the unit the fixers work
+    on and the instance cache's on-disk format.
 
-    policy: str
-    num_offenders: int
-    instances: list[BadInstance]
+    `bboxes_fixed` is needed because `do_bboxes` can differ between runs that otherwise
+    share a cache (e.g. a `--no_bbox` run followed by a normal one): without this marker,
+    an instance cached with its raw/unfixed placeholder bbox would be indistinguishable
+    from one that was actually bbox-fixed, and would be reused as-is forever.
+
+    `fixes` is None only for entries loaded from a cache written before fixes were
+    recorded; `rebuild_legacy_fixes` fills it in.
+    """
+
+    instance: Instance
+    bboxes_fixed: bool
+    fixes: list[FixRecord] | None = []
+
+    @property
+    def removed(self) -> bool:
+        return any(fix.action == "removed" for fix in self.fixes or [])
+
+    def record(self, stage: FixStage, action: FixAction, reason: str) -> None:
+        if self.fixes is None:
+            self.fixes = []
+        self.fixes.append(FixRecord(stage=stage, action=action, reason=reason))
+
+
+class LoggedInstance(Instance):
+    """An instance that preprocessing changed or removed, as written to the log."""
+
+    fixes: list[FixRecord]
+
+
+class SetLog(BaseModel):
+    """What preprocessing did to one set. `num_raw == num_kept + num_removed` always holds."""
+
+    num_raw: int
+    num_kept: int
+    num_removed: int
+    counts: dict[str, int]  # "<stage>:<action>" -> number of instances
+    instances: list[LoggedInstance]
+
+
+class PreprocessLog(BaseModel):
+    """Log of one split's preprocessing run, written to `<split output dir>/preprocess_log.json`."""
+
+    split: str
+    length_cutoff: int
+    strictness: tuple[RemovePolicy, RemovePolicy]
+    do_bboxes: bool
+    sets: dict[str, SetLog]
 
 
 def is_processed_instance(obj: Any) -> TypeGuard[Instance]:
@@ -85,11 +141,6 @@ def instance_to_processed(d: RawInstance, label_num: int, label_name: str) -> In
     )
 
 
-def processed_to_bad(d: Instance, reason: str) -> BadInstance:
-    """Convert a Instance to a BadInstance by adding a reason."""
-    return BadInstance(**d.model_dump(), reason=reason)
-
-
 def get_set(
     lst_wlasl_class_dicts: list[WLASLClass], set_name: AVAIL_SETS
 ) -> list[Instance]:
@@ -102,91 +153,63 @@ def get_set(
     return mod_instances
 
 
-def output_bad(
-    bad_instances: list[BadInstance],
-    remove_policy: str,
-    log_path: str | Path,
-    fixing_description: str,
-) -> None:
-    """Output offending instances to a file using Pydantic's JSON serialization."""
-    if len(bad_instances) != 0:
-        err_dict = ErrLog(
-            policy=remove_policy,
-            num_offenders=len(bad_instances),
-            instances=bad_instances,
-        )
-        with open(log_path, "w") as log_file:
-            # use model_dump_json to serialize safely
-            log_file.write(err_dict.model_dump_json(indent=4))
-        print(f"Bad {fixing_description} logged to {log_path}.")
-    else:
-        print(f"No {fixing_description} ranges found")
+def _partition(entries: list[CacheEntry]) -> tuple[list[CacheEntry], list[CacheEntry]]:
+    """Split entries into (kept, removed)."""
+    kept = [entry for entry in entries if not entry.removed]
+    removed = [entry for entry in entries if entry.removed]
+    return kept, removed
 
 
 def fix_bad_frame_range(
     raw_path: Path,
-    instances: list[Instance],
-    log_dir: Path,
-    remove_policy: Literal["strict", "reset"] = "strict",
-    file_extension: str = "bad_frame_ranges.json",
-) -> list[Instance]:
-    """Remove videos where the file cannot be read, or the start or end frame are impossible."""
-    bad_instances: list[BadInstance] = []
-    clean_instances: list[Instance] = []
+    entries: list[CacheEntry],
+    remove_policy: RemovePolicy = "strict",
+) -> tuple[list[CacheEntry], list[CacheEntry]]:
+    """Check each entry's frame range against its video, recording every change on the entry.
 
-    for instance in tqdm.tqdm(instances, desc="fixing frame ranges"):
+    A video that cannot be opened is always removed, whatever the policy, since there is
+    nothing to reset to. An impossible start or end frame is removed ("strict") or reset
+    to the start/end of the video ("reset").
+
+    Returns:
+        (kept, removed) entries.
+    """
+    for entry in tqdm.tqdm(entries, desc="fixing frame ranges"):
+        instance = entry.instance
         vid_path = raw_path / f"{instance.video_id}.mp4"
 
         cap = cv2.VideoCapture(str(vid_path))
         if not cap.isOpened():
-            message = f"Could not open video {instance.video_id}. Removing"
-            bad_instances.append(processed_to_bad(instance, message))
+            entry.record("unreadable", "removed", f"Could not open video {vid_path}.")
             continue
-        else:
-            num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
 
         start = instance.frame_start
         end = instance.frame_end
 
         if start < 0 or start >= num_frames:
-            message = f"Invalid start frame {start} for video {instance.video_id} with length {num_frames}."
+            message = f"Invalid start frame {start} for video length {num_frames}."
             if remove_policy == "strict":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Removing instance.")
-                )
+                entry.record("frame_range", "removed", message)
                 continue
-            elif remove_policy == "reset_frames":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Setting to 0.")
-                )
+            entry.record("frame_range", "reset", message + " Setting to 0.")
             start = 0
 
         if end <= start or end > (start + num_frames):
-            message = f"Invalid end frame {end} for video {instance.video_id} with length {num_frames} and start frame {start}."
+            message = f"Invalid end frame {end} for video length {num_frames} and start frame {start}."
             if remove_policy == "strict":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Removing instance.")
-                )
+                entry.record("frame_range", "removed", message)
                 continue
-            elif remove_policy == "reset_frames":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Setting to num_frames.")
-                )
+            entry.record(
+                "frame_range", "reset", message + " Setting to start + num_frames."
+            )
             end = start + num_frames
 
         instance.frame_start = start
         instance.frame_end = end
-        clean_instances.append(instance)
 
-    log_path = log_dir / f"{remove_policy}_{file_extension}"
-    output_bad(
-        bad_instances=bad_instances,
-        remove_policy=remove_policy,
-        log_path=log_path,
-        fixing_description="frame range",
-    )
-
-    return clean_instances
+    return _partition(entries)
 
 
 def get_largest_bbox(bboxes: list[list[float]]) -> list[float] | None:
@@ -204,6 +227,8 @@ def get_largest_bbox(bboxes: list[list[float]]) -> list[float] | None:
 
 
 class VideoFrameDataset(Dataset):
+    """Loads each instance's frames, yielding `(frames, index into instances)`."""
+
     def __init__(self, raw_path: Path, instances: list[Instance]):
         self.raw_path = raw_path
         self.instances = instances
@@ -211,47 +236,50 @@ class VideoFrameDataset(Dataset):
     def __len__(self):
         return len(self.instances)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         instance = self.instances[idx]
         vid_path = self.raw_path / f"{instance.video_id}.mp4"
         frames = load_rgb_frames_from_video(
             str(vid_path), instance.frame_start, instance.frame_end
         )
         # stays uint8 here — 4x smaller in the prefetch queue than float32
-        return frames, instance
+        return frames, idx
 
 
 def fix_bad_bboxes(
     raw_path: Path,
-    instances: list[Instance],
-    log_dir: Path,
-    remove_policy: Literal["strict", "reset"] = "strict",
-    file_extension: str = "bad_bboxes.json",
+    entries: list[CacheEntry],
+    remove_policy: RemovePolicy = "strict",
     num_workers: int = 8,
-) -> list[Instance]:
-    """Fix bad bounding boxes by running a pre-trained YOLOv8 model on the video."""
+) -> tuple[list[CacheEntry], list[CacheEntry]]:
+    """Replace each entry's bbox with the smallest box enclosing every person YOLOv8 detects
+    across its frames, recording every change on the entry.
+
+    If no person is detected, the entry is removed ("strict") or given a whole-frame bbox
+    ("reset"). Kept entries are marked `bboxes_fixed`.
+
+    Returns:
+        (kept, removed) entries.
+    """
     model = YOLO("yolov8n.pt")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    dataset = VideoFrameDataset(raw_path, instances)
+    dataset = VideoFrameDataset(raw_path, [entry.instance for entry in entries])
     loader = DataLoader(
         dataset,
         batch_size=1,
         num_workers=num_workers,  # tune to your CPU core count
-        collate_fn=lambda batch: batch[0],  # unwrap the single (frames, instance) pair
+        collate_fn=lambda batch: batch[0],  # unwrap the single (frames, idx) pair
         pin_memory=True,
-        prefetch_factor=4,
+        prefetch_factor=4 if num_workers > 0 else None,
     )
 
-    bad_instances: list[BadInstance] = []
-    clean_instances: list[Instance] = []
-
-    for frames, instance in tqdm.tqdm(
-        loader, total=len(instances), desc="Fixing bounding boxes"
+    for frames, idx in tqdm.tqdm(
+        loader, total=len(entries), desc="Fixing bounding boxes"
     ):
-        frames = (
-            frames.to(device).float() / 255.0
-        )  # normalize after transfer, not before
+        entry = entries[idx]
+        # normalize after transfer, not before
+        frames = frames.to(device).float() / 255.0
         results = model(frames, device=device, verbose=False)
         bboxes = []
         for result in results:
@@ -259,73 +287,39 @@ def fix_bad_bboxes(
             if len(person_bboxes) > 0:
                 bboxes.extend(person_bboxes.tolist())
 
-        if not bboxes:
-            message = f"No bounding boxes found for video {instance.video_id}."
+        largest_bbox = get_largest_bbox(bboxes)
+        if largest_bbox is None:
+            message = "No person detected by YOLO."
             if remove_policy == "strict":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Removing instance.")
-                )
+                entry.record("bbox", "removed", message)
                 continue
-            elif remove_policy == "reset_bbox":
-                bad_instances.append(
-                    processed_to_bad(instance, message + " Using whole frame.")
-                )
-                largest_bbox = [0, 0, frames.shape[3], frames.shape[2]]
-            else:
-                raise ValueError(f"Invalid remove_policy: {remove_policy}")
-        else:
-            largest_bbox = get_largest_bbox(bboxes)
-            assert largest_bbox is not None, "largest_bbox can not be None here"
+            entry.record("bbox", "reset", message + " Using whole frame.")
+            _, _, height, width = frames.shape
+            largest_bbox = [0, 0, width, height]
 
-        largest_bbox = [round(coord) for coord in largest_bbox]
-        instance.bbox = largest_bbox
-        clean_instances.append(instance)
+        entry.instance.bbox = [round(coord) for coord in largest_bbox]
+        entry.bboxes_fixed = True
 
-    log_path = log_dir / f"{remove_policy}_{file_extension}"
-
-    output_bad(
-        bad_instances=bad_instances,
-        remove_policy=remove_policy,
-        log_path=log_path,
-        fixing_description="bounding boxes",
-    )
-
-    return clean_instances
+    return _partition(entries)
 
 
 def remove_short_samples(
-    instances: list[Instance],
-    log_dir: Path,
-    cutoff: int = 9,
-    file_extension: str = "removed_short_samples.json",
-) -> list[Instance]:
-    """Remove samples where the number of frames is less than or equal to the cutoff."""
-    clean_instances = []
-    short_samples = []
+    entries: list[CacheEntry], cutoff: int
+) -> tuple[list[CacheEntry], list[CacheEntry]]:
+    """Remove entries with `cutoff` or fewer frames, recording the removal on the entry.
 
-    for inst in instances:
-        num_frame = inst.frame_end - inst.frame_start
-        if num_frame > cutoff:
-            clean_instances.append(inst)
-        else:
-            # Fixed bug: Append a BadInstance instead of a raw string
-            short_samples.append(
-                processed_to_bad(
-                    inst,
-                    f"bad number of frames {num_frame} for video {inst.video_id}, removing.",
-                )
+    Returns:
+        (kept, removed) entries.
+    """
+    for entry in entries:
+        num_frames = entry.instance.frame_end - entry.instance.frame_start
+        if num_frames <= cutoff:
+            entry.record(
+                "length",
+                "removed",
+                f"{num_frames} frames, at or below the cutoff of {cutoff}.",
             )
-
-    log_path = log_dir / f"cutoff_{cutoff}_{file_extension}"
-
-    output_bad(
-        bad_instances=short_samples,
-        remove_policy="strict",
-        log_path=log_path,
-        fixing_description="short samples",
-    )
-
-    return clean_instances
+    return _partition(entries)
 
 
 def print_v(s: str, y: bool) -> None:
@@ -355,34 +349,24 @@ def check_paths(
     return True
 
 
-SetIdInst: TypeAlias = dict[str, dict[str, Instance]]
-StrictValues: TypeAlias = Literal["strict", "reset"]
-
-
-class CacheEntry(BaseModel):
-    """A cached instance plus whether bbox-fixing was applied to it.
-
-    Needed because `do_bboxes` can differ between runs that otherwise share a cache
-    (e.g. a `--no_bbox` run followed by a normal one): without this marker, an instance
-    cached with its raw/unfixed placeholder bbox would be indistinguishable from one
-    that was actually bbox-fixed, and would be reused as-is forever.
-    """
-
-    instance: Instance
-    bboxes_fixed: bool
-
-
 def load_instance_cache(cache_path: Path) -> dict[str, CacheEntry]:
+    """Load the instance cache, keyed by video_id. A missing or unreadable cache loads as empty.
+
+    Entries written before fixes were recorded load with `fixes=None`; see
+    `rebuild_legacy_fixes`.
+    """
     if not cache_path.exists():
         return {}
     with open(cache_path, "r") as f:
         raw = json.load(f)
     try:
         return {
-            item["instance"]["video_id"]: CacheEntry.model_validate(item)
+            item["instance"]["video_id"]: CacheEntry.model_validate(
+                {"fixes": None} | item
+            )
             for item in raw
         }
-    except (KeyError, ValidationError):
+    except (KeyError, TypeError, ValidationError):
         print(
             f"Cache at {cache_path} is in an old/incompatible format; ignoring it and "
             "rebuilding from scratch."
@@ -395,43 +379,68 @@ def save_instance_cache(cache_path: Path, cache: dict[str, CacheEntry]) -> None:
         json.dump([entry.model_dump() for entry in cache.values()], f, indent=2)
 
 
-def _apply_fixes(
-    instances: list[Instance],
-    subset: str,
-    do_bboxes: bool,
-    length_cuttoff: int,
-    strictness: tuple[StrictValues, StrictValues],
-    raw_path: Path,
-    output_dir: Path,
-    verbose: bool,
-) -> list[Instance]:
-    print_v("Fixing frame ranges", verbose)
-    instances = fix_bad_frame_range(
-        raw_path=raw_path,
-        instances=instances,
-        log_dir=output_dir,
-        remove_policy=strictness[0],
-        file_extension=f"bad_frame_ranges_{subset}.json",
-    )
+def rebuild_legacy_fixes(entry: CacheEntry, raw: Instance) -> None:
+    """Fill in `fixes` for a cache entry written before fixes were recorded, by comparing
+    it to the raw instance it came from.
 
-    if do_bboxes:
-        print_v("Fixing bounding boxes", verbose)
-        instances = fix_bad_bboxes(
-            raw_path=raw_path,
-            instances=instances,
-            log_dir=output_dir,
-            remove_policy=strictness[1],
-            file_extension=f"bad_bboxes_{subset}.json",
+    Only frame-range resets can differ between the two. The old code never cached removed
+    instances, and could never apply a whole-frame bbox reset ("reset" raised instead), so
+    these rebuilt records are complete.
+    """
+    cached = entry.instance
+    entry.fixes = []
+    if (cached.frame_start, cached.frame_end) != (raw.frame_start, raw.frame_end):
+        entry.record(
+            "frame_range",
+            "reset",
+            f"Frame range {raw.frame_start}-{raw.frame_end} was reset to "
+            f"{cached.frame_start}-{cached.frame_end} (rebuilt from a legacy cache entry).",
         )
 
-    print_v("Removing small samples", verbose)
-    instances = remove_short_samples(
-        instances=instances,
-        log_dir=output_dir,
-        cutoff=length_cuttoff,
-        file_extension=f"removed_short_samples_{subset}.json",
+
+def _fix_uncached(
+    raw_path: Path,
+    entries: list[CacheEntry],
+    do_bboxes: bool,
+    strictness: tuple[RemovePolicy, RemovePolicy],
+    verbose: bool,
+) -> tuple[list[CacheEntry], list[CacheEntry]]:
+    """Run the video-dependent fixes (frame range, then bboxes) on fresh entries.
+
+    Returns:
+        (kept, removed) entries.
+    """
+    if not entries:
+        return [], []
+    print_v("Fixing frame ranges", verbose)
+    kept, removed = fix_bad_frame_range(raw_path, entries, remove_policy=strictness[0])
+    if do_bboxes:
+        print_v("Fixing bounding boxes", verbose)
+        kept, bbox_removed = fix_bad_bboxes(raw_path, kept, remove_policy=strictness[1])
+        removed += bbox_removed
+    return kept, removed
+
+
+def _set_log(num_raw: int, kept: list[CacheEntry], removed: list[CacheEntry]) -> SetLog:
+    """Summarise one set's preprocessing, checking that every raw instance is accounted for."""
+    if num_raw != len(kept) + len(removed):
+        raise RuntimeError(
+            f"{num_raw} raw instances but {len(kept)} kept + {len(removed)} removed"
+        )
+    changed = [entry for entry in kept + removed if entry.fixes]
+    counts = Counter(
+        f"{fix.stage}:{fix.action}" for entry in changed for fix in entry.fixes or []
     )
-    return instances
+    return SetLog(
+        num_raw=num_raw,
+        num_kept=len(kept),
+        num_removed=len(removed),
+        counts=dict(sorted(counts.items())),
+        instances=[
+            LoggedInstance(**entry.instance.model_dump(), fixes=entry.fixes or [])
+            for entry in changed
+        ],
+    )
 
 
 def preprocess_split(
@@ -440,7 +449,7 @@ def preprocess_split(
     output_base: Path,
     verbose: bool = False,
     file_extension: str = "fixed_frange_bboxes.json",
-    strictness: tuple[StrictValues, StrictValues] = ("strict", "strict"),
+    strictness: tuple[RemovePolicy, RemovePolicy] = ("strict", "strict"),
     do_bboxes: bool = True,
     length_cuttoff: int = 9,
     cache_path: Path | None = None,
@@ -449,11 +458,17 @@ def preprocess_split(
     """Preprocesses a split of the WLASL dataset, reusing fixes for
     instances already processed in a previous split (e.g. asl100 -> asl300).
 
-    use_cache: if True, trusts that fix parameters (length_cuttoff, strictness,
-    etc.) are unchanged since the cache was built and reuses cached instances
-    as-is. If False, ignores the cache for reads and reprocesses every
-    instance from scratch (still writing results back to the cache for later
-    runs).
+    Writes each set's kept instances, plus one `preprocess_log.json` for the whole split
+    recording every instance that was changed or removed (see `PreprocessLog`). The log
+    covers cached instances too, so it is complete whatever order the splits are run in.
+
+    The cache holds instances after the frame-range and bbox fixes, but before the length
+    cutoff, which is re-applied to every instance on every run. Removed instances are not
+    cached.
+
+    use_cache: if True, trusts that the fix parameters (strictness etc.) are unchanged
+    since the cache was built and reuses cached instances as-is. If False, reprocesses
+    every instance from scratch (still writing results back to the cache for later runs).
 
     A cached instance is only reused as-is if it matches this run's `do_bboxes`
     requirement: an instance cached from a `do_bboxes=False` run (raw/unfixed bbox)
@@ -474,10 +489,6 @@ def preprocess_split(
     wlasl_adapter = TypeAdapter(list[WLASLClass])
     asl_num = wlasl_adapter.validate_python(raw_json_data)
 
-    train_instances = get_set(asl_num, "train")
-    test_instances = get_set(asl_num, "test")
-    val_instances = get_set(asl_num, "val")
-
     base_name = split_path.name.replace(".json", "")
     base_name = (
         f"{base_name}_cutoff_{length_cuttoff}" if length_cuttoff > 0 else base_name
@@ -486,72 +497,76 @@ def preprocess_split(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cache_path = cache_path or (output_base / "instance_cache.json")
-    cache = load_instance_cache(cache_path) if use_cache else {}
+    cache = load_instance_cache(cache_path)
+    set_logs: dict[str, SetLog] = {}
 
     print_v(f"Processing {base_name}", verbose)
-    for subset, instances in [
-        ("train", train_instances),
-        ("test", test_instances),
-        ("val", val_instances),
-    ]:
+    subsets: list[AVAIL_SETS] = ["train", "test", "val"]
+    for subset in subsets:
         print_v(f"For split: {subset}", verbose)
+        instances = get_set(asl_num, subset)
 
-        uncached = [inst for inst in instances if inst.video_id not in cache]
-        reusable_ids = [
-            inst.video_id
-            for inst in instances
-            if inst.video_id in cache
-            and (not do_bboxes or cache[inst.video_id].bboxes_fixed)
-        ]
-        bbox_only_ids = [
-            inst.video_id
-            for inst in instances
-            if inst.video_id in cache
-            and do_bboxes
-            and not cache[inst.video_id].bboxes_fixed
-        ]
+        reused: list[CacheEntry] = []
+        needs_bboxes: list[CacheEntry] = []
+        fresh: list[CacheEntry] = []
+        for inst in instances:
+            cached = cache.get(inst.video_id) if use_cache else None
+            if cached is None:
+                fresh.append(CacheEntry(instance=inst.model_copy(), bboxes_fixed=False))
+                continue
+            entry = cached.model_copy(deep=True)
+            if entry.fixes is None:
+                rebuild_legacy_fixes(entry, inst)
+            if do_bboxes and not entry.bboxes_fixed:
+                needs_bboxes.append(entry)
+            else:
+                reused.append(entry)
         print_v(
-            f"Reusing {len(reusable_ids)} cached / re-fixing bboxes for "
-            f"{len(bbox_only_ids)} cached / fixing {len(uncached)} new",
+            f"Reusing {len(reused)} cached / re-fixing bboxes for "
+            f"{len(needs_bboxes)} cached / fixing {len(fresh)} new",
             verbose,
         )
 
-        reused = [cache[video_id].instance.model_copy() for video_id in reusable_ids]
-
-        bbox_fixed = (
-            fix_bad_bboxes(
-                raw_path=raw_path,
-                instances=[cache[vid].instance.model_copy() for vid in bbox_only_ids],
-                log_dir=output_dir,
-                remove_policy=strictness[1],
-                file_extension=f"bad_bboxes_{subset}.json",
-            )
-            if bbox_only_ids
-            else []
+        bbox_kept, bbox_removed = (
+            fix_bad_bboxes(raw_path, needs_bboxes, remove_policy=strictness[1])
+            if needs_bboxes
+            else ([], [])
+        )
+        fresh_kept, fresh_removed = _fix_uncached(
+            raw_path, fresh, do_bboxes, strictness, verbose
         )
 
-        newly_fixed = _apply_fixes(
-            instances=uncached,
-            subset=subset,
-            do_bboxes=do_bboxes,
-            length_cuttoff=length_cuttoff,
-            strictness=strictness,
-            raw_path=raw_path,
-            output_dir=output_dir,
-            verbose=verbose,
+        fixed = reused + bbox_kept + fresh_kept
+        removed = bbox_removed + fresh_removed
+        for entry in fixed:
+            cache[entry.instance.video_id] = entry.model_copy(deep=True)
+
+        if length_cuttoff > 0:
+            print_v("Removing small samples", verbose)
+            kept, short = remove_short_samples(fixed, length_cuttoff)
+            removed += short
+        else:
+            kept = fixed
+
+        set_log = _set_log(len(instances), kept, removed)
+        set_logs[subset] = set_log
+        print(
+            f"{base_name}/{subset}: {set_log.num_raw} raw -> {set_log.num_kept} kept, "
+            f"{set_log.num_removed} removed {set_log.counts}"
         )
 
-        processed = reused + bbox_fixed + newly_fixed
-
-        for inst in newly_fixed:
-            cache[inst.video_id] = CacheEntry(instance=inst, bboxes_fixed=do_bboxes)
-        for inst in bbox_fixed:
-            cache[inst.video_id] = CacheEntry(instance=inst, bboxes_fixed=True)
-
-        print_v("Saving results", verbose)
         inst_path = output_dir / f"{subset}_{file_extension}"
         with open(inst_path, "w") as f:
-            json.dump([inst.model_dump() for inst in processed], f, indent=2)
+            json.dump([entry.instance.model_dump() for entry in kept], f, indent=2)
+
+    log = PreprocessLog(
+        split=base_name,
+        length_cutoff=length_cuttoff,
+        strictness=strictness,
+        do_bboxes=do_bboxes,
+        sets=set_logs,
+    )
+    (output_dir / "preprocess_log.json").write_text(log.model_dump_json(indent=2))
 
     save_instance_cache(cache_path, cache)
     print("\n------------------------- finished preprocessing ---------------\n")
@@ -608,6 +623,13 @@ if __name__ == "__main__":
         "-nb", "--no_bbox", action="store_true", help="Skip intense bbox step"
     )
     parser.add_argument(
+        "-nc",
+        "--no_cache",
+        action="store_true",
+        help="Reprocess every instance from scratch instead of reusing the instance cache "
+        "(the cache is still updated). Slow: reruns YOLO on every video.",
+    )
+    parser.add_argument(
         "-lc",
         "--length_cutoff",
         type=int,
@@ -636,4 +658,5 @@ if __name__ == "__main__":
             strictness=tuple(args.strictness),
             do_bboxes=(not args.no_bbox),
             length_cuttoff=args.length_cutoff,
+            use_cache=not args.no_cache,
         )
