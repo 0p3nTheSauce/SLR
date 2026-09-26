@@ -23,12 +23,24 @@ with FPS=25), *indexed from 1*.
 
 ## Our copy of the data
 
+**Source.** The YouTube download scripts no longer work reliably, so, following the WLASL
+instructions, the data was requested from the WLASL authors. They supplied `WLASL2000.zip` (the
+videos), `splits.zip` (the annotation JSONs) and `pose_per_individual_videos.zip`.
+
 Checked against `data/WLASL/splits/asl2000.json` and `data/WLASL/WLASL2000/` on 2026-09-26.
 
-* 21095 instances, 2000 glosses, 119 signers.
-* The videos come pre-cut from the original YouTube videos, so each `video_id` is one instance.
-  No `video_id` appears twice.
-* Clips are 256x256 at 25 fps (all of a random sample of 400).
+* 21095 instances, 2000 glosses, 119 signers. The paper reports 21,083 videos, and per subset
+  2,038 / 5,117 / 13,168 / 21,083; our annotation file has 2,038 / 5,118 / 13,174 / 21,095. The
+  annotations have evidently changed since publication, for reasons we don't know.
+* The supplied videos were already preprocessed by the authors: each is cut from its original
+  YouTube video and resized to 256x256, so each `video_id` is one instance, and all 21095 are
+  present and readable. No `video_id` appears twice. Evidence that the cutting and resizing came
+  after annotation: every raw `bbox` extends past 256 px (up to 492), so bboxes are in the
+  original videos' coordinates, and some `northtexas` frame ranges are offsets into the original
+  video (see [frame-range resets](#frame-range-resets)).
+* Clips are 256x256 at 25 fps (all of a random sample of 400), and the shortest has 9 frames.
+* The original WLASL loader (`code/I3D/datasets/nslt_dataset.py`) skips videos whose file has
+  fewer than 9 frames, so it removes none of these clips. Our `cutoff_9` splits are stricter.
 * `frame_end = -1` never occurs, despite the description above.
 * `frame_start` is 1 for 20791 instances. Most of the rest are offsets into the original,
   uncut video (see [frame-range resets](#frame-range-resets)).

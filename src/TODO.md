@@ -32,3 +32,7 @@ Misc TODOs:
   `src/info/WLASL_info.md` from the new logs, and delete the old `instance_cache.json` (it only
   matters for reproducing the old labels, together with the commit before this change). See
   `src/info/WLASL_info.md` ("What the rerun will change") for what to expect.
+  Decision (2026-09-26): the final results should not remove any short clips, to match the
+  original WLASL loader, which only skips videos under 9 frames, and no clip is that short. So train
+  on the no-cutoff splits (`asl100`/.../`asl2000`), not `*_cutoff_9` (which after the rerun still
+  removes `15144`, 9 frames). Switching the configs/`CUTOFF_9_NAMES` users over is part of this.
