@@ -43,7 +43,7 @@ python -m preprocess all -ve # add -lc 9 to remove samples with <= 9 frames
 ```
 
 Each split's output directory gets a `preprocess_log.json` recording every instance that was reset
-or removed, and why, with per-set counts. Fixed instances are cached in `instance_cache.json` so
+or removed, and why, with per-set counts. Fixed instances are cached in `instance_cache_v2.json` so
 later splits skip the slow YOLO bbox step. Pass `--no_cache` to reprocess everything from scratch.
 
 Most models pull their pretrained weights automatically the first time they're constructed, but a

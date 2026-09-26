@@ -23,12 +23,12 @@ Misc TODOs:
 - `results/seed_comparison/results.ipynb` only covers the `S3D_13idpda6.toml` seed runs (its
   filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs
   once they finish.
-- `preprocess.fix_bad_frame_range` accepts `end <= start + num_frames`, so an end frame past the
-  end of the video is kept whenever start > 0. WLASL's `frame_start` is 1-indexed, but the code
-  treats it as 0-indexed. Left unchanged on purpose, because changing it would change the labels
-  that published results were trained on. Decide whether to fix it for future runs.
-- `src/video_dataset.py:314-330` is dead commented-out code that calls the old
-  `fix_bad_frame_range`/`fix_bad_bboxes`/`remove_short_samples` signatures. Delete it.
-- `src/benchmark.py` uses bare imports (`from models import ...`), so it only works when run as a
-  script from `src/` and `import src.benchmark` fails. Switch to `src.`-prefixed imports like the
-  rest of the repo, and check it still runs from `src/`.
+- **Regenerate the labels before the final round of results.** `preprocess.py` now stores
+  0-based frame starts (cache version 2), fixing an off-by-one where every unreset instance
+  skipped its first annotated frame, but the label files on disk still have the old 1-based
+  starts so in-progress experiments (SATNAC, sweeps) stay comparable. When ready:
+  `python -m src.preprocess all -ve` and `python -m src.preprocess all -ve -lc 9`. This is a full
+  YOLO run, because the new `instance_cache_v2.json` starts empty. Then update the numbers in
+  `src/info/WLASL_info.md` from the new logs, and delete the old `instance_cache.json` (it only
+  matters for reproducing the old labels, together with the commit before this change). See
+  `src/info/WLASL_info.md` ("What the rerun will change") for what to expect.

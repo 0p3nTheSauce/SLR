@@ -6,6 +6,7 @@ import pytest
 import torch
 
 from src.preprocess import (
+    CACHE_VERSION,
     CacheEntry,
     Instance,
     PreprocessLog,
@@ -14,6 +15,7 @@ from src.preprocess import (
     WLASLClass,
     fix_bad_bboxes,
     fix_bad_frame_range,
+    instance_to_processed,
     load_instance_cache,
     preprocess_split,
     remove_short_samples,
@@ -24,8 +26,9 @@ PLACEHOLDER_BBOX = [137, 16, 492, 480]
 
 
 def _raw_instance(
-    video_id: str, frame_start: int = 0, frame_end: int = 20
+    video_id: str, frame_start: int = 1, frame_end: int = 20
 ) -> RawInstance:
+    """A WLASL-style instance: `frame_start` is 1-based."""
     return RawInstance(
         bbox=list(PLACEHOLDER_BBOX),
         frame_end=frame_end,
@@ -41,6 +44,7 @@ def _raw_instance(
 
 
 def _instance(video_id: str, frame_start: int = 0, frame_end: int = 20) -> Instance:
+    """A processed instance: frames are 0-based."""
     return Instance(
         **_raw_instance(video_id, frame_start, frame_end).model_dump(),
         label_num=0,
@@ -87,6 +91,10 @@ def _run(
         output_base=dirs.output_base,
         **kwargs,  # type: ignore[arg-type]
     )
+
+
+def _cache_path(dirs: SimpleNamespace) -> Path:
+    return dirs.output_base / f"instance_cache_v{CACHE_VERSION}.json"
 
 
 def _read_log(dirs: SimpleNamespace, split: str = "asl100") -> PreprocessLog:
@@ -146,7 +154,7 @@ class TestPreprocessSplitCache:
             PLACEHOLDER_BBOX,
         ]
 
-        cache = load_instance_cache(dirs.output_base / "instance_cache.json")
+        cache = load_instance_cache(_cache_path(dirs))
         assert cache["00001"].bboxes_fixed is False
         assert cache["00001"].instance.bbox == PLACEHOLDER_BBOX
 
@@ -167,7 +175,7 @@ class TestPreprocessSplitCache:
         assert bboxes["00001"] == _fake_bbox_for("00001")
         assert bboxes["00002"] == _fake_bbox_for("00002")
 
-        cache = load_instance_cache(dirs.output_base / "instance_cache.json")
+        cache = load_instance_cache(_cache_path(dirs))
         assert cache["00001"].bboxes_fixed is True
         assert cache["00001"].instance.bbox == _fake_bbox_for("00001")
 
@@ -187,7 +195,7 @@ class TestPreprocessSplitCache:
     def test_use_cache_false_reprocesses_but_keeps_other_entries(
         self, dirs: SimpleNamespace, stub_fixers: SimpleNamespace
     ) -> None:
-        cache_path = dirs.output_base / "instance_cache.json"
+        cache_path = _cache_path(dirs)
         save_instance_cache(cache_path, {"99999": _entry("99999")})
         _write_split(dirs.split_path, [_raw_instance("00001")])
 
@@ -219,7 +227,7 @@ class TestPreprocessSplitLog:
             [
                 _raw_instance("00001"),
                 _raw_instance("00002"),
-                _raw_instance("00003", frame_start=0, frame_end=5),
+                _raw_instance("00003", frame_end=5),
             ],
         )
 
@@ -269,38 +277,34 @@ class TestPreprocessSplitLog:
         }
 
 
-class TestLegacyCacheMigration:
-    def _write_legacy_cache(self, cache_path: Path, instance: Instance) -> None:
-        cache_path.write_text(
-            json.dumps([{"instance": instance.model_dump(), "bboxes_fixed": True}])
+class TestZeroBasedFrames:
+    def test_start_is_converted_and_end_kept(self) -> None:
+        inst = instance_to_processed(_raw_instance("00001", 1, 20), 0, "book")
+
+        assert (inst.frame_start, inst.frame_end) == (0, 20)
+
+    def test_labels_are_written_zero_based(
+        self, dirs: SimpleNamespace, stub_fixers: SimpleNamespace
+    ) -> None:
+        _write_split(dirs.split_path, [_raw_instance("00001", 1, 20)])
+
+        _run(dirs, do_bboxes=False, length_cuttoff=0)
+
+        ((start, end),) = [(i["frame_start"], i["frame_end"]) for i in _read_set(dirs)]
+        assert (start, end) == (0, 20)
+
+    def test_cutoff_counts_every_annotated_frame(
+        self, dirs: SimpleNamespace, stub_fixers: SimpleNamespace
+    ) -> None:
+        """Regression test: 1-based starts used to make a 10-frame clip count as 9."""
+        _write_split(
+            dirs.split_path,
+            [_raw_instance("00001", 1, 10), _raw_instance("00002", 1, 9)],
         )
 
-    def test_frame_range_reset_is_rebuilt_from_raw(
-        self, dirs: SimpleNamespace, stub_fixers: SimpleNamespace
-    ) -> None:
-        cache_path = dirs.output_base / "instance_cache.json"
-        self._write_legacy_cache(cache_path, _instance("00001", 0, 121))
-        _write_split(dirs.split_path, [_raw_instance("00001", 3732, 3852)])
+        _run(dirs, do_bboxes=False, length_cuttoff=9)
 
-        _run(dirs, do_bboxes=True, length_cuttoff=0)
-
-        assert stub_fixers.frame_calls == []  # reused, not reprocessed
-        (logged,) = _read_log(dirs).sets["train"].instances
-        assert [(f.stage, f.action) for f in logged.fixes] == [("frame_range", "reset")]
-        assert "3732-3852" in logged.fixes[0].reason
-        assert load_instance_cache(cache_path)["00001"].fixes == logged.fixes
-
-    def test_unchanged_entry_gets_no_records(
-        self, dirs: SimpleNamespace, stub_fixers: SimpleNamespace
-    ) -> None:
-        cache_path = dirs.output_base / "instance_cache.json"
-        self._write_legacy_cache(cache_path, _instance("00001"))
-        _write_split(dirs.split_path, [_raw_instance("00001")])
-
-        _run(dirs, do_bboxes=True, length_cuttoff=0)
-
-        assert _read_log(dirs).sets["train"].instances == []
-        assert load_instance_cache(cache_path)["00001"].fixes == []
+        assert [i["video_id"] for i in _read_set(dirs, "asl100_cutoff_9")] == ["00001"]
 
 
 class FakeCapture:
@@ -347,6 +351,24 @@ class TestFixBadFrameRange:
         assert [(f.stage, f.action) for f in entry.fixes or []] == [
             ("frame_range", "reset"),
             ("frame_range", "reset"),
+        ]
+
+    def test_end_of_minus_one_means_last_frame(self, tmp_path: Path) -> None:
+        kept, _ = fix_bad_frame_range(tmp_path, [_entry("00001", 0, -1)], "strict")
+
+        (entry,) = kept
+        assert entry.instance.frame_end == FakeCapture.NUM_FRAMES
+        assert entry.fixes == []
+
+    def test_end_past_clip_resets_to_clip_length(self, tmp_path: Path) -> None:
+        """Regression test: with a valid start, an end past the clip used to be accepted
+        up to start + num_frames, and reset to start + num_frames beyond that."""
+        kept, _ = fix_bad_frame_range(tmp_path, [_entry("00001", 5, 102)], "reset")
+
+        (entry,) = kept
+        assert (entry.instance.frame_start, entry.instance.frame_end) == (5, 100)
+        assert [(f.stage, f.action) for f in entry.fixes or []] == [
+            ("frame_range", "reset")
         ]
 
     def test_strict_removes_and_records(self, tmp_path: Path) -> None:
@@ -435,6 +457,23 @@ class TestLoadInstanceCache:
         cache_path = tmp_path / "instance_cache.json"
         old_format = [_instance("00001").model_dump()]
         cache_path.write_text(json.dumps(old_format))
+
+        assert load_instance_cache(cache_path) == {}
+
+    def test_other_version_is_ignored(self, tmp_path: Path) -> None:
+        cache_path = tmp_path / "instance_cache.json"
+        entry = CacheEntry(instance=_instance("00001"), bboxes_fixed=True)
+        cache_path.write_text(
+            json.dumps({"version": CACHE_VERSION - 1, "entries": [entry.model_dump()]})
+        )
+
+        assert load_instance_cache(cache_path) == {}
+
+    def test_version_1_list_format_is_ignored(self, tmp_path: Path) -> None:
+        """Version-1 caches were a bare list of entries, with 1-based frames."""
+        cache_path = tmp_path / "instance_cache.json"
+        entry = CacheEntry(instance=_instance("00001"), bboxes_fixed=True)
+        cache_path.write_text(json.dumps([entry.model_dump()]))
 
         assert load_instance_cache(cache_path) == {}
 

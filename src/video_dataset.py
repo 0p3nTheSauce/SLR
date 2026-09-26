@@ -302,31 +302,3 @@ def get_data_set(
     dataset = VideoDataset(set_info, transforms=transform, **kwargs)
 
     return dataset, perm, sh_e
-
-
-
-
-if __name__ == "__main__":
-    # test_crop()
-    # prep_train() #--run to preprocess the training data
-    # prep_test()  #--run to preprocess the test data
-    # prep_val() #--run to preprocess the validation data
-    # fix_bad_frame_range("./preprocessed_labels/asl100/train_instances.json",
-    #                     "../data/WLASL2000/") #--run to fix bad frame ranges in the training instances
-    # fix_bad_frame_range("./preprocessed_labels/asl100/test_instances.json",
-    #                   "../data/WLASL2000/") #--run to fix bad frame ranges in the test instances
-    # fix_bad_frame_range("./preprocessed_labels/asl100/val_instances.json",
-    #                   "../data/WLASL2000/") #--run to fix bad frame ranges in the validation instances
-    # fix_bad_bboxes("./preprocessed_labels/asl100/train_instances.json",
-    #               "../data/WLASL2000/", output='./output') #--run to fix bad bounding boxes in the training instances
-    # fix_bad_bboxes("./preprocessed_labels/asl100/test_instances.json",
-    #               "../data/WLASL2000/", output='./output')
-    # fix_bad_bboxes("./preprocessed_labels/asl100/val_instances.json",
-    #               "../data/WLASL2000/", output='./output')
-    # remove_short_samples('./output/train_instances_fixed_bboxes.json',
-    #                      output='./preprocessed_labels/asl100')
-    # remove_short_samples('./output/test_instances_fixed_bboxes.json',
-    #                      output='./preprocessed_labels/asl100')
-    # remove_short_samples('./output/val_instances_fixed_bboxes.json',
-    #                      output='./preprocessed_labels/asl100')
-    pass

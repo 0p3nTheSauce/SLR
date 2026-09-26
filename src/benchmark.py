@@ -61,8 +61,8 @@ from torch.profiler import ProfilerActivity, profile, record_function
 from torch.utils.data import DataLoader
 
 # locals
-from models import avail_models, get_model, norm_vals
-from run_types import (
+from src.models import avail_models, get_model, norm_vals
+from src.run_types import (
     AugInfo,
     CentreCropConfig,
     DataInfo,
@@ -71,7 +71,7 @@ from run_types import (
     RandomCropConfig,
     UniformSampler,
 )
-from video_dataset import get_data_set, get_wlasl_info
+from src.video_dataset import get_data_set, get_wlasl_info
 
 # constants
 OUTPUT = "benchmark.json"
@@ -99,14 +99,14 @@ def get_run_metadata() -> dict:
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.abspath(__file__))
         ).decode().strip()
-    except Exception:
+    except (subprocess.CalledProcessError, OSError):
         commit = None
 
     try:
         dirty = bool(subprocess.check_output(
             ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.abspath(__file__))
         ).decode().strip())
-    except Exception:
+    except (subprocess.CalledProcessError, OSError):
         dirty = None
 
     clocks = {}
@@ -630,7 +630,7 @@ def single_benchmark(
                 iterations=iterations, full_step=full_step, trials=trials,
                 profile_iterations=profile_iterations,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             torch.cuda.empty_cache()
             gc.collect()
             if _is_oom_error(e):
@@ -674,7 +674,7 @@ def single_benchmark(
                 iterations=iterations, trials=trials,
                 profile_iterations=profile_iterations,
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             torch.cuda.empty_cache()
             gc.collect()
             if _is_oom_error(e):
@@ -763,7 +763,7 @@ def run_all_separately(
             cmd.append("--full_step")
 
         print(f"\n{'=' * 50}\n[{i}/{len(archs)}] Launching subprocess for: {arch}\n{'=' * 50}")
-        result = subprocess.run(cmd)
+        result = subprocess.run(cmd, check=False)
         if result.returncode != 0:
             print(f"WARNING: subprocess for {arch} exited with code {result.returncode}; continuing.")
             failures.append(arch)

@@ -41,7 +41,12 @@ class RawInstance(BaseModel):
 
 
 class Instance(RawInstance):
-    """Represents a single instance of a gloss in the dataset, with the label_num and label_name added."""
+    """Represents a single instance of a gloss in the dataset, with the label_num and label_name added.
+
+    Unlike `RawInstance`, frames are 0-based and end-exclusive: the clip is
+    `frames[frame_start:frame_end]`. Label files generated before cache version 2 kept
+    WLASL's 1-based `frame_start` instead; see `src/info/WLASL_info.md`.
+    """
 
     label_num: int
     label_name: str
@@ -79,22 +84,30 @@ class CacheEntry(BaseModel):
     an instance cached with its raw/unfixed placeholder bbox would be indistinguishable
     from one that was actually bbox-fixed, and would be reused as-is forever.
 
-    `fixes` is None only for entries loaded from a cache written before fixes were
-    recorded; `rebuild_legacy_fixes` fills it in.
     """
 
     instance: Instance
     bboxes_fixed: bool
-    fixes: list[FixRecord] | None = []
+    fixes: list[FixRecord] = []
 
     @property
     def removed(self) -> bool:
-        return any(fix.action == "removed" for fix in self.fixes or [])
+        return any(fix.action == "removed" for fix in self.fixes)
 
     def record(self, stage: FixStage, action: FixAction, reason: str) -> None:
-        if self.fixes is None:
-            self.fixes = []
         self.fixes.append(FixRecord(stage=stage, action=action, reason=reason))
+
+
+CACHE_VERSION = 2
+"""Bump when cached instances stop being valid for the current code. Version 2 switched
+frames to 0-based, so version-1 entries have shifted frame ranges and bboxes."""
+
+
+class InstanceCache(BaseModel):
+    """On-disk format of the instance cache."""
+
+    version: int
+    entries: list[CacheEntry]
 
 
 class LoggedInstance(Instance):
@@ -133,9 +146,15 @@ def is_processed_instance(obj: Any) -> TypeGuard[Instance]:
 
 
 def instance_to_processed(d: RawInstance, label_num: int, label_name: str) -> Instance:
-    """Convert a RawInstance to a Instance by adding labels."""
+    """Convert a RawInstance to an Instance: add labels, and convert WLASL's 1-based
+    `frame_start` to a 0-based index.
+
+    WLASL's inclusive, 1-based `frame_end` already equals the 0-based exclusive end, so it
+    is kept as-is, including its -1 ("ends at the last frame") sentinel, which
+    `fix_bad_frame_range` resolves against the video.
+    """
     return Instance(
-        **d.model_dump(),
+        **d.model_dump() | {"frame_start": d.frame_start - 1},
         label_num=label_num,
         label_name=label_name,
     )
@@ -167,6 +186,9 @@ def fix_bad_frame_range(
 ) -> tuple[list[CacheEntry], list[CacheEntry]]:
     """Check each entry's frame range against its video, recording every change on the entry.
 
+    Frames are 0-based and end-exclusive (see `instance_to_processed`). A `frame_end` of -1
+    means the clip's last frame, and is set to the frame count without being logged.
+
     A video that cannot be opened is always removed, whatever the policy, since there is
     nothing to reset to. An impossible start or end frame is removed ("strict") or reset
     to the start/end of the video ("reset").
@@ -186,7 +208,7 @@ def fix_bad_frame_range(
         cap.release()
 
         start = instance.frame_start
-        end = instance.frame_end
+        end = num_frames if instance.frame_end == -1 else instance.frame_end
 
         if start < 0 or start >= num_frames:
             message = f"Invalid start frame {start} for video length {num_frames}."
@@ -196,15 +218,13 @@ def fix_bad_frame_range(
             entry.record("frame_range", "reset", message + " Setting to 0.")
             start = 0
 
-        if end <= start or end > (start + num_frames):
+        if end <= start or end > num_frames:
             message = f"Invalid end frame {end} for video length {num_frames} and start frame {start}."
             if remove_policy == "strict":
                 entry.record("frame_range", "removed", message)
                 continue
-            entry.record(
-                "frame_range", "reset", message + " Setting to start + num_frames."
-            )
-            end = start + num_frames
+            entry.record("frame_range", "reset", message + " Setting to num_frames.")
+            end = num_frames
 
         instance.frame_start = start
         instance.frame_end = end
@@ -350,52 +370,32 @@ def check_paths(
 
 
 def load_instance_cache(cache_path: Path) -> dict[str, CacheEntry]:
-    """Load the instance cache, keyed by video_id. A missing or unreadable cache loads as empty.
+    """Load the instance cache, keyed by video_id.
 
-    Entries written before fixes were recorded load with `fixes=None`; see
-    `rebuild_legacy_fixes`.
+    A missing cache, or one that is unreadable or from a different `CACHE_VERSION`, loads as
+    empty, so every instance is reprocessed.
     """
     if not cache_path.exists():
         return {}
-    with open(cache_path, "r") as f:
-        raw = json.load(f)
     try:
-        return {
-            item["instance"]["video_id"]: CacheEntry.model_validate(
-                {"fixes": None} | item
-            )
-            for item in raw
-        }
-    except (KeyError, TypeError, ValidationError):
+        cache = InstanceCache.model_validate_json(cache_path.read_text())
+    except ValidationError:
+        cache = None
+    if cache is None or cache.version != CACHE_VERSION:
         print(
-            f"Cache at {cache_path} is in an old/incompatible format; ignoring it and "
-            "rebuilding from scratch."
+            f"Cache at {cache_path} is from an older version or unreadable; ignoring it "
+            "and reprocessing from scratch."
         )
         return {}
+    return {entry.instance.video_id: entry for entry in cache.entries}
 
 
 def save_instance_cache(cache_path: Path, cache: dict[str, CacheEntry]) -> None:
-    with open(cache_path, "w") as f:
-        json.dump([entry.model_dump() for entry in cache.values()], f, indent=2)
-
-
-def rebuild_legacy_fixes(entry: CacheEntry, raw: Instance) -> None:
-    """Fill in `fixes` for a cache entry written before fixes were recorded, by comparing
-    it to the raw instance it came from.
-
-    Only frame-range resets can differ between the two. The old code never cached removed
-    instances, and could never apply a whole-frame bbox reset ("reset" raised instead), so
-    these rebuilt records are complete.
-    """
-    cached = entry.instance
-    entry.fixes = []
-    if (cached.frame_start, cached.frame_end) != (raw.frame_start, raw.frame_end):
-        entry.record(
-            "frame_range",
-            "reset",
-            f"Frame range {raw.frame_start}-{raw.frame_end} was reset to "
-            f"{cached.frame_start}-{cached.frame_end} (rebuilt from a legacy cache entry).",
-        )
+    cache_path.write_text(
+        InstanceCache(
+            version=CACHE_VERSION, entries=list(cache.values())
+        ).model_dump_json(indent=2)
+    )
 
 
 def _fix_uncached(
@@ -429,7 +429,7 @@ def _set_log(num_raw: int, kept: list[CacheEntry], removed: list[CacheEntry]) ->
         )
     changed = [entry for entry in kept + removed if entry.fixes]
     counts = Counter(
-        f"{fix.stage}:{fix.action}" for entry in changed for fix in entry.fixes or []
+        f"{fix.stage}:{fix.action}" for entry in changed for fix in entry.fixes
     )
     return SetLog(
         num_raw=num_raw,
@@ -437,7 +437,7 @@ def _set_log(num_raw: int, kept: list[CacheEntry], removed: list[CacheEntry]) ->
         num_removed=len(removed),
         counts=dict(sorted(counts.items())),
         instances=[
-            LoggedInstance(**entry.instance.model_dump(), fixes=entry.fixes or [])
+            LoggedInstance(**entry.instance.model_dump(), fixes=entry.fixes)
             for entry in changed
         ],
     )
@@ -496,7 +496,7 @@ def preprocess_split(
     output_dir = output_base / base_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    cache_path = cache_path or (output_base / "instance_cache.json")
+    cache_path = cache_path or (output_base / f"instance_cache_v{CACHE_VERSION}.json")
     cache = load_instance_cache(cache_path)
     set_logs: dict[str, SetLog] = {}
 
@@ -515,8 +515,6 @@ def preprocess_split(
                 fresh.append(CacheEntry(instance=inst.model_copy(), bboxes_fixed=False))
                 continue
             entry = cached.model_copy(deep=True)
-            if entry.fixes is None:
-                rebuild_legacy_fixes(entry, inst)
             if do_bboxes and not entry.bboxes_fixed:
                 needs_bboxes.append(entry)
             else:
@@ -634,7 +632,7 @@ if __name__ == "__main__":
         "--length_cutoff",
         type=int,
         default=0,
-        help="Minimum number of frames for a sample to be kept. (default: %(default)s)",
+        help="Remove samples with this many frames or fewer; 0 keeps all. (default: %(default)s)",
     )
     args = parser.parse_args()
 

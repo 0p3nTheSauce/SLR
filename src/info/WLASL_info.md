@@ -37,10 +37,18 @@ Checked against `data/WLASL/splits/asl2000.json` and `data/WLASL/WLASL2000/` on 
 
 * **There is a gloss called `empty`.** Don't use `"empty"` as a placeholder or sentinel gloss
   name. `stats.reverse_preproc_format` did, and silently dropped 6 instances of it.
-* **`frame_start` is 1-indexed, but `preprocess.py` treats it as 0-indexed.** A sample's length
-  is computed as `frame_end - frame_start`, so a clip annotated 1-10 counts as 9 frames. The
-  `cutoff_9` splits therefore remove clips of 10 or fewer real frames. This is tracked in
-  `src/TODO.md`, and left unchanged so the labels match the published results.
+* **The label files on disk are off by one frame; a rerun is due.** WLASL's `frame_start` is
+  1-based, but the current labels store it as-is, and `utils.cv_load` returns
+  `frames[frame_start:frame_end]` (0-based). So each of the 20799 asl2000 instances whose range
+  wasn't reset skips its first annotated frame, while the 296 reset instances (reset to 0-based
+  `0` to frame count) keep every frame. Lengths (`frame_end - frame_start`) are one short too, so
+  the current `cutoff_9` splits remove clips of 10 or fewer real frames. `preprocess.py` now
+  converts starts to 0-based (cache version 2), but the labels have deliberately not been
+  regenerated, so every experiment in progress uses the same inputs. Regenerate them before the
+  final round of results (tracked in `src/TODO.md`); see
+  [what the rerun will change](#what-the-rerun-will-change).
+* Every `frame_end` in the kept data is within its clip: 20725 instances end exactly at the last
+  frame, and 74 are annotated shorter than the clip (by up to 91 frames).
 
 ## Naming conventions
 
@@ -52,7 +60,8 @@ For the naming of different functions, 'set' and 'split' can somtimes be used in
 
 ## Preprocessing
 
-The numbers below come from each split's
+The numbers below describe the current label files (1-based starts, see [Gotchas](#gotchas)), and
+come from each split's
 `data/WLASL/preprocessed/labels/<split>/preprocess_log.json`, which lists every instance that was
 reset or removed and why. Those logs are the source of truth: if you rerun `preprocess.py`,
 update this section from them.
@@ -85,10 +94,24 @@ the end of the clip, or its end frame is impossible. Of the 296 resets in asl200
 
 ### Removed by `cutoff_9`
 
-Samples with 9 or fewer frames by our length calculation (see [Gotchas](#gotchas)):
+Samples with 9 or fewer frames by the old, off-by-one length calculation (see
+[Gotchas](#gotchas)):
 
 | Video id | Gloss | Set | Frames (annotated) | In splits |
 |---|---|---|---|---|
 | 18223 | earring | train | 1-10 | asl1000, asl2000 |
 | 59958 | turkey | val | 1-10 | asl1000, asl2000 |
 | 15144 | deduct | val | 1-9 | asl2000 |
+
+### What the rerun will change
+
+Previewed on 2026-09-26 by running the new frame-range code on the raw splits against the real
+videos (no labels written):
+
+* The same 296 instances are reset, to the same ranges.
+* Every other `frame_start` goes down by one (1 to 0 for 20791 asl2000 instances), so each clip
+  gains its first annotated frame.
+* `cutoff_9` keeps `18223` and `59958` (10 frames each), and removes only `15144` "deduct"
+  (9 frames), so asl1000_cutoff_9 loses nothing and asl2000_cutoff_9 loses 1.
+* Bboxes are recomputed by YOLO over the corrected ranges, because the version-2 cache starts
+  empty, so they may shift slightly.
