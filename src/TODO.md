@@ -29,6 +29,3 @@ Misc TODOs:
   that published results were trained on. Decide whether to fix it for future runs.
 - `src/video_dataset.py:314-330` is dead commented-out code that calls the old
   `fix_bad_frame_range`/`fix_bad_bboxes`/`remove_short_samples` signatures. Delete it.
-- `src/results/dataset_analysis/wlasl_stats_set_level.ipynb`'s gloss-merge and `find_missing`
-  cells were a scratch investigation of the (now fixed) `reverse_preproc_format` bug. Clean them
-  up or remove them.
