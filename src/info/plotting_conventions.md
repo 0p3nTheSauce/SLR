@@ -1,6 +1,6 @@
-# `src/visualise2.py` conventions
+# Plotting conventions (`src/visualise2.py`)
 
-Reference for adding to or reusing [`visualise2.py`](visualise2.py). Read this before writing new
+Reference for adding to or reusing [`visualise2.py`](../visualise2.py). Read this before writing new
 plotting code for a thesis figure, so the signature/colour/styling conventions below don't have to
 be re-derived from the source (or from `git log`/old notebooks) each time.
 
@@ -9,12 +9,10 @@ be re-derived from the source (or from `git log`/old notebooks) each time.
 Check the [function catalog](#function-catalog) below first — a small parameter addition to an
 existing function (e.g. a new `color`/`shade_by_density`-style toggle) is usually enough; a new
 top-level function should be the exception, not the default. This mirrors the repo-wide rule (see
-root `CLAUDE.md`, "Notebooks in `src/results` need updating") of checking for an existing
-convention/notebook before writing new code.
+root `CLAUDE.md`) of checking for an existing convention/notebook before writing new code.
 
-Reference implementations (no `todo.txt` — these are the current convention, not legacy):
-`src/results/aug_comparison`, `src/results/satnac_2026`. Directories *with* a `todo.txt` are still
-mid-migration — don't copy patterns from them.
+Reference implementations that follow these conventions: `src/results/aug_comparison`,
+`src/results/satnac_2026`.
 
 ## Signature conventions
 

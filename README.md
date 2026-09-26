@@ -65,7 +65,7 @@ Training and testing have the following **arguments** in common:
 - `EXP_NO`: 
     is the experiment number (e.g. 4)
 
-Additionally, both of them by default set a random [seed](./code/configs.py) for reproducability. (Note the [Que](./code/que/README.md) had a bug which broke RNG state during some experiments).
+Additionally, both of them by default set a random [seed](./src/configs.py) for reproducability. (Note the [Que](./src/que/README.md) had a bug which broke RNG state during some experiments).
 </details>
 
 <details>
@@ -335,8 +335,8 @@ runs
 
 ## Features
 
-- Run [utils.py](./code/utils.py) to automatically clean up checkpoints.
-- Use the [Que](./code/que/README.md) feature to schedule and automatically train + test runs.
+- Run [utils.py](./src/utils.py) to automatically clean up checkpoints.
+- Use the [Que](./src/que/README.md) feature to schedule and automatically train + test runs.
 
 
 ## Contributing

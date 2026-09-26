@@ -29,3 +29,6 @@ Misc TODOs:
   that published results were trained on. Decide whether to fix it for future runs.
 - `src/video_dataset.py:314-330` is dead commented-out code that calls the old
   `fix_bad_frame_range`/`fix_bad_bboxes`/`remove_short_samples` signatures. Delete it.
+- `src/benchmark.py` uses bare imports (`from models import ...`), so it only works when run as a
+  script from `src/` and `import src.benchmark` fails. Switch to `src.`-prefixed imports like the
+  rest of the repo, and check it still runs from `src/`.

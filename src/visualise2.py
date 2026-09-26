@@ -213,7 +213,7 @@ def add_iqr_lines(
     Overlay mean +/- std and lower/upper quartile reference lines on an
     existing bar chart axes (e.g. the `ax` returned by plot_bar_chart), with
     the legend placed outside the axes so it never occludes the bars (see
-    VISUALISE2_CONVENTIONS.md).
+    src/info/plotting_conventions.md).
 
     values: the data the bars represent (e.g. df["Test Loss"]) -- mean/std/
         quartiles are computed from this, not read back from the bars.
