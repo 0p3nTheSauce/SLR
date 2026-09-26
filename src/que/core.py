@@ -1173,6 +1173,16 @@ def worker_state_validate(obj: Any) -> WorkerStateDict:
     return _worker_state_adapter.validate_python(obj)
 
 
+def clear_worker_process(state: WorkerStateDict) -> None:
+    """Mark the worker as not running (in place, so it works on a manager `DictProxy`).
+
+    `exception` is kept so the last failure stays inspectable after the worker has exited.
+    """
+    state["task"] = "inactive"
+    state["current_run_id"] = None
+    state["working_pid"] = None
+
+
 class SweepInfo(TypedDict):
     sweep_id: str
     sweep_project: str

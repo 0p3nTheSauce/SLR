@@ -119,7 +119,8 @@ class Worker:
         return self.state
 
     def set_state(self, state: WorkerStateDict) -> None:
-        self.state = state
+        """Update the state in place, so references to it (e.g. the Daemon's) stay valid."""
+        self.state.update(state)
 
     def seperator(self, r_str: str) -> str:
         sep = ""
@@ -346,13 +347,6 @@ class Worker:
                 event=self.stop_event,
             )
         run.finish(exit_code=0)
-
-    def _reset_state(self):
-        self.set_state(
-            WorkerStateDict(
-                task="inactive", current_run_id=None, working_pid=None, exception=None, 
-            )
-        )
 
     def _reattach_server_logger(self):
         """Re-attach the server log file handler in a spawned child process."""

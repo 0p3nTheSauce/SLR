@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from src.que.core import Que, QueIdxOOR
+from src.que.core import Que, QueIdxOOR, WorkerStateDict, clear_worker_process
 
 # Plain dicts stand in for runs: get_nested/get_nested_or_none index dicts and
 # pydantic models alike, so the list-manipulation helpers don't need real configs.
@@ -124,3 +124,13 @@ class TestQueIdxOOR:
         assert str(err) == (
             "Index 2 is out of range for fail_runs after filtering (length: 1)"
         )
+
+
+def test_clear_worker_process_keeps_exception() -> None:
+    state = WorkerStateDict(
+        task="training", current_run_id="abc", working_pid=123, exception="boom"
+    )
+    clear_worker_process(state)
+    assert state == WorkerStateDict(
+        task="inactive", current_run_id=None, working_pid=None, exception="boom"
+    )

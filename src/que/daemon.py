@@ -13,8 +13,11 @@ from typing import Any, Literal, cast
 from src.que.core import (
     DAEMON_NAME,
     SERVER_LOG_PATH,
+    TO_RUN,
     DaemonStateDict,
     SweepInfo,
+    WorkerStateDict,
+    clear_worker_process,
     connect_manager,
     is_sweep_complete,
 )
@@ -47,8 +50,18 @@ class Daemon:
         stop_worker_event: EventClass,
         stop_daemon_event: EventClass,
         state: DaemonStateDict,
+        idle_poll_interval: float = 10.0,
     ) -> None:
+        """
+        Args:
+            idle_poll_interval (float, optional): Seconds the supervisor waits between checks for
+                new work when there is none. Defaults to 10.0.
+        """
         self.worker = worker
+        # rebound to the manager's proxy in supervise(); see the note there
+        self.worker_state: WorkerStateDict = worker.state
+        self.idle_poll_interval = idle_poll_interval
+        self._idling = False
         self.logger = logger
         self.stop_worker_event = stop_worker_event
         self.stop_daemon_event = stop_daemon_event
@@ -100,7 +113,7 @@ class Daemon:
         assert isinstance(self.worker_process, Process)
         self.worker_process.join()
 
-        self.worker.state["working_pid"] = None
+        clear_worker_process(self.worker_state)
         # If worker died naturally (crash or finish)
         exit_code = self.worker_process.exitcode
         if exit_code == 0:
@@ -137,6 +150,14 @@ class Daemon:
                 )
         return sweep_to_hand_off(sweep, completed_runs, to_run_len)
 
+    def _idle(self) -> None:
+        """Wait `idle_poll_interval` for work to arrive (a run in to_run or a sweep to hand off),
+        logging once per idle stretch. Returns early if the daemon is stopped."""
+        if not self._idling:
+            self._idling = True
+            self.logger.info("No runs in to_run and no sweep to hand off; waiting for work...")
+        self.stop_daemon_event.wait(self.idle_poll_interval)
+
     def supervise(
         self,
         recover_run: bool = False,
@@ -148,7 +169,8 @@ class Daemon:
 
         Before each launch the shared sweep, its progress and to_run are re-read to decide whether
         the worker gets a sweep trial or a Que run (see sweep_to_hand_off), so edits made via the
-        shell (e.g. `daemon set_max_runs`) apply from the next worker on.
+        shell (e.g. `daemon set_max_runs`) apply from the next worker on. When there is neither,
+        no worker is launched: the supervisor idles, polling until work arrives (see _idle).
 
         Args:
             recover_run (bool, optional): Wether to recover the last failed run. Defaults to False.
@@ -159,6 +181,8 @@ class Daemon:
         manager = connect_manager()
         self.state = manager.get_daemon_state()
         self.que = manager.get_que()
+        # self.worker is a pickled copy in this process, so its .state is too: write to the proxy
+        self.worker_state = manager.get_worker_state()
         sweep = manager.get_sweep()
         sweep_progress = manager.get_sweep_progress()
         # handle automatic recovery
@@ -171,11 +195,17 @@ class Daemon:
         cnt = 0
         worker_pid = None
         while not self.stop_daemon_event.is_set():
-        
             try:
+                to_run_len = self.que.len_loc(TO_RUN)
                 sweep_info = self._next_sweep(
-                    dict(sweep), sweep_progress["completed_runs"], self.que.len_loc("to_run")
+                    dict(sweep), sweep_progress["completed_runs"], to_run_len
                 )
+                if sweep_info is None and to_run_len == 0:
+                    self._idle()
+                    cnt = 0
+                    continue
+                self._idling = False
+
                 self.worker_process = Process(target=self.worker.start, args=(sweep_info,))
                 self.worker_process.start()
                 worker_pid = self.worker_process.pid
@@ -185,6 +215,7 @@ class Daemon:
                     break
 
                 self.worker.cleanup()
+                cnt = 0
 
             except Exception as e:  # noqa: BLE001
                 self.logger.error(f"Supervisor error: {e}")
@@ -278,9 +309,7 @@ class Daemon:
     def _reset_process_state(self, worker: bool = False, supervisor: bool = False):
         if worker:
             self.worker_process = None
-            self.worker.state["working_pid"] = None
-            self.worker.state["task"] = "inactive"
-            self.worker.state["current_run_id"] = None
+            clear_worker_process(self.worker_state)
 
         if supervisor:
             self.state["awake"] = False
@@ -324,7 +353,7 @@ class Daemon:
         if name == "worker":
             self.stop_worker_event.set()
             proc = self.worker_process
-            pid = self.worker.state["working_pid"]
+            pid = self.worker_state["working_pid"]
             w, d = True, False
         elif name == "daemon":
             self.stop_daemon_event.set()

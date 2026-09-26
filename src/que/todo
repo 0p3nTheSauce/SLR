@@ -1,11 +1,13 @@
 
 Que:
-- add flag to check if changes were made before saving 
+- add flag to check if changes were made before saving
 - core.py/shell.py mix `from src.configs import ...` with bare `from configs import ...` /
     `from utils import ...` (lazy imports inside methods). The bare form only resolves because
     setup.sh launches `python -m que.shell`/`que.server` from inside src/; it breaks under pytest
     from the repo root (tests/que/test_shell.py's TestSetMaxRuns has to prepend src/ to sys.path),
     and can load the same module twice under two names. Switch them all to `src.`-prefixed imports.
+- tmux.py has 8 ruff warnings (unsorted imports, Optional[...] instead of `X | None`); all
+    auto-fixable with `ruff check --fix src/que/tmux.py`.
 
 Shell:
 - add more flexibility to run summarisation
@@ -21,24 +23,13 @@ Shell:
     silently edits a different run (it re-validates fine, so nothing flags it). Possible fix:
     pass the expected run to edit_run and raise if peak_run(loc, idx) differs (note
     debug.any_dups -- content comparison only works if runs are unique).
+- `server status` can't tell an idle daemon (awake, no work, polling -- see Daemon._idle) from one
+    running a worker except by the worker's task. Consider an explicit idle flag in
+    DaemonStateDict.
 
 Daemon:
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
     that the process started successfully)
-- [DONE 2026-09-22] supervise()'s loop passed `dict(sweep).copy() if sweep is not None else None`
-    to Worker.start() -- but `sweep` is a DictProxy fetched once before the loop, so it is never
-    actually `None`, even when the underlying dict is empty. This meant an empty/no-op sweep
-    ({}) was always passed through as a truthy-looking dict, so Worker.start() (which checks
-    `sweep_info is not None`) would try to run a sweep trial with no sweep configured, hit
-    sweep_info_validate()'s ValidationError, crash the worker subprocess, and (with the default
-    stop_on_fail=True) stop the whole supervisor -- surfaced while adding the max_runs cap, whose
-    stop mechanism (clearing the sweep once the cap is hit) triggers exactly this case. Fixed by
-    checking the materialized dict's truthiness instead of the proxy handle's identity.
-
-- when there is no work (to_run empty and no sweep to hand off -- none set, or complete) the
-    supervisor still launches a worker, which hits an empty Que and exits non-zero, so
-    stop_on_fail decides whether it stops or restart-loops every second. sweep_to_hand_off
-    already knows there's no sweep work; have the Daemon idle (poll) or exit cleanly instead.
 - sweep progress (completed_runs) lives only in the server state file. Record each finished
     trial in the base_config folder's sweep_meta.json (next to the creation/set_max_runs
     entries) so progress can be reloaded from it, e.g. when re-attaching to a sweep via
@@ -47,36 +38,6 @@ Daemon:
 
 Worker:
 - if GPU is busy on startup, gets stuck, needs server process to be restarted
-- [DONE 2026-09-18] silent-swallow visibility gap in _sweep_train: wandb's hyperband/
-    early-terminate stops a sweep trial by injecting a bare, message-less `Exception` into
-    the training thread (ctypes.pythonapi.PyThreadState_SetAsyncExc, in wandb's own
-    pyagent.py _terminate_thread), which wandb's own `_run_job` then swallows internally
-    (calls wandb.finish(exit_code=1), doesn't re-raise) -- so it never reached
-    Worker.sweep()'s except Exception, and the trial fell through to testing/old_runs with
-    zero log trace that it had been cut short (this outcome is actually desired, since
-    earlier-epoch checkpoints are still usable, but it was happening by accident). Fixed by
-    _is_wandb_injected_stop() + a try/except around the train_loop() call in _sweep_train
-    that detects this specific signature and logs it explicitly, instead of relying on
-    wandb's internal swallow. Test: tests/que/test_worker.py.
-- [DONE 2026-09-18] genuine crash during a sweep trial's train_loop() was ALSO invisible,
-    not just the hyperband case above: wandb's own agent thread (pyagent.py's _run_job)
-    swallows *any* exception from _sweep_train unconditionally, not just the injected
-    hyperband one -- confirmed live on the debug sweep (a real shape-mismatch RuntimeError
-    fell straight through to testing against an empty checkpoints dir). Worker.sweep()'s
-    except Exception / stash_failed_run was dead code for this. Fixed by handling the
-    non-wandb-stop branch directly inside _sweep_train's except block: stash to fail_runs +
-    log there (mirrors Worker.train()'s existing pattern), which also empties cur_run so
-    Worker.start()'s existing len_loc('cur_run')==1 dispatch correctly skips testing.
-    Verified end-to-end with a forced-crash debug sweep trial (fail_runs gained the entry,
-    cur_run emptied, test() correctly skipped).
-- [DONE 2026-09-24] a crashed sweep trial never triggered stop_on_fail: wandb.agent swallows
-    every exception from _sweep_train (confirmed in wandb 0.25.0 pyagent._run_job), so the
-    worker exited 0 after stashing it. Worse, failures in create_sweep_run/_inject_sweep_config
-    (outside the old train_loop try) weren't recorded at all -- a broken base_config looped
-    silently, burning wandb trials and counting towards max_runs. Fixed: _sweep_train records
-    any non-hyperband failure in `_trial_error` and Worker.sweep() re-raises it as
-    SweepTrialFailed after wandb.agent returns; failed trials are no longer counted. Also
-    sweep()'s outer except no longer masks errors with QueEmpty by stashing an empty cur_run.
 - broader: train/sweep/test's outer `except Exception` blocks (worker.py's _fail path)
     still blindly stash/report every non-QueException the same way -- e.g. no distinction
     between a real crash and GPU OOM. Need to distinguish exception types explicitly instead
@@ -84,6 +45,16 @@ Worker:
     src/TODO.md's repo-wide blind-except audit item.
 
 Server:
+- server state is only written to Server.json on graceful shutdown or a manual `server save`, so
+    an unclean death loses everything since (sweep progress included). On 2026-09-25 the server
+    died without a SIGTERM and the next start loaded a mid-run snapshot from 21:14 -- the stale
+    pids/task it showed are no longer restored (load_state keeps live process fields), but the
+    sweep progress etc. is still just as stale. Consider saving after each worker exits (in the
+    supervisor loop) and/or on every sweep-trial registration.
+- `server load` at runtime still restores `awake` from the file: loading awake=True starts a
+    supervisor, and awake=False while a supervisor runs makes status misreport it. Either keep
+    the live `awake` value when the server is already up (only restore it at startup, for
+    power-outage recovery) or refuse to load while the daemon is running.
 - wandb's own per-run "Logs" tab / local output.log has been empty for a long time --
     NOT a block-scoping bug in the `redirect_stdout(self.log_adapter)` calls in
     _train/_sweep_train (tried merging the setup/training blocks into one continuous

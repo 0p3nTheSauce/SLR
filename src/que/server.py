@@ -263,26 +263,39 @@ class ServerContext:
         self.server_logger.info(f"Saved state to: {out_path}")
 
     def load_state(self, in_path: str | Path | None = None) -> None:
-        if in_path is None:
-            in_path = self.state_path
-        elif not Path(in_path).exists():
+        """Load a saved server state (default: `self.state_path`).
+
+        The saved `stop_on_fail` and process fields (supervisor/worker pids, worker task and run
+        id) are not restored: those describe processes, not configuration, and the ones in the
+        file may be long gone (e.g. a snapshot taken mid-run before the server died), so the
+        current values are kept. An 'awake' daemon relaunches its supervisor (see Daemon.set_state).
+        """
+        in_path = self.state_path if in_path is None else in_path
+        if not Path(in_path).exists():
             self.server_logger.warning(
                 f"No existing state found at {in_path}. Load unsuccessful."
             )
             return
 
         try:
-            state = read_server_state(self.state_path)
-
-            # do not override start up stop on fail
-            state.daemon_state["stop_on_fail"] = self.daemon.state["stop_on_fail"]
+            state = read_server_state(in_path)
+            self._keep_live_fields(state)
             self._set_state(state)
-            self.server_logger.info(f"Loaded state from: {self.state_path}")
+            self.server_logger.info(f"Loaded state from: {in_path}")
         except Exception as e:
             self.server_logger.warning(
                 f"Ran into an error when loading state: {e}\nloading abandoned",
                 exc_info=True,
             )
+
+    def _keep_live_fields(self, state: ServerState) -> None:
+        """Overwrite the fields of a loaded `state` that load_state must not restore with their
+        current values."""
+        state.daemon_state["stop_on_fail"] = self.daemon.state["stop_on_fail"]
+        state.daemon_state["supervisor_pid"] = self.daemon.state["supervisor_pid"]
+        state.worker_state["task"] = self.worker.state["task"]
+        state.worker_state["current_run_id"] = self.worker.state["current_run_id"]
+        state.worker_state["working_pid"] = self.worker.state["working_pid"]
 
 
 # --- Registration Logic ---
