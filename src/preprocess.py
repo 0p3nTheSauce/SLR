@@ -154,7 +154,7 @@ def instance_to_processed(d: RawInstance, label_num: int, label_name: str) -> In
     `fix_bad_frame_range` resolves against the video.
     """
     return Instance(
-        **d.model_dump() | {"frame_start": d.frame_start - 1},
+        **d.model_copy(update={"frame_start": d.frame_start - 1}).model_dump(),
         label_num=label_num,
         label_name=label_name,
     )
