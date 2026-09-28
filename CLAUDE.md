@@ -146,6 +146,8 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
   - `aug_comparison` — augmentation comparison notebook + helpers (reference).
   - `saicist` — per-instance analysis: correlation plots, over/underachiever JSONs, notebook.
   - `sacair_2026` — benchmark + results notebooks, CSV.
+  - `benchmark` — `benchmark.ipynb`: every run in `all_benchmark.json` (all models), with
+    the method, environment, coverage, summary and full tables in one file.
   - `stats` — dataset-stat notebooks.
   - `augmentation_demos` — illustrative notebooks, one per augmentation type.
   - `seed_comparison` — variance of one config across 10 seeds (see

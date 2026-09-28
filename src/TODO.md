@@ -36,3 +36,8 @@ Misc TODOs:
   original WLASL loader, which only skips videos under 9 frames, and no clip is that short. So train
   on the no-cutoff splits (`asl100`/.../`asl2000`), not `*_cutoff_9` (which after the rerun still
   removes `15144`, 9 frames). Switching the configs/`CUTOFF_9_NAMES` users over is part of this.
+- The per-venue benchmark notebooks (`results/{satnac_2025,sacair_2026,satnac_2026}/benchmark.ipynb`)
+  each copy-paste the same untyped `all_benchmark.json` loader and LaTeX formatting, differing
+  only in which archs they keep. `results/benchmark/benchmark.ipynb` now has a typed loader
+  (`load_runs`) covering every run; move it into a shared helper module and have the venue
+  notebooks filter its output instead of re-parsing the JSON.
