@@ -234,9 +234,15 @@ def _is_bare_safe(token: str) -> bool:
     zfilled string like '082', a multi-word value) is not a valid bare
     atom and must be quoted so it becomes a string constant instead of
     tripping ast.parse.
+
+    Zero-padded digit strings ('000', '00') are always quoted even though
+    Python accepts them as the int 0: left bare, `x == 000` would silently
+    compare against 0 and never match a zfilled exp_no.
     """
     if token in _BARE_OPERATORS:
         return True
+    if len(token) > 1 and token.startswith("0") and token.isdigit():
+        return False
     if token.isidentifier():
         # covers real identifiers (S3D, x) AND keywords (and, or, not,
         # in, is, True, False, None) -- isidentifier() only checks
@@ -251,7 +257,8 @@ def _is_bare_safe(token: str) -> bool:
 
 
 def _join_criterion_tokens(tokens: list[str]) -> str:
-    """...(existing docstring)..."""
+    """Join a --criterion group's shell tokens into one expression string,
+    quoting any token that isn't a valid bare atom (see _is_bare_safe)."""
     return " ".join(t if _is_bare_safe(t) else f'"{t}"' for t in tokens)
 
 

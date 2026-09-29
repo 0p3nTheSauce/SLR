@@ -10,7 +10,34 @@ from rich.console import Console
 
 from src.que import shell as shell_module
 from src.que.core import ServerState
-from src.que.shell import QueShell, get_filters_drop_keys, unpack_filters
+from src.que.shell import (
+    QueShell,
+    _join_criterion_tokens,
+    get_filters_drop_keys,
+    parse_criterion,
+    unpack_filters,
+)
+
+
+def _criterion(tokens: list[str]) -> Any:
+    return parse_criterion(_join_criterion_tokens(tokens))
+
+
+class TestParseCriterion:
+    def test_bareword_becomes_string(self) -> None:
+        crit = _criterion(["x", "==", "S3D"])
+        assert crit("S3D")
+        assert not crit("R3D")
+
+    @pytest.mark.parametrize("exp_no", ["000", "001", "010", "00"])
+    def test_zfilled_number_matches_as_string(self, exp_no: str) -> None:
+        crit = _criterion(["x", "==", exp_no])
+        assert crit(exp_no)
+        assert not crit(0)
+
+    def test_plain_numbers_stay_numeric(self) -> None:
+        assert _criterion(["x", ">", "0"])(1)
+        assert _criterion(["x", "==", "0.5"])(0.5)
 
 
 class TestUnpackFilters:
