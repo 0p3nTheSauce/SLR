@@ -9,7 +9,7 @@ query/load/stash conveniences used across `src/results/*`:
 - `load_runs` reads back a previously-saved JSON list of runs (e.g. via
   `output_path`/`output_filtered_runs`).
 - `get_out_stub`/`get_stash_path`/`get_asset_path`/`stash_json`/`load_json`/
-  `stash_from_saved` implement the local "stash" (raw JSON) vs "asset" (figures, LaTeX)
+  `get_stub_from_original_path`/`stash_from_saved` implement the local "stash" (raw JSON) vs "asset" (figures, LaTeX)
   saving convention for notebooks — see below.
 - `match`/`same_augs` are equality helpers for comparing `RunInst`/augmentation configs.
 
@@ -72,6 +72,7 @@ __all__ = [
     "get_filters_drop_keys",
     "get_out_stub",
     "get_stash_path",
+    "get_stub_from_original_path",
     "load_json",
     "load_runs",
     "match",
@@ -151,6 +152,7 @@ def search_old_runs(
         list[CompExpInfo]: List of CompExpInfo objects representing the filtered runs.
     """
     drop_key_sets = drop_key_sets if drop_key_sets is not None else []
+    sort_keys = sort_keys if sort_keys is not None else []
     que = Que()
     runs = list(
         Que.list_manipulation(
@@ -333,16 +335,21 @@ def load_json(stash_path: Path) -> Any:
         return json.load(f)
 
 
+def get_stub_from_original_path(
+    original_save_path: Path, checkpoint_num: int | str | None = None
+) -> str:
+    """Get the stub that `stash_from_saved` uses."""
+    results_dir = original_save_path.parent
+    exp_dir = results_dir.parent
+    model_dir = exp_dir.parent
+    split_dir = model_dir.parent
+    return get_out_stub(split_dir.name, model_dir.name, exp_dir.name, checkpoint_num)
+
+
 def stash_from_saved(
     original_save_path: Path, checkpoint_num: int | str | None = None
 ) -> tuple[Path, str]:
     """Copy a result already computed under the runs/ directory straight into the stash,
     without re-running inference."""
-    results_dir = original_save_path.parent
-
-    exp_dir = results_dir.parent
-    model_dir = exp_dir.parent
-    split_dir = model_dir.parent
-
-    stub = get_out_stub(split_dir.name, model_dir.name, exp_dir.name, checkpoint_num)
+    stub = get_stub_from_original_path(original_save_path, checkpoint_num)
     return stash_json(load_json(original_save_path), get_stash_path(stub)), stub
