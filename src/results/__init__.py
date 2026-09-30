@@ -45,6 +45,7 @@ Asset
 """
 
 import json
+import re
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeVar
@@ -295,19 +296,22 @@ def get_asset_path(
 ) -> Path:
     """Generate a consistent file path for `assets`.
 
+    Runs of characters outside `[A-Za-z0-9_-]` in the filename are replaced with
+    `_`, so free-text descriptors (e.g. glosses like `"come here"` or
+    `"don't want"`) give names that are safe to `\\includegraphics` in LaTeX.
+
     Args:
         metric_descriptor (str): What is this chart measuring? (e.g. `corr_signers`).
         stub (str): Where did the results come from? (use `get_out_stub`).
         project_name (str): What is the directory name the notebook is running in? (e.g. `satnac_2026`).
-        file_suffix (str, optional): For `with_suffix`. Defaults to ".pdf".
+        file_suffix (str, optional): Appended to the filename, dot included. Defaults to ".pdf".
         asset_dir (Path, optional): Where is the top level asset directory?. Defaults to RESULTS_OUTPUTS.
 
     Returns:
         Path: Descriptive path.
     """
-    return (asset_dir / project_name / f"{metric_descriptor}_{stub}").with_suffix(
-        file_suffix
-    )
+    name = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{metric_descriptor}_{stub}")
+    return asset_dir / project_name / f"{name}{file_suffix}"
 
 
 def get_stash_path(
