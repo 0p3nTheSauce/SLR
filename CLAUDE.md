@@ -30,9 +30,12 @@ The pytest suite lives in `tests/` (configured via `[tool.pytest.ini_options]` i
 
 - Tests needing real pretrained weights are marked `requires_weights` and are auto-skipped on this
   machine (see `conftest.py`), so the full suite should pass locally.
-- Importing `src.que.core` configures the root logger to write to the real `src/que/Server.log`.
-  Tests that construct a `Que` should pass a non-propagating logger and a `tmp_path` runs file
-  (see `tests/que/test_core.py`) so they don't pollute it.
+- A `Que` saves itself after every change, so tests must never build one on the default (live)
+  runs path: use the `que`/`make_que` fixtures in `tests/que/conftest.py` (a `tmp_path` runs file;
+  calling `make_que()` again simulates a restart), with runs from `tests/que/factories.py`.
+  `tests/que/test_server.py`'s `start_server` fixture does the same for a real `ServerContext`.
+- `setup_server_logging`/`setup_training_logging` (`src/que/core.py`) configure global loggers;
+  tests calling them must restore those (see `TestLoggingSetup` in `tests/que/test_core.py`).
 - `QueShell` can be built in tests with a fake server by stubbing `_show_banner`,
   `_setup_history` and `tmux_manager` (see the `harness` fixture in `tests/que/test_shell.py`) —
   this avoids touching the real `~/.que_shell_history`.

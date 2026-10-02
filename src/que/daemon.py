@@ -12,7 +12,6 @@ from typing import Any, Literal, cast
 # locals
 from src.que.core import (
     DAEMON_NAME,
-    SERVER_LOG_PATH,
     TO_RUN,
     DaemonStateDict,
     SweepInfo,
@@ -20,6 +19,7 @@ from src.que.core import (
     clear_worker_process,
     connect_manager,
     is_sweep_complete,
+    setup_server_logging,
 )
 from src.que.worker import Worker
 
@@ -72,19 +72,9 @@ class Daemon:
         self.set_state(state)
 
     def _reattach_server_logger(self):
-        """Re-attach the server log file handler in a spawned child process."""
-        logger = logging.getLogger(DAEMON_NAME)
-        if not logger.handlers:  # avoid duplicate handlers on repeated calls
-            handler = logging.FileHandler(SERVER_LOG_PATH)
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-                )
-            )
-            logger.addHandler(handler)
-            logger.setLevel(logging.DEBUG)
-        self.logger = logger
+        """Set up logging to Server.log in the spawned supervisor process (see setup_server_logging)."""
+        setup_server_logging()
+        self.logger = logging.getLogger(DAEMON_NAME)
 
     def get_state(self) -> DaemonStateDict:
         return self.state

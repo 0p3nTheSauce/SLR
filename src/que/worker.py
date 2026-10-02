@@ -16,9 +16,6 @@ from pydantic import ValidationError
 import wandb
 from src.que.core import (
     CUR_RUN,
-    SERVER_LOG_PATH,
-    TRAINING_LOG_PATH,
-    TRAINING_NAME,
     WORKER_NAME,
     CompExpInfo,
     Que,
@@ -26,6 +23,8 @@ from src.que.core import (
     SweepInfo,  # now also carries model/split/dataset -- see note below
     WorkerStateDict,
     connect_manager,
+    setup_server_logging,
+    setup_training_logging,
     sweep_info_validate,
 )
 from src.run_types import RunInfo, WandbInfo
@@ -339,36 +338,14 @@ class Worker:
         run.finish(exit_code=0)
 
     def _reattach_server_logger(self):
-        """Re-attach the server log file handler in a spawned child process."""
-        logger = logging.getLogger(WORKER_NAME)
-        if not logger.handlers:  # avoid duplicate handlers on repeated calls
-            handler = logging.FileHandler(SERVER_LOG_PATH)
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-                )
-            )
-            logger.addHandler(handler)
-            logger.setLevel(logging.DEBUG)
-        self.server_logger = logger
+        """Set up logging to Server.log in the spawned worker process (see setup_server_logging)."""
+        setup_server_logging()
+        self.server_logger = logging.getLogger(WORKER_NAME)
 
     def _attach_training_loggers(self):
-        """Attach the training log file hanlder in a spawned child process"""
-        self.training_logger = logging.getLogger(TRAINING_NAME)
-        if not self.training_logger.handlers:
-            handler = logging.FileHandler(TRAINING_LOG_PATH)
-            handler.setLevel(logging.INFO)
-            handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-                )
-            )
-            self.training_logger.addHandler(handler)
-            self.training_logger.setLevel(logging.INFO)
-            self.training_logger.propagate = (
-                False  # match what _setup_training_logger does
-            )
+        """Set up the training logger in the spawned worker process, and the stdout adapter that
+        redirects training output to it."""
+        self.training_logger = setup_training_logging()
         self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
 
     def train(self) -> None:

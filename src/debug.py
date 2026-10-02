@@ -10,7 +10,7 @@ import torch
 
 import preprocess
 import video_dataset
-from que.core import Que, QueEmpty, _get_basic_logger, connect_manager
+from que.core import Que, QueEmpty, connect_manager
 from run_types import CleverDict
 
 logging.basicConfig(
@@ -234,7 +234,7 @@ def _safe_reformat_conf(model_exp_c:str) -> str:
         return model_exp_c
 
 def reformat_runs_json(runs:str):
-    q= Que(_get_basic_logger(), runs_path = runs, auto_save=False)
+    q= Que(logger, runs_path = runs, auto_save=False)
     ks = ['admin', 'save_path']
     ks2 = ['admin']
     ks3 = ['admin', 'weight_path']
@@ -292,7 +292,7 @@ def test_load_checkpoint():
 
 
 def test_filter_runs():
-    q = Que(_get_basic_logger())
+    q = Que(logger)
     _ = q.summarise_runs('old_runs')
     
 

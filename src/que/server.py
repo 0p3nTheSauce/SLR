@@ -16,7 +16,6 @@ from src.que.core import (
     QUE_NAME,
     RUN_PATH,
     # ProcessNames,
-    SERVER_LOG_PATH,
     SERVER_NAME,
     SERVER_STATE_PATH,
     WORKER_NAME,
@@ -31,6 +30,7 @@ from src.que.core import (
     atomic_write_json,
     is_sweep_complete,
     read_server_state,
+    setup_server_logging,
     # Process_states
     timestamp_path,
 )
@@ -121,12 +121,8 @@ class ServerContext:
         return sep.title()
 
     def _setup_logging(self) -> tuple[Logger, Logger, Logger, Logger]:
-        """Sets up loggers for the server components."""
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            filename=SERVER_LOG_PATH,
-        )
+        """Sets up logging to Server.log, returning the Que, Daemon, Server and Worker loggers."""
+        setup_server_logging()
 
         que_logger = logging.getLogger(QUE_NAME)
         dn_logger = logging.getLogger(DAEMON_NAME)

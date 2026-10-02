@@ -373,3 +373,39 @@ class TestLogged:
         with pytest.raises(TypeError):
             que.copy_runs("old_runs", [0], "to_run")  # place_runs rejects the CompExpInfo
         assert [r.message for r in log.records] == ["place_runs failed"]
+
+
+class TestLoggingSetup:
+    @pytest.fixture(autouse=True)
+    def restore_logging(self) -> Iterator[None]:
+        """setup_*_logging configure global loggers: put them back afterwards."""
+        names = [None, *core_module.QUE_LOGGERS, core_module.TRAINING_NAME]
+        loggers = [logging.getLogger(n) for n in names]
+        saved = [(lg.handlers[:], lg.level, lg.propagate) for lg in loggers]
+        yield
+        for lg, (handlers, level, propagate) in zip(loggers, saved):
+            for h in lg.handlers:
+                if h not in handlers:
+                    h.close()
+            lg.handlers[:] = handlers
+            lg.level, lg.propagate = level, propagate
+
+    def test_que_debug_and_other_info_written_once(self, tmp_path: Path) -> None:
+        log = tmp_path / "Server.log"
+        core_module.setup_server_logging(log)
+        core_module.setup_server_logging(log)  # e.g. a spawned process setting up again
+        logging.getLogger(core_module.WORKER_NAME).debug("worker debug")
+        logging.getLogger("some_library").debug("library debug")
+        logging.getLogger("some_library").info("library info")
+        lines = log.read_text().splitlines()
+        assert [line.split(" - ", 1)[1] for line in lines] == [
+            "Worker - DEBUG - worker debug",
+            "some_library - INFO - library info",
+        ]
+
+    def test_training_log_is_separate(self, tmp_path: Path) -> None:
+        core_module.setup_server_logging(tmp_path / "Server.log")
+        logger = core_module.setup_training_logging(tmp_path / "Training.log")
+        logger.info("epoch 1")
+        assert "epoch 1" in (tmp_path / "Training.log").read_text()
+        assert "epoch 1" not in (tmp_path / "Server.log").read_text()

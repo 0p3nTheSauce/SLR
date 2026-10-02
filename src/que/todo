@@ -79,14 +79,6 @@ Files & logging:
     SERVER_STATE_PATH, SERVER_LOG_PATH, TRAINING_LOG_PATH, ARCHIVE_DIR), so the code change is
     small; the existing files need moving on the server (with the service stopped) and
     .gitignore/README updating. Decide whether the tracked snapshots stay in git.
-- importing src.que.core runs logging.basicConfig (QUE_LOGGER = _get_basic_logger()), which
-    points the root logger at Server.log as an import side effect. src/results/__init__.py imports
-    it, so results notebooks/scripts can log into the live server's log; tests have to work
-    around it (see CLAUDE.md's Testing section). Configure logging only in entry points
-    (server.py, shell.py), and give Que a NullHandler-style default logger.
-- logging setup is duplicated: ServerContext._setup_logging (basicConfig) and copy-pasted
-    _reattach_server_logger methods in daemon.py and worker.py (plus worker's
-    _attach_training_loggers). One helper (logger name, path, level -> logger) would do for all.
 - no log rotation: on 2026-10-02 Training.log was 26 MB and Server.log 1.7 MB, growing forever.
     Several processes (server, supervisor, worker) append to Server.log through separate
     FileHandlers, so RotatingFileHandler isn't safe across them -- use logrotate (copytruncate)

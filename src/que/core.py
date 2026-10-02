@@ -135,16 +135,48 @@ class Specification(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _get_basic_logger() -> Logger:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        filename=SERVER_LOG_PATH,
-    )
-    return logging.getLogger(__name__)
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+QUE_LOGGERS = (QUE_NAME, DAEMON_NAME, SERVER_NAME, WORKER_NAME)
 
 
-QUE_LOGGER = _get_basic_logger()
+def add_file_handler(logger: Logger, path: str | Path) -> None:
+    """Attach a handler writing `logger`'s records to `path` in LOG_FORMAT, unless `logger`
+    already has one for `path`."""
+    path = Path(path).resolve()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler) and Path(handler.baseFilename) == path:
+            return
+    handler = logging.FileHandler(path)
+    handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    logger.addHandler(handler)
+
+
+def setup_server_logging(path: str | Path = SERVER_LOG_PATH) -> None:
+    """Send this process's logging to `path` (default: Server.log): the Que system's own loggers
+    (QUE_LOGGERS) at DEBUG, everything else (e.g. wandb) at INFO.
+
+    Call it once in each server-side process -- the server, and the supervisor and worker it
+    spawns, which start with no logging config. A single handler on the root logger means each
+    record is written once. Calling it again in the same process changes nothing. Importing this
+    module configures nothing, so other users of the Que (e.g. src/results) don't log here.
+    """
+    root = logging.getLogger()
+    add_file_handler(root, path)
+    root.setLevel(logging.INFO)
+    # a record is checked against its own logger's level only, so these reach the root's
+    # handler at DEBUG while other libraries' DEBUG records are dropped
+    for name in QUE_LOGGERS:
+        logging.getLogger(name).setLevel(logging.DEBUG)
+
+
+def setup_training_logging(path: str | Path = TRAINING_LOG_PATH) -> Logger:
+    """The Training logger (training/testing output, see worker.LoggerWriter), writing at INFO to
+    `path` (default: Training.log) only, not to Server.log. Calling it again changes nothing."""
+    logger = logging.getLogger(TRAINING_NAME)
+    add_file_handler(logger, path)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    return logger
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -367,13 +399,14 @@ class Que:
 
     def __init__(
         self,
-        logger: Logger = QUE_LOGGER,
+        logger: Logger | None = None,
         runs_path: str | Path = RUN_PATH,
         auto_save: bool = True,
     ) -> None:
         """
         Args:
-            logger (Logger, optional): Defaults to QUE_LOGGER.
+            logger (Logger | None, optional): Defaults to the Que logger, which only writes
+                somewhere once logging is set up (see setup_server_logging).
             runs_path (str | Path, optional): Where the Que is loaded from and saved to. Defaults
                 to RUN_PATH, the live server's file.
             auto_save (bool, optional): Save to `runs_path` after every mutation. Turn off for a
@@ -385,7 +418,7 @@ class Que:
         self.to_run: list[ExpInfo] = []
         self.fail_runs: list[FailedExp] = []
         self.auto_save: bool = auto_save
-        self.logger = logger
+        self.logger = logger if logger is not None else logging.getLogger(QUE_NAME)
         self._lock = threading.RLock()
         self._mutation_depth = 0
         self.load_state()
@@ -1519,8 +1552,7 @@ def connect_manager(
 
 
 def main():
-    logger = _get_basic_logger()
-    q = Que(logger)
+    q = Que()
     q.disp_runs(OLD_RUNS)
 
 
