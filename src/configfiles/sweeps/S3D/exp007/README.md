@@ -24,6 +24,14 @@ Changes from Sweep 4, whose augmentation pipeline this reuses via [base.py](./ba
   `drop_p`, and RandAugment `magnitude`. `hflip_p` now starts at 0.1, since higher was better.
 
 **Caveat**: PyTorch's `CosineAnnealingLR` is periodic, so after warmup + `tmax` epochs the LR
-rises again. Patience 20 should stop a run before this matters (the best checkpoint is kept),
-but training doesn't yet end at the bottom of the cycle.
+rises again. Patience 20 was meant to stop a run before this mattered, but 13 of the 50 trials
+found their best in a later cycle (see [Result](#result)). Later sweeps set `hold_after_tmax` to
+keep the LR at `eta_min` instead.
 
+## Result
+
+Best val loss 0.867 (`cs9lwmiy`), within seed noise of Sweep 4's config (0.880 ± 0.039), with
+a much better median trial (1.04 vs. 1.89). The search space is flat at the top, so this is the
+last S3D sweep for now. The analysis is in
+[suggest_sweep.ipynb](../../../../results/sweeping/suggest_sweep.ipynb), and it feeds into
+[MViTv2_S_16x4_e sweep 1](../../MViTv2_S_16x4_e/exp001/README.md).

@@ -1,0 +1,78 @@
+program: /home/luke/Code/SLR/src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_loss
+  goal: minimize
+entity: ljgoodall2001-rhodes-university
+project: Sweeps
+
+# No early_terminate: in sweep 0, hyperband stopped 18 of 24 trials at epoch 15, and only the 6
+# it let finish got below 0.8. base.py holds the LR at eta_min after warmup + tmax, so patience
+# ends each trial soon after the cycle (see README).
+
+parameters:
+  # --- tuned ---
+  # Ranges are the spread of sweep 0's 6 finished trials, padded, unless noted.
+  #Optimizer params
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 0.00003
+    max: 0.0006
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.003
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.1 # flat in sweep 0 and S3D sweep 7
+  classifier_weight_decay:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.03
+  #model params
+  drop_p:
+    distribution: uniform
+    min: 0.1
+    max: 0.6 # lower than S3D: sweep 0's finished trials used 0.19 - 0.51
+  #Scheduler params
+  tmax:
+    distribution: int_uniform
+    min: 10
+    max: 30 # sweep 0's finished trials used t0 = 10 - 28, best at its lower bound
+  warmup_epochs:
+    values: [5, 8] # the only values in S3D sweep 7's top 10, and 5 of sweep 0's 6 finished
+  #Augmentation params
+  magnitude:
+    distribution: int_uniform
+    min: 3
+    max: 15 # sweep 0's finished trials favoured 10-11, S3D sweep 7's top 10 had a median of 5.5
+
+  # --- fixed ---
+  # Flat in both sweep 0 and S3D sweep 7, so fixed to free the budget for the parameters above.
+  eps: {value: 0.000003} # median of sweep 0's finished trials (all <= 3.7e-5)
+  start_factor: {value: 0.1}
+  hflip_p: {value: 0.4}
+  max_wobble: {value: 3}
+  num_ops: {value: 3}
+  eta_min: {value: 0}
+  end_factor: {value: 1.0}
+  batch_size: {value: 2}
+  update_per_step: {value: 4}
+  frame_size: {value: 224}
+  target_length: {value: 32}
+  num_magnitude_bins: {value: 31}
+  max_epoch: {value: 55} # warmup + tmax (at most 38) + patience; only a backstop
+  patience: {value: 15}
+  min_delta: {value: 0.01}
+
+# Only consumed by CLI/subprocess-mode agents (`wandb agent <sweep_id>`).
+command:
+  - ${env}
+  - python
+  - ${program}
+  - MViTv2_S_16x4_e
+  - asl100_cutoff_9
+  - /home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_S_16x4_e/exp001/base.py
+
+# Not run yet.
