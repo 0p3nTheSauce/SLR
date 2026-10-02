@@ -118,6 +118,8 @@ Each of these locations can be viewed with `list` command. Alternatively a singl
 
 When using `create` a new training run is specified using the same parser as *training.py* (see [training](../../README.md#training)) and is added to `to_run`. `add` also uses this parser, and is used to add already completed runs to `old_runs`
 
+`to_run` and `cur_run` only hold runs without results or errors, so a completed or failed run can't be `move`d back into them: requeue it with `recover`, or `copy` it with `--clean_slate`.
+
 #### Que Daemon
 
 To start the training que, use the command: `daemon start`
@@ -144,11 +146,13 @@ The status of which can be checked with the command `server status`:
 
 Once training and testing are complete, the completed run with results is added to `old_runs`. If an exception occurs, the failed run is added to `fail_runs`. If `stop on fail` is *True*, then the Que Daemon will halt training. Otherwise it will continue. This can be set when being prompted during [setup](#setup). 
 
-The Daemon will stop when it reaches the end of the queue, or when when the `daemon stop` command is used. Flags can be used to send a stop signal to the supervisor, or the worker. 
+When there are no runs in `to_run` and no sweep trials left to hand out, the Daemon idles, checking for new work periodically. It stops when the `daemon stop` command is used. Flags can be used to send a stop signal to the supervisor, or the worker.
 
 #### Recovery
 
 If there is an outside influence (power failure) the que-training service will autorecover, if it was awake before. 
+
+Nothing has to be saved by hand for this: every change to the Que is written to `Runs.json` before it returns, and the server state (`Server.json`: sweep, daemon settings) is written whenever it changes and after each worker exits. Both are written atomically, so a crash mid-write leaves the previous file intact. A sweep's progress is not stored but counted from the Que (its trials in `old_runs`), so it can't drift from it; on startup, a difference from the saved count is logged as a warning.
 
 Otherwise, If a run fails, the `recover` command can be used.  In the event of an exception, specify the location as `fail_runs`:
 
@@ -161,5 +165,5 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 - `attach` attaches to tmux session (only opens on the shell side)
 - `wandb` open up wandb website
 - `logs` View the logs from the worker, server or systemd service (requires sudo).
-- `save` Save state of que or server to .json file
+- `save` Save a copy of the que or server state to a .json file (state is already saved automatically, see [Recovery](#recovery))
 - `load` Load state of que or server from .json file

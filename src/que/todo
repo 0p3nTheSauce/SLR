@@ -1,11 +1,18 @@
 
 Que:
-- add flag to check if changes were made before saving
-- core.py/shell.py mix `from src.configs import ...` with bare `from configs import ...` /
+- shell.py mixes `from src.configs import ...` with bare `from configs import ...` /
     `from utils import ...` (lazy imports inside methods). The bare form only resolves because
     setup.sh launches `python -m que.shell`/`que.server` from inside src/; it breaks under pytest
     from the repo root (tests/que/test_shell.py's TestSetMaxRuns has to prepend src/ to sys.path),
-    and can load the same module twice under two names. Switch them all to `src.`-prefixed imports.
+    and can load the same module twice under two names. Switch them all to `src.`-prefixed imports
+    (core.py's were switched on 2026-10-02).
+- Que reads (list_runs, peak_run, summarise_runs, len_sweep_runs, ...) don't take the Que's lock,
+    only mutations do (see core._persists). The manager serves each connection on its own thread,
+    so a read can interleave with a mutation from another client (e.g. the shell listing while the
+    worker moves a run). Consider locking reads too.
+- Que.load_state only handles FileNotFoundError: an unparsable or invalid Runs.json (e.g. hand
+    edited) raises from Que(), so the server fails to start. Saves are atomic now, so it can't be
+    truncated by a crash, but consider a clear error/fallback to the latest timestamped copy.
 - tmux.py has 8 ruff warnings (unsorted imports, Optional[...] instead of `X | None`); all
     auto-fixable with `ruff check --fix src/que/tmux.py`.
 
@@ -30,11 +37,6 @@ Shell:
 Daemon:
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
     that the process started successfully)
-- sweep progress (completed_runs) lives only in the server state file. Record each finished
-    trial in the base_config folder's sweep_meta.json (next to the creation/set_max_runs
-    entries) so progress can be reloaded from it, e.g. when re-attaching to a sweep via
-    set_sweep --sweep_id. Needs a decision on which machine writes it: the shell writes the
-    existing entries and may run remotely over the SSH tunnel, but trials finish on the server.
 
 Worker:
 - if GPU is busy on startup, gets stuck, needs server process to be restarted
@@ -45,12 +47,11 @@ Worker:
     src/TODO.md's repo-wide blind-except audit item.
 
 Server:
-- server state is only written to Server.json on graceful shutdown or a manual `server save`, so
-    an unclean death loses everything since (sweep progress included). On 2026-09-25 the server
-    died without a SIGTERM and the next start loaded a mid-run snapshot from 21:14 -- the stale
-    pids/task it showed are no longer restored (load_state keeps live process fields), but the
-    sweep progress etc. is still just as stale. Consider saving after each worker exits (in the
-    supervisor loop) and/or on every sweep-trial registration.
+- the daemon's `awake` flag (what makes the server resume the daemon after an outage) isn't saved
+    when it changes: `daemon start`/`stop` go straight to the Daemon over its proxy, so Server.json
+    only picks it up at the next worker exit, ServerContext setter or graceful shutdown. Dying
+    in between resumes (or doesn't) based on the older value. Route start/stop through the
+    ServerContext so they save, like set_sweep does.
 - `server load` at runtime still restores `awake` from the file: loading awake=True starts a
     supervisor, and awake=False while a supervisor runs makes status misreport it. Either keep
     the live `awake` value when the server is already up (only restore it at startup, for
