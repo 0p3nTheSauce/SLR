@@ -40,7 +40,7 @@ sudo ./unsetup.sh
 
 ### The `que` command
 
-**que --host <server_ip> [options]**
+**que --host <server_ip> [options] [command ...]**
 
 #### Available options:
 -   `--host`          Host IP or hostname to connect to
@@ -50,6 +50,7 @@ sudo ./unsetup.sh
 -   `--port_server`   Remote port on server (default: 50000)
 -   `--max_retries`   Max connection retries (default: 5)
 -   `--retry_delay`   Seconds between retries (default: 2)
+-   `--yes`, `-y`     Answer yes to confirmation prompts (see below)
 
 If running the que-shell on the server, run:
 
@@ -64,6 +65,28 @@ que --host '123.456.78.910' #example IP address
 ```
 
 after the first use the last host will be used by default.
+
+#### Running a single command
+
+Anything after the options is run as one QueShell command, and `que` then exits instead of
+opening the shell. The exit status is 0 if the command succeeded, and 1 if it failed or was
+cancelled, so this works in scripts:
+
+```bash
+que server status
+que list to_run
+que daemon set_sweep --sweep_path configfiles/sweeps/S3D/exp007/config.yaml
+```
+
+- Options for `que` itself go before the command. Everything after the command is its own
+  arguments, as in the shell.
+- Connection messages go to stderr, so stdout is just the command's output. (The
+  "Connecting to last-used host" lines come from the `que` wrapper that `setup.sh` generates,
+  so re-run `setup.sh` once to move them to stderr too.)
+- Commands that ask for confirmation (`clear`, `remove`, `logs -c`, and `create`/`add` of a
+  duplicate run) refuse when there's no terminal to ask on. Pass `--yes` to answer yes:
+  `que --yes clear fail_runs`.
+- One-shot mode doesn't show the banner or read/write `~/.que_shell_history`.
 
 ### The QueShell
 
@@ -160,10 +183,30 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 (que)$ recover -ol fail
 ```
 
+#### State history
+
+Every version of `Runs.json` and `Server.json` is kept in a git repo of their own, in `state/`, so the project's history isn't flooded with Que changes. A server installed by `setup.sh` runs `que-training-state-backup.timer`, which commits both files every 15 minutes if they changed (the message counts the runs in each location), then pushes if the repo has a remote. The snapshots from `save -t` and `old_ques/` stay untracked. See [state_backup.py](./state_backup.py).
+
+To back up off the machine, create an empty **private** repo (the Que holds every run's config), then, from the repo root:
+
+```bash
+python -m src.que.state_backup init --remote git@github.com:<user>/<repo>.git
+```
+
+Pushes run unattended, so they need an SSH key without a passphrase (or a running agent). A failed push keeps the commit, and the next run pushes it. `systemctl status que-training-state-backup` shows the last result, and `journalctl -u que-training-state-backup` the history.
+
+To restore an earlier version, find it in the log, copy it out, and `load` it (which makes it the saved state):
+
+```bash
+git -C src/que/state log --format='%h %ad %s' --date=iso -- Runs.json
+git -C src/que/state show <commit>:Runs.json > /tmp/Runs_restore.json
+que load que -ip /tmp/Runs_restore.json
+```
+
 #### Files
 
 The Que's data and logs are kept apart from the code, in gitignored directories:
-- `state/`: `Runs.json` (the Que), `Server.json` (server state), timestamped snapshots from `save -t`, and `old_ques/` (archived Ques)
+- `state/`: `Runs.json` (the Que), `Server.json` (server state), timestamped snapshots from `save -t`, and `old_ques/` (archived Ques). `state/` is also a git repo of its own, versioning `Runs.json` and `Server.json` (see [State history](#state-history))
 - `logs/`: `Server.log` (server, daemon and worker) and `Training.log` (training and testing output). A server installed by `setup.sh` rotates them with logrotate (weekly, or sooner past 50 MB; 8 kept, older ones gzipped)
 
 Until 2026-10-02 these lived directly in `src/que/`. The server moves them into place when it starts (`migrate_legacy_files` in `core.py`), never overwriting a file already there. On a machine that doesn't run the server (e.g. to read `Runs.json` from `src/results`), run it once by hand, from `src/`, and only while no Que server on that machine is still running the old code:

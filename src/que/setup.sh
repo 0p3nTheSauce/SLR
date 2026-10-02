@@ -217,6 +217,43 @@ LOGROTATE
     echo -e "${GREEN}Log rotation config created at: $LOGROTATE_FILE${NC}"
     echo ""
 
+    # Version the Que's state (state/Runs.json, state/Server.json) in a git repo of its own,
+    # committed every 15 minutes if it changed, and pushed if the repo has a remote. See
+    # state_backup.py.
+    BACKUP_NAME="${SERVICE_NAME}-state-backup"
+    REPO_DIR="$(dirname "$PROJECT_DIR")"
+    BACKUP_PYTHON="$CONDA_PATH/envs/$ENV_NAME/bin/python"
+    cat > "/etc/systemd/system/${BACKUP_NAME}.service" << BACKUP_SERVICE
+[Unit]
+Description=Commit the Que state to its git repo, and push it
+
+[Service]
+Type=oneshot
+User=$CURRENT_USER
+Group=$CURRENT_GROUP
+WorkingDirectory=$REPO_DIR
+ExecStart=$BACKUP_PYTHON -m src.que.state_backup snapshot
+SyslogIdentifier=$BACKUP_NAME
+BACKUP_SERVICE
+    cat > "/etc/systemd/system/${BACKUP_NAME}.timer" << BACKUP_TIMER
+[Unit]
+Description=Commit the Que state every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+BACKUP_TIMER
+    (cd "$REPO_DIR" && sudo -u "$CURRENT_USER" "$BACKUP_PYTHON" -m src.que.state_backup init)
+    systemctl daemon-reload
+    systemctl enable --now "${BACKUP_NAME}.timer"
+    echo -e "${GREEN}State backup timer enabled: ${BACKUP_NAME}.timer${NC}"
+    echo "  To also push off this machine, create an empty private repo, then run (from $REPO_DIR):"
+    echo "    python -m src.que.state_backup init --remote <url>"
+    echo ""
+
         
 
 fi
@@ -291,7 +328,7 @@ else
     echo ""
     echo "  No host configured. Please specify a server to connect to:"
     echo ""
-    echo "    que --host <server_ip> [options]"
+    echo "    que --host <server_ip> [options] [command ...]"
     echo ""
     echo "  Available options:"
     echo "    --host          Host IP or hostname to connect to"
@@ -301,6 +338,10 @@ else
     echo "    --port_server   Remote port on server (default: 50000)"
     echo "    --max_retries   Max connection retries (default: 5)"
     echo "    --retry_delay   Seconds between retries (default: 2)"
+    echo "    --yes, -y       Answer yes to confirmation prompts"
+    echo ""
+    echo "  With a command (e.g. 'que server status'), runs it and exits instead of"
+    echo "  opening the shell."
     echo ""
     exit 1
 fi
@@ -308,9 +349,10 @@ fi
 # If no --host was passed explicitly, inject the saved one
 if [ -z "\$EXPLICIT_HOST" ]; then
     ARGS=("--host" "\$HOST_TO_USE" "\${ARGS[@]}")
-    echo -e "  \033[0;36mConnecting to last-used host: \$HOST_TO_USE\033[0m"
-    echo -e "  \033[1;33m(Use --host <ip> to connect to a different server)\033[0m"
-    echo ""
+    # stderr, so a single command's stdout (\`que list ...\`) is just its output
+    echo -e "  \033[0;36mConnecting to last-used host: \$HOST_TO_USE\033[0m" >&2
+    echo -e "  \033[1;33m(Use --host <ip> to connect to a different server)\033[0m" >&2
+    echo "" >&2
 fi
 
 # Save the resolved host for next time

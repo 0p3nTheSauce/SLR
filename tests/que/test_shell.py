@@ -396,7 +396,119 @@ class TestLogs:
     def test_clear_server_log(
         self, harness: ShellHarness, context: FakeLogContext, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        monkeypatch.setattr(shell_module.sys.stdin, "isatty", lambda: True)
         monkeypatch.setattr(shell_module.Confirm, "ask", lambda *a, **kw: True)
         harness.run("logs", "-s -c")
         assert context.cleared == ["server"]
         assert context.reads == []
+
+
+class FailingSaver:
+    def save_state(self, **kwargs: Any) -> None:
+        raise RuntimeError("disk full")
+
+
+class TestRunOnce:
+    """A single command run from the terminal (`que <command> ...`): its exit status says
+    whether it worked."""
+
+    def run_once(self, harness: ShellHarness, *argv: str) -> tuple[int, str]:
+        harness.out.seek(0)
+        harness.out.truncate()
+        return harness.shell.run_once(list(argv)), harness.out.getvalue()
+
+    def test_success(self, harness: ShellHarness) -> None:
+        status, out = self.run_once(harness, "display", "to_run", "2", *S3D_BY_ACC.split())
+        assert status == 0
+        assert '"acc": 0.7' in out
+
+    def test_arguments_with_spaces_survive(
+        self, harness: ShellHarness, s3d_filters: Path, tmp_path: Path
+    ) -> None:
+        spaced = tmp_path / "with space.py"
+        spaced.write_text(s3d_filters.read_text())
+        status, out = self.run_once(harness, "display", "to_run", "-1", "-ip", str(spaced), "-s", "acc")
+        assert status == 0
+        assert '"acc": 0.7' in out
+
+    def test_unknown_command(self, harness: ShellHarness) -> None:
+        status, out = self.run_once(harness, "bogus", "x")
+        assert status == 1
+        assert "Unknown command: bogus" in out
+
+    def test_bad_arguments(self, harness: ShellHarness) -> None:
+        assert self.run_once(harness, "display")[0] == 1
+
+    def test_help_is_not_a_failure(self, harness: ShellHarness) -> None:
+        assert self.run_once(harness, "display", "-h")[0] == 0
+
+    def test_exception_fails_without_claiming_success(self, harness: ShellHarness) -> None:
+        harness.shell.server_context = FailingSaver()  # type: ignore[assignment]
+        status, out = self.run_once(harness, "save", "server")
+        assert status == 1
+        assert "disk full" in out
+        assert "✓" not in out
+
+    def test_failure_does_not_carry_over(self, harness: ShellHarness) -> None:
+        assert self.run_once(harness, "bogus")[0] == 1
+        assert self.run_once(harness, "display", "to_run", "0")[0] == 0
+
+
+class TestConfirm:
+    @pytest.fixture
+    def context(self, harness: ShellHarness) -> FakeLogContext:
+        context = FakeLogContext([])
+        harness.shell.server_context = context  # type: ignore[assignment]
+        return context
+
+    def test_refuses_without_a_terminal(
+        self, harness: ShellHarness, context: FakeLogContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(shell_module.sys.stdin, "isatty", lambda: False)
+        assert harness.shell.run_once(["logs", "-s", "-c"]) == 1
+        assert context.cleared == []
+        assert "pass --yes" in harness.out.getvalue()
+
+    def test_assume_yes(self, harness: ShellHarness, context: FakeLogContext) -> None:
+        harness.shell.assume_yes = True
+        assert harness.shell.run_once(["logs", "-s", "-c"]) == 0
+        assert context.cleared == ["server"]
+
+    def test_declined_is_a_failure(
+        self, harness: ShellHarness, context: FakeLogContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(shell_module.sys.stdin, "isatty", lambda: True)
+        monkeypatch.setattr(shell_module.Confirm, "ask", lambda *a, **kw: False)
+        assert harness.shell.run_once(["logs", "-s", "-c"]) == 1
+        assert context.cleared == []
+
+
+class TestMain:
+    def test_options_before_the_command_are_que_options(self) -> None:
+        args = shell_module.get_queshell_parser().parse_args(
+            ["--host", "h", "-y", "logs", "-s", "--host", "x"]
+        )
+        assert (args.host, args.yes) == ("h", True)
+        assert args.command == ["logs", "-s", "--host", "x"]
+
+    def test_runs_one_command_non_interactively(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        def no_side_effects(self: QueShell) -> None:
+            raise AssertionError("one-shot mode must not show the banner or touch history")
+
+        monkeypatch.setattr(QueShell, "_show_banner", no_side_effects)
+        monkeypatch.setattr(QueShell, "_setup_history", no_side_effects)
+        monkeypatch.setattr(shell_module, "tmux_manager", lambda: None)
+        connected: list[dict[str, Any]] = []
+
+        def fake_connect(**kwargs: Any) -> FakeServer:
+            connected.append(kwargs)
+            return FakeServer()
+
+        monkeypatch.setattr(shell_module, "connect_manager", fake_connect)
+
+        assert shell_module.main(["--port_server", "50001", "display", "to_run", "1"]) == 0
+        assert '"acc": 0.9' in capsys.readouterr().out
+        assert connected == [{"port": 50001, "max_retries": 5, "retry_delay": 2}]
+        assert shell_module.main(["display", "to_run", "7"]) == 1

@@ -101,6 +101,17 @@ if [[ "$MODE" == "server" ]]; then
         systemctl reset-failed 2>/dev/null || true
     fi
 
+    #state backup timer removal (the state repo in state/ is kept)
+    BACKUP_NAME="${SERVICE_NAME}-state-backup"
+    if [ -f "/etc/systemd/system/${BACKUP_NAME}.timer" ]; then
+        systemctl disable --now "${BACKUP_NAME}.timer" 2>/dev/null || true
+        rm -f "/etc/systemd/system/${BACKUP_NAME}.timer" "/etc/systemd/system/${BACKUP_NAME}.service"
+        systemctl daemon-reload
+        echo -e "${GREEN}✓ State backup timer removed (the state repo is kept)${NC}"
+    else
+        echo -e "${YELLOW}State backup timer not found — skipping.${NC}"
+    fi
+
     #log rotation config removal (the logs themselves are kept)
     LOGROTATE_FILE="/etc/logrotate.d/${SERVICE_NAME}"
     if [ -f "$LOGROTATE_FILE" ]; then
