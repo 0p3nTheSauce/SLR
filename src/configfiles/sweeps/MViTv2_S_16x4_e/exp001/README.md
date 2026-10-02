@@ -1,6 +1,6 @@
-# Sweep 1 : not created yet
+# Sweep 1 : 510lhysg
 
-Planned for 20 runs (see [Cost](#cost)).
+Created for 20 runs (see [Cost](#cost)) : [wandb](https://wandb.ai/ljgoodall2001-rhodes-university/Sweeps/sweeps/510lhysg)
 
 This sweep follows [Sweep 0](../exp000/README.md) and carries over the setup of
 [S3D sweep 7](../../S3D/exp007/README.md). The reasoning is in
