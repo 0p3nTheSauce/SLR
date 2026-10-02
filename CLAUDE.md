@@ -44,7 +44,12 @@ cares a lot about code quality — not just "does it run." Hold new/edited code 
 
 - **Strict typing, zero linter warnings.** Ruff (and type checking) should report nothing on
   code you touch. Prefer precise types (e.g. `Literal` over bare `str` for closed sets of names)
-  over `Any`/untyped escape hatches.
+  over `Any`/untyped escape hatches. Run both from the repo root (from a subdirectory, ruff's
+  isort misclassifies `src.` imports):
+  - `ruff check <files>`
+  - `pyright --pythonpath ~/miniconda3/envs/wlasl/bin/python <files>` — pyright is the checker
+    behind VS Code's Pylance, installed locally as a uv tool (`uv tool install pyright`); there's
+    no pyright config, so it runs in its default mode.
 - **Documented, but not over-commented.** Public functions/classes get docstrings explaining
   non-obvious behaviour, inputs/outputs, and gotchas — but avoid restating what the code already
   says. This mirrors the top-level house style (see the "Default to writing no comments" rule),
