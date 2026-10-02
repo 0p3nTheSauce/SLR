@@ -65,11 +65,11 @@ class FakeProcess:
     """Stands in for multiprocessing.Process: 'runs' the worker instantly, exiting 0."""
 
     started: ClassVar[list[Any]] = []
+    exitcode: ClassVar[int] = 0
 
     def __init__(self, target: Any, args: tuple[Any, ...] = ()) -> None:
         self.args = args
         self.pid = None  # so the supervisor's exit-time _hard_stop has nothing to kill
-        self.exitcode = 0
 
     def start(self) -> None:
         FakeProcess.started.append(self.args)
@@ -88,7 +88,8 @@ class TestSupervise:
             to_run=[0],  # to_run length per supervisor iteration; stops after the last
             sweep={},
             completed=0,  # the sweep's finished trials in the Que
-            saves=0,
+            saves=[],  # the daemon state at each server-state save
+            daemon_state={"awake": True, "stop_on_fail": True, "supervisor_pid": 1},
             # what the manager's worker-state proxy points at, i.e. the real shared state
             shared_worker_state=WorkerStateDict(
                 task="training", current_run_id="abc", working_pid=123, exception=None
@@ -101,10 +102,10 @@ class TestSupervise:
             return env.to_run.pop(0)
 
         def save_state() -> None:
-            env.saves += 1
+            env.saves.append(dict(env.daemon_state))
 
         manager = SimpleNamespace(
-            get_daemon_state=lambda: {"awake": True, "stop_on_fail": True, "supervisor_pid": 1},
+            get_daemon_state=lambda: env.daemon_state,
             get_que=lambda: SimpleNamespace(len_loc=len_loc),
             get_worker_state=lambda: env.shared_worker_state,
             get_sweep=lambda: env.sweep,
@@ -115,6 +116,7 @@ class TestSupervise:
         monkeypatch.setattr(daemon_module, "connect_manager", lambda: manager)
         monkeypatch.setattr(daemon_module, "Process", FakeProcess)
         FakeProcess.started = []
+        FakeProcess.exitcode = 0
 
         logger = logging.getLogger("test_daemon")
         logger.propagate = False
@@ -183,4 +185,12 @@ class TestSupervise:
         setup.to_run = [1, 1, 0]
         setup.daemon.supervise()
         assert len(FakeProcess.started) == 2
-        assert setup.saves == 2
+        assert len(setup.saves) == 3  # one per worker, plus the supervisor's exit
+
+    def test_exit_saves_daemon_as_not_awake(self, setup: SimpleNamespace) -> None:
+        """Otherwise a daemon that stopped (e.g. stop_on_fail after a failed run) would still be
+        'awake' on disk, and resumed by a server restarted after an outage."""
+        setup.to_run = [1]
+        FakeProcess.exitcode = 1
+        setup.daemon.supervise()
+        assert setup.saves[-1]["awake"] is False

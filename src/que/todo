@@ -47,11 +47,6 @@ Worker:
     src/TODO.md's repo-wide blind-except audit item.
 
 Server:
-- the daemon's `awake` flag (what makes the server resume the daemon after an outage) isn't saved
-    when it changes: `daemon start`/`stop` go straight to the Daemon over its proxy, so Server.json
-    only picks it up at the next worker exit, ServerContext setter or graceful shutdown. Dying
-    in between resumes (or doesn't) based on the older value. Route start/stop through the
-    ServerContext so they save, like set_sweep does.
 - `server load` at runtime still restores `awake` from the file: loading awake=True starts a
     supervisor, and awake=False while a supervisor runs makes status misreport it. Either keep
     the live `awake` value when the server is already up (only restore it at startup, for

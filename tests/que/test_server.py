@@ -70,6 +70,40 @@ class TestSetSweepMaxRuns:
             ServerContext.set_sweep_max_runs(make_context({}, completed=0), 10)  # type: ignore[arg-type]
 
 
+class TestDaemonStartStop:
+    """The daemon's 'awake' flag decides whether a restarted server resumes it after an outage,
+    so starting or stopping it must be saved straight away."""
+
+    @pytest.fixture
+    def ctx(self) -> SimpleNamespace:
+        ctx = make_context({}, completed=0)
+        ctx.daemon = SimpleNamespace(calls=[])
+        ctx.daemon.start_supervisor = lambda: ctx.daemon.calls.append("start")
+        ctx.daemon.stop_supervisor = lambda **kwargs: ctx.daemon.calls.append(("stop", kwargs))
+        return ctx
+
+    def test_start_saves(self, ctx: SimpleNamespace) -> None:
+        ServerContext.start_daemon(ctx)  # type: ignore[arg-type]
+        assert ctx.daemon.calls == ["start"]
+        assert ctx.saves == 1
+
+    def test_stop_passes_options_and_saves(self, ctx: SimpleNamespace) -> None:
+        ServerContext.stop_daemon(ctx, timeout=5.0, hard=True)  # type: ignore[arg-type]
+        assert ctx.daemon.calls == [("stop", {"timeout": 5.0, "hard": True, "stop_worker": False})]
+        assert ctx.saves == 1
+
+    def test_failed_stop_still_saves(self, ctx: SimpleNamespace) -> None:
+        """stop_supervisor clears 'awake' before it can fail (e.g. stopping a stuck process)."""
+        ctx.daemon.stop_supervisor = lambda **kwargs: raise_(RuntimeError("stuck"))
+        with pytest.raises(RuntimeError):
+            ServerContext.stop_daemon(ctx)  # type: ignore[arg-type]
+        assert ctx.saves == 1
+
+
+def raise_(exc: Exception) -> Any:
+    raise exc
+
+
 class TestSweepCompletedRuns:
     def test_counts_active_sweeps_finished_trials(self) -> None:
         ctx = make_context({"sweep_id": "abc", "max_runs": 50}, completed=4)

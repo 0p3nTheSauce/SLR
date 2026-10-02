@@ -224,6 +224,27 @@ class ServerContext:
         self.save_state()
         return previous
 
+    def start_daemon(self) -> None:
+        """Start the Daemon's supervisor (see Daemon.start_supervisor), and save the server state.
+
+        Starting sets the daemon 'awake', which is what makes the server resume it on restart
+        after an outage (see load_state), so it has to reach disk straight away.
+        """
+        try:
+            self.daemon.start_supervisor()
+        finally:
+            self.save_state()
+
+    def stop_daemon(
+        self, timeout: float | None = None, hard: bool = False, stop_worker: bool = False
+    ) -> None:
+        """Stop the Daemon's supervisor (see Daemon.stop_supervisor), and save the server state,
+        so a server restarted after an outage doesn't resume it."""
+        try:
+            self.daemon.stop_supervisor(timeout=timeout, hard=hard, stop_worker=stop_worker)
+        finally:
+            self.save_state()
+
     def toggle_stop_on_fail(self) -> None:
         self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]
         self.save_state()

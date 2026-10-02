@@ -1179,12 +1179,12 @@ class QueShell(cmdLib.Cmd):
                 with self.unwrap_exception(
                     "Worker process started", "Failed to start worker"
                 ):
-                    self.daemon.start_supervisor()
+                    self.server_context.start_daemon()
             elif parsed_args.command == "stop":
                 with self.unwrap_exception(
                     "Supervisor process stopped", "Failed to stop supervisor"
                 ):
-                    self.daemon.stop_supervisor(
+                    self.server_context.stop_daemon(
                         timeout=parsed_args.timeout,
                         hard=parsed_args.hard,
                         stop_worker=parsed_args.worker,

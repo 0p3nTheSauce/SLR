@@ -172,7 +172,9 @@ class Daemon:
         gets a sweep trial or a Que run (see sweep_to_hand_off), so edits made via the shell (e.g.
         `daemon set_max_runs`) apply from the next worker on. When there is neither, no worker is
         launched: the supervisor idles, polling until work arrives (see _idle). After each worker
-        exits the server state is saved, so the copy on disk stays current if the server dies.
+        exits, and when the supervisor itself exits (no longer 'awake'), the server state is
+        saved, so the copy on disk stays current if the server dies -- in particular, a daemon
+        that stopped (e.g. on a failure with stop_on_fail) isn't resumed after an outage.
 
         Args:
             recover_run (bool, optional): Wether to recover the last failed run. Defaults to False.
@@ -232,6 +234,7 @@ class Daemon:
         self.logger.info("Supervisor process exiting.")
         self._hard_stop(name="worker", pid=worker_pid, proc=self.worker_process)
         self._reset_process_state(worker=True, supervisor=True)
+        server_context.save_state()
 
     def start_supervisor(self, recover_run: bool = False) -> None:
         """
