@@ -1,3 +1,4 @@
+import math
 import random
 from collections.abc import Callable
 from multiprocessing.synchronize import Event as EventClass
@@ -79,6 +80,23 @@ def setup_data(config: RunInfo) -> tuple[dict[str, DataLoader[VideoDataset]], in
     return dataloaders, train_dataset.num_classes
 
 
+def cosine_then_hold(optimizer: optim.Optimizer, tmax: int, eta_min: float) -> LRScheduler:
+    """Cosine annealing from each param group's `initial_lr` to `eta_min` over `tmax` epochs,
+    then held at `eta_min`. Up to `tmax` this is the closed form of `CosineAnnealingLR`.
+
+    Reads `initial_lr`, which PyTorch sets on the param groups when the first scheduler on
+    `optimizer` is created, so a warm-up scheduler must be created before this one.
+    """
+
+    def factor(base_lr: float) -> Callable[[int], float]:
+        floor = eta_min / base_lr if base_lr else 0.0
+        return lambda epoch: floor + (1 - floor) * (1 + math.cos(math.pi * min(epoch, tmax) / tmax)) / 2
+
+    return optim.lr_scheduler.LambdaLR(
+        optimizer, lr_lambda=[factor(group["initial_lr"]) for group in optimizer.param_groups]
+    )
+
+
 def get_scheduler(
     optimizer: optim.Optimizer, sched_conf: SchedInfo | None = None
 ) -> LRScheduler:
@@ -106,7 +124,9 @@ def get_scheduler(
             optimizer, lr_lambda=lambda epoch: 1.0
         )
 
-    if sched_conf.type == "CosineAnnealingLR":
+    if sched_conf.type == "CosineAnnealingLR" and sched_conf.hold_after_tmax:
+        scheduler = cosine_then_hold(optimizer, sched_conf.tmax, sched_conf.eta_min)
+    elif sched_conf.type == "CosineAnnealingLR":
         scheduler = optim.lr_scheduler.CosineAnnealingLR(
             optimizer, T_max=sched_conf.tmax, eta_min=sched_conf.eta_min
         )
