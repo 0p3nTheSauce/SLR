@@ -4,7 +4,7 @@ import sys
 
 # from .server import connect_manager
 # from que.shell import QueShell
-from src.que.core import QUE_LOCATIONS, GenExp, Que
+from src.que.core import QUE_LOCATIONS, RUN_PATH, GenExp, Que
 from src.run_types import (
     CompExpInfo,
     ExpInfo,
@@ -31,12 +31,12 @@ def update_runs_que_template():
 
     key_set = []
     q.update_runs(key_set, ident)
-    q.save_state("/home/luke/Code/SLR/src/que/Runs_updated.json")
+    q.save_state(RUN_PATH.with_name("Runs_updated.json"))
 
 
 def update_runs_json_template():
     """Update Json directly"""
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+    with open(RUN_PATH, "r") as f:
         all_runs = json.load(f)
 
     for loc in QUE_LOCATIONS:
@@ -57,13 +57,13 @@ def update_runs_json_template():
 
         all_runs[loc] = new_quelist
 
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
+    with open(RUN_PATH.with_name("Runs_fixed.json"), "w") as f:
         json.dump(all_runs, f, indent=4)
 
 
 def update_runs_json():
     """Update Json directly"""
-    with open("/home/luke/Code/SLR/src/que/Runs.json", "r") as f:
+    with open(RUN_PATH, "r") as f:
         all_runs = json.load(f)
 
     for loc in QUE_LOCATIONS:
@@ -87,7 +87,7 @@ def update_runs_json():
 
         all_runs[loc] = new_quelist
 
-    with open("/home/luke/Code/SLR/src/que/Runs_fixed.json", "w") as f:
+    with open(RUN_PATH.with_name("Runs_fixed.json"), "w") as f:
         json.dump(all_runs, f, indent=4)
 
 

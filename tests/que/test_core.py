@@ -409,3 +409,40 @@ class TestLoggingSetup:
         logger.info("epoch 1")
         assert "epoch 1" in (tmp_path / "Training.log").read_text()
         assert "epoch 1" not in (tmp_path / "Server.log").read_text()
+
+
+class TestMigrateLegacyFiles:
+    """Data and logs used to live beside the code in src/que/; the server moves them on startup."""
+
+    @pytest.fixture
+    def dirs(self, tmp_path: Path) -> tuple[Path, Path, Path]:
+        old = tmp_path / "que"
+        old.mkdir()
+        for name in ("Runs.json", "Server.json", "Runs_T.json", "Server_T.json", "Server.log"):
+            (old / name).write_text(name)
+        (old / "old_ques").mkdir()
+        (old / "core.py").write_text("code")
+        return old, tmp_path / "state", tmp_path / "logs"
+
+    def test_moves_data_and_logs_but_not_code(self, dirs: tuple[Path, Path, Path]) -> None:
+        old, state, logs = dirs
+        messages = core_module.migrate_legacy_files(old, state, logs)
+        assert sorted(p.name for p in state.iterdir()) == [
+            "Runs.json", "Runs_T.json", "Server.json", "Server_T.json", "old_ques"
+        ]
+        assert [p.name for p in logs.iterdir()] == ["Server.log"]
+        assert [p.name for p in old.iterdir()] == ["core.py"]
+        assert len(messages) == 6
+
+    def test_second_run_does_nothing(self, dirs: tuple[Path, Path, Path]) -> None:
+        core_module.migrate_legacy_files(*dirs)
+        assert core_module.migrate_legacy_files(*dirs) == []
+
+    def test_never_overwrites(self, dirs: tuple[Path, Path, Path]) -> None:
+        old, state, logs = dirs
+        state.mkdir()
+        (state / "Runs.json").write_text("newer")
+        messages = core_module.migrate_legacy_files(old, state, logs)
+        assert (state / "Runs.json").read_text() == "newer"
+        assert (old / "Runs.json").exists()
+        assert any(m.startswith("Not migrating") for m in messages)

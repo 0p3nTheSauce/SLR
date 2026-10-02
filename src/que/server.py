@@ -29,6 +29,7 @@ from src.que.core import (
     WorkerStateDict,
     atomic_write_json,
     is_sweep_complete,
+    migrate_legacy_files,
     read_server_state,
     setup_server_logging,
     # Process_states
@@ -448,6 +449,10 @@ def start_server(
     address: tuple[str, int] = ("localhost", 50000),
     authkey: bytes = b"abracadabra",
 ):
+    migrations = migrate_legacy_files()
+    setup_server_logging()
+    for message in migrations:
+        logging.getLogger(SERVER_NAME).info(message)
     setup_manager(stop_on_fail=stop_on_fail)
 
     # Note: We bind to localhost for security, change to 0.0.0.0 to expose externally

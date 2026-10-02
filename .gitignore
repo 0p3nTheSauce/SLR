@@ -16,6 +16,9 @@ src/media/
 src/weights/
 src/wandb/
 src/preprocessed/
+src/que/state/
+src/que/logs/
+# pre-2026-10-02 layout, until a server start migrates them (see core.migrate_legacy_files)
 src/que/Server.json
 src/que/Runs.json
 src/que/old_ques/

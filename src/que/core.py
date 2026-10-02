@@ -63,13 +63,17 @@ WORKER_NAME = "Worker"
 SERVER_NAME = "Server"
 TRAINING_NAME = "Training"
 
-RUN_PATH = QUE_DIR / "Runs.json"
-SERVER_STATE_PATH = QUE_DIR / "Server.json"
+# data and logs are kept apart from the code (both directories are gitignored)
+STATE_DIR = QUE_DIR / "state"
+LOG_DIR = QUE_DIR / "logs"
 
-TRAINING_LOG_PATH = QUE_DIR / "Training.log"
-SERVER_LOG_PATH = QUE_DIR / "Server.log"
+RUN_PATH = STATE_DIR / "Runs.json"
+SERVER_STATE_PATH = STATE_DIR / "Server.json"
 
-ARCHIVE_DIR = QUE_DIR / "old_ques"
+TRAINING_LOG_PATH = LOG_DIR / "Training.log"
+SERVER_LOG_PATH = LOG_DIR / "Server.log"
+
+ARCHIVE_DIR = STATE_DIR / "old_ques"
 
 WR_PATH = QUE_DIR / "worker.py"
 WR_MODULE_PATH = f"{QUE_DIR.name}.worker"
@@ -133,6 +137,41 @@ class Specification(BaseModel):
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
+
+
+def migrate_legacy_files(
+    old_dir: Path = QUE_DIR, state_dir: Path = STATE_DIR, log_dir: Path = LOG_DIR
+) -> list[str]:
+    """Move the Que's data and log files from `old_dir`, where they lived beside the code until
+    2026-10-02, into `state_dir`/`log_dir` (creating those). Idempotent.
+
+    A file already at its new location is never overwritten: the old one is left in place and
+    reported. Run only by the server at startup (see server.start_server), the files' owner --
+    never by a shell, which could move files out from under a server still on the old layout.
+
+    Returns:
+        list[str]: One message per file moved or left in place, to log once logging is set up
+            (it can't be before: the logs are among the files moved).
+    """
+    state_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    names = [
+        *((n, state_dir) for n in ("Runs.json", "Server.json", "old_ques")),
+        *((p.name, state_dir) for p in sorted(old_dir.glob("Runs_*.json"))),
+        *((p.name, state_dir) for p in sorted(old_dir.glob("Server_*.json"))),
+        *((n, log_dir) for n in ("Server.log", "Training.log")),
+    ]
+    messages = []
+    for name, new_dir in names:
+        old, new = old_dir / name, new_dir / name
+        if not old.exists():
+            continue
+        if new.exists():
+            messages.append(f"Not migrating {old}: {new} already exists")
+            continue
+        old.replace(new)
+        messages.append(f"Migrated {old} -> {new}")
+    return messages
 
 
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

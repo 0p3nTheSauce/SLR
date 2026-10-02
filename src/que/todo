@@ -72,13 +72,6 @@ Server:
 - redirect testing output to log file
 
 Files & logging:
-- data and log files live beside the code in src/que/: Runs.json, Server.json, Server.log,
-    Training.log, timestamped snapshots (Runs_<ts>.json/Server_<ts>.json, some git-tracked) and
-    old_ques/. Move them to their own (gitignored) directory, e.g. src/que/state/ and
-    src/que/logs/. Every path comes from the constants at the top of core.py (RUN_PATH,
-    SERVER_STATE_PATH, SERVER_LOG_PATH, TRAINING_LOG_PATH, ARCHIVE_DIR), so the code change is
-    small; the existing files need moving on the server (with the service stopped) and
-    .gitignore/README updating. Decide whether the tracked snapshots stay in git.
 - no log rotation: on 2026-10-02 Training.log was 26 MB and Server.log 1.7 MB, growing forever.
     Several processes (server, supervisor, worker) append to Server.log through separate
     FileHandlers, so RotatingFileHandler isn't safe across them -- use logrotate (copytruncate)

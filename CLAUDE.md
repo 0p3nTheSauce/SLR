@@ -36,6 +36,8 @@ The pytest suite lives in `tests/` (configured via `[tool.pytest.ini_options]` i
   `tests/que/test_server.py`'s `start_server` fixture does the same for a real `ServerContext`.
 - `setup_server_logging`/`setup_training_logging` (`src/que/core.py`) configure global loggers;
   tests calling them must restore those (see `TestLoggingSetup` in `tests/que/test_core.py`).
+- The Que's live data and logs are in `src/que/state/` and `src/que/logs/` (see the "Files"
+  section of `src/que/README.md`) — tests must never write there.
 - `QueShell` can be built in tests with a fake server by stubbing `_show_banner`,
   `_setup_history` and `tmux_manager` (see the `harness` fixture in `tests/que/test_shell.py`) —
   this avoids touching the real `~/.que_shell_history`.
