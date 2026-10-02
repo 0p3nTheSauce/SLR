@@ -9,6 +9,7 @@ import functools
 import json
 import logging
 import os
+import sys
 import tempfile
 import threading
 import time
@@ -1622,7 +1623,7 @@ def connect_manager(
             m.connect()
             return m  # type: ignore[return-value]
         except ConnectionRefusedError:
-            print(f"Queue server not ready, retrying in {retry_delay}s...")
+            print(f"Queue server not ready, retrying in {retry_delay}s...", file=sys.stderr)
             time.sleep(retry_delay)
 
     raise RuntimeError("Cannot connect to Queue server.")
