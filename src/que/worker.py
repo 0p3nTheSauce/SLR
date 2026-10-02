@@ -23,7 +23,6 @@ from src.que.core import (
     CompExpInfo,
     Que,
     QueException,
-    ServerContextProtocol,
     SweepInfo,  # now also carries model/split/dataset -- see note below
     WorkerStateDict,
     connect_manager,
@@ -97,8 +96,6 @@ class Worker:
         self.do_traceback = do_traceback
         self.sweep_info: SweepInfo | None = None
         self._trial_error: Exception | None = None
-        self._trial_finished = False
-        self.server_context: ServerContextProtocol | None = None
         self.server_logger.info("Worker initialized")
 
 
@@ -159,7 +156,6 @@ class Worker:
 
         # prepare next run (move from to_run -> cur_run)
         run_sum = self.que.stash_next_run()
-        self.que.save_state()
 
         # print a seperator between runs
         self.server_logger.info(self.seperator(run_sum))
@@ -183,9 +179,7 @@ class Worker:
         self.state['current_run_id'] = run.id
 
         self.server_logger.info("saving my id")
-        _ = self.que.pop_cur_run()
-        self.que.set_cur_run(info)
-        self.que.save_state()
+        self.que.replace_cur_run(info)
 
         self.server_logger.info(f"Run ID: {run.id}")
         self.server_logger.info(f"Run name: {run.name}")  # Human-readable name
@@ -256,7 +250,6 @@ class Worker:
         )
         self.server_logger.debug(f"Injecting run: {json.dumps(config.model_dump())}")
         self.que.add_new_run(config, wandb_i, loc=CUR_RUN) # inject directly into cur_run, and skip the move from to_run -> cur_run step in _train, since the sweep controller already sampled the hyperparameters for this trial
-        self.que.save_state()
 
     def _sweep_train(self) -> None:
         """Callback passed to wandb.agent(function=...). Runs in-process, in
@@ -275,7 +268,9 @@ class Worker:
         run already reached cur_run (which also makes Worker.start() skip
         testing), and saved to `_trial_error` for Worker.sweep() to re-raise
         once wandb.agent returns. A trial that finishes -- naturally or via a
-        hyperband stop -- sets `_trial_finished` so Worker.sweep() reports it.
+        hyperband stop -- is left in cur_run for Worker.start() to test; it
+        counts towards the sweep's progress once it reaches old_runs (see
+        ServerContext.sweep_completed_runs).
         """
         if not gpu_manager.wait_for_completion(
             check_interval=10,
@@ -296,16 +291,13 @@ class Worker:
                     f"Sweep trial {self.state['current_run_id']} was stopped early by wandb (e.g. hyperband "
                     "early-terminate); continuing to testing with the last saved checkpoint"
                 )
-                self._trial_finished = True
                 return
             self._fail(e, "Sweep trial failed due to an error")
             if self.que.len_loc(CUR_RUN) == 1:
                 self.que.stash_failed_run(self.build_exception_info(e))
-                self.que.save_state()
             self._trial_error = e
             return
 
-        self._trial_finished = True
         self.server_logger.info("_sweep_train method completed successfully")
 
     def _run_sweep_trial(self) -> None:
@@ -399,22 +391,10 @@ class Worker:
         except Exception as e:
             self._fail(e, "Training run failed due to an error")
             self.que.stash_failed_run(str(e))
-            self.que.save_state()
             raise
         finally:
             self.cleanup()
             self.state['task'] = "inactive"
-
-    def _register_sweep_trial_completion(self, sweep_info: SweepInfo) -> None:
-        """Report a finished trial (naturally or via a wandb hyperband early-stop) to the server,
-        the sweep counterpart of Que.store_fin_run. Deciding whether the sweep is complete is the
-        Daemon's job, before it hands out the next trial.
-        """
-        assert self.server_context is not None, "_register_sweep_trial_completion called before start()"
-        sweep_id = sweep_info["sweep_id"]
-        completed = self.server_context.register_sweep_trial(sweep_id)
-        if completed is not None:
-            self.training_logger.info(f"Sweep {sweep_id}: {completed} trials completed")
 
     def sweep(self, sweep_info: SweepInfo) -> None:
         """Run one sweep trial via wandb.agent.
@@ -425,7 +405,6 @@ class Worker:
         """
         self.sweep_info = sweep_info
         self._trial_error = None
-        self._trial_finished = False
         try:
             sweep_info_validate(sweep_info)
             self.training_logger.info(f"Starting sweep trial: {sweep_info['sweep_id']}")
@@ -437,8 +416,6 @@ class Worker:
                 function=self._sweep_train,
                 count=1,
             )
-            if self._trial_finished:
-                self._register_sweep_trial_completion(sweep_info)
         except (QueException, ValidationError) as e:
             self._fail(e, f"{type(e).__name__} — cannot continue")
             raise
@@ -453,7 +430,6 @@ class Worker:
             self._fail(e, "Sweep trial failed due to an error")
             if self.que.len_loc(CUR_RUN) == 1:
                 self.que.stash_failed_run(str(e))
-                self.que.save_state()
             raise
         finally:
             self.cleanup()
@@ -478,7 +454,6 @@ class Worker:
             err_str = self.build_exception_info(e)
             self._fail(e, "Testing run failed due to an error")
             self.que.stash_failed_run(err_str)
-            self.que.save_state()
             raise
         finally:
             self.cleanup()
@@ -494,7 +469,6 @@ class Worker:
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
-        self.server_context = manager.get_server_context()
 
         #update state
         self.state['working_pid'] = os.getpid()
@@ -516,8 +490,6 @@ class Worker:
             self.test()
         else:
             self.server_logger.warning("No run in cur_run. Skipping tests.")
-        
-        self.que.save_state()  # save state
 
 
 if __name__ == "__main__":
