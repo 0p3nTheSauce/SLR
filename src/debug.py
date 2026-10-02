@@ -69,7 +69,7 @@ def test_clear():
         print(e)
         
 def test_clear2():
-    q = Que(logger)
+    q = Que(logger, auto_save=False)
     try:
         q.clear_runs('cur_run')
     except Exception as e:
@@ -234,7 +234,7 @@ def _safe_reformat_conf(model_exp_c:str) -> str:
         return model_exp_c
 
 def reformat_runs_json(runs:str):
-    q= Que(_get_basic_logger(), runs_path = runs)
+    q= Que(_get_basic_logger(), runs_path = runs, auto_save=False)
     ks = ['admin', 'save_path']
     ks2 = ['admin']
     ks3 = ['admin', 'weight_path']

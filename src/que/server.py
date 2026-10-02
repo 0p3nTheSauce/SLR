@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 
 # from multiprocessing.managers import BaseManager
@@ -15,6 +14,7 @@ from pathlib import Path
 from src.que.core import (
     DAEMON_NAME,
     QUE_NAME,
+    RUN_PATH,
     # ProcessNames,
     SERVER_LOG_PATH,
     SERVER_NAME,
@@ -28,8 +28,9 @@ from src.que.core import (
     SweepInfo,
     SweepProgressDict,
     WorkerStateDict,
+    atomic_write_json,
+    is_sweep_complete,
     read_server_state,
-    sweep_progress_validate,
     # Process_states
     timestamp_path,
 )
@@ -41,6 +42,11 @@ class ServerContext:
     """
     Holds the Singleton instances of the Daemon, Worker, and State.
     This prevents relying on loose global variables.
+
+    The server can die at any moment (e.g. a power outage, after which systemd restarts it), so
+    its state is saved whenever it changes: the Que saves itself (see Que), and the server state
+    (sweep config, daemon flags) is saved by the methods that change it. Sweep progress isn't
+    stored at all -- it's derived from the Que (see sweep_completed_runs), so it can't drift.
     """
 
     def __init__(
@@ -50,6 +56,7 @@ class ServerContext:
         stop_on_fail: bool = True,
         awake: bool = False,
         server_state_path: str | Path = SERVER_STATE_PATH,
+        runs_path: str | Path = RUN_PATH,
     ):
         # context attributes
         self.save_on_shutdown: bool = save_on_shutdown
@@ -77,8 +84,7 @@ class ServerContext:
 
         # Classes
         self.sweep: dict = {}
-        self.sweep_progress: SweepProgressDict = sweep_progress_validate({})
-        self.que = Que(logger=que_logger)
+        self.que = Que(logger=que_logger, runs_path=runs_path)
         self.worker = Worker(
             server_logger=worker_logger,
             que=self.que,
@@ -165,21 +171,35 @@ class ServerContext:
             sweep=self.sweep,
             daemon_state=self.daemon.get_state(),
             worker_state=self.worker.get_state(),
-            sweep_progress=self.sweep_progress,
+            sweep_progress=SweepProgressDict(completed_runs=self.sweep_completed_runs()),
         )
 
+    def sweep_completed_runs(self) -> int:
+        """The active sweep's finished trials: its runs in old_runs (0 if no sweep is set).
+
+        Counted from the Que on every call rather than stored, so it always matches the Que --
+        including after shell edits (remove, recover, ...) and unclean restarts. A trial that
+        fails (in training or testing) lands in fail_runs instead, so doesn't count.
+        """
+        if not self.sweep:
+            return 0
+        return self.que.len_sweep_runs(self.sweep["sweep_id"])
+
     def set_sweep(self, sweep: SweepInfo | dict) -> None:
-        """Sets the sweep information for the server context, resetting the completed-trial counter.
+        """Set (or, with `{}`, clear) the active sweep, and save the server state.
+
+        Trials of the sweep already in old_runs count towards its progress, so re-setting a
+        sweep resumes it where it left off.
 
         Args:
             sweep (SweepInfo | dict): Sweep information to set.
         """
         self.sweep.clear()
         self.sweep.update(sweep)
-        self.sweep_progress["completed_runs"] = 0
+        self.save_state()
 
     def set_sweep_max_runs(self, max_runs: int | None) -> int | None:
-        """Change the active sweep's trial cap without resetting its completed-trial counter.
+        """Change the active sweep's trial cap, and save the server state.
 
         The Daemon checks the cap before handing out each trial, so the change applies from the
         next trial on. A cap at or below the completed count marks the sweep complete (the
@@ -201,27 +221,12 @@ class ServerContext:
             raise ValueError(f"max_runs must be at least 1, got {max_runs}")
         previous: int | None = self.sweep["max_runs"]
         self.sweep["max_runs"] = max_runs
+        self.save_state()
         return previous
-
-    def register_sweep_trial(self, sweep_id: str) -> int | None:
-        """Count one finished trial of `sweep_id` towards the active sweep's progress.
-
-        Called by the Worker when a trial finishes. A trial whose sweep was cleared or replaced
-        while it ran isn't counted.
-
-        Returns:
-            int | None: The new completed-trial count, or None if the trial wasn't counted.
-        """
-        if self.sweep.get("sweep_id") != sweep_id:
-            self.server_logger.warning(
-                f"Sweep {sweep_id} was cleared or replaced during its trial; not counting it."
-            )
-            return None
-        self.sweep_progress["completed_runs"] += 1
-        return self.sweep_progress["completed_runs"]
 
     def toggle_stop_on_fail(self) -> None:
         self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]
+        self.save_state()
 
     def _set_state(
         self,
@@ -240,7 +245,6 @@ class ServerContext:
             # do not reset server_pid after loading
             self.sweep.clear()
             self.sweep.update(server.sweep)
-            self.sweep_progress["completed_runs"] = server.sweep_progress["completed_runs"]
             self.daemon.set_state(server.daemon_state)
             self.worker.set_state(server.worker_state)
         if daemon is not None:
@@ -249,6 +253,8 @@ class ServerContext:
             self.worker.set_state(worker)
 
     def save_state(self, out_path: str | Path | None = None, timestamp: bool = False):
+        """Save the server state (atomically, see atomic_write_json) to `out_path`, default
+        `self.state_path`."""
         if out_path is None:
             out_path = self.state_path
         elif Path(out_path).exists() and not timestamp:
@@ -257,8 +263,7 @@ class ServerContext:
         if timestamp:
             out_path = timestamp_path(out_path)
 
-        with open(out_path, "w") as f:
-            json.dump(self.get_state().model_dump(), f)
+        atomic_write_json(out_path, self.get_state().model_dump())
 
         self.server_logger.info(f"Saved state to: {out_path}")
 
@@ -269,6 +274,8 @@ class ServerContext:
         id) are not restored: those describe processes, not configuration, and the ones in the
         file may be long gone (e.g. a snapshot taken mid-run before the server died), so the
         current values are kept. An 'awake' daemon relaunches its supervisor (see Daemon.set_state).
+        The saved sweep progress isn't restored either: it's derived from the Que, and only
+        checked against it (see _check_sweep_progress).
         """
         in_path = self.state_path if in_path is None else in_path
         if not Path(in_path).exists():
@@ -280,6 +287,7 @@ class ServerContext:
         try:
             state = read_server_state(in_path)
             self._keep_live_fields(state)
+            self._check_sweep_progress(state)
             self._set_state(state)
             self.server_logger.info(f"Loaded state from: {in_path}")
         except Exception as e:
@@ -296,6 +304,28 @@ class ServerContext:
         state.worker_state["task"] = self.worker.state["task"]
         state.worker_state["current_run_id"] = self.worker.state["current_run_id"]
         state.worker_state["working_pid"] = self.worker.state["working_pid"]
+
+    def _check_sweep_progress(self, state: ServerState) -> None:
+        """Warn if a loaded `state`'s saved sweep progress differs from the Que's count, which is
+        the one used (see sweep_completed_runs), and log if the sweep is complete.
+
+        A difference means the server died between a trial finishing and the state being saved
+        (or Runs.json was edited); before progress was derived from the Que, it left a 44/50 sweep
+        whose 50 trials were all in old_runs (2026-10-02).
+        """
+        if not state.sweep:
+            return
+        sweep_id = state.sweep["sweep_id"]
+        saved = state.sweep_progress["completed_runs"]
+        completed = self.que.len_sweep_runs(sweep_id)
+        if saved != completed:
+            self.server_logger.warning(
+                f"Sweep {sweep_id}: saved progress was {saved} trials, but old_runs holds "
+                f"{completed}; using the Que's count"
+            )
+        max_runs = state.sweep.get("max_runs")
+        if is_sweep_complete(max_runs, completed):
+            self.server_logger.info(f"Sweep {sweep_id} is complete ({completed}/{max_runs})")
 
 
 # --- Registration Logic ---
@@ -349,11 +379,6 @@ def setup_manager(stop_on_fail: bool = True):
         proxytype=DictProxy,
     )
 
-    QueManager.register(
-        "get_sweep_progress",
-        callable=lambda: context.sweep_progress,
-        proxytype=DictProxy,
-    )
 
 
 # --- Server Startup ---

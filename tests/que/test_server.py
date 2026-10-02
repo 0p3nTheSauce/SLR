@@ -8,27 +8,37 @@ import pytest
 from factories import MakeQue, comp_run, exp_run, failed_run, silent_logger
 
 from src.que import server as server_module
-from src.que.core import NoSweepSet, Que, ServerState, SweepInfo
+from src.que.core import NoSweepSet, Que, ServerState, SweepInfo, read_server_state
 from src.que.server import ServerContext
 from src.run_types import WandbInfo
 
 
 def make_context(sweep: dict[str, Any], completed: int) -> SimpleNamespace:
-    """Stand-in for ServerContext: its constructor installs signal handlers and real logging."""
+    """Stand-in for ServerContext (see start_server below for a real one), with `completed`
+    finished trials of any sweep in its Que. Records each save_state call in `saves`."""
     logger = logging.getLogger("test_server")
     logger.propagate = False
-    return SimpleNamespace(
-        sweep=sweep, sweep_progress={"completed_runs": completed}, server_logger=logger
+    ctx = SimpleNamespace(
+        sweep=sweep,
+        que=SimpleNamespace(len_sweep_runs=lambda sweep_id: completed),
+        server_logger=logger,
+        saves=0,
     )
+
+    def save_state() -> None:
+        ctx.saves += 1
+
+    ctx.save_state = save_state
+    return ctx
 
 
 class TestSetSweepMaxRuns:
-    def test_updates_cap_and_keeps_progress(self) -> None:
+    def test_updates_cap_and_saves(self) -> None:
         ctx = make_context({"sweep_id": "abc", "max_runs": 50}, completed=49)
         previous = ServerContext.set_sweep_max_runs(ctx, 60)  # type: ignore[arg-type]
         assert previous == 50
         assert ctx.sweep["max_runs"] == 60
-        assert ctx.sweep_progress["completed_runs"] == 49
+        assert ctx.saves == 1
 
     def test_can_set_unlimited(self) -> None:
         ctx = make_context({"sweep_id": "abc", "max_runs": 50}, completed=10)
@@ -53,28 +63,20 @@ class TestSetSweepMaxRuns:
         with pytest.raises(ValueError):
             ServerContext.set_sweep_max_runs(ctx, max_runs)  # type: ignore[arg-type]
         assert ctx.sweep["max_runs"] == 50
+        assert ctx.saves == 0
 
     def test_raises_without_sweep(self) -> None:
         with pytest.raises(NoSweepSet):
             ServerContext.set_sweep_max_runs(make_context({}, completed=0), 10)  # type: ignore[arg-type]
 
 
-class TestRegisterSweepTrial:
-    def test_counts_trial_of_active_sweep(self) -> None:
+class TestSweepCompletedRuns:
+    def test_counts_active_sweeps_finished_trials(self) -> None:
         ctx = make_context({"sweep_id": "abc", "max_runs": 50}, completed=4)
-        assert ServerContext.register_sweep_trial(ctx, "abc") == 5  # type: ignore[arg-type]
-        assert ctx.sweep_progress["completed_runs"] == 5
+        assert ServerContext.sweep_completed_runs(ctx) == 4  # type: ignore[arg-type]
 
-    def test_does_not_clear_sweep_at_cap(self) -> None:
-        ctx = make_context({"sweep_id": "abc", "max_runs": 5}, completed=4)
-        ServerContext.register_sweep_trial(ctx, "abc")  # type: ignore[arg-type]
-        assert ctx.sweep["sweep_id"] == "abc"
-
-    @pytest.mark.parametrize("sweep", [{}, {"sweep_id": "other", "max_runs": 5}])
-    def test_ignores_cleared_or_replaced_sweep(self, sweep: dict[str, Any]) -> None:
-        ctx = make_context(sweep, completed=3)
-        assert ServerContext.register_sweep_trial(ctx, "abc") is None  # type: ignore[arg-type]
-        assert ctx.sweep_progress["completed_runs"] == 3
+    def test_zero_without_sweep(self) -> None:
+        assert ServerContext.sweep_completed_runs(make_context({}, completed=4)) == 0  # type: ignore[arg-type]
 
 
 class TestLoadState:
@@ -103,6 +105,7 @@ class TestLoadState:
         )
         ctx.loaded = None
         ctx._keep_live_fields = lambda state: ServerContext._keep_live_fields(ctx, state)  # type: ignore[arg-type]
+        ctx._check_sweep_progress = lambda state: None
         ctx._set_state = lambda state: setattr(ctx, "loaded", state)
         return ctx
 
@@ -118,13 +121,12 @@ class TestLoadState:
     def test_restores_sweep(self, ctx: SimpleNamespace) -> None:
         ServerContext.load_state(ctx)  # type: ignore[arg-type]
         assert ctx.loaded.sweep == self.SAVED.sweep
-        assert ctx.loaded.sweep_progress == {"completed_runs": 7}
 
     def test_reads_given_path(self, ctx: SimpleNamespace, tmp_path: Path) -> None:
         other = tmp_path / "other.json"
-        other.write_text(ServerState(sweep_progress={"completed_runs": 3}).model_dump_json())
+        other.write_text(ServerState(sweep={"sweep_id": "other"}).model_dump_json())
         ServerContext.load_state(ctx, other)  # type: ignore[arg-type]
-        assert ctx.loaded.sweep_progress == {"completed_runs": 3}
+        assert ctx.loaded.sweep == {"sweep_id": "other"}
 
     def test_missing_file_loads_nothing(self, ctx: SimpleNamespace, tmp_path: Path) -> None:
         ServerContext.load_state(ctx, tmp_path / "missing.json")  # type: ignore[arg-type]
@@ -158,8 +160,9 @@ def start_server(
         "_setup_logging",
         lambda self: tuple(silent_logger(f"test_{n}") for n in ("que", "daemon", "server", "worker")),
     )
-    monkeypatch.setattr(server_module, "Que", lambda logger: make_que())
-    return lambda: ServerContext(server_state_path=tmp_path / "Server.json")
+    return lambda: ServerContext(
+        server_state_path=tmp_path / "Server.json", runs_path=tmp_path / "Runs.json"
+    )
 
 
 def finish_sweep_trial(ctx: ServerContext, exp_no: str) -> None:
@@ -167,7 +170,6 @@ def finish_sweep_trial(ctx: ServerContext, exp_no: str) -> None:
     no explicit save afterwards, i.e. the server dies right after the trial."""
     wandb = WandbInfo(entity="e", project="p", run_id=exp_no, sweep_id=SWEEP["sweep_id"])
     ctx.que.add_new_run(exp_run(exp_no), wandb, loc="cur_run")
-    ctx.register_sweep_trial(SWEEP["sweep_id"])
     ctx.que.store_fin_run(comp_run(exp_no, SWEEP["sweep_id"]))
 
 
@@ -183,7 +185,6 @@ class TestSweepProgressRecovery:
     def test_finished_trial_survives_restart(self, start_server: StartServer) -> None:
         ctx = start_server()
         ctx.set_sweep(SWEEP)
-        ctx.save_state()  # isolate the trial from set_sweep's own persistence
         finish_sweep_trial(ctx, "r1")
 
         restarted = start_server()
@@ -199,10 +200,8 @@ class TestSweepProgressRecovery:
         que.fail_runs = [failed_run("failed", "abc")]
         que.cur_run = [exp_run("running", "abc")]
         que.save_state()
-        ctx = start_server()
-        ctx.set_sweep(SWEEP)
-        ctx.sweep_progress["completed_runs"] = 44
-        ctx.save_state()
+        saved = ServerState(sweep=SWEEP, sweep_progress={"completed_runs": 44})
+        (que.runs_path.parent / "Server.json").write_text(saved.model_dump_json())
         return start_server
 
     def test_startup_takes_progress_from_que(self, drifted: StartServer) -> None:
@@ -219,3 +218,31 @@ class TestSweepProgressRecovery:
         warnings = [r.message for r in caplog.records if r.levelno == logging.WARNING]
         assert any("44" in m and "50" in m for m in warnings), warnings
         assert any("abc" in r.message and "complete" in r.message for r in caplog.records)
+
+    def test_progress_follows_que_edits(self, start_server: StartServer) -> None:
+        ctx = start_server()
+        ctx.set_sweep(SWEEP)
+        finish_sweep_trial(ctx, "r1")
+        finish_sweep_trial(ctx, "r2")
+        assert ctx.get_state().sweep_progress["completed_runs"] == 2
+        ctx.que.remove_run("old_runs", 0)
+        assert ctx.get_state().sweep_progress["completed_runs"] == 1
+
+    def test_resetting_sweep_resumes_its_progress(self, start_server: StartServer) -> None:
+        ctx = start_server()
+        ctx.set_sweep(SWEEP)
+        finish_sweep_trial(ctx, "r1")
+        ctx.set_sweep({})
+        assert ctx.get_state().sweep_progress["completed_runs"] == 0
+        ctx.set_sweep(SWEEP)
+        assert ctx.get_state().sweep_progress["completed_runs"] == 1
+
+    def test_sweep_and_daemon_settings_survive_restart(self, start_server: StartServer) -> None:
+        ctx = start_server()
+        ctx.set_sweep(SWEEP)
+        ctx.set_sweep_max_runs(60)
+        stop_on_fail = ctx.daemon.state["stop_on_fail"]
+        ctx.toggle_stop_on_fail()
+        saved = read_server_state(ctx.state_path)
+        assert saved.sweep["max_runs"] == 60
+        assert saved.daemon_state["stop_on_fail"] is not stop_on_fail

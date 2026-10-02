@@ -87,6 +87,8 @@ class TestSupervise:
         env = SimpleNamespace(
             to_run=[0],  # to_run length per supervisor iteration; stops after the last
             sweep={},
+            completed=0,  # the sweep's finished trials in the Que
+            saves=0,
             # what the manager's worker-state proxy points at, i.e. the real shared state
             shared_worker_state=WorkerStateDict(
                 task="training", current_run_id="abc", working_pid=123, exception=None
@@ -98,12 +100,17 @@ class TestSupervise:
                 stop.set()
             return env.to_run.pop(0)
 
+        def save_state() -> None:
+            env.saves += 1
+
         manager = SimpleNamespace(
             get_daemon_state=lambda: {"awake": True, "stop_on_fail": True, "supervisor_pid": 1},
             get_que=lambda: SimpleNamespace(len_loc=len_loc),
             get_worker_state=lambda: env.shared_worker_state,
             get_sweep=lambda: env.sweep,
-            get_sweep_progress=lambda: {"completed_runs": 0},
+            get_server_context=lambda: SimpleNamespace(
+                sweep_completed_runs=lambda: env.completed, save_state=save_state
+            ),
         )
         monkeypatch.setattr(daemon_module, "connect_manager", lambda: manager)
         monkeypatch.setattr(daemon_module, "Process", FakeProcess)
@@ -163,3 +170,17 @@ class TestSupervise:
         assert setup.shared_worker_state == WorkerStateDict(
             task="inactive", current_run_id=None, working_pid=None, exception=None
         )
+
+    def test_complete_sweep_counted_from_que_is_not_handed_off(self, setup: SimpleNamespace) -> None:
+        """On 2026-10-02 a stale counter (44/50) let the Daemon hand out a 51st trial."""
+        setup.to_run = [0, 0]
+        setup.sweep = {"sweep_id": "abc", "max_runs": 50}
+        setup.completed = 50
+        setup.daemon.supervise()
+        assert FakeProcess.started == []
+
+    def test_saves_server_state_after_each_worker(self, setup: SimpleNamespace) -> None:
+        setup.to_run = [1, 1, 0]
+        setup.daemon.supervise()
+        assert len(FakeProcess.started) == 2
+        assert setup.saves == 2

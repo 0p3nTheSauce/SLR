@@ -167,10 +167,12 @@ class Daemon:
         The worker process is started and monitored here. After it completes successfully, it is restarted.
         If it crashes and 'stop_on_fail' is True, the supervisor exits without restarting.
 
-        Before each launch the shared sweep, its progress and to_run are re-read to decide whether
-        the worker gets a sweep trial or a Que run (see sweep_to_hand_off), so edits made via the
-        shell (e.g. `daemon set_max_runs`) apply from the next worker on. When there is neither,
-        no worker is launched: the supervisor idles, polling until work arrives (see _idle).
+        Before each launch the shared sweep, its progress (counted from the Que, see
+        ServerContext.sweep_completed_runs) and to_run are re-read to decide whether the worker
+        gets a sweep trial or a Que run (see sweep_to_hand_off), so edits made via the shell (e.g.
+        `daemon set_max_runs`) apply from the next worker on. When there is neither, no worker is
+        launched: the supervisor idles, polling until work arrives (see _idle). After each worker
+        exits the server state is saved, so the copy on disk stays current if the server dies.
 
         Args:
             recover_run (bool, optional): Wether to recover the last failed run. Defaults to False.
@@ -184,7 +186,7 @@ class Daemon:
         # self.worker is a pickled copy in this process, so its .state is too: write to the proxy
         self.worker_state = manager.get_worker_state()
         sweep = manager.get_sweep()
-        sweep_progress = manager.get_sweep_progress()
+        server_context = manager.get_server_context()
         # handle automatic recovery
         if recover_run:
             self.que.recover_run()
@@ -198,7 +200,7 @@ class Daemon:
             try:
                 to_run_len = self.que.len_loc(TO_RUN)
                 sweep_info = self._next_sweep(
-                    dict(sweep), sweep_progress["completed_runs"], to_run_len
+                    dict(sweep), server_context.sweep_completed_runs(), to_run_len
                 )
                 if sweep_info is None and to_run_len == 0:
                     self._idle()
@@ -211,7 +213,9 @@ class Daemon:
                 worker_pid = self.worker_process.pid
                 self.logger.info(f"Worker started with PID: {worker_pid}")
 
-                if not self.monitor_worker():
+                restart = self.monitor_worker()
+                server_context.save_state()
+                if not restart:
                     break
 
                 self.worker.cleanup()

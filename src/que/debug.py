@@ -23,7 +23,7 @@ logger.propagate = False  # don't also send to root's (possibly broken) handlers
 def update_runs_que_template():
     """Use the Que.update_runs method to apply a function to runs"""
 
-    q = Que()
+    q = Que(auto_save=False)  # writes to Runs_updated.json below, not back to Runs.json
 
     def ident(x):
         # replace with custom function
