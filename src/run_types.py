@@ -1,44 +1,44 @@
 from __future__ import annotations
+
+from collections.abc import Iterable
+from pathlib import Path
 from typing import (
-    TypeGuard,
-    Literal,
-    Optional,
-    Union,
-    List,
-    Tuple,
     Annotated,
     Any,
-    Dict,
+    Literal,
     TypeAlias,
+    TypeGuard,
     TypeVar,
-    Type,
-    get_origin,
+    Union,
     get_args,
+    get_origin,
 )
+
 from pydantic import (
     BaseModel,
-    Field,
-    model_validator,
-    computed_field,
-    field_validator,
     ConfigDict,
+    Field,
+    computed_field,
+    model_validator,
 )
 from pydantic_core import PydanticUndefined
-from pathlib import Path
+
 # constants
 #wandb
 ENTITY = "ljgoodall2001-rhodes-university"
 PROJECT_BASE = "WLASL"
 
 #Files
-LABEL_SUFFIX = "instances_fixed_frange_bboxes_len.json"
+LABEL_SUFFIX = "fixed_frange_bboxes.json"
+
 NUM_INSTANCES_SUFFIX = "num_instances.json"
-WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_004.json"
+WORST_INSTANCES_SUFFIX = "f1-score_MViTv2_B_32x3_asl2000_cutoff_9_004.json"
 ZFILL = 3
 CONFIG_FILETYPE = ".toml"
 #Directories
-SLR_ROOT = Path.home() / "Code/SLR"
-SRC_ROOT = SLR_ROOT / "src"
+CURRENT_FILE = Path(__file__).resolve()
+SRC_ROOT = CURRENT_FILE.parent
+SLR_ROOT = SRC_ROOT.parent
 CLASSES_PATH = SRC_ROOT / "info/wlasl_class_list.json"
 RUNS_PATH = SRC_ROOT / "runs"
 CONFIGS_PATH = SRC_ROOT / "configfiles"
@@ -46,23 +46,32 @@ WLASL_ROOT = SLR_ROOT / "data/WLASL"
 LABELS_PATH = WLASL_ROOT  / "preprocessed/labels"
 RAW_DIR = WLASL_ROOT / "WLASL2000"
 SPLIT_DIR = WLASL_ROOT / "splits"
+RESULTS_DIR = SRC_ROOT / 'results'
+RESULTS_OUTPUTS = RESULTS_DIR / 'outputs'
 # Misc
 SEED = 42
+
 
 
 ### for model normalisation
 
 
 class NormDict(BaseModel):
-    mean: Tuple[float, float, float]
-    std: Tuple[float, float, float]
+    mean: tuple[float, float, float]
+    std: tuple[float, float, float]
 
 
 ####################### Data loading and augmentation #############################
 
 AVAIL_SETS : TypeAlias = Literal["train", "val", "test"]
 ORIGINAL_SPLITS : TypeAlias = Literal["asl100", "asl300", "asl1000", "asl2000"]
-AVAIL_SPLITS : TypeAlias = Union[Literal["asl100_bottom", "asl100_worst"], ORIGINAL_SPLITS]
+#Splits with different frame cuttoff
+CUTOFF_SPLITS : TypeAlias = Literal["asl100_cutoff_9", "asl300_cutoff_9", "asl1000_cutoff_9", "asl2000_cutoff_9"]
+CUTOFF_9_NAMES : list[CUTOFF_SPLITS] = ["asl100_cutoff_9", "asl300_cutoff_9", "asl1000_cutoff_9", "asl2000_cutoff_9"]
+#Splits reconstructed from the worst and fewest classes
+WORST_SPLITS : TypeAlias = Literal["asl100_bottom", "asl100_worst"]
+
+AVAIL_SPLITS : TypeAlias =  ORIGINAL_SPLITS | CUTOFF_SPLITS | WORST_SPLITS
 
 ### Samplers
 
@@ -127,7 +136,7 @@ class SpeedSampler(BaseSampler):
     speed_max: float = 1.2
 
     @model_validator(mode="after")
-    def check_speeds(self) -> "SpeedSampler":
+    def check_speeds(self) -> SpeedSampler:
         if self.speed_min > self.speed_max:
             raise ValueError("speed_min cannot be > speed_max")
         return self
@@ -137,17 +146,7 @@ def is_sampler_config(config: TemporalAugs) -> TypeGuard[SamplerConfig]:
     return config.type in SAMPLER_TYPES
 
 SamplerConfig = Annotated[
-    Union[
-        UniformSampler,
-        WobbledSampler,
-        SpeedSampler,
-        FocalNormalSampler,
-        FocalLaplaceSampler,
-        FocalBetaSampler,
-        ChunkedSampler,
-        PadFramesT,
-        OG_Sampler,
-    ],
+    UniformSampler | WobbledSampler | SpeedSampler | FocalNormalSampler | FocalLaplaceSampler | FocalBetaSampler | ChunkedSampler | PadFramesT | OG_Sampler,
     Field(discriminator="type"),
 ]
 
@@ -156,7 +155,7 @@ SamplerConfig = Annotated[
 
 class ShuffleT(BaseModel):
     type: Literal["shuffle"] = "shuffle"
-    num_frames: Optional[int] = None
+    num_frames: int | None = None
 
 
 class ReverseT(BaseModel):
@@ -164,14 +163,14 @@ class ReverseT(BaseModel):
     probability: float = 0.5
 
 
-TemporalTransforms = Annotated[Union[ShuffleT, ReverseT], Field(discriminator="type")]
+TemporalTransforms = Annotated[ShuffleT |  ReverseT, Field(discriminator="type")]
 
 TEMPORAL_TYPES = {"shuffle", "reverse"}
 def is_temporal_config(config: TemporalAugs) -> TypeGuard[TemporalTransforms]:
     return config.type in TEMPORAL_TYPES
 
 TemporalAugs = Annotated[
-    Union[TemporalTransforms, SamplerConfig], Field(discriminator="type")
+    TemporalTransforms | SamplerConfig, Field(discriminator="type")
 ]
 
 
@@ -201,7 +200,7 @@ class RandomResizedConfig(CropConfig):
 
 
 CropTransforms = Annotated[
-    Union[CentreCropConfig, RandomCropConfig, ScaleAndPadConfig, RandomResizedConfig],
+    CentreCropConfig | RandomCropConfig | ScaleAndPadConfig | RandomResizedConfig,
     Field(discriminator="type"),
 ]
 
@@ -244,14 +243,7 @@ class RandAugConfig(BaseModel):
 
 
 SpatialTransforms = Annotated[
-    Union[
-        AutoAugmentConfig,
-        RandAugConfig,
-        HorizontalFlipConfig,
-        RandomGrayscaleConfig,
-        GaussianBlurConfig
-        
-    ],
+    AutoAugmentConfig | RandAugConfig | HorizontalFlipConfig | RandomGrayscaleConfig | GaussianBlurConfig,
     Field(discriminator="type"),
 ]
 
@@ -261,7 +253,7 @@ def is_spatial_transform_config(config: SpatialAugs) -> TypeGuard[SpatialTransfo
     return config.type in SPATIAL_TYPES
 
 SpatialAugs = Annotated[
-    Union[CropTransforms, SpatialTransforms],
+    CropTransforms | SpatialTransforms,
     Field(discriminator="type"),
 ]
 
@@ -272,21 +264,21 @@ class AugInfo(BaseModel):
     Attributes:
         normalise (bool): Flag to fetch norm values during config parsing. Default False.
         norm_dict (Optional[NormDict]): Supplied Normalisation values. Default None.
-        temporal_aug (List[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
-        spatial_aug (List[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
+        temporal_aug (list[TemporalAugs]): Temporal augmentations to be applied in order. Default [].
+        spatial_aug (list[SpatialAugs]): Spatial augmentations to be applied in order. Default [].
         strict_size (bool): Validate that at least one frame sampler and crop strategy is defined. Default True.
     """
 
     normalise: bool = False
-    norm_dict: Optional[NormDict] = None
-    temporal_aug: List[TemporalAugs] = []
-    spatial_aug: List[SpatialAugs] = []
+    norm_dict: NormDict | None = None
+    temporal_aug: list[TemporalAugs] = []
+    spatial_aug: list[SpatialAugs] = []
     strict_size: bool = True
-    target_length: Optional[int] = None
-    frame_size: Optional[int] = None
+    target_length: int | None = None
+    frame_size: int | None = None
 
     @model_validator(mode="after")
-    def _validate_augs(self) -> "AugInfo":
+    def _validate_augs(self) -> AugInfo:
         if not self.strict_size:
             return self
 
@@ -305,16 +297,15 @@ class AugInfo(BaseModel):
 
         return self
 
-
 class DataInfo(BaseModel):
-    train_augs: Optional[AugInfo] = None
-    test_augs: Optional[AugInfo] = None
+    train_augs: AugInfo | None = None
+    test_augs: AugInfo | None = None
     strict_size: bool = True  # from config
-    target_length: Optional[int] = None
-    frame_size: Optional[int] = None
+    target_length: int | None = None
+    frame_size: int | None = None
 
     @model_validator(mode="after")
-    def check_frame_strat(self) -> "DataInfo":
+    def check_frame_strat(self) -> DataInfo:
         if not self.strict_size:
             return self
 
@@ -338,36 +329,43 @@ class DataInfo(BaseModel):
 
 
 ########################## Early stopping #############################
+StoppingMetrics: TypeAlias = Literal["loss", "acc"]
+StoppingPhases: TypeAlias = Literal['val', 'train']
+StoppingModes: TypeAlias = Literal["min", "max"]
 
 
-class StopperOn(BaseModel):
-    metric: Union[Tuple[str, str], List[str]]
-    mode: str
+class EarlyStopperInfo(BaseModel):
+    type: Literal['early_stopper'] = 'early_stopper'
+    metric: StoppingMetrics
+    phase: StoppingPhases = 'val'
+    mode: StoppingModes
     patience: int
     min_delta: float
 
+    @model_validator(mode="after")
+    def _config_precheck(self) -> EarlyStopperInfo:
+        if self.patience <= 0:
+            raise ValueError(
+                f"Patience must be a positive integer, got {self.patience}"
+            )
+        if self.min_delta < 0:
+            raise ValueError(
+                f"Min delta must be non-negative, got {self.min_delta}"
+            )
+        return self
 
-class StopperState(BaseModel):
-    on: bool
-    phase: str
-    metric: str
-    mode: str
-    patience: int
-    min_delta: float
-    curr_epoch: int
-    best_score: Optional[float] = None
-    best_epoch: int
-    counter: int
-    stop: bool
-    stopped_by_event: bool
-
+class StopperState(EarlyStopperInfo):
+    best_score: float | None = None
+    best_epoch: int = 0
+    counter: int = 0
+    stop: bool = False
 
 ####################### Models #############################
 
 
 class MinInfo(BaseModel):
     model: str
-    dataset: str
+    dataset: str = "WLASL"
     split: AVAIL_SPLITS
     save_path: str
     seed: int = SEED
@@ -377,7 +375,7 @@ class AdminInfo(MinInfo):
     exp_no: str
     recover: bool
     config_path: str
-    weight_path: Optional[str] = None
+    weight_path: str | None = None
 
 
 class TrainingInfo(BaseModel):
@@ -399,47 +397,8 @@ class OptimizerInfo(BaseModel):
     classifier_weight_decay: float
 
 
-TRAIN_TYPE: TypeAlias = Literal["supervised", "unsupervised"]
-
-
-class SupervisedInfo(BaseModel):
-    drop_p: Optional[float] = None
-    type: Literal["supervised"] = "supervised"
-
-
-class MVirTedInfo(BaseModel):
-    type: Literal["mvir_ted"] = "mvir_ted"
-    drop_p: Optional[float] = None
-    embed_dim: int = 512
-    num_heads: int = 8
-    num_layers: int = 4
-    max_frames: int = 64
-    mvit_out_dim: int = 768
-
-
-class UnsupervisedInfo(BaseModel):
-    type: Literal["unsupervised"] = "unsupervised"
-
-
-class MVirTedMaeInfo(BaseModel):
-    type: Literal["mvir_ted_mae"] = "mvir_ted_mae"
-    encoder_info: MVirTedInfo = MVirTedInfo()
-    mask_ratio: float = 0.5
-    embed_dim: int = 512
-
-SUPERVISED_TYPES = {"supervised"}
-PRETRAIN_TYPES = {"mvir_ted_mae"}
-
-def is_supervised_config(config: ModelInfo) -> TypeGuard[SupervisedInfo]:
-    return config.type in SUPERVISED_TYPES
-
-def is_pretrain_config(config: ModelInfo) -> TypeGuard[MVirTedMaeInfo]:
-    return config.type in PRETRAIN_TYPES
-
-ModelInfo = Annotated[
-    Union[SupervisedInfo, MVirTedInfo, MVirTedMaeInfo],
-    Field(discriminator="type"),
-]
+class ModelClassifierInfo(BaseModel):
+    drop_p: float | None = None
 
 
 class WarmUpSched(BaseModel):
@@ -451,13 +410,13 @@ class WarmUpSched(BaseModel):
     def _check_factors(self) -> WarmUpSched:
         if self.warmup_epochs < 0:
             raise ValueError("warmup_epochs must be non-negative")
-        if not (0 < self.start_factor < self.end_factor <= 1.0):
-            raise ValueError("start_factor must be > 0 and < end_factor <= 1.0")
+        if not (0 <= self.start_factor < self.end_factor <= 1.0):
+            raise ValueError(f"start_factor must be >= 0 and < end_factor <= 1.0, but got: start {self.start_factor} end {self.end_factor}")
         return self
 
 
 class SchedBase(BaseModel):
-    warm_up: Optional[WarmUpSched] = None
+    warm_up: WarmUpSched | None = None
 
 
 class WarmOnly(SchedBase):
@@ -485,13 +444,13 @@ class ReduceLROnPlateau(SchedBase):
     threshold: float
     threshold_mode: Literal["rel", "abs"]
     cooldown: int
-    min_lr: Union[List[float], float]
+    min_lr: list[float] | float
     eps: float
 
 
 # Discriminated union: pydantic dispatches on the 'type' field automatically
 SchedInfo = Annotated[
-    Union[WarmOnly, CosAnealInfo, WarmRestartInfo, ReduceLROnPlateau],
+    WarmOnly | CosAnealInfo | WarmRestartInfo | ReduceLROnPlateau,
     Field(discriminator="type"),
 ]
 
@@ -499,9 +458,9 @@ SchedInfo = Annotated[
 class WandbInfo(BaseModel):
     entity: str
     project: str
-    tags: List[str]
-    run_id: Optional[str] = None
-
+    tags: list[str] = []
+    run_id: str | None = None
+    sweep_id: str | None = None
 
 # Results
 
@@ -519,14 +478,14 @@ class BaseRes(BaseModel):
 
 
 class ShuffRes(BaseRes):
-    perm: List[int]
+    perm: list[int]
     shannon_entropy: float
 
 
 class ClassReport(BaseModel):
-    cls_report: Dict[str, Dict[str, float]]
-    all_targets: List[int]
-    all_preds: List[int]
+    cls_report: dict[str, dict[str, float]]
+    all_targets: list[int]
+    all_preds: list[int]
 
 class CompRes(BaseModel):
     check_name: str
@@ -562,20 +521,13 @@ class RunInfo(BaseModel):
     admin: AdminInfo
     training: TrainingInfo
     optimizer: OptimizerInfo
-    model_params: ModelInfo = Field(default_factory=SupervisedInfo)
+    model_params: ModelClassifierInfo 
     data: DataInfo
-    scheduler: Optional[SchedInfo] = None
-    early_stopping: Optional[StopperOn] = None
-
-    @field_validator("model_params", mode="before")
-    @classmethod
-    def _default_model_type(cls, v: Any) -> Any:
-        if isinstance(v, dict) and "type" not in v:
-            v = {"type": "supervised", **v}
-        return v
+    scheduler: SchedInfo | None = None
+    stopping: EarlyStopperInfo | None = None
 
     @model_validator(mode="after")
-    def _resolve_norms(self) -> "RunInfo":
+    def _resolve_norms(self) -> RunInfo:
         """Substitute norm_dict based on model name when norm=True."""
         from src.models import norm_vals
 
@@ -594,24 +546,18 @@ class CompExpInfo(ExpInfo):
     results: CompRes
 
 
-# class GenInfo(BaseModel):
-#     training: Optional[TrainingInfo] = None
-#     optimizer: Optional[OptimizerInfo] = None
-#     model_params: Optional[ModelParamsInfo] = None
-#     data: Optional[DataInfo] = None
-#     scheduler: Optional[SchedInfo] = None
-#     early_stopping: Optional[StopperOn] = None
 
-GenInfo: TypeAlias = Dict[str, Any]
+GenInfo: TypeAlias = dict[str, Any]
 
 
 class ResSet(BaseModel):
     spec: GenInfo
-    results: List[RunRes]
+    results: list[RunRes]
 
 
 class RunRes(BaseModel):
     admin: AdminInfo
+    wandb: WandbInfo
     results: CompRes
 
 
@@ -620,7 +566,7 @@ class FailedExp(ExpInfo):
 
 
 class SumarisedNew(BaseModel):
-    run_id: Optional[str] = None
+    run_id: str | None = None
     model: str
     exp_no: str
     dataset: str
@@ -629,35 +575,54 @@ class SumarisedNew(BaseModel):
 
 
 class Sumarised(SumarisedNew):
-    best_val_acc: Optional[float] = None
-    best_val_loss: Optional[float] = None
+    best_val_acc: float | None = None
+    best_val_loss: float | None = None
 
 
 class SummarisedRes(Sumarised):
-    test_top1_acc: Optional[float] = None
-    test_av_loss: Optional[float] = None
+    test_top1_acc: float | None = None
+    test_av_loss: float | None = None
 
 
 class SummarisedError(Sumarised):
     error: str
 
 
-class CleverDict(Dict):
-    def __init__(self, dict: Dict[Any, Any]):
+def _pop(d : dict, keys: list[Any], default=None) -> Any:
+    if len(keys) == 1:
+        return d.pop(keys[0], default)
+    
+    # Navigate to the parent of the target key
+    parent = d.copy()
+    for key in keys[:-1]:
+        try:
+            parent = parent[key]
+        except KeyError:
+            print(f'Parent: {parent}, Key: {key}')
+            raise
+            
+
+    return parent.pop(keys[-1], default)
+        
+
+class CleverDict(dict):
+    
+    def __init__(self, dict: dict[Any, Any]):
         self.dict = dict
 
-    def __getitem__(self, keys: List[Any]) -> Any:
+    def __getitem__(self, keys: Iterable[Any]) -> Any:
+        #NOTE: not a deepcopy, so exposes internal references
         d = self.dict.copy()
         for key in keys:
             d = d[key]
         return d
 
-    def __setitem__(self, keys: List[Any], val: Any):
+    def __setitem__(self, keys: list[Any], val: Any):
         self.dict = self._set_inplace(self.dict, keys[0], keys[1:], val)
 
     def _set_inplace(
-        self, d: Dict[Any, Any], k: Any, ks: List[Any], val: Any
-    ) -> Dict[Any, Any]:
+        self, d: dict[Any, Any], k: Any, ks: list[Any], val: Any
+    ) -> dict[Any, Any]:
         if hasattr(d, "__setitem__"):
             if len(ks) == 0:
                 d[k] = val
@@ -673,36 +638,27 @@ class CleverDict(Dict):
                 d = {k: self._set_inplace({}, next_key, ks, val)}
         return d
 
-    def pop(self, keys: List[Any], default=None) -> Any:
-        if len(keys) == 1:
-            return self.dict.pop(keys[0], default)
+    def pop(self, keys: Iterable[Any], default=None) -> Any:
+        return _pop(self.dict, list(keys), default)
 
-        # Navigate to the parent of the target key
-        parent = self.dict
-        for key in keys[:-1]:
-            parent = parent[key]
-
-        return parent.pop(keys[-1], default)
-
-    def to_dict(self) -> Dict[Any, Any]:
+    def to_dict(self) -> dict[Any, Any]:
         return self.dict.copy()
 
     def __str__(self) -> str:
         return str(self.dict)
 
-    def __delitem__(self, key):
-        raise NotImplementedError
+    def __delitem__(self, keys: Iterable[Any]):
+        return self.pop(keys)
 
     def __iter__(self):
         yield from self._iter_leaves(self.dict, [])
 
-    def _iter_leaves(self, d: Any, path: List[Any]):
+    def _iter_leaves(self, d: Any, path: list[Any]):
         if isinstance(d, dict):
             for key, val in d.items():
                 yield from self._iter_leaves(val, path + [key])
         else:
             yield path, d
-
 
 # not ignoring extra keys overrides: Claudes baby
 
@@ -720,11 +676,11 @@ def _replace_in_annotation(annotation, old_cls, new_cls):
             _replace_in_annotation(arg, old_cls, new_cls)
             for arg in get_args(annotation)
         )
-        return Union[new_args]
+        return new_args
     return annotation
 
 
-def make_strict(model_cls: Type[BaseModel]) -> Type[BaseModel]:
+def make_strict(model_cls: type[BaseModel]) -> type[BaseModel]:
     namespace: dict = {"model_config": ConfigDict(extra="forbid")}
     annotations = {}
 
@@ -746,7 +702,7 @@ def make_strict(model_cls: Type[BaseModel]) -> Type[BaseModel]:
 
     return type(model_cls.__name__, (model_cls,), namespace)
 
-def _unwrap_annotation(annotation) -> Type | None:
+def _unwrap_annotation(annotation) -> type | None:
     origin = get_origin(annotation)
     if origin is Union:
         for arg in get_args(annotation):
@@ -758,7 +714,7 @@ def _unwrap_annotation(annotation) -> Type | None:
     return None
 
 
-def _strip_computed(model_cls: Type[BaseModel], data: dict) -> dict:
+def _strip_computed(model_cls: type[BaseModel], data: dict) -> dict:
     """Recursively remove computed field keys from a data dict before strict validation."""
     computed_keys = set(model_cls.model_computed_fields.keys())
     result = {}
@@ -776,7 +732,7 @@ def _strip_computed(model_cls: Type[BaseModel], data: dict) -> dict:
     return result
 
 
-def strict_validate(model_cls: Type[T], data: dict) -> T:
+def strict_validate(model_cls: type[T], data: dict) -> T:
     strict_cls = make_strict(model_cls)
     strict_cls.model_validate(_strip_computed(model_cls, data))
     return model_cls.model_validate(data)

@@ -1,44 +1,23 @@
-from typing import (
-    Dict,
-    Optional,
-    Callable,
-    List,
-    Union,
-    Any,
-    Literal,
-    Tuple
-)
-from typing_extensions import TypedDict, Unpack
-from sklearn.metrics import confusion_matrix
 import json
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import seaborn as sns
-import numpy as np
 from pathlib import Path
-import logging
-from logging import Logger
-from torch.utils.data import DataLoader, Dataset
+from typing import Literal
 
-from torch import Tensor
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib import patches
+from sklearn.metrics import confusion_matrix
+
+from src.configs import CLASSES_PATH
+from src.preprocess import Instance
 
 # locals
-from src.run_types import CentreCropConfig, OG_Sampler
-from src.configs import get_class_list, CLASSES_PATH
-from src.video_dataset import (
-    get_wlasl_info,
-    get_video_path,
-    get_transform,
-)
-from src.utils import plt_display_grid, load_rgb_frames_from_video
-from src.preprocess import Instance
 from src.stats import (
     AVAIL_SETS,
     AVAIL_SPLITS,
     HistoGram,
     instance_stats,
-    
 )
 
 # Set style for better-looking plots
@@ -49,7 +28,7 @@ from src.stats import (
 VERBOSITY = 0
 
 
-visualise_logger = logging.getLogger(__name__)
+
 
 BG_FIGSIZE_3G = (8, 5)
 BG_WiDTH_3G = 0.2
@@ -73,108 +52,9 @@ def set_font_size(size: int = 14) -> None:
 set_font_size()  # Set default font size
 
 
-# Frame visualiser
-
-
-class MiniSetKwargsRequired(TypedDict):
-    cls_idx: int
-    all_sets: dict[str, Any]
-    set_name: AVAIL_SETS
-    split_name: AVAIL_SPLITS
-
-
-class MiniSetKwargs(MiniSetKwargsRequired, total=False):
-    classes: List[str]
-    target_length: int
-    frame_size: int
-    logger: Logger
-
-
-class MiniSet(Dataset):
-    def __init__(
-        self,
-        cls_idx: int,
-        all_sets: dict[str, Any],
-        set_name: AVAIL_SETS,
-        split_name: AVAIL_SPLITS,
-        classes: List[str] = get_class_list(),
-        target_length: int = 16,
-        frame_size: int = 224,
-        logger: Logger = visualise_logger,
-        transform: Optional[Callable[[Tensor], Tensor]] = None,
-    ) -> None:
-
-        self.logger = logger
-        self.cls_idx = cls_idx
-        self.set_name = set_name
-        self.split_name = split_name
-        self.classes = classes
-        self.target_length = target_length
-        self.frame_size = frame_size
-
-        if transform is None:
-            self.transform, _, _ = get_transform(
-                temporal_aug=[OG_Sampler(target_length=target_length)],
-                spatial_aug=[CentreCropConfig(frame_size=frame_size)],
-                normalise_to_float=False,
-                permute_time_channel=False,
-            )
-        else:
-            self.transform = transform
-
-        self.set_path_info = get_wlasl_info(split_name, set_name)
-        self.data = all_sets[self.set_name][self.cls_idx]["instances"]
-        self.tot_samples = len(self.data)
-
-    def __getitem__(self, idx):
-        self.logger.info(f"From: {self.split_name}S/{self.set_name}")
-        self.logger.info(f'Example videos for class: "{self.classes[self.cls_idx]}"')
-        self.logger.info(f"Instance: {idx + 1}/{self.tot_samples}")
-
-        next_example = Instance.model_validate(self.data[idx])
-        ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
-
-        self.logger.info(f"Next example video path: {ex_path}")
-
-        return self.transform(
-            load_rgb_frames_from_video(
-                ex_path, next_example.frame_start, next_example.frame_end
-            )
-        )
-
-    def __len__(self):
-        return self.tot_samples
-
-
-class FrameVisualiser:
-    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
-        if "target_length" in kwargs:
-            self.target_frames = kwargs["target_length"]
-        else:
-            self.target_frames = 16
-        self.iter_loader = iter(
-            DataLoader(
-                MiniSet(**kwargs),
-                batch_size=1,
-                shuffle=False,
-                num_workers=4,
-                pin_memory=False,
-            )
-        )
-
-    def __call__(self):
-        frames = next(self.iter_loader)[0]
-        if len(frames.shape) == 5:
-            frames = frames.squeeze(dim=0)
-        if frames.shape[1] != 3:
-            frames = frames.permute(1, 0, 2, 3)  # swap T and C
-        plt_display_grid(frames, self.target_frames)
 
 
 # Standardised plots for results
-
-
-# def 
 
 
 # half claude
@@ -187,12 +67,12 @@ def plot_distribution(
     unit: str = "",
     categorical: bool = False,
     hist_or_bar: Literal["hist", "bar"] = "hist",
-    bins: Optional[int] = None,
-    figsize: Tuple[int, int] = (12, 4),
+    bins: int | None = None,
+    figsize: tuple[int, int] = (12, 4),
     show_nums_on_bars: bool = True,
     no_statsy_lines: bool = False,
     out_path: str = "",
-    x_label_step: Optional[int] = 1,  # None = no labels, N = show every Nth label
+    x_label_step: int | None = 1,  # None = no labels, N = show every Nth label
 ) -> None:
 
     sorted_items = sorted(histogram.items(), key=lambda x: x[0])
@@ -218,7 +98,7 @@ def plot_distribution(
 
     elif hist_or_bar == "hist":
         cmap = plt.get_cmap(PALETTE["default_cmap"])
-        n, bins_out, patches_list = plt.hist(expanded_values, bins=bins)
+        n, _, patches_list = plt.hist(expanded_values, bins=bins)
         norm = plt.Normalize(n.min(), n.max())  # type: ignore
         for patch, count in zip(patches_list, n):  # type: ignore
             patch.set_facecolor(cmap(norm(count)))
@@ -272,15 +152,15 @@ def plot_distribution(
 
 
 def plot_dimension_distributions(
-    instances: List[Instance],
-    figsize: Tuple[int, int] = (12, 4),
+    instances: list[Instance],
+    figsize: tuple[int, int] = (12, 4),
 ) -> None:
     """Histograms of bbox width and height across all instances."""
     widths = [inst.bbox[2] - inst.bbox[0] for inst in instances]
     heights = [inst.bbox[3] - inst.bbox[1] for inst in instances]
 
     cmap = plt.get_cmap("coolwarm")
-    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    _, axes = plt.subplots(1, 2, figsize=figsize)
     for ax, data, label, colour in zip(
         axes,
         [widths, heights],
@@ -312,10 +192,10 @@ def plot_dimension_distributions(
 
 
 def barplot_metric(
-    per_class: Dict[str, instance_stats],
+    per_class: dict[str, instance_stats],
     metric: str,
-    top_n: Optional[int] = None,
-    title: Optional[str] = None,
+    top_n: int | None = None,
+    title: str | None = None,
     figsize: tuple = (12, 6),
 ) -> None:
     if metric not in {"num_instances", "num_signers", "num_variations"}:
@@ -341,10 +221,10 @@ def barplot_metric(
 
 
 def histogram_metric(
-    per_class: Dict[str, instance_stats],
+    per_class: dict[str, instance_stats],
     metric: str,
     bins: int = 20,
-    title: Optional[str] = None,
+    title: str | None = None,
     figsize: tuple = (8, 5),
 ) -> None:
     if metric not in {"num_instances", "num_signers", "num_variations"}:
@@ -363,9 +243,9 @@ def histogram_metric(
 
 
 def scatter_instances_vs_signers(
-    per_class: Dict[str, instance_stats],
+    per_class: dict[str, instance_stats],
     figsize: tuple = (6, 5),
-    title: Optional[str] = None,
+    title: str | None = None,
 ) -> None:
     x = [c["num_instances"] for c in per_class.values()]
     y = [len(c["signers_distribution"]) for c in per_class.values()]
@@ -386,11 +266,12 @@ AverageMethod = Literal["mean", "median"]
 
 
 def average_bboxes(
-    instances: List[Instance],
+    instances: list[Instance],
     method: AverageMethod = "mean",
-) -> List[Instance]:
+) -> list[Instance]:
     """Return one representative Instance per class with an averaged bounding box."""
     from collections import defaultdict
+
     import numpy as np
 
     groups: dict[str, list[Instance]] = defaultdict(list)
@@ -400,7 +281,7 @@ def average_bboxes(
     avg_fn = np.mean if method == "mean" else np.median
 
     averaged = []
-    for _, insts in groups.items():
+    for insts in groups.values():
         boxes = np.array([inst.bbox for inst in insts], dtype=float)  # (N, 4)
         avg_box = avg_fn(boxes, axis=0).round().astype(int).tolist()
         # Use the first instance as a template, just swap the bbox
@@ -411,22 +292,22 @@ def average_bboxes(
 
 # claude/me
 def plot_bboxes_on_canvas(
-    instances: List[Instance],
-    figsize: Tuple[int, int] = (6, 6),
+    instances: list[Instance],
+    figsize: tuple[int, int] = (6, 6),
     average: bool = True,
     method: AverageMethod = "mean",
     title: str = "Bounding Boxes by Class",
     out_path: str = "",
 ) -> None:
     """Draw bounding boxes for each class on a blank 256x256 canvas, coloured by class."""
-    fig, ax = plt.subplots(figsize=figsize)
+    _fig, ax = plt.subplots(figsize=figsize)
     ax.set_xlim(0, FRAME_WIDTH)
     ax.set_ylim(0, FRAME_HEIGHT)
     ax.invert_yaxis()  # image coordinates: y increases downward
     # ax.set_facecolor("#1a1a1a")
     # fig.patch.set_facecolor("#1a1a1a")
 
-    unique_labels = list(set(inst.label_name for inst in instances))
+    unique_labels = list({inst.label_name for inst in instances})
     cmap = plt.cm.get_cmap("tab20", len(unique_labels))
     colour_map = {label: cmap(i) for i, label in enumerate(unique_labels)}
 
@@ -459,10 +340,10 @@ def plot_bboxes_on_canvas(
 
 
 def plot_heatmap(
-    report: Dict[str, Dict[str, float]],
-    classes_path: Union[str, Path] = CLASSES_PATH,
+    report: dict[str, dict[str, float]],
+    classes_path: str | Path = CLASSES_PATH,
     title: str = "Classification Report Heatmap",
-    save_path: Optional[Union[str, Path]] = None,
+    save_path: str | Path | None = None,
     disp: bool = True,
 ) -> None:
     """Plot a heatmap visualization of a classification report.
@@ -490,7 +371,7 @@ def plot_heatmap(
             >>> plot_heatmap(report, "classes.json", save_path="heatmap.png")
     """
     with open(classes_path, "r") as f:
-        test_classes: List[str] = json.load(f)
+        test_classes: list[str] = json.load(f)
 
     df = pd.DataFrame(report).iloc[:-1, :].T
     num_classes_to_plot = min(len(df) - 2, len(test_classes))
@@ -513,10 +394,10 @@ def plot_heatmap(
 
 
 def plot_bar_graph(
-    report: Dict[str, Dict[str, float]],
-    classes_path: Union[str, Path] = CLASSES_PATH,
+    report: dict[str, dict[str, float]],
+    classes_path: str | Path = CLASSES_PATH,
     title: str = "Classification Report - Per Class Metrics",
-    save_path: Optional[Union[str, Path]] = None,
+    save_path: str | Path | None = None,
     disp: bool = True,
 ) -> None:
     """Plot a horizontal bar graph of classification metrics per class.
@@ -544,7 +425,7 @@ def plot_bar_graph(
             >>> plot_bar_graph(report, "classes.json", save_path="bar_graph.png")
     """
     with open(classes_path, "r") as f:
-        test_classes: List[str] = json.load(f)
+        test_classes: list[str] = json.load(f)
 
     classes = list(report.keys())[
         :-3
@@ -559,7 +440,7 @@ def plot_bar_graph(
     x = np.arange(len(classes))
     width = 0.25
 
-    fig, ax = plt.subplots(figsize=(10, 18))
+    _fig, ax = plt.subplots(figsize=(10, 18))
     _ = ax.barh(x - width, precision, height=width, label="Precision", alpha=0.8)
     _ = ax.barh(x, recall, height=width, label="Recall", alpha=0.8)
     _ = ax.barh(x + width, f1_score, height=width, label="F1-Score", alpha=0.8)
@@ -587,14 +468,14 @@ def plot_bar_graph(
 
 
 def plot_confusion_matrix(
-    y_true: Union[np.ndarray, List[int]],
-    y_pred: Union[np.ndarray, List[int]],
-    classes_path: Optional[Union[str, Path]] = CLASSES_PATH,
+    y_true: np.ndarray | list[int],
+    y_pred: np.ndarray | list[int],
+    classes_path: str | Path | None = CLASSES_PATH,
     num_classes: int = 100,
     title: str = "Confusion Matrix",
     size: tuple[int, int] = (10, 8),
     row_perc: bool = True,
-    save_path: Optional[Union[str, Path]] = None,
+    save_path: str | Path | None = None,
     disp: bool = True,
 ) -> None:
     """Plot confusion matrix from true and predicted labels.
@@ -636,10 +517,10 @@ def plot_confusion_matrix(
     cm = confusion_matrix(y_true, y_pred)
 
     # Load class names if provided
-    class_names: Optional[List[str]] = None
+    class_names: list[str] | None = None
     if classes_path is not None and num_classes:
         with open(classes_path, "r") as f:
-            test_classes: List[str] = json.load(f)
+            test_classes: list[str] = json.load(f)
 
         class_names = test_classes[:num_classes]
 

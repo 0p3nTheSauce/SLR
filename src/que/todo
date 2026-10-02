@@ -1,19 +1,72 @@
-GUI: 
-- trash the vibe coded gui.html + api.py and build from scratch
-
 
 Que:
-- add flag to check if changes were made before saving 
+- shell.py mixes `from src.configs import ...` with bare `from configs import ...` /
+    `from utils import ...` (lazy imports inside methods). The bare form only resolves because
+    setup.sh launches `python -m que.shell`/`que.server` from inside src/; it breaks under pytest
+    from the repo root (tests/que/test_shell.py's TestSetMaxRuns has to prepend src/ to sys.path),
+    and can load the same module twice under two names. Switch them all to `src.`-prefixed imports
+    (core.py's were switched on 2026-10-02).
+- Que reads (list_runs, peak_run, summarise_runs, len_sweep_runs, ...) don't take the Que's lock,
+    only mutations do (see core._persists). The manager serves each connection on its own thread,
+    so a read can interleave with a mutation from another client (e.g. the shell listing while the
+    worker moves a run). Consider locking reads too.
+- Que.load_state only handles FileNotFoundError: an unparsable or invalid Runs.json (e.g. hand
+    edited) raises from Que(), so the server fails to start. Saves are atomic now, so it can't be
+    truncated by a crash, but consider a clear error/fallback to the latest timestamped copy.
+- tmux.py has 8 ruff warnings (unsorted imports, Optional[...] instead of `X | None`); all
+    auto-fixable with `ruff check --fix src/que/tmux.py`.
 
 Shell:
 - add more flexibility to run summarisation
 - add a flag to turn into debugging mode. Check debugging mode in unwrap_exception
 - fix argument parsing short flags
+- nargs="+" options swallow following positionals: e.g. `edit to_run 0 -ek acc 0.99` fails
+    with "required: value" because -ek/--edit_keys consumes 0.99; the value has to be written
+    before the flag (`edit to_run 0 0.99 -ek acc`). -c/--criterion has the same problem, so it
+    must come last. Affects any parser mixing nargs="+" options with trailing positionals.
+- indirect indexing is racy: edit/display/copy/to_config resolve the filtered/sorted index
+    against a client-side snapshot (list_runs), then act on the server by original index in a
+    separate call. If the queue changes in between (e.g. the worker pops to_run[0]), edit_run
+    silently edits a different run (it re-validates fine, so nothing flags it). Possible fix:
+    pass the expected run to edit_run and raise if peak_run(loc, idx) differs (note
+    debug.any_dups -- content comparison only works if runs are unique).
+- `server status` can't tell an idle daemon (awake, no work, polling -- see Daemon._idle) from one
+    running a worker except by the worker's task. Consider an explicit idle flag in
+    DaemonStateDict.
 
-Daemon
+Daemon:
 - Add better checking when starting daemon/worker (check it is actually working instead of just reporting
     that the process started successfully)
 
+Worker:
+- if GPU is busy on startup, gets stuck, needs server process to be restarted
+- broader: train/sweep/test's outer `except Exception` blocks (worker.py's _fail path)
+    still blindly stash/report every non-QueException the same way -- e.g. no distinction
+    between a real crash and GPU OOM. Need to distinguish exception types explicitly instead
+    of blanket `except Exception` + str(e) throughout worker.py/training.py. See also
+    src/TODO.md's repo-wide blind-except audit item.
+
 Server:
-- redirect wandb output to log file
+- `server load` at runtime still restores `awake` from the file: loading awake=True starts a
+    supervisor, and awake=False while a supervisor runs makes status misreport it. Either keep
+    the live `awake` value when the server is already up (only restore it at startup, for
+    power-outage recovery) or refuse to load while the daemon is running.
+- wandb's own per-run "Logs" tab / local output.log has been empty for a long time --
+    NOT a block-scoping bug in the `redirect_stdout(self.log_adapter)` calls in
+    _train/_sweep_train (tried merging the setup/training blocks into one continuous
+    redirect on 2026-09-18; verified on a live debug-sweep trial that this made no
+    difference -- output.log stayed empty, reverted). Real mechanism: wandb's
+    wandb/sdk/lib/console_capture.py patches the *write method* of whichever object is
+    sys.stdout at the first `import wandb` in the process, once, permanently ("not
+    possible to unpatch or repatch" per its own docstring). Our redirect_stdout(...)
+    reassigns the sys.stdout *name* to self.log_adapter during training, so print()
+    calls self.log_adapter.write() directly and never touch wandb's patched object at
+    all -- no restructuring of our `with` blocks changes that. Real fix needs to either
+    (a) not reassign sys.stdout during training at all (which likely means moving
+    training.py's print()-based step/epoch logging to a real logger, removing the need
+    for redirect_stdout here in the first place -- training.py's bare print() calls are
+    the underlying quick-and-dirty pattern), or (b) additionally register
+    self.log_adapter's write via wandb.sdk.lib.console_capture.capture_stdout(...)
+    directly so both wandb's capture and our own log file see the same writes (couples
+    us to a wandb-internal module path, so needs a version-pin/compat note if taken).
 - redirect testing output to log file

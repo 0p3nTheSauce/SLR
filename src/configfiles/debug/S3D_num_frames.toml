@@ -1,0 +1,62 @@
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 20
+
+[optimizer]
+eps = 4.64460308721673e-05
+backbone_init_lr = 0.00035410865092832156
+backbone_weight_decay = 0.003032694975506355
+classifier_init_lr = 0.00012710231350078905
+classifier_weight_decay = 0.001837188289788592
+
+[model_params]
+drop_p = 0.5647451763133025
+type = "supervised"
+
+[data]
+strict_size = true
+target_length = 64
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 64, max_wobble = 5, type = "chunked" },
+]
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.05909898798791119
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 4
+magnitude = 8
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 64, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 5
+min_delta = 0.01
+
+
+#OOMED

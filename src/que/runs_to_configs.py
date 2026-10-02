@@ -1,9 +1,18 @@
-from typing import Optional, Literal
+import argparse
+import json
 from pathlib import Path
+from typing import Literal
+
+import pydantic
 import tomli_w
 
 # from que.shell import QueShell
 from src.que.core import (
+    CUR_RUN,
+    FAIL_RUNS,
+    OLD_RUNS,
+    RUN_PATH,
+    TO_RUN,
     GenExp,
 )
 
@@ -45,7 +54,8 @@ def _get_old_comments(contents: str) -> list[str]:
 def _get_save_name(
     save_path: str, mode: Literal["overwrite", "duplicate"] = "duplicate"
 ) -> str:
-    """Generate a save name based on the save path and mode.
+    """Generate a save name based on the save path and mode. 
+    Adds a .toml suffix
 
     Args:
         save_path (str): The path where the file will be saved.
@@ -61,37 +71,73 @@ def _get_save_name(
     else:
         return str(path.with_suffix(".toml"))
 
+def _drop_nested(d : dict, key_set: list[list[str]]) -> dict:
+    from src.run_types import _pop
+    for keys in key_set:
+        _pop(d, keys)
+    return d
+
+
 
 def _run_to_config(
     run: GenExp | dict,
-    comments: list[str] = [],
-    ignore_sections: list[str] = ["admin", "wandb", "results",],
+    comments: list[str] | None = None,
+    ignore_sections: list[list[str]] | None = None,
 ) -> str:
     """Turn a general run into its TOML string representation for the config
     file system. Skips ignored sections, strips None values (TOML has no
     null), and appends comment lines.
 
     Args:
-        run (GenExp | dict): run (GenExp | dict): Experiment from que
-        comments (list[str], optional): Comment lines to append at the end. Defaults to [].
-        ignore_sections (list[str], optional): Sections to ignore. Defaults to ["admin", "wandb", "results"].
+        run (GenExp | dict): Experiment from que
+        comments (list[str] | None, optional): Comment lines to append at the end. Defaults to None.
+        ignore_sections (list[str] | None, optional): Sections to ignore. Defaults to None (uses ["admin", "wandb", "results"]).
 
     Returns:
         str: String representation of the config file content for this run
     """
-
+    
+    if comments is None:
+        comments = []
+    if ignore_sections is None:
+        ignore_sections = [
+            ["admin"],
+            ["wandb"],
+            ["results"],
+            ["data", "train_augs", "norm_dict"],
+            ["data", "train_augs", "strict_size"],
+            ["data", "train_augs", "target_length"],
+            ["data", "train_augs", "frame_size"],
+            
+            ["data", "test_augs", "norm_dict"],
+            ["data", "test_augs", "strict_size"],
+            ["data", "test_augs", "target_length"],
+            ["data", "test_augs", "frame_size"],
+                        
+            ["data", "strict_size"],
+            ["data", "target_length"],
+            ["data", "frame_size"],
+            ["training", "batch_size_equivalent"]
+                
+        ]
     if isinstance(run, GenExp):
         run_info = run.model_dump()
     else:
         run_info = run
 
+    run_info = _drop_nested(run_info, ignore_sections)
+
     filtered = {
         section_name: _strip_none(section_content)
-        for section_name, section_content in run_info.items()
-        if section_name not in ignore_sections and section_content
+        for section_name, section_content in run_info.items() 
+        if section_content
     }
 
-    config_str = tomli_w.dumps(filtered)
+    try:
+        config_str = tomli_w.dumps(filtered)
+    except TypeError:
+        print(filtered)
+        raise
 
     if len(comments) > 0:
         config_str += "\n"
@@ -107,10 +153,15 @@ def update_config_file(
     default_mode: Literal["overwrite", "duplicate"] = "overwrite",
     dry_run: bool = True,
     retro_support: bool = False,
-    output: Optional[Path] = None,
+    output: Path | None = None,
+    ignore_paths: list[str] | None = None,
+    message: str = "updated by script"
 ):
     from src.configs import load_config
     from src.run_types import AdminInfo
+
+    if ignore_paths is None:
+        ignore_paths = []
 
     if isinstance(run, GenExp):
         run_info = run.model_dump()
@@ -118,31 +169,37 @@ def update_config_file(
         run_info = run
 
     conf_path = Path(run_info["admin"]["config_path"])
-    print(f"Updating config file: {conf_path}")
+    if str(conf_path) in ignore_paths:
+        # print(f'Skipping: {conf_path!s}')
+        return
 
     if conf_path.exists():
+        # get old comments
         with open(conf_path, "r") as f:
             old_contents = f.read()
         old_comments = _get_old_comments(old_contents)
 
+        # skip file if it is already valid
         try:
             _ = load_config(
                 AdminInfo.model_validate(run_info["admin"]), retro_support=retro_support
             )
             print(f"Valid config found at {conf_path}, skipping overwrite mode.")
             return
-        except Exception as e:
+        except (FileNotFoundError, pydantic.ValidationError, ValueError) as e:
             print(f"Validation failed for existing config: {e}")
 
             mode: Literal["overwrite", "duplicate"] = default_mode
             print(f"Proceeding with {mode} mode.")
-
     else:
         old_comments = []
         mode: Literal["overwrite", "duplicate"] = "overwrite"
 
-    config_str = _run_to_config(run_info, comments=old_comments + ["updated by script"])
+    print(f"Updating config file: {conf_path}")
 
+    # generate new config file
+    config_str = _run_to_config(run_info, comments=old_comments + [message])
+    # get save path
     save_name = _get_save_name(conf_path.as_posix(), mode=mode)
 
     if dry_run:
@@ -151,6 +208,7 @@ def update_config_file(
     else:
         parent_dir = Path(save_name).parent
         parent_dir.mkdir(parents=True, exist_ok=True)
+        # write file
         with open(save_name, "w") as f:
             f.write(config_str)
         print(f"Saved config to: {save_name}")
@@ -159,3 +217,160 @@ def update_config_file(
         with open(output, "w") as f:
             f.write(config_str)
         print(f"Debug config saved to: {output}")
+
+
+
+def write_config_file(
+    run: GenExp | dict,   
+    output: Path,
+) -> None:
+    if isinstance(run, GenExp):
+        run_info = run.model_dump()
+    else:
+        run_info = run
+
+    conf_path = Path(run_info["admin"]["config_path"])
+    if conf_path.exists():
+        # get old comments
+        with open(conf_path, "r") as f:
+            old_contents = f.read()
+        old_comments = _get_old_comments(old_contents)
+    else:
+        old_comments = []
+    
+    # generate new config file
+    config_str = _run_to_config(run_info, comments=old_comments + ["created by script"])
+    
+    with open(output, "w") as f:
+        f.write(config_str)
+    print(f"Config saved to: {output}")
+    
+    
+
+def update_all_files(
+    default_mode: Literal["overwrite", "duplicate"] = "overwrite",
+    dry_run: bool = True,
+    retro_support: bool = False,
+    output: Path | None = None,
+    ignore_paths: list[str] | None = None,
+    message: str = "updated by script"
+):
+
+    KEYS = [TO_RUN, CUR_RUN, OLD_RUNS, FAIL_RUNS]
+    with open(RUN_PATH, "r") as f:
+        all_runs = json.load(f)
+
+    flat_all_runs = []
+    for key in KEYS:
+        flat_all_runs.extend(all_runs[key])
+
+    for run_info in flat_all_runs:
+        update_config_file(
+            run_info, default_mode, dry_run, retro_support, output=output, ignore_paths=ignore_paths, message=message
+        )
+
+    print(len(flat_all_runs))
+
+
+if __name__ == "__main__":
+    
+    ignore_paths = ['<in-memory:sweep>', 'configfiles/sweeps/MViTv2_B_32x3/sweep_base.toml']
+    
+    parser = argparse.ArgumentParser(
+        description="Utility script to update TOML configuration files from experiment run data."
+    )
+
+    # Global arguments
+    parser.add_argument(
+        "--mode",
+        choices=["overwrite", "duplicate"],
+        default="overwrite",
+        help="Default saving mode if file exists (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--run",
+        action="store_false",
+        dest="dry_run",
+        help="Actually write changes to files. If not specified, defaults to a dry run.",
+    )
+    parser.add_argument(
+        "--retro-support",
+        action="store_true",
+        help="Enable legacy/retro support configuration parsing.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Optional path to write a debug copy of the generated config.",
+    )
+   
+
+    # Sub-commands (making dest="command" optional by not enforcing required=True)
+    subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
+
+    # Sub-command: single
+    single_parser = subparsers.add_parser(
+        "single", help="Update a single configuration file."
+    )
+    single_parser.add_argument(
+        "--run-data",
+        type=str,
+        default=str(RUN_PATH),
+        help="JSON string or path to a JSON file. Defaults to RUN_PATH (default: %(default)s).",
+    )
+    single_parser.add_argument(
+        "--key",
+        type=str,
+        default=OLD_RUNS,
+        help="The dictionary key to extract from the run database (default: %(default)s).",
+    )
+    single_parser.add_argument(
+        "--index",
+        type=int,
+        default=0,
+        help="The list index to extract from the specified key section (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--message",
+        type=str,
+        default="updated by script",
+        help="Extra comment to add to explain what this script does"
+    )
+
+    # Sub-command: all
+    all_parser = subparsers.add_parser(
+        "all", help="Update all configuration files found in the runs database."
+    )
+
+    args = parser.parse_args()
+
+    # Fallback: If the user didn't specify 'single' or 'all', default to 'all'
+    chosen_command = args.command if args.command else "all"
+
+    if chosen_command == "single":
+        p = Path(args.run_data)
+        assert p.exists()
+
+        with open(args.run_data, "r") as f:
+            all_runs = json.load(f)
+
+        update_config_file(
+            run=all_runs[args.key][args.index],
+            default_mode=args.mode,
+            dry_run=args.dry_run,
+            retro_support=args.retro_support,
+            output=args.output,
+            ignore_paths=ignore_paths,
+            message=args.message
+        )
+
+    elif chosen_command == "all":
+        update_all_files(
+            default_mode=args.mode,
+            dry_run=args.dry_run,
+            retro_support=args.retro_support,
+            output=args.output,
+            ignore_paths=ignore_paths,
+            message=args.message
+        )

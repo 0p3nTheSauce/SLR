@@ -23,9 +23,14 @@ conda activate wlasl
 #alternatively if no GPU available 
 # conda env create -f wlasl_cpu.yml 
 # conda activate wlasl_cpu
+# note: wlasl_cpu is CPU-only and does not include the MViT/slowfast model
+# dependencies -- use it for non-MViT models, notebooks, and plotting only.
+
+# add as package:
+pip install -e .
 
 #download data
-mkdir data/WLASL && cd data/WLASL
+mkdir -p data/WLASL && cd data/WLASL
 wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/splits.zip"
 wget -L "https://github.com/0p3nTheSauce/SLR/releases/download/v1.0/WLASL2000.zip"
 unzip splits.zip
@@ -33,9 +38,18 @@ unzip WLASL2000.zip
 cd ../..
 
 #preprocess data
-cd code
-python preprocess.py all -ve
+cd src
+python -m preprocess all -ve # add -lc 9 to remove samples with <= 9 frames
 ```
+
+Each split's output directory gets a `preprocess_log.json` recording every instance that was reset
+or removed, and why, with per-set counts. Fixed instances are cached in `instance_cache_v2.json` so
+later splits skip the slow YOLO bbox step. Pass `--no_cache` to reprocess everything from scratch.
+
+Most models pull their pretrained weights automatically the first time they're constructed, but a
+few (the slowfast-based `MViTv2_S_16x4`/`MViTv2_B_32x3` variants) require manually downloading a
+checkpoint file first — see [src/models/README.md](src/models/README.md) for which models need
+this and how to fetch them.
 
 ## Usage
 <details>
@@ -45,13 +59,13 @@ python preprocess.py all -ve
 Training and testing have the following **arguments** in common:
 
 - `MODEL_NAME`: 
-    One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S, Swin3D_B, MViTv2_S, MViTv2_S_e, MViTv1_B, MViTv2_S_16x4, MViTv2_B_32x3, MVirTed_t, MVirTed_t_MAE 
+    One of: S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S, Swin3D_B, MViTv2_S, MViTv2_S_e, MViTv1_B, MViTv2_S_16x4, MViTv2_S_16x4_e MViTv2_B_32x3, MViTv2_B_32x3_r
 - `SPLIT`: 
-    The ASL split, one of: asl100, asl300, asl1000, asl2000
+    The ASL split, one of: asl100, asl300, asl1000, asl2000 or variations. 
 - `EXP_NO`: 
     is the experiment number (e.g. 4)
 
-Additionally, both of them by default set a random [seed](./code/configs.py) for reproducability. (Note the [Que](./code/que/README.md) had a bug which broke RNG state during some experiments).
+Additionally, both of them by default set a random [seed](./src/configs.py) for reproducability. (Note the [Que](./src/que/README.md) had a bug which broke RNG state during some experiments).
 </details>
 
 <details>
@@ -321,8 +335,8 @@ runs
 
 ## Features
 
-- Run [utils.py](./code/utils.py) to automatically clean up checkpoints.
-- Use the [Que](./code/que/README.md) feature to schedule and automatically train + test runs.
+- Run [utils.py](./src/utils.py) to automatically clean up checkpoints.
+- Use the [Que](./src/que/README.md) feature to schedule and automatically train + test runs.
 
 
 ## Contributing
@@ -333,4 +347,4 @@ Contributions are welcome! Please open issues or submit pull requests.
 
 The data provided in this project is subject to the C-UDA license of the forked WLASL dataset. By downloading or using this data, you agree to the terms of the C-UDA and any downstream redistribution must also comply with these terms. See [C-UDA-1.0.pdf](C-UDA-1.0.pdf)
 
-Some models used are implemented from other repositories. By using any of these models you are implicitly subject to their licenses. See the [models README.md](./code/models/README.md) for more details.  
+Some of the MViTv2 models (the ones that have 16x4 or 32x3 in the name) are implemented from the [Slowfast repository](https://github.com/facebookresearch/slowfast). By using any of these models you are implicitly subject to their [license](./src/models/mvit/SLOWFAST_LICENSE.md).

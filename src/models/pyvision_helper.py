@@ -1,20 +1,23 @@
+from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
-from typing import Any, Callable, Optional
 from enum import Enum
+from functools import partial
+from typing import Any, TypeVar
+
 import torch
 import torch.fx
-import torch.nn as nn
-from typing import Union, TypeVar
-from torchvision.transforms import InterpolationMode
-from torch import Tensor
 import torchvision.transforms.functional as F
-
+from torch import Tensor, nn
+from torchvision.transforms import InterpolationMode
 
 try:
     from torch.hub import load_state_dict_from_url  # noqa: 401
 except ImportError:
-    from torch.utils.model_zoo import load_url as load_state_dict_from_url  # noqa: 401 #type: ignore
+    from torch.utils.model_zoo import (
+        load_url as load_state_dict_from_url,  # noqa: 401 #type: ignore
+    )
+
+
 
 
 
@@ -39,7 +42,7 @@ class Weights:
     transforms: Callable
     meta: dict[str, Any]
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         # We need this custom implementation for correct deep-copy and deserialization behavior.
         # TL;DR: After the definition of an enum, creating a new instance, i.e. by deep-copying or deserializing it,
         # involves an equality check against the defined members. Unfortunately, the `transforms` attribute is often
@@ -473,7 +476,7 @@ class VideoClassification(nn.Module):
         self,
         *,
         crop_size: tuple[int, int],
-        resize_size: Union[tuple[int], tuple[int, int]],
+        resize_size: tuple[int] | tuple[int, int],
         mean: tuple[float, ...] = (0.43216, 0.394666, 0.37645),
         std: tuple[float, ...] = (0.22803, 0.22145, 0.216989),
         interpolation: InterpolationMode = InterpolationMode.BILINEAR,
@@ -570,7 +573,7 @@ class WeightsEnum(Enum):
 
 V = TypeVar("V")
 
-def _ovewrite_named_param(kwargs: dict[str, Any], param: str, new_value: V) -> None:
+def _ovewrite_named_param(kwargs: dict[str, Any], param: str, new_value: object) -> None:
     if param in kwargs:
         if kwargs[param] != new_value:
             raise ValueError(f"The parameter '{param}' expected value {new_value} but got {kwargs[param]} instead.")
@@ -657,9 +660,9 @@ class MLP(torch.nn.Sequential):
         self,
         in_channels: int,
         hidden_channels: list[int],
-        norm_layer: Optional[Callable[..., torch.nn.Module]] = None,
-        activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
-        inplace: Optional[bool] = None,
+        norm_layer: Callable[..., torch.nn.Module] | None = None,
+        activation_layer: Callable[..., torch.nn.Module] | None = torch.nn.ReLU,
+        inplace: bool | None = None,
         bias: bool = True,
         dropout: float = 0.0,
     ):

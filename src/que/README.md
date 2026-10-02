@@ -118,6 +118,8 @@ Each of these locations can be viewed with `list` command. Alternatively a singl
 
 When using `create` a new training run is specified using the same parser as *training.py* (see [training](../../README.md#training)) and is added to `to_run`. `add` also uses this parser, and is used to add already completed runs to `old_runs`
 
+`to_run` and `cur_run` only hold runs without results or errors, so a completed or failed run can't be `move`d back into them: requeue it with `recover`, or `copy` it with `--clean_slate`.
+
 #### Que Daemon
 
 To start the training que, use the command: `daemon start`
@@ -144,11 +146,13 @@ The status of which can be checked with the command `server status`:
 
 Once training and testing are complete, the completed run with results is added to `old_runs`. If an exception occurs, the failed run is added to `fail_runs`. If `stop on fail` is *True*, then the Que Daemon will halt training. Otherwise it will continue. This can be set when being prompted during [setup](#setup). 
 
-The Daemon will stop when it reaches the end of the queue, or when when the `daemon stop` command is used. Flags can be used to send a stop signal to the supervisor, or the worker. 
+When there are no runs in `to_run` and no sweep trials left to hand out, the Daemon idles, checking for new work periodically. It stops when the `daemon stop` command is used. Flags can be used to send a stop signal to the supervisor, or the worker.
 
 #### Recovery
 
 If there is an outside influence (power failure) the que-training service will autorecover, if it was awake before. 
+
+Nothing has to be saved by hand for this: every change to the Que is written to `Runs.json` before it returns, and the server state (`Server.json`: sweep, daemon settings) is written whenever it changes and after each worker exits. Both are written atomically, so a crash mid-write leaves the previous file intact. A sweep's progress is not stored but counted from the Que (its trials in `old_runs`), so it can't drift from it; on startup, a difference from the saved count is logged as a warning.
 
 Otherwise, If a run fails, the `recover` command can be used.  In the event of an exception, specify the location as `fail_runs`:
 
@@ -156,10 +160,22 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 (que)$ recover -ol fail
 ```
 
+#### Files
+
+The Que's data and logs are kept apart from the code, in gitignored directories:
+- `state/`: `Runs.json` (the Que), `Server.json` (server state), timestamped snapshots from `save -t`, and `old_ques/` (archived Ques)
+- `logs/`: `Server.log` (server, daemon and worker) and `Training.log` (training and testing output). A server installed by `setup.sh` rotates them with logrotate (weekly, or sooner past 50 MB; 8 kept, older ones gzipped)
+
+Until 2026-10-02 these lived directly in `src/que/`. The server moves them into place when it starts (`migrate_legacy_files` in `core.py`), never overwriting a file already there. On a machine that doesn't run the server (e.g. to read `Runs.json` from `src/results`), run it once by hand, from `src/`, and only while no Que server on that machine is still running the old code:
+
+```bash
+python -c "from src.que.core import migrate_legacy_files; print(*migrate_legacy_files(), sep='\n')"
+```
+
 #### Misc
 
 - `attach` attaches to tmux session (only opens on the shell side)
 - `wandb` open up wandb website
-- `logs` View the logs from the worker, server or systemd service (requires sudo).
-- `save` Save state of que or server to .json file
-- `load` Load state of que or server from .json file
+- `logs` Follow the server's logs, read through the server so it works over the SSH tunnel too: `-s` for `Server.log`, `-t` for `Training.log` (`-c` clears instead). `-j` follows this machine's systemd journal (requires sudo).
+- `save` Save a copy of the que or server state to a .json file (state is already saved automatically, see [Recovery](#recovery)). `-t` timestamps the file name; `save all -t` snapshots both as a matching `Runs_<ts>.json`/`Server_<ts>.json` pair.
+- `load` Load the que or server state from a .json file (`-ip`, default: the server's own), which then becomes the saved state

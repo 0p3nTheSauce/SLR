@@ -1,0 +1,12 @@
+[
+  {
+    "recorded": "2026-08-24 19:27:41",
+    "sweep_id": "imootel6",
+    "sweep_project": "WLASL-100_cutoff_9",
+    "sweep_entity": "ljgoodall2001-rhodes-university",
+    "model": "MViTv2_S_16x4_e",
+    "dataset": "WLASL",
+    "split": "asl100_cutoff_9",
+    "base_config": "/home/luke/Code/SLR/src/configfiles/sweeps/MViTv2_S_16x4_e/exp000/base.py"
+  }
+]

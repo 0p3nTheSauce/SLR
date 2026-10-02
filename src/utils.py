@@ -1,28 +1,32 @@
-from typing import List, Union, Tuple
-import torch
-import cv2
-from logging import Logger
-import numpy as np
-import matplotlib.pyplot as plt
-import re
-from pathlib import Path
-import shutil
-from argparse import ArgumentParser
-import wandb
-import time
-import subprocess
-from typing import Optional
-from multiprocessing.synchronize import Event as EventClass
+import importlib.util
 import math
-#locals
-from src.run_types import CONFIGS_PATH, ZFILL
+import re
+import shutil
+import subprocess
+import sys
+import time
+from argparse import ArgumentParser
+from logging import Logger
+from multiprocessing.synchronize import Event as EventClass
+from pathlib import Path
+from types import ModuleType
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
+import wandb
+
+# locals
+from src.run_types import ZFILL
 
 ################ GPU ###################
 
 
 class gpu_manager:
     @classmethod
-    def get_gpu_memory_usage(cls, gpu_id: int = 0) -> Tuple[float, float]:
+    def get_gpu_memory_usage(cls, gpu_id: int = 0) -> tuple[float, float]:
         """Get GPU usage across all processes
 
         Args:
@@ -34,7 +38,7 @@ class gpu_manager:
             ValueError: Failed to parse GPU memory usage:
 
         Returns:
-            Tuple[float, float]: used, total in GiB
+            tuple[float, float]: used, total in GiB
         """
 
         result = subprocess.run(
@@ -46,6 +50,7 @@ class gpu_manager:
             ],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode != 0:
             raise RuntimeError(f"nvidia-smi failed: {result.stderr.strip()}")
@@ -61,7 +66,7 @@ class gpu_manager:
         return used / 1024, total / 1024  # In GB
 
     @classmethod
-    def output(cls, logger: Optional[Logger], message: str) -> None:
+    def output(cls, logger: Logger | None, message: str) -> None:
         if logger is None:
             print(message)
         else:
@@ -75,8 +80,8 @@ class gpu_manager:
         num_checks: int = 5,  # confirm consistency over 5 minutes
         gpu_id: int = 0,
         max_util_gb: float = 1.0,  # Maximum memory usage in GB
-        logger: Optional[Logger] = None,
-        event: Optional[EventClass] = None,
+        logger: Logger | None = None,
+        event: EventClass | None = None,
     ) -> bool:
         """Wait for GPU memory to be free before proceeding
 
@@ -149,8 +154,8 @@ class gpu_manager:
 class wandb_manager:
     @classmethod
     def get_run_id(
-        cls, run_name, entity: str, project: str, idx: Optional[int] = None
-    ) -> Optional[str]:
+        cls, run_name, entity: str, project: str, idx: int | None = None
+    ) -> str | None:
         api = wandb.Api()
 
         runs = api.runs(f"{entity}/{project}")
@@ -181,7 +186,7 @@ class wandb_manager:
         disp: bool = False,
     ) -> list:
         """
-        List all runs for a given entity and project.
+        list all runs for a given entity and project.
 
         Args:
                                         entity (str): The wandb entity.
@@ -205,8 +210,8 @@ class wandb_manager:
         return runs
 
     @classmethod
-    def run_present(cls, run_id: str, runs: List) -> bool:
-        return any([run.id == run_id for run in runs])
+    def run_present(cls, run_id: str, runs: list) -> bool:
+        return any(run.id == run_id for run in runs)
 
     @classmethod
     def validate_runId(cls, run_id: str, entity: str, project: str) -> bool:
@@ -217,7 +222,7 @@ class wandb_manager:
         cls,
         entity: str,
         project: str,
-        run_id: Optional[str],
+        run_id: str | None,
     ) -> None:
         """Open wandb page in default browser.
         Args:
@@ -230,14 +235,35 @@ class wandb_manager:
             url = f"https://wandb.ai/{entity}/{project}/"
         else:
             url = f"https://wandb.ai/{entity}/{project}/runs/{run_id}"
-        subprocess.run(["xdg-open", url])
+        subprocess.run(["xdg-open", url], check=False)
 
 
 ################# Loading #####################
+def load_module_from_path(path: Path, module_prefix: str = "_module") -> ModuleType:
+    """Load an arbitrary .py file by path as a standalone module.
+
+    This works regardless of where `path` lives on disk - it doesn't need to
+    be on sys.path or part of any package.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"No such file: {path}")
+
+    module_name = f"{module_prefix}_{path.stem}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load spec for {path}")
+
+    module = importlib.util.module_from_spec(spec)
+    # Registering in sys.modules first lets the module's own top-level code
+    # (e.g. dataclasses, or anything doing `import module_name`) resolve
+    # correctly, and avoids it being garbage-collected mid-exec.
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def load_rgb_frames_from_video(
-    video_path: Union[str, Path], start: int, end: int, all: bool = False
+    video_path: str | Path, start: int, end: int, all: bool = False
 ) -> torch.Tensor:
     """Load frames from video into torch Tensor
 
@@ -254,7 +280,7 @@ def load_rgb_frames_from_video(
 
 
 def cv_load(
-    video_path: Union[str, Path], start: int, end: int, all: bool = False
+    video_path: str | Path, start: int, end: int, all: bool = False
 ) -> np.ndarray:
     """Load rgb frames from a video file
 
@@ -331,7 +357,7 @@ def watch_video(frames=None, path="", wait=33, title="Video"):
     if frames is None and not path:
         raise ValueError("pass either a tensor or path")
     elif frames is not None:
-        if not (isinstance(frames, torch.Tensor) or isinstance(frames, np.ndarray)):
+        if not (isinstance(frames, (torch.Tensor, np.ndarray))):
             raise ValueError("frames must be torch.Tensor or np.ndarray")
         if frames.dtype == torch.uint8:
             frames = torch_to_cv(frames)  # type: ignore
@@ -385,7 +411,7 @@ def show_bbox(frames, bbox):
     cv2.destroyAllWindows()
 
 
-def cv_display(frames: np.ndarray, output: Optional[Union[str, Path]] = None):
+def cv_display(frames: np.ndarray, output: str | Path | None = None):
     for i, frame in enumerate(frames):
         cv2.imshow("Cropped Frames", frame)  # Display the first frame
         cv2.waitKey(100)  # Wait for a key press to close the window
@@ -394,7 +420,7 @@ def cv_display(frames: np.ndarray, output: Optional[Union[str, Path]] = None):
     cv2.destroyAllWindows()
 
 
-def cv_save(frames: np.ndarray, output: Union[str, Path]):
+def cv_save(frames: np.ndarray, output: str | Path):
     Path(output).mkdir(parents=True, exist_ok=True)
     for i, img in enumerate(frames):
         cv2.imwrite(f"{output}/frame_{i:04d}.jpg", img)  # Save each frame as an image
@@ -403,32 +429,39 @@ def cv_save(frames: np.ndarray, output: Union[str, Path]):
     ################# Plot based #########################
 
 
+################## MATPLOT based ###################
+
 def plt_display(
     frames: torch.Tensor,
     num: int,
-    size: Tuple[float, float] = (5.0, 5.0),
+    size: tuple[float, float] = (5.0, 5.0),
     adapt: bool = False,
-    output: Optional[Union[str, Path]] = None,
+    output_dir: str | Path | None = None,
+    file_suffix: str = ".png",
+    dpi : float | None = None,
+    interpolation: str = 'antialiased'
 ):
     """
     Visualise a subset of frames using matplotlib.
 
     Args:
-                                    frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
-                                    num (int): Number of frames to display (evenly sampled). Must be >= 1.
-                                    size (tuple, optional): Figure size (width, height) in inches. Defaults to (5, 5).
-                                    adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
-                                    output (str | Path, optional): If provided, directory to save each plotted frame as 'frame{i}.png'.
+        frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
+        num (int): Number of frames to display (evenly sampled). Must be >= 1.
+        size (tuple, optional): Figure size (width, height) in inches. Defaults to (5, 5).
+        adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
+        output (str | Path | None, optional): If provided, directory to save each plotted frame as 'frame{i}.file_suffix'.
 
     Returns:
-                                    None
+        None
 
     Raises:
-                                    ValueError: If num < 1 or frames has incompatible shape.
+        ValueError: If num < 1 or frames has incompatible shape.
     """
-    if output:
-        output = Path(output)
+    if output_dir:
+        output = Path(output_dir)
         output.mkdir(parents=True, exist_ok=True)
+    else:
+        output = None
 
     if adapt:
         factor = 5 / 256
@@ -451,38 +484,42 @@ def plt_display(
         # Normalize to [0, 1] range
         np_frame = (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
 
-        plt.figure(figsize=size)
-        plt.imshow(np_frame)
+        plt.figure(figsize=size,dpi=dpi,)
+        plt.imshow(np_frame, interpolation=interpolation)
         plt.axis("off")
         if output:
-            plt.savefig(output / f"frame{i}.png", bbox_inches="tight", pad_inches=0)
+            plt.savefig(
+                (output / f"frame{i}").with_suffix(file_suffix),
+                bbox_inches="tight",
+                pad_inches=0,
+            )
         plt.show()
 
 
 def plt_display_grid(
     frames: torch.Tensor,
     num: int,
-    size: Tuple[float, float] = (5.0, 5.0),
+    size: tuple[float, float] = (5.0, 5.0),
     adapt: bool = False,
-    output: Optional[Union[str, Path]] = None,
+    output: str | Path | None = None,
     cols: int = 8,
 ):
     """
     Visualise a subset of frames in a grid layout using matplotlib.
 
     Args:
-                                    frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
-                                    num (int): Number of frames to display (evenly sampled). Must be >= 1.
-                                    size (tuple, optional): Size (width, height) in inches per cell. Defaults to (5, 5).
-                                    adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
-                                    output (str | Path, optional): If provided, saves the grid figure as output.
-                                    cols (int, optional): Maximum number of frames per row. Defaults to 8.
+        frames (torch.Tensor): 4D tensor of shape (T, C, H, W). Channels expected in RGB order.
+        num (int): Number of frames to display (evenly sampled). Must be >= 1.
+        size (tuple, optional): Size (width, height) in inches per cell. Defaults to (5, 5).
+        adapt (bool, optional): If True, scale `size` based on frame resolution. Defaults to False.
+        output (str | Path, optional): If provided, saves the grid figure as output.
+        cols (int, optional): Maximum number of frames per row. Defaults to 8.
 
     Returns:
-                                    None
+        None
 
     Raises:
-                                    ValueError: If num < 1 or frames has incompatible shape.
+        ValueError: If num < 1 or frames has incompatible shape.
     """
     if num < 1:
         raise ValueError("num must be >= 1")
@@ -497,7 +534,7 @@ def plt_display_grid(
     sampled = frames[::step][:num]
 
     rows = math.ceil(len(sampled) / cols)
-    fig, axes = plt.subplots(
+    _fig, axes = plt.subplots(
         rows,
         cols,
         figsize=(size[0] * cols, size[1] * rows),
@@ -599,9 +636,6 @@ def plot_from_lists(
 ##################### Misc ###################################
 
 
-def to_mark_down(configs_path: Path = Path(CONFIGS_PATH)):
-    pass
-
 def extract_num(fname):
     num_substrs = re.findall(r"\d+", fname)
     if len(num_substrs) > 1:
@@ -656,7 +690,10 @@ def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
             path_str += "0".zfill(decimals)
         path = Path(path_str)
         while path.exists():
-            num = int(path_str[-decimals:])
+            try: 
+                num = int(path_str[-decimals:])
+            except ValueError:
+                raise ValueError(f"Failed to parse number from path: {path_str}")
             path_str = path_str[:-decimals] + str(num + 1).zfill(decimals)
             path = Path(path_str)
     if make:
@@ -672,8 +709,10 @@ def is_removable(f: Path, rem_files: list[str]) -> bool:
             return True
     return False
 
+
 def is_empty(path):
     return not any(Path(path).iterdir())
+
 
 def clean_checkpoint_dirs(
     path: Path,
@@ -681,9 +720,9 @@ def clean_checkpoint_dirs(
     add_zfill: bool = True,
     decimals: int = ZFILL,
     rem_empty: bool = False,
-    rem_files: List[str] = [],
+    rem_files: list[str] | None = None,
     key_word: str = "checkpoint",
-    ignore_keywords: List[str] = ["best"],
+    ignore_keywords: list[str] | None = None,
 ) -> None:
     """Clean run checkpoint directories in an experiment folder, keeping only the last checkpoint and any with ignore_keywords in the name. Optionally remove empty directories and files with specified suffixes.
 
@@ -693,11 +732,15 @@ def clean_checkpoint_dirs(
         add_zfill (bool, optional): Whether to zfill the checkpoint numbers. Defaults to True.
         decimals (int, optional): Number of digits to zfill by. Defaults to 3.
         rem_empty (bool, optional): Whether to remove empty directories. Defaults to False.
-        rem_files (List[str], optional): List of file suffixes to remove. Defaults to [str].
+        rem_files (list[str], optional): list of file suffixes to remove. Defaults to [str].
         key_word (str, optional): Keyword to identify checkpoint directories. Defaults to "checkpoint".
-        ignore_keywords (List[str], optional): List of keywords to ignore when selecting checkpoint directories. Defaults to ["best"].
+        ignore_keywords (list[str], optional): list of keywords to ignore when selecting checkpoint directories. Defaults to ["best"].
     """
 
+    if ignore_keywords is None:
+        ignore_keywords = ["best"]
+    if rem_files is None:
+        rem_files = []
     remove = rem_empty
     path_obj = Path(path)
     check_point_dirs = [
@@ -705,8 +748,8 @@ def clean_checkpoint_dirs(
         for item in path_obj.iterdir()
         if item.is_dir() and key_word in item.name
     ]
-    
-    #Remove files with specified suffixes in rem_files 
+
+    # Remove files with specified suffixes in rem_files
     if rem_files:
         to_rem = [p for p in path_obj.iterdir() if is_removable(p, rem_files)]
         for f in to_rem:
@@ -723,9 +766,9 @@ def clean_checkpoint_dirs(
             else:
                 print(f"Skipping {f}")
 
-    #Removing empty directories
+    # Removing empty directories
     if len(check_point_dirs) == 0 or all(
-        [is_empty(path_obj / d) for d in check_point_dirs]
+        is_empty(path_obj / d) for d in check_point_dirs
     ):
         if ask and rem_empty:
             print(f"No checkpoints found in {path}")
@@ -753,7 +796,12 @@ def clean_checkpoint_dirs(
         to_empty = path_obj / check
 
         dirty = sorted([item.name for item in to_empty.iterdir() if item.is_file()])
-        files = [file for file in dirty if file.endswith(".pth") and not any(keyword in file for keyword in ignore_keywords)]
+        files = [
+            file
+            for file in dirty
+            if file.endswith(".pth")
+            and not any(keyword in file for keyword in ignore_keywords)
+        ]
 
         if add_zfill:
             for i, f in enumerate(files):
@@ -766,7 +814,7 @@ def clean_checkpoint_dirs(
             continue
 
         # leave best.pth and the last checkpoint
-        to_remove = files[:-1]  
+        to_remove = files[:-1]
         if ask:
             ans = "none"
             while ans != "y" and ans != "" and ans != "n":
@@ -788,21 +836,23 @@ def recursive_cleaner(
     path: str | Path,
     ask: bool = False,
     rem_empty: bool = False,
-    rem_files: List[str] = [],
+    rem_files: list[str] | None = None,
     stopping_keyword="checkpoints",
 ):
-    """Recursively clean runs checkpoints and miscilaneaous files 
+    """Recursively clean runs checkpoints and miscilaneaous files
 
     Args:
         path (str | Path): Base runs directory to clean
         ask (bool, optional): Whether to ask for confirmation before removing files. Defaults to False.
         rem_empty (bool, optional): Whether to remove empty directories. Defaults to False.
-        rem_files (List[str], optional): List of file suffixes to remove. Defaults to [].
+        rem_files (list[str], optional): list of file suffixes to remove. Defaults to [].
         stopping_keyword (str, optional): Keyword to identify checkpoint directories. Defaults to "checkpoints".
 
     Raises:
         FileNotFoundError: If the provided path does not exist
     """
+    if rem_files is None:
+        rem_files = []
     path_obj = Path(path)
 
     if not path_obj.exists():
@@ -852,8 +902,6 @@ def main():
         rem_empty=args.remove_empty,
         rem_files=args.remove_files,
     )
-
-
 
 
 if __name__ == "__main__":

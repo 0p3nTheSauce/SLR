@@ -18,27 +18,25 @@ Naming convention:
 """
 
 import json
+import logging
+from collections import defaultdict
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import (
-	List,
-	Dict,
-	TypedDict,
-	TypeAlias,
-	Literal,
-	Optional,
-	Union,
 	Any,
-	Iterable,
-	Callable,
+	Literal,
+	TypeAlias,
+	TypedDict,
 )
-import logging
 
-# locals
-from src.preprocess import RawInstance, WLASLClass, Instance
-from src.run_types import AVAIL_SETS, AVAIL_SPLITS
-from src.video_dataset import get_labels_path, load_data_from_json, get_wlasl_info
+import pandas as pd
+
 from src.configs import get_class_list
 
+# locals
+from src.preprocess import Instance, RawInstance, WLASLClass
+from src.run_types import AVAIL_SETS, AVAIL_SPLITS
+from src.video_dataset import get_labels_path, get_wlasl_info, load_data_from_json
 
 stats_logger = logging.getLogger(__name__)
 
@@ -68,16 +66,15 @@ def get_n(
 ) -> dict:
 	return {
 		k: v
-		for k, v in list(sorted(distribution.items(), key=key))[
+		for k, v in sorted(distribution.items(), key=key)[
 			start_index : start_index + n : step
 		]
 	}
 
 
-class HistoGram(Dict[Any, int]):
+class HistoGram(dict[Any, int]):
 	"""Represents a histogram with value : count"""
 
-	pass
 
 
 def make_histogram(values: Iterable) -> HistoGram:
@@ -117,7 +114,7 @@ class set_stats(TypedDict):
 
 	num_instances: int
 	num_signers: int
-	per_instance_stats: Dict[str, instance_stats]  # key is the class name
+	per_instance_stats: dict[str, instance_stats]  # key is the class name
 
 
 class split_stats(TypedDict):
@@ -126,7 +123,7 @@ class split_stats(TypedDict):
 	num_classes: int
 	num_instances: int
 	num_signers: int
-	per_set_stats: Dict[AVAIL_SETS, set_stats]
+	per_set_stats: dict[AVAIL_SETS, set_stats]
 
 
 # SET MANIPULATION
@@ -143,30 +140,36 @@ class preproc_class_dict(TypedDict):
 	"""
 
 	gloss: str
-	instances: List[Instance]
+	instances: list[Instance]
 
 
 def reverse_preproc_format(
-	preproc_instances: List[Instance],
-	classes: Optional[List[str]] = None,
-) -> List[preproc_class_dict]:
-	"""Convert from flat preprocessed format to original class seperated format"""
-	num_classes = len(set([inst.label_num for inst in preproc_instances]))
-	lst_ppcd = [preproc_class_dict(gloss="empty", instances=[])] * num_classes
+	preproc_instances: list[Instance],
+	classes: list[str] | None = None,
+) -> list[preproc_class_dict]:
+	"""Convert from flat preprocessed format to original class seperated format.
+
+	The result is indexed by `label_num` and runs up to the largest label present, so a
+	class with no instances in this set still gets an (empty) slot. Its gloss is taken
+	from `classes`, which is therefore required if any label below the maximum is absent.
+	"""
+	by_label: dict[int, list[Instance]] = defaultdict(list)
+	names: dict[int, str] = {}
 	for pp_inst in preproc_instances:
-		label_num = pp_inst.label_num
-		entry = lst_ppcd[label_num]
-		if entry["gloss"] == "empty":
-			if hasattr(pp_inst, "label_name"):
-				# if "label_name" in pp_inst:
-				gloss = pp_inst.label_name
-			elif classes is not None:
-				gloss = classes[pp_inst.label_num]
-			else:
-				raise ValueError("instance does not contain the key: label_name")
-			lst_ppcd[label_num] = preproc_class_dict(gloss=gloss, instances=[pp_inst])
+		by_label[pp_inst.label_num].append(pp_inst)
+		names[pp_inst.label_num] = pp_inst.label_name
+
+	lst_ppcd: list[preproc_class_dict] = []
+	for label_num in range(max(by_label, default=-1) + 1):
+		if label_num in names:
+			gloss = names[label_num]
+		elif classes is not None:
+			gloss = classes[label_num]
 		else:
-			lst_ppcd[label_num]["instances"].append(pp_inst)
+			raise ValueError(
+				f"No instances with label_num {label_num}, and no `classes` to name it from"
+			)
+		lst_ppcd.append(preproc_class_dict(gloss=gloss, instances=by_label[label_num]))
 
 	return lst_ppcd
 
@@ -176,9 +179,9 @@ def _ident(_):
 	return True
 
 def to_preproc_format(
-	gloss_seperated_instances: List[preproc_class_dict],
+	gloss_seperated_instances: list[preproc_class_dict],
 	criterion: Callable[[preproc_class_dict], bool] = _ident,
-) -> List[Instance]:
+) -> list[Instance]:
 	"""Undo reverse_preproc_format, converting from class seperated format to flat preprocessed format"""
 	preproc_instances = []
 	for gloss in gloss_seperated_instances:
@@ -187,7 +190,7 @@ def to_preproc_format(
 	return preproc_instances
 
 
-def get_set(instances: List[RawInstance], set_name: AVAIL_SETS) -> List[RawInstance]:
+def get_set(instances: list[RawInstance], set_name: AVAIL_SETS) -> list[RawInstance]:
 	"""Filters instances to only include those belonging to a specific set (train/val/test)."""
 	filtered_instances = []
 	for instance in instances:
@@ -197,17 +200,17 @@ def get_set(instances: List[RawInstance], set_name: AVAIL_SETS) -> List[RawInsta
 
 
 def seperate_by_set(
-	glosses: List[WLASLClass],
-) -> Dict[AVAIL_SETS, List[WLASLClass]]:
+	glosses: list[WLASLClass],
+) -> dict[AVAIL_SETS, list[WLASLClass]]:
 	"""Separates glosses by their set (train/val/test)."""
-	set_names: List[AVAIL_SETS] = ["train", "val", "test"]
-	sets: Dict[AVAIL_SETS, List[WLASLClass]] = {name: [] for name in set_names}
+	set_names: list[AVAIL_SETS] = ["train", "val", "test"]
+	sets: dict[AVAIL_SETS, list[WLASLClass]] = {name: [] for name in set_names}
 	for gloss in glosses:
 		instances = gloss.instances
-		for set_name in sets.keys():
+		for set_name, set_val in sets.items():
 			filtered_instances = get_set(instances, set_name)
 
-			sets[set_name].append(
+			set_val.append(
 				WLASLClass.model_validate(
 					{"gloss": gloss.gloss, "instances": filtered_instances}
 				)
@@ -217,7 +220,7 @@ def seperate_by_set(
 
 def retrieve_split_data(
 	split: AVAIL_SPLITS, labels_dir: Path, pattern: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
 
 	split_dir = labels_dir / split
 	objects = {}
@@ -230,13 +233,17 @@ def retrieve_split_data(
 
 def get_all_sets(
 	split_name: AVAIL_SPLITS,
-	set_options: List[AVAIL_SETS] = ["train", "test", "val"],  # type: ignore
-	classes: List[str] = get_class_list(),
+	set_options: list[AVAIL_SETS] | None = None,  # type: ignore
+	classes: list[str] | None = None,
 	logger: logging.Logger = stats_logger,
 ) -> dict[str, list[preproc_class_dict]]:
 	"""Load a particular set (e.g. asl100) into a dictionary with the available sets as keys.
 	The values, are in the original WLASL format. 
 	"""
+	if set_options is None:
+		set_options = ["train", "test", "val"]
+	if classes is None:
+		classes = get_class_list()
 	all_sets = {}
 	for set_name in set_options:
 		set_path_info = get_wlasl_info(split_name, set_name)
@@ -255,7 +262,7 @@ def get_all_sets(
 
 
 def collect_instance_stats(
-	instances: Union[List[Instance], List[RawInstance]],
+	instances: list[Instance] | list[RawInstance],
 ) -> instance_stats:
 	"""Collects statistics for a single class based on its instances.
 
@@ -298,7 +305,7 @@ def collect_instance_stats(
 	)
 
 
-def get_per_instance_stats(glosses: List[WLASLClass]) -> Dict[str, instance_stats]:
+def get_per_instance_stats(glosses: list[WLASLClass]) -> dict[str, instance_stats]:
 	"""Collects statistics for all classes in a list of WLASLClasss (recommend seperating into test/val/train first)"""
 	per_instance_stats = {}
 	for gloss in glosses:
@@ -308,7 +315,7 @@ def get_per_instance_stats(glosses: List[WLASLClass]) -> Dict[str, instance_stat
 	return per_instance_stats
 
 
-def get_unique_signers(dataset: List[WLASLClass]) -> set[int]:
+def get_unique_signers(dataset: list[WLASLClass]) -> set[int]:
 	"""Get set of unique sighners in a list of WLASLClasss"""
 	signers = set()
 	for gloss_d in dataset:
@@ -317,7 +324,7 @@ def get_unique_signers(dataset: List[WLASLClass]) -> set[int]:
 	return signers
 
 
-def get_num_instances(dataset: List[WLASLClass]) -> int:
+def get_num_instances(dataset: list[WLASLClass]) -> int:
 	"""Get the number of instances in a dataset"""
 
 	num_instances = 0
@@ -326,7 +333,7 @@ def get_num_instances(dataset: List[WLASLClass]) -> int:
 	return num_instances
 
 
-def get_set_stats(subset: List[WLASLClass]) -> set_stats:
+def get_set_stats(subset: list[WLASLClass]) -> set_stats:
 	"""Get stats for a particular set (one of test/val.train, seperate first)"""
 	return set_stats(
 		num_instances=get_num_instances(subset),
@@ -335,7 +342,7 @@ def get_set_stats(subset: List[WLASLClass]) -> set_stats:
 	)
 
 
-def get_per_set_stats(glosses: List[WLASLClass]) -> Dict[AVAIL_SETS, set_stats]:
+def get_per_set_stats(glosses: list[WLASLClass]) -> dict[AVAIL_SETS, set_stats]:
 	"""Seperates into sets, then returns stats per set"""
 	sets = seperate_by_set(glosses)
 	per_set_stats = {}
@@ -344,7 +351,7 @@ def get_per_set_stats(glosses: List[WLASLClass]) -> Dict[AVAIL_SETS, set_stats]:
 	return per_set_stats
 
 
-def get_split_stats(split: List[WLASLClass]) -> split_stats:
+def get_split_stats(split: list[WLASLClass]) -> split_stats:
 	return split_stats(
 		num_classes=len(split),
 		num_instances=get_num_instances(split),
@@ -352,6 +359,85 @@ def get_split_stats(split: List[WLASLClass]) -> split_stats:
 		per_set_stats=get_per_set_stats(split),
 	)
 
+
+# -----------------------------------------------------------------------------------------------------------
+# correlation_f1_instances.ipynb:
+# -----------------------------------------------------------------------------------------------------------
+
+def get_min_max_num_instances(per_instance_stats: dict[str, instance_stats]) -> tuple[int, int]:
+    """Returns the minumum and maximum number of instances in a dictionary of instance stats
+
+    Args:
+        per_instance_stats (Dict[str, stats.instance_stats]): A dictionary with stats for each class indexed by label_name
+
+    Returns:
+        Tuple[int, int]: min, max number of instances.
+    """
+    mini = float('inf')
+    maxi = float(0)
+    for inst_stats in per_instance_stats.values():
+        num_inst = inst_stats['num_instances']
+        maxi = max(maxi, num_inst)
+        mini = min(mini, num_inst)
+    return int(mini), int(maxi) 
+
+def get_min_max_num_signers(per_instance_stats: dict[str, instance_stats]) -> tuple[int, int]:
+    """Returns the minumum and maximum number of signers in a dictionary of instance stats
+
+    Args:
+        per_instance_stats (Dict[str, stats.instance_stats]): A dictionary with stats for each class indexed by label_name
+
+    Returns:
+        Tuple[int, int]: min, max number of signers.
+    """
+    mini = float('inf')
+    maxi = float(0)
+    for inst_stats in per_instance_stats.values():
+        num_signers = len(inst_stats['signers_distribution'])
+        maxi = max(maxi, num_signers)
+        mini = min(mini, num_signers)
+    return int(mini), int(maxi) 
+
+def create_instances_table(per_set_stats: dict[AVAIL_SETS, set_stats]) -> pd.DataFrame:
+    rows = []
+    for set_name, set_stats in per_set_stats.items():
+        mini_i, maxi_i = get_min_max_num_instances(set_stats['per_instance_stats'])
+        mini_s, maxi_s = get_min_max_num_signers(set_stats['per_instance_stats'])
+        rows.append({
+            'Set name': set_name,
+            'Num instances': set_stats['num_instances'],
+            'Num signers': set_stats['num_signers'],
+            'instances per gloss': f'[{mini_i} - {maxi_i}]',
+            'signers per gloss': f'[{mini_s} - {maxi_s}]'
+        })
+
+    return pd.DataFrame(rows)
+
+
+def create_split_summary_table(split: split_stats) -> pd.DataFrame:
+    """Per-set (train/val/test) instance/signer/class counts for one split, ready for `.to_latex()`."""
+    rows = []
+    for set_name, s in split["per_set_stats"].items():
+        rows.append({
+            "Set": set_name,
+            "Instances": s["num_instances"],
+            "Signers": s["num_signers"],
+            "Classes": len(s["per_instance_stats"]),
+        })
+    return pd.DataFrame(rows)
+
+
+def create_class_stats_table(subset: set_stats) -> pd.DataFrame:
+    """Per-gloss instance/signer/variation counts for one set, ready for `.to_latex()`."""
+    rows = []
+    for gloss, cstats in subset["per_instance_stats"].items():
+        rows.append({
+            "Gloss": gloss,
+            "Instances": cstats["num_instances"],
+            "Signers": len(cstats["signers_distribution"]),
+            "Variations": len(cstats["variation_distribution"]),
+        })
+    return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":

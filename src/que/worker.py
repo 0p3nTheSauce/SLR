@@ -1,33 +1,66 @@
-import os
-from typing import Optional, IO, cast
-import traceback
-import torch
 import gc
-import logging
-from logging import Logger
-from contextlib import redirect_stdout
 import io
-
+import json
+import logging
+import os
+import traceback
+from contextlib import redirect_stdout
+from logging import Logger
 from multiprocessing.synchronize import Event as EventClass
+from pathlib import Path
+from typing import IO, cast
 
-from run_types import RunInfo
+import torch
+from pydantic import ValidationError
+
+import wandb
+from src.que.core import (
+    CUR_RUN,
+    WORKER_NAME,
+    CompExpInfo,
+    Que,
+    QueException,
+    SweepInfo,  # now also carries model/split/dataset -- see note below
+    WorkerStateDict,
+    connect_manager,
+    setup_server_logging,
+    setup_training_logging,
+    sweep_info_validate,
+)
+from src.run_types import RunInfo, WandbInfo
+from src.sweeping import create_sweep_run
 
 # locals
 from src.testing import full_test
-from src.que.core import (
-    connect_manager,
-    TRAINING_LOG_PATH,
-    WORKER_NAME,
-    SERVER_LOG_PATH,
-    TRAINING_NAME,
-    QueException,
-    WorkerStateDict,
-    CompExpInfo,
-    Que,
-)
-
+from src.training import _setup_wandb, train_loop
 from src.utils import gpu_manager
-from src.training import train_loop, _setup_wandb
+
+
+def _is_wandb_injected_stop(exc: Exception) -> bool:
+    """Heuristic for wandb's Hyperband/early-terminate stop signal.
+
+    wandb kills an in-process sweep trial (no subprocess to terminate) via
+    ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, Exception) -- see
+    wandb/agents/pyagent.py's _terminate_thread. That raises the bare `Exception`
+    class with no args wherever the thread happens to be executing. A base
+    `Exception` with an empty message is not otherwise raised anywhere in this
+    codebase (see src/que/todo), so this is a reliable-in-practice signature,
+    not a certainty.
+    """
+    return type(exc) is Exception and not exc.args
+
+
+class SweepTrialFailed(Exception):
+    """A sweep trial crashed inside wandb.agent's callback.
+
+    wandb's agent swallows any exception from the callback (see Worker._sweep_train), so the
+    original is recorded there and re-raised as this from Worker.sweep() once wandb.agent returns
+    -- making the worker process exit non-zero so the Daemon's stop_on_fail applies, the same as
+    a crash in Worker.train(). The original exception is chained as `__cause__`.
+    """
+
+    def __init__(self, sweep_id: str):
+        super().__init__(f"Sweep {sweep_id} trial failed")
 
 
 class LoggerWriter(io.TextIOBase):
@@ -52,28 +85,38 @@ class Worker:
         server_logger: Logger,
         que: Que,
         state: WorkerStateDict,
-        stop_event: Optional[EventClass] = None,
+        stop_event: EventClass | None = None,
         do_traceback: bool = True
     ) -> None:
         self.server_logger = server_logger
         self.que = que
-        self.stop_event: Optional[EventClass] = stop_event
+        self.stop_event: EventClass | None = stop_event
         self.state = state
         self.do_traceback = do_traceback
+        self.sweep_info: SweepInfo | None = None
+        self._trial_error: Exception | None = None
         self.server_logger.info("Worker initialized")
 
 
     def build_exception_info(self, e: Exception) -> str:
         if self.do_traceback:
-            return f"{str(e)}\n{traceback.format_exc()}"
+            return f"{e!s}\n{traceback.format_exc()}"
         else:
             return str(e)
+
+    def _fail(self, exc: Exception, label: str, clear_pid: bool = True) -> None:
+        """Shared failure-path state update for train/sweep/test except blocks."""
+        self.server_logger.info(f"{label}: {exc}")
+        self.state['exception'] = self.build_exception_info(exc)
+        if clear_pid:
+            self.state['working_pid'] = None
 
     def get_state(self) -> WorkerStateDict:
         return self.state
 
     def set_state(self, state: WorkerStateDict) -> None:
-        self.state = state
+        """Update the state in place, so references to it (e.g. the Daemon's) stay valid."""
+        self.state.update(state)
 
     def seperator(self, r_str: str) -> str:
         sep = ""
@@ -98,7 +141,7 @@ class Worker:
         self.server_logger.debug(f"GPU memory after cleanup: {used}/{total} GiB")
 
     def _train(self) -> None:
-
+        #TODO: gets stuck if the GPU was actually busy, whole server process needs to be restarted
         if not gpu_manager.wait_for_completion(
             check_interval=10,
             logger=self.server_logger,
@@ -112,7 +155,6 @@ class Worker:
 
         # prepare next run (move from to_run -> cur_run)
         run_sum = self.que.stash_next_run()
-        self.que.save_state()
 
         # print a seperator between runs
         self.server_logger.info(self.seperator(run_sum))
@@ -136,14 +178,23 @@ class Worker:
         self.state['current_run_id'] = run.id
 
         self.server_logger.info("saving my id")
-        _ = self.que.pop_cur_run()
-        self.que.set_cur_run(info)
-        self.que.save_state()
+        self.que.replace_cur_run(info)
 
         self.server_logger.info(f"Run ID: {run.id}")
         self.server_logger.info(f"Run name: {run.name}")  # Human-readable name
         self.server_logger.info(f"Run path: {run.path}")  # entity/project/run_id format
 
+        # NOTE (see src/que/todo, Server section): print() output during train_loop
+        # only reaches this redirect target, never wandb's own console capture --
+        # confirmed empirically, not just a block-scoping issue. wandb patches the
+        # *write method* of whichever object is sys.stdout at first `import wandb`
+        # (wandb/sdk/lib/console_capture.py), once, permanently, before this
+        # redirect ever runs. Reassigning sys.stdout to self.log_adapter here means
+        # print() calls sys.stdout.write() on our object instead, which never
+        # touches wandb's patched object -- no amount of restructuring these
+        # `with` blocks changes that. A real fix has to either stop reassigning
+        # sys.stdout during training, or additionally register self.log_adapter's
+        # write via wandb.sdk.lib.console_capture.capture_stdout(...) directly.
         with redirect_stdout(self.log_adapter):
             train_loop(
                 admin.model,
@@ -155,38 +206,6 @@ class Worker:
             run.finish(exit_code=0)
 
         self.server_logger.info("_train method completed successfully")
-
-    def train(self) -> None:
-        """
-        The train method is the main entry point for training a model.
-        Currently implemented to be in a process started by the Daemon.
-        """
-        try:
-            # self.state.task = "training"
-            self.state['task'] = "training"
-            self._train()
-        except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = self.build_exception_info(Qe)
-            self.state['working_pid'] = None
-            raise
-        except KeyboardInterrupt:
-            self.server_logger.info("Worker killed by user")
-            self.state['exception'] = "KeyboardInterrupt"
-            self.state['working_pid'] = None
-            raise
-        except Exception as e:
-            self.server_logger.error(f"Training run failed due to an error: {e}")
-            self.state['exception'] = self.build_exception_info(e)
-            self.state['working_pid'] = None
-            self.que.stash_failed_run(str(e))
-            self.que.save_state()
-            # exit with error
-            raise
-        finally:
-            self.cleanup()
-            # self.state.task = "inactive"
-            self.state['task'] = "inactive"
 
     def _test(self) -> None:
         """Tests the run in cur_runs and moves to old_runs"""
@@ -211,102 +230,243 @@ class Worker:
             model_params=fin_run.model_params,
             data=fin_run.data,
             scheduler=fin_run.scheduler,
-            early_stopping=fin_run.early_stopping,
+            stopping=fin_run.stopping,
             wandb=fin_run.wandb,
             results=results,
         )
-        _ = self.que.pop_cur_run()
-        self.que.set_cur_run(comp_run)
-        self.que.store_fin_run()
+        self.que.store_fin_run(comp_run)
         self.server_logger.info("Exiting _test method")
+
+    def _inject_sweep_config(self, config: RunInfo, run_id: str) -> None:
+        """Injects the sweep config into the Que"""
+        assert self.sweep_info is not None, "_inject_sweep_config called without sweep_info set"
+        wandb_i = WandbInfo(
+            entity=self.sweep_info["sweep_entity"],
+            project=self.sweep_info["sweep_project"],
+            run_id=run_id,
+            sweep_id=self.sweep_info["sweep_id"],
+            tags=["sweep"],
+        )
+        self.server_logger.debug(f"Injecting run: {json.dumps(config.model_dump())}")
+        self.que.add_new_run(config, wandb_i, loc=CUR_RUN) # inject directly into cur_run, and skip the move from to_run -> cur_run step in _train, since the sweep controller already sampled the hyperparameters for this trial
+
+    def _sweep_train(self) -> None:
+        """Callback passed to wandb.agent(function=...). Runs in-process, in
+        the thread the agent invokes it on -- NOT a separate process, so when
+        wandb's backend decides to early-stop this trial (e.g. hyperband), it
+        has no subprocess to kill and instead injects a bare exception into
+        this thread (see _is_wandb_injected_stop). That case is detected and
+        logged below rather than fixed at the root -- running each trial in
+        an actual subprocess would sidestep the injected-exception mechanism
+        entirely, but that's a bigger change than this handles.
+
+        wandb's own agent thread (pyagent.py's _run_job) swallows *any*
+        exception raised here unconditionally and never re-raises, so every
+        other failure -- in create_sweep_run, the que injection, or training --
+        is handled here: recorded in worker state, stashed to fail_runs if the
+        run already reached cur_run (which also makes Worker.start() skip
+        testing), and saved to `_trial_error` for Worker.sweep() to re-raise
+        once wandb.agent returns. A trial that finishes -- naturally or via a
+        hyperband stop -- is left in cur_run for Worker.start() to test; it
+        counts towards the sweep's progress once it reaches old_runs (see
+        ServerContext.sweep_completed_runs).
+        """
+        if not gpu_manager.wait_for_completion(
+            check_interval=10,
+            logger=self.server_logger,
+            event=self.stop_event,
+        ):
+            # only returns False when stopped (stop event / Ctrl+C), so not a failure
+            self.server_logger.info("GPU not available, exiting")
+            return
+        else:
+            self.server_logger.info("GPU is available")
+
+        try:
+            self._run_sweep_trial()
+        except Exception as e:  # noqa: BLE001
+            if _is_wandb_injected_stop(e):
+                self.server_logger.info(
+                    f"Sweep trial {self.state['current_run_id']} was stopped early by wandb (e.g. hyperband "
+                    "early-terminate); continuing to testing with the last saved checkpoint"
+                )
+                return
+            self._fail(e, "Sweep trial failed due to an error")
+            if self.que.len_loc(CUR_RUN) == 1:
+                self.que.stash_failed_run(self.build_exception_info(e))
+            self._trial_error = e
+            return
+
+        self.server_logger.info("_sweep_train method completed successfully")
+
+    def _run_sweep_trial(self) -> None:
+        """Build, register and train one sweep trial (the body of _sweep_train).
+
+        Unlike _train, there's no que injection step beforehand: create_sweep_run
+        builds the RunInfo directly from this trial's sweep-sampled hyperparameters,
+        so there's nothing sitting in TO_RUN for this run.
+        """
+        assert self.sweep_info is not None, "_run_sweep_trial called without sweep_info set"
+
+        with redirect_stdout(self.log_adapter):
+            config, run = create_sweep_run(
+                model=self.sweep_info["model"],
+                split=self.sweep_info["split"],
+                config_path=Path(self.sweep_info['base_config']),
+                dataset=self.sweep_info["dataset"],
+            )
+
+        #inject the sweep config into the Que for recovery/state tracking
+        self._inject_sweep_config(config, run.id)
+
+        self.state['current_run_id'] = run.id
+        self.server_logger.info(f"Run ID: {run.id}")
+        self.server_logger.info(f"Run name: {run.name}")
+        self.server_logger.info(f"Run path: {run.path}")
+
+        # NOTE (see src/que/todo, Server section): this redirect means wandb's own
+        # console capture never sees train_loop's print() output -- see _train's
+        # matching comment for the actual mechanism (it's not a block-scoping bug).
+        with redirect_stdout(self.log_adapter):
+            train_loop(
+                config.admin.model,
+                config,
+                run,
+                recover=False,
+                event=self.stop_event,
+            )
+        run.finish(exit_code=0)
+
+    def _reattach_server_logger(self):
+        """Set up logging to Server.log in the spawned worker process (see setup_server_logging)."""
+        setup_server_logging()
+        self.server_logger = logging.getLogger(WORKER_NAME)
+
+    def _attach_training_loggers(self):
+        """Set up the training logger in the spawned worker process, and the stdout adapter that
+        redirects training output to it."""
+        self.training_logger = setup_training_logging()
+        self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
+
+    def train(self) -> None:
+        """
+        The train method is the main entry point for training a model.
+        Currently implemented to be in a process started by the Daemon.
+        """
+        try:
+            self.training_logger.info("Starting training run")
+            self.state['task'] = "training"
+            self._train()
+        except QueException as e:
+            self._fail(e, "que based error, cannot continue")
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.state['exception'] = "KeyboardInterrupt"
+            self.state['working_pid'] = None
+            raise
+        except Exception as e:
+            self._fail(e, "Training run failed due to an error")
+            self.que.stash_failed_run(str(e))
+            raise
+        finally:
+            self.cleanup()
+            self.state['task'] = "inactive"
+
+    def sweep(self, sweep_info: SweepInfo) -> None:
+        """Run one sweep trial via wandb.agent.
+
+        Raises:
+            SweepTrialFailed: If the trial failed inside wandb.agent's callback (which wandb
+                itself swallows -- see _sweep_train), so the worker exits non-zero.
+        """
+        self.sweep_info = sweep_info
+        self._trial_error = None
+        try:
+            sweep_info_validate(sweep_info)
+            self.training_logger.info(f"Starting sweep trial: {sweep_info['sweep_id']}")
+            self.state['task'] = "training"
+            wandb.agent(
+                sweep_info["sweep_id"],
+                entity=sweep_info["sweep_entity"],
+                project=sweep_info["sweep_project"],
+                function=self._sweep_train,
+                count=1,
+            )
+        except (QueException, ValidationError) as e:
+            self._fail(e, f"{type(e).__name__} — cannot continue")
+            raise
+        except KeyboardInterrupt:
+            self.server_logger.info("Worker killed by user")
+            self.state['exception'] = "KeyboardInterrupt"
+            self.state['working_pid'] = None
+            raise
+        except Exception as e:
+            # Only for things raised outside wandb's callback thread (e.g. wandb.agent
+            # itself); failures inside it are handled by _sweep_train and re-raised below.
+            self._fail(e, "Sweep trial failed due to an error")
+            if self.que.len_loc(CUR_RUN) == 1:
+                self.que.stash_failed_run(str(e))
+            raise
+        finally:
+            self.cleanup()
+            self.state['task'] = "inactive"
+
+        # outside the try, so the handlers above don't re-record an already-recorded failure
+        if self._trial_error is not None:
+            raise SweepTrialFailed(sweep_info["sweep_id"]) from self._trial_error
 
     def test(self) -> None:
         try:
             self.state['task'] = "testing"
             self._test()
-        except QueException as Qe:
-            self.server_logger.info(f"que based error, cannot continue: {Qe}")
-            self.state['exception'] = self.build_exception_info(Qe)
+        except QueException as e:
+            self._fail(e, "que based error, cannot continue", clear_pid=False)
             raise
         except KeyboardInterrupt:
             self.server_logger.info("Worker killed by user")
             self.state['exception'] = "KeyboardInterrupt"
+            raise
         except Exception as e:
-            self.server_logger.error(f"Testing run failed due to an error: {e}")
             err_str = self.build_exception_info(e)
-            self.state['exception'] = err_str
+            self._fail(e, "Testing run failed due to an error")
             self.que.stash_failed_run(err_str)
-            self.que.save_state()
-            # exit with error
             raise
         finally:
             self.cleanup()
             self.state['current_run_id'] = None
             self.state['task'] = "inactive"
 
-    def _reset_state(self):
-        self.set_state(
-            WorkerStateDict(
-                task="inactive", current_run_id=None, working_pid=None, exception=None
-            )
-        )
 
-    def _reattach_server_logger(self):
-        """Re-attach the server log file handler in a spawned child process."""
-        logger = logging.getLogger(WORKER_NAME)
-        if not logger.handlers:  # avoid duplicate handlers on repeated calls
-            handler = logging.FileHandler(SERVER_LOG_PATH)
-            handler.setLevel(logging.DEBUG)
-            handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-                )
-            )
-            logger.addHandler(handler)
-            logger.setLevel(logging.DEBUG)
-        self.server_logger = logger
+    def start(self, sweep_info: SweepInfo | None = None) -> None:
+        """Run one unit of work: a trial of `sweep_info` if the Daemon handed one over, otherwise
+        the next run in the Que. Started in a separate process, so it connects to the manager."""
 
-    def _attach_training_loggers(self):
-        """Attach the training log file hanlder in a spawned child process"""
-        self.training_logger = logging.getLogger(TRAINING_NAME)
-        if not self.training_logger.handlers:
-            handler = logging.FileHandler(TRAINING_LOG_PATH)
-            handler.setLevel(logging.INFO)
-            handler.setFormatter(
-                logging.Formatter(
-                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-                )
-            )
-            self.training_logger.addHandler(handler)
-            self.training_logger.setLevel(logging.INFO)
-            self.training_logger.propagate = (
-                False  # match what _setup_training_logger does
-            )
-        self.log_adapter: IO[str] = cast(IO[str], LoggerWriter(self.training_logger))
-
-    def start(self):
-        """this is likely started in a seperate process, so que requires connecting"""
-
+        #get state handlers
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
-        # self.state.working_pid = os.getpid()
+
+        #update state
         self.state['working_pid'] = os.getpid()
-        # self.state.exception = None
         self.state['exception'] = None
 
         self._attach_training_loggers()
         self._reattach_server_logger()
 
-        self.train()
+        # the Daemon decides between the sweep and the Que (see daemon.sweep_to_hand_off)
+        if sweep_info is not None:
+            self.sweep(sweep_info)
+        else:
+            self.train()
 
         if self.stop_event is not None and self.stop_event.is_set():
             self.server_logger.warning("Training was interrupted by stopping event.")
-            self.que.save_state()  # keep current run for recovery
-        else:
+        elif self.que.len_loc('cur_run') == 1:
             self.server_logger.info("Training finished successfully. Running tests")
             self.test()
-            self.que.save_state()
+        else:
+            self.server_logger.warning("No run in cur_run. Skipping tests.")
 
 
 if __name__ == "__main__":

@@ -101,6 +101,15 @@ if [[ "$MODE" == "server" ]]; then
         systemctl reset-failed 2>/dev/null || true
     fi
 
+    #log rotation config removal (the logs themselves are kept)
+    LOGROTATE_FILE="/etc/logrotate.d/${SERVICE_NAME}"
+    if [ -f "$LOGROTATE_FILE" ]; then
+        rm -f "$LOGROTATE_FILE"
+        echo -e "${GREEN}✓ Log rotation config removed${NC}"
+    else
+        echo -e "${YELLOW}Log rotation config not found: $LOGROTATE_FILE — skipping.${NC}"
+    fi
+
     #start script removal
     if [ ! -f "$START_SERVER_SCRIPT" ]; then
         echo -e "${YELLOW}Start server script not found: $START_SERVER_SCRIPT — skipping removal.${NC}"

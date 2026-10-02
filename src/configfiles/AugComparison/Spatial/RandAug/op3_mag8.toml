@@ -1,0 +1,58 @@
+[training]
+batch_size = 4
+update_per_step = 2
+max_epoch = 200
+
+[optimizer]
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
+
+[model_params]
+drop_p = 0.5
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "uniform" },
+]
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.5
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 3
+magnitude = 8
+num_magnitude_bins = 31
+interpolation = "nearest"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 16, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
+
+
+# same as /home/luke/Code/SLR/src/configfiles/sweeps/AugComparison/baseline.toml
+# but with randAugment num_magnitude_bins = 31, num_ops = 3, magnitude = 8
+# using centre crop instead of random crop
+# updated by script to remove training.type

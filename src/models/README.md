@@ -1,95 +1,51 @@
 # Models
 
-The models in this repo come from 3 sources:
-- [PyTorch vision library](https://github.com/pytorch/vision)
-- [SlowFast GitHub repo](https://github.com/facebookresearch/SlowFast)
-- [Detectron2 repo](https://github.com/facebookresearch/detectron2)
+Model architecture wrappers used by `training.py`/`testing.py` (`MODEL_NAME` argument — see
+[the root README](../../README.md#usage)). `src/models/__init__.py`'s `get_model()` is the single
+entry point that maps a `MODEL_NAME` string to a constructor.
 
+## Table of Contents
 
-## PyTorch vision models
+- [Auto-downloaded weights (most models)](#auto-downloaded-weights-most-models)
+- [Manually-downloaded weights (slowfast MViTv2 models)](#manually-downloaded-weights-slowfast-mvitv2-models)
 
-No extra installation is needed, the models are native in [PyTorch vision](https://docs.pytorch.org/vision/stable/models.html#video-classification), and weights are downlaoded automatically. 
+## Auto-downloaded weights (most models)
 
-This includes the following models:
-- [S3D](./pytorch_s3d.py)
-- [R3D_18](./pytorch_r3d.py)
-- [R(2+1)D_18](./pytorch_r3d.py)
-- [Swin3D_T](./pytorch_swin3d.py)
-- [Swin3D_S](./pytorch_swin3d.py)
-- [Swin3D_B](./pytorch_swin3d.py)
-- [MViTv2_S](./pytorch_mvit.py)
-- [MViTv2_S_e](./pytorch_mvit.py)
-- [MViTv1_B](./pytorch_mvit.py)
+Every model *except* the ones listed below is a thin wrapper around a `torchvision.models.video`
+constructor called with its `*_Weights.KINETICS400*` enum
+(`pytorch_r3d.py`, `pytorch_s3d.py`, `pytorch_swin3d.py`, `pytorch_mvit.py`, `pyvision_mvit.py` —
+covering `MODEL_NAME`s `S3D`, `R3D_18`, `R(2+1)D_18`, `Swin3D_T`, `Swin3D_S`, `Swin3D_B`,
+`MViTv2_S`, `MViTv2_S_e`, `MViTv1_B`). torchvision downloads these automatically the first time
+each model is constructed, caching them under `~/.cache/torch/hub/checkpoints/`. Nothing needs to
+be downloaded manually for these — just make sure the machine has internet access the first time
+you construct one.
 
+## Manually-downloaded weights (slowfast MViTv2 models)
 
-
-Citation:
-```bibtex
-@software{torchvision2016,
-    title        = {TorchVision: PyTorch's Computer Vision library},
-    author       = {TorchVision maintainers and contributors},
-    year         = 2016,
-    journal      = {GitHub repository},
-    publisher    = {GitHub},
-    howpublished = {\url{https://github.com/pytorch/vision}}
-}
-```
-
-## SlowFast models
-
-[MViTv2_S_16x4](./og_mvit.py) and [MViTv2_B_32x3](./og_mvit.py) come from the [SlowFast repository](https://github.com/facebookresearch/SlowFast/tree/main/projects/mvitv2). These models are subject to their [license](./mvit/SLOWFAST_LICENSE.md).
-
-To download the weights, use:
-```bash
-cd models
-mkdir -p ./mvit/weights/
-wget -P ./mvit/weights/ https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_S_16x4_k400_f302660347.pyth
-wget -P ./mvit/weights/ https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_B_32x3_k400_f304025456.pyth
-```
-
-Citation:
-```bibtex
-@inproceedings{li2021improved,
-    title={MViTv2: Improved multiscale vision transformers for classification and detection},
-    author={Li, Yanghao and Wu, Chao-Yuan and Fan, Haoqi and Mangalam, Karttikeya and Xiong, Bo and Malik, Jitendra and Feichtenhofer, Christoph},
-    booktitle={CVPR},
-    year={2022}
-}
-
-@inproceedings{fan2021multiscale,
-    title={Multiscale vision transformers},
-    author={Fan, Haoqi and Xiong, Bo and Mangalam, Karttikeya and Li, Yanghao and Yan, Zhicheng and Malik, Jitendra and Feichtenhofer, Christoph},
-    booktitle={ICCV},
-    year={2021}
-}
-```
-
-## Detectron2 models
-
-Some experimental models use a [2D pretrained MViT](https://github.com/facebookresearch/detectron2/tree/main/projects/MViTv2). These are:
-- [MVirTed_t](./sep_mvit_bert.py)
-- [MVirTed_t_MAE](./mvirted_mae.py)
-
-These models are subject to the detectron2 [licence](./mvit/DETECTRON2_LICENSE.md).
-
-To note: the weights from the image classification [repo](https://github.com/facebookresearch/mvit) may be an alternative, but would require some tweaking to the model setup as we used the object detection weights.
-
-Weights for the B, S and T ImageNet 1K instatiations (pretrained on COCO) can be downloaded as follows:
+`MODEL_NAME`s `MViTv2_S_16x4`, `MViTv2_S_16x4_e`, `MViTv2_B_32x3`, `MViTv2_B_32x3_r` (defined in
+[`og_mvit.py`](og_mvit.py), built on the vendored `mvit/slowfast` reference implementation — see
+its [license](mvit/SLOWFAST_LICENSE.md)) are **not** auto-downloaded. `get_model()` does not
+forward a weights path for these — `og_mvit.py` hardcodes `pretrain_path` to two fixed paths, so
+the checkpoint files must exist at those exact paths, with these exact filenames:
 
 ```bash
-wget -p ./mvit/weights/ -O ./mvit/weights/MViTV2-T_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_t_3x/f308344828/model_final_c6967a.pkl
-
-wget -p ./mvit/weights/ -O ./mvit/weights/MViTV2-S_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_s_3x/f308344647/model_final_279baf.pkl
-
-wget -p ./mvit/weights/ -O ./mvit/weights/MViTV2-B_IN1K.pkl https://dl.fbaipublicfiles.com/detectron2/MViTv2/cascade_mask_rcnn_mvitv2_b_3x/f308109448/model_final_421a91.pkl
+mkdir -p src/models/mvit/weights
+cd src/models/mvit/weights
+wget "https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_S_16x4_k400_f302660347.pyth"
+wget "https://dl.fbaipublicfiles.com/pyslowfast/model_zoo/mvitv2/pysf_video_models/MViTv2_B_32x3_k400_f304025456.pyth"
 ```
 
-Citation:
-```bibtex
-@inproceedings{li2021improved,
-    title={MViTv2: Improved multiscale vision transformers for classification and detection},
-    author={Li, Yanghao and Wu, Chao-Yuan and Fan, Haoqi and Mangalam, Karttikeya and Xiong, Bo and Malik, Jitendra and Feichtenhofer, Christoph},
-    booktitle={CVPR},
-    year={2022}
-}
-```
+| `MODEL_NAME`(s) | Weights file | Config yaml |
+| --- | --- | --- |
+| `MViTv2_S_16x4`, `MViTv2_S_16x4_e` | `mvit/weights/MViTv2_S_16x4_k400_f302660347.pyth` (~400MB) | `mvit/configs/MVITv2_S_16x4.yaml` |
+| `MViTv2_B_32x3`, `MViTv2_B_32x3_r` | `mvit/weights/MViTv2_B_32x3_k400_f304025456.pyth` (~615MB) | `mvit/configs/MVITv2_B_32x3.yaml` |
+
+Both come from Meta's [SlowFast model zoo](https://github.com/facebookresearch/SlowFast/blob/main/MODEL_ZOO.md)
+(the `MVITv2_S_16x4`/`MVITv2_B_32x3` Kinetics-400 rows). The paired config yamls under
+`mvit/configs/` are small and tracked in git — they only need restoring if deleted, not
+downloading.
+
+You only need these weights on whichever machine actually constructs one of these four models
+(i.e. the training server — see the [repo CLAUDE.md](../../CLAUDE.md#development-setup-two-machines)
+for the local/server split this project uses). Constructing them without the weights in place
+raises `FileNotFoundError`.

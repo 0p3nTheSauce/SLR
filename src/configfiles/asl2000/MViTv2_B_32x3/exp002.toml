@@ -2,7 +2,6 @@
 batch_size = 1
 update_per_step = 8
 max_epoch = 200
-batch_size_equivalent = 8
 
 [optimizer]
 eps = 1e-05
@@ -13,12 +12,6 @@ classifier_weight_decay = 0.001
 
 [model_params]
 drop_p = 0.5
-type = "supervised"
-
-[data]
-strict_size = true
-target_length = 32
-frame_size = 224
 
 [data.train_augs]
 normalise = true
@@ -29,21 +22,6 @@ spatial_aug = [
     { frame_size = 224, type = "Random_crop" },
     { type = "HORIZONTAL_FLIP", p = 0.5 },
 ]
-strict_size = true
-target_length = 32
-frame_size = 224
-
-[data.train_augs.norm_dict]
-mean = [
-    0.45,
-    0.45,
-    0.45,
-]
-std = [
-    0.225,
-    0.225,
-    0.225,
-]
 
 [data.test_augs]
 normalise = true
@@ -53,27 +31,11 @@ temporal_aug = [
 spatial_aug = [
     { frame_size = 224, type = "Centre_crop" },
 ]
-strict_size = true
-target_length = 32
-frame_size = 224
 
-[data.test_augs.norm_dict]
-mean = [
-    0.45,
-    0.45,
-    0.45,
-]
-std = [
-    0.225,
-    0.225,
-    0.225,
-]
-
-[early_stopping]
-metric = [
-    "val",
-    "loss",
-]
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
 mode = "min"
 patience = 50
 min_delta = 0.01
@@ -85,3 +47,6 @@ min_delta = 0.01
 # same as /home/luke/Code/SLR/code/configfiles/asl100/MViTv2_B_32x3/exp007.toml
 # same as exp000 and exp001. exp001 did not converge, propably patience was too low. Plan to run without weight path and with patience = 50
 # updated by script
+# updated by script
+# updated by script
+# updated by script to remove training.type

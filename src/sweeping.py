@@ -1,40 +1,158 @@
-"""Standalone entrypoint for wandb sweep agents.
-
-Each invocation merges this trial's sweep-selected hyperparameters into a
-base TOML config, builds a fresh RunInfo, and runs training exactly as
-training.py would -- but without the interactive confirmation prompt, and
-with save_path/exp_no derived from the wandb run id rather than filesystem
-enumeration, so concurrent agents never collide.
+"""Helpers for running wandb sweep trials, plus a standalone CLI entrypoint.
+ 
+This module serves two roles:
+ 
+1. A library of commonly-used pieces (build_base_config, SWEEP_KEY_MAP,
+   apply_sweep_overrides, create_sweep_run, ...) called in-process by the Que
+   system: Worker._sweep_train hands these to wandb.agent(function=...), so a
+   trial's RunInfo is built from an in-memory config skeleton plus that
+   trial's sweep-selected hyperparameters, rather than merging onto a
+   base_config.toml file on disk.
+ 
+2. A standalone script (see `main`/`get_sweep_parser` below) that can itself
+   be the target of a sweep yaml's `program`/`command` field, so the same
+   sweep can be launched the plain way -- `wandb agent <entity>/<project>/
+   <sweep_id>` -- for quick testing outside the Daemon/Worker stack. Keep
+   `main()` a valid, self-sufficient entrypoint: the `command` block in any
+   sweep yaml pointing at this file depends on it.
 """
 
 from __future__ import annotations
 
 import argparse
-try:
-    import tomllib  # type: ignore
-except ImportError:
-    import tomli as tomllib
+import copy
 from pathlib import Path
-from typing import Any, Dict, List
+from types import ModuleType
+from typing import Any
+
+import yaml
 
 import wandb
+from src.configs import get_avail_splits, get_model_checkpoint_dir
+from src.run_types import AVAIL_SPLITS, RUNS_PATH, AdminInfo, RunInfo, strict_validate
+from src.training import train_loop
+from src.utils import load_module_from_path
 
-from src.run_types import RunInfo, AdminInfo, RUNS_PATH, strict_validate
-from src.configs import print_config, set_seed, get_avail_splits, get_model_checkpoint_dir
-from src.training import train_model  # adjust if train_model lives elsewhere
 
-
-def _set_nested(d: Any, keys: List[str], value: Any) -> None:
-    """Set a value at a dotted/list-indexed path inside a nested dict/list.
-
-    Path segments that are integers index into lists (TOML arrays of tables,
-    e.g. `data.train_augs.spatial_aug.2.magnitude`); all other segments index
-    into dicts, creating intermediate dicts as needed.
+def extract_args_from_command(command: list[str]) -> argparse.Namespace:
+    """Recover the args from a sweep yaml's `command` block, which already has to carry them for
+    the standalone `wandb agent` CLI-mode entrypoint (see get_sweep_parser/main).
+    Reusing it here means the sweep yaml only names the args once.
+    The args returned are the same as those returned by get_sweep_parser().parse_args()
     """
+    literal_args = [c for c in command if not (isinstance(c, str) and c.startswith("${"))]
+    if not literal_args:
+        raise SweepConfigError("Sweep yaml `command` block has no literal args to parse from.")
+    # literal_args[0] is the interpreter (e.g. "python"); the rest are
+    # get_sweep_parser's own positionals/options, so reuse it rather than
+    # re-deriving the arg order by hand.
+    parsed = get_sweep_parser().parse_args(literal_args[1:])
+    return parsed
+
+def args_from_sweep_yaml(sweep_path: Path) -> argparse.Namespace:
+    """Load `sweep_path` and pull the args out of its `command` block. Used when creating a fresh sweep (`daemon set_sweep -sp`)."""
+    with open(sweep_path) as f:
+        sweep_cfg = yaml.safe_load(f)
+    command = sweep_cfg.get("command")
+    if not command:
+        raise SweepConfigError(f"{sweep_path} has no top-level `command` block to recover args from.")
+    return extract_args_from_command(command)
+
+def args_from_existing_sweep(sweep_id: str, project: str, entity: str) -> argparse.Namespace:
+    """Fetch a previously-created sweep's stored config from wandb and pull
+    the args out of its `command` block. Used when attaching to an already-initialised sweep (`daemon set_sweep --sweep_id`), where no
+    local sweep yaml is necessarily available.
+    """
+    api = wandb.Api()
+    sweep = api.sweep(f"{entity}/{project}/{sweep_id}")
+    command = sweep.config.get("command")
+    if not command:
+        raise SweepConfigError(
+            f"Sweep {sweep_id!r} has no `command` block in its stored config -- "
+            "pass --base_config explicitly."
+        )
+    return extract_args_from_command(command)
+
+
+
+class SweepConfigError(ValueError):
+    """Raised for any sweep-config problem that should fail loudly and early:
+    a SWEEP_KEY_MAP entry that doesn't resolve against the skeleton, or a
+    skeleton leaf that never got overridden by a sweep value."""
+
+BASE_CONFIG_ATTR = "base_config"
+SWEEP_KEY_MAP_ATTR = "sweep_key_map"
+
+def load_attribute(module: ModuleType, attr_name: str, module_prefix: str = '_base_config') -> dict:
+    """Load a top-level dict attribute from a module, raising SweepConfigError if it's missing.
+
+    Args:
+        module (ModuleType): The module from which to load the attribute.
+        attr_name (str): The name of the attribute to load.
+        module_prefix (str, optional): The prefix for the module name. Defaults to '_base_config'.
+
+    Raises:
+        SweepConfigError: If the specified attribute is not found in the module.
+
+    Returns:
+        dict: The loaded attribute from the module.
+    """
+    if not hasattr(module, attr_name):
+        raise SweepConfigError(
+            f"{module.__file__} has no top-level `{attr_name}` attribute for load_attribute to load."
+        )
+    attr = getattr(module, attr_name)
+    if not isinstance(attr, dict):
+        raise SweepConfigError(
+            f"{module.__file__}: `{attr_name}` must be a dict, got {type(attr).__name__}."
+        )
+    return attr
+
+def build_base_config(config_path: Path, load_attributes: list[str] | None = None) -> dict[str, dict]:
+    """Load arbitrary attributes from a python file. By default, these attributes include a 
+    `base_config` attribute and `sweep_key_map` attribute. The wandb sweep only works with a flat 
+    config structure for the Python API, so it is the role of `sweep_key_map` to expand this to the
+    nested config structure used in this codebase. The config structure does not currently support
+    arbitrary combinations of parameters, and by extension the augmentations cannot be swept against 
+    eachother. This means the `sweep_key_map` must hard code the sampling and cropping transforms, 
+    and is specific to the `base_config`. The `base_config` is a skeleton config structure with all
+    the parameters that can be swept over set to None. The config incoming from the sweep controller 
+    must override all of these None values, otherwise the sweep will fail. 
+
+    Args:
+        config_path (Path): Path to the base_config.py file containing the `base_config` and `sweep_key_map` attributes.
+        load_attributes (list[str] | None, optional): List of attribute names to load. Defaults to None.
+
+    Returns:
+        dict[str, dict]: A dictionary containing the loaded attributes from the module. By default 
+        includes the `base_config` and `sweep_key_map` attributes.
+    """
+    if load_attributes is None:
+        load_attributes = [BASE_CONFIG_ATTR, SWEEP_KEY_MAP_ATTR]
+    
+    
+    module = load_module_from_path(config_path, module_prefix="_base_config")
+
+    return {attr_name: copy.deepcopy(load_attribute(module, attr_name)) for attr_name in load_attributes}
+
+def _resolve_list_index(lst: list, selector: str) -> int:
+    """selector like 'type:RANDAUGMENT' -> index of the first list item whose
+    'type' field matches. Falls back to plain int index for backward compat."""
+    if ":" not in selector:
+        return int(selector)
+    field, _, val = selector.partition(":")
+    for i, item in enumerate(lst):
+        if isinstance(item, dict) and item.get(field) == val:
+            return i
+    raise KeyError(f"No item in list matches selector {selector!r}")
+
+
+def _set_nested(d: Any, keys: list[str], value: Any) -> None:
+    """Set a value at a dotted/selector path inside a nested dict/list."""
     key = keys[0]
 
     if isinstance(d, list):
-        idx = int(key)
+        idx = _resolve_list_index(d, key)
         if len(keys) == 1:
             d[idx] = value
         else:
@@ -50,11 +168,91 @@ def _set_nested(d: Any, keys: List[str], value: Any) -> None:
     _set_nested(d[key], keys[1:], value)
 
 
-def apply_sweep_overrides(raw: Dict[str, Any], wandb_config: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge dotted-path sweep parameters into a raw TOML config dict, in place."""
-    for dotted_key, value in wandb_config.items():
-        _set_nested(raw, dotted_key.split("."), value)
+def _find_unresolved(d: Any, path: str = "") -> list[str]:
+    """Recursively collect dotted paths of any leaf still set to None."""
+    unresolved: list[str] = []
+    if isinstance(d, dict):
+        for k, v in d.items():
+            unresolved.extend(_find_unresolved(v, f"{path}.{k}" if path else k))
+    elif isinstance(d, list):
+        for i, item in enumerate(d):
+            unresolved.extend(_find_unresolved(item, f"{path}.{i}"))
+    elif d is None:
+        unresolved.append(path)
+    return unresolved
+
+
+def _get_nested(d: Any, keys: list[str]) -> Any:
+    """Read the value at a dotted/selector path inside a nested dict/list (the
+    read counterpart of `_set_nested`). Raises KeyError/IndexError if the path
+    doesn't resolve."""
+    child = d[_resolve_list_index(d, keys[0])] if isinstance(d, list) else d[keys[0]]
+    return _get_nested(child, keys[1:]) if len(keys) > 1 else child
+
+
+SweepKeyMap = dict[str, str | list[str]]
+"""Flat sweep parameter name -> one dotted target path, or several paths that all
+receive the same sampled value (e.g. `frame_size` -> train and test crops)."""
+
+
+def _as_target_list(dotted_or_list: str | list[str]) -> list[str]:
+    return [dotted_or_list] if isinstance(dotted_or_list, str) else dotted_or_list
+
+
+def apply_sweep_overrides(raw: dict[str, Any], wandb_config: dict[str, Any], sweep_key_map: SweepKeyMap) -> dict[str, Any]:
+    """Mutate `raw` in place, applying each wandb.config key via SWEEP_KEY_MAP
+    (or, if absent from the map, as a literal dotted path)."""
+    for key, value in wandb_config.items():
+        for dotted_key in _as_target_list(sweep_key_map.get(key, key)):
+            _set_nested(raw, dotted_key.split("."), value)
     return raw
+
+
+def extract_sweep_values(config: dict[str, Any], sweep_key_map: SweepKeyMap, names: list[str]) -> dict[str, Any]:
+    """Recover a trial's flat sweep values from its nested run config -- the
+    inverse of `apply_sweep_overrides`, e.g. for analysing finished trials
+    from the Que rather than from wandb.
+
+    Names absent from the map are read as literal dotted paths, matching
+    `apply_sweep_overrides`. Names with several targets were all set to the
+    same sampled value, so only the first target is read.
+    """
+    return {
+        name: _get_nested(config, _as_target_list(sweep_key_map.get(name, name))[0].split("."))
+        for name in names
+    }
+
+
+def validate_sweep_key_map(config_path: Path) -> None:
+    """Check every `sweep_key_map` target resolves against the skeleton shape.
+    Structural check only -- doesn't require any particular run's values, so
+    it can run once at sweep-launch time, independent of wandb.init().
+    """
+    attributes = build_base_config(config_path)
+    raw = attributes[BASE_CONFIG_ATTR]
+    key_map = attributes[SWEEP_KEY_MAP_ATTR]
+    for name, dotted_or_list in key_map.items():
+        for dotted in _as_target_list(dotted_or_list):
+            try:
+                _get_nested(raw, dotted.split("."))
+            except (KeyError, IndexError) as e:
+                raise SweepConfigError(
+                    f"SWEEP_KEY_MAP[{name!r}] -> {dotted!r} does not resolve "
+                    f"against the base config skeleton: {e}"
+                ) from None
+
+def validate_resolved(config: dict[str, Any]) -> None:
+    """Raise if any skeleton placeholder was never overwritten by a sweep
+    value -- catches a yaml `parameters` entry that got renamed/removed
+    without updating SWEEP_KEY_MAP (or vice versa) before it silently reaches
+    Pydantic as None."""
+    unresolved = _find_unresolved(config)
+    if unresolved:
+        raise SweepConfigError(
+            "Sweep config has unresolved placeholders (no value supplied "
+            f"for): {unresolved}. Check that the sweep yaml's `parameters` "
+            "block and SWEEP_KEY_MAP are in sync."
+        )
 
 
 def get_sweep_exp_dir(split: str, model: str, sweep_id: str, run_id: str,
@@ -63,50 +261,46 @@ def get_sweep_exp_dir(split: str, model: str, sweep_id: str, run_id: str,
     return Path(runs_path) / split / model / f"sweep_{sweep_id}" / run_id
 
 
-def get_sweep_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run a single trial of a wandb sweep")
-    parser.add_argument("model", type=str)
-    parser.add_argument("split", type=str, choices=get_avail_splits())
-    parser.add_argument(
-        "-bc", "--base_config", type=str, required=True,
-        help="TOML template; sweep parameters override its values",
-    )
-    parser.add_argument("-ds", "--dataset", type=str, default="WLASL")
-    parser.add_argument("-se", "--save_every", type=int, default=5)
-    return parser
+def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset: str = "WLASL"):
+    """Build a fresh RunInfo + wandb Run for one sweep trial.
 
+    Called from inside the callback passed to wandb.agent(function=...).
+    wandb.agent sets sweep context via env vars before invoking that callback;
+    wandb.init() attaches to the sweep and populates run.config with this
+    trial's chosen hyperparameters -- do NOT pass `config=` or `id=` here,
+    that would shadow the sweep-sampled values with defaults.
 
-def main():
-    args = get_sweep_parser().parse_args()
+    `model`/`split`/`dataset` are NOT sweep parameters -- they're passed in by
+    the caller (Worker, via SweepInfo from the Daemon), since they determine
+    architecture/data plumbing rather than being tuned. `config_path` points
+    at the base_config.py defining the BASE_CONFIG skeleton for this sweep
+    (see build_base_config) and is likewise caller-supplied rather than tuned.
+    """
+    validate_sweep_key_map(config_path)  # structural check, fails before any wandb call
 
-    base_path = Path(args.base_config)
-    if not base_path.exists():
-        raise FileNotFoundError(f"{base_path} not found")
-
-    with open(base_path, "rb") as f:
-        raw = tomllib.load(f)
-
-    # wandb agent sets WANDB_SWEEP_ID / WANDB_ENTITY / WANDB_PROJECT in the env;
-    # wandb.init() attaches to the sweep and populates run.config with this
-    # trial's chosen hyperparameters.
     run = wandb.init()
 
+    attributes = build_base_config(config_path)
+    raw = attributes[BASE_CONFIG_ATTR]
+    key_map = attributes[SWEEP_KEY_MAP_ATTR]
     sweep_overrides = dict(run.config)
     if sweep_overrides:
-        raw = apply_sweep_overrides(raw, sweep_overrides)
+        raw = apply_sweep_overrides(raw, sweep_overrides, key_map)
+
+    validate_resolved(raw)
 
     sweep_id = run.sweep_id or "manual"
-    exp_dir = get_sweep_exp_dir(args.split, args.model, sweep_id, run.id)
+    exp_dir = get_sweep_exp_dir(split, model, sweep_id, run.id)
     save_path = get_model_checkpoint_dir(exp_dir)
     save_path.mkdir(parents=True, exist_ok=True)
 
     admin = AdminInfo(
-        model=args.model,
-        dataset=args.dataset,
-        split=args.split,
+        model=model,
+        dataset=dataset,
+        split=split,
         exp_no=run.id,
         recover=False,
-        config_path=str(base_path),
+        config_path=str(config_path),  # save the original sweep file
         save_path=str(save_path),
         weight_path=None,
     )
@@ -116,10 +310,48 @@ def main():
     run.name = f"{admin.model}_{admin.split}_{run.id}"
     run.config.update(config.model_dump(), allow_val_change=True)  # log resolved config
 
-    print_config(config)
+    return config, run
 
-    set_seed(config.admin.seed)
-    train_model(args.model, config, run, save_every=args.save_every, recover=False)
+
+# --- CLI entrypoint, for running this as a subprocess under `wandb agent` ---
+#
+# Function mode (Worker._sweep_train calling create_sweep_run directly) is the
+# path used by the Que system. This entrypoint exists so the same sweep can
+# also be launched the plain way -- `wandb agent <entity>/<project>/<sweep_id>`
+# -- for standalone sweeping outside the Daemon/Worker stack. To use this
+# mode, the sweep yaml needs `program`/`command` pointing back at this script,
+# e.g.:
+#
+#   command:
+#     - ${env}
+#     - python
+#     - ${program}
+#     - S3D
+#     - asl100
+#     - /path/to/base.py
+#
+# model/split/config_path/dataset/save_every are CLI args here, NOT wandb
+# parameters -- they aren't tuned, so they don't belong in the sweep's
+# `parameters` block (see create_sweep_run's docstring).
+
+def get_sweep_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run a single trial of a wandb sweep")
+    parser.add_argument("model", type=str)
+    parser.add_argument("split", type=str, choices=get_avail_splits())
+    parser.add_argument("config_path", type=Path, help="Path to a base.py defining base_config and sweep_key_map attributes. ")
+    parser.add_argument("-ds", "--dataset", type=str, default="WLASL")
+    parser.add_argument("-se", "--save_every", type=int, default=5)
+    return parser
+
+
+def main():
+    args = get_sweep_parser().parse_args()
+
+    config, run = create_sweep_run(
+        model=args.model, split=args.split, config_path=args.config_path, dataset=args.dataset
+    )
+
+    train_loop(args.model, config, run, save_every=args.save_every, recover=False)
     run.finish()
 
 

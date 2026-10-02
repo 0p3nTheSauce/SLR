@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved.
 
 """Configs."""
@@ -339,7 +338,7 @@ _C.X3D.WIDTH_FACTOR = 1.0
 _C.X3D.DEPTH_FACTOR = 1.0
 
 # Bottleneck expansion factor for the 3x3x3 conv.
-_C.X3D.BOTTLENECK_FACTOR = 1.0  #
+_C.X3D.BOTTLENECK_FACTOR = 1.0  
 
 # Dimensions of the last linear layer before classificaiton.
 _C.X3D.DIM_C5 = 2048

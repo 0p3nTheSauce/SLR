@@ -1,44 +1,42 @@
+import gc
+import random
+import statistics
+import time
+from functools import partial
+from typing import Callable, List, Optional, Tuple, cast
+
+import numpy as np
 import torch
 import torch.nn.functional as F
+import torchvision.transforms.v2 as v2
 from torch import Tensor
 from torchvision.transforms.v2 import Transform
-import torchvision.transforms.v2 as v2
-from functools import partial
-from typing import Callable, List, Tuple, Optional, cast
-import random
-
-import time
-import gc
-import statistics
-import numpy as np
 
 # locals
 import src.utils as utils
 from src.preprocess import Instance
 from src.run_types import (
-	SpatialAugs,
-	NormDict,
-	TemporalAugs,
-	ScaleAndPadConfig,
-	CentreCropConfig,
-	RandomCropConfig,
-	RandomResizedConfig,
-	CropTransforms,
-	SpatialTransforms,
-	TemporalTransforms,
-	SamplerConfig,
-	HorizontalFlipConfig,
-	RandomGrayscaleConfig,
-	GaussianBlurConfig,
 	AutoAugmentConfig,
+	CentreCropConfig,
+	CropTransforms,
+	GaussianBlurConfig,
+	HorizontalFlipConfig,
+	NormDict,
 	RandAugConfig,
-	is_sampler_config,
-	is_temporal_config,
+	RandomCropConfig,
+	RandomGrayscaleConfig,
+	RandomResizedConfig,
+	SamplerConfig,
+	ScaleAndPadConfig,
+	SpatialAugs,
+	SpatialTransforms,
+	TemporalAugs,
+	TemporalTransforms,
 	is_crop_config,
-	is_spatial_transform_config
-
+	is_sampler_config,
+	is_spatial_transform_config,
+	is_temporal_config,
 )
-
 
 #   --- Bench marking ---
 
