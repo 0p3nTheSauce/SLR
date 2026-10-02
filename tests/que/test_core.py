@@ -446,3 +446,33 @@ class TestMigrateLegacyFiles:
         assert (state / "Runs.json").read_text() == "newer"
         assert (old / "Runs.json").exists()
         assert any(m.startswith("Not migrating") for m in messages)
+
+
+class TestReadLog:
+    """read_log lets the shell follow a server log by polling with the offset it returns."""
+
+    @pytest.fixture
+    def log(self, tmp_path: Path) -> Path:
+        log = tmp_path / "Server.log"
+        log.write_text("".join(f"line {i}\n" for i in range(5)))
+        return log
+
+    def test_last_n_lines(self, log: Path) -> None:
+        text, offset = core_module.read_log(log, n=2)
+        assert text == "line 3\nline 4\n"
+        assert offset == log.stat().st_size
+
+    def test_follows_from_offset(self, log: Path) -> None:
+        _, offset = core_module.read_log(log)
+        with open(log, "a") as f:
+            f.write("line 5\n")
+        assert core_module.read_log(log, offset) == ("line 5\n", offset + 7)
+        assert core_module.read_log(log, offset + 7) == ("", offset + 7)
+
+    def test_rotated_or_cleared_log_is_read_from_the_start(self, log: Path) -> None:
+        _, offset = core_module.read_log(log)
+        log.write_text("new\n")
+        assert core_module.read_log(log, offset) == ("new\n", 4)
+
+    def test_missing_log_is_empty(self, tmp_path: Path) -> None:
+        assert core_module.read_log(tmp_path / "missing.log") == ("", 0)

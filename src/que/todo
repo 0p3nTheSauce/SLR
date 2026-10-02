@@ -70,8 +70,3 @@ Server:
     directly so both wandb's capture and our own log file see the same writes (couples
     us to a wandb-internal module path, so needs a version-pin/compat note if taken).
 - redirect testing output to log file
-
-Files & logging:
-- the `logs` parser's --worker help says "Tail the Worker.log file", but it tails Training.log
-    (TRAINING_LOG_PATH). The `logs` command also reads these paths on the shell's machine, which
-    isn't the server when the shell connects over the SSH tunnel.

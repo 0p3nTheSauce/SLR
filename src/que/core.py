@@ -208,6 +208,40 @@ def setup_server_logging(path: str | Path = SERVER_LOG_PATH) -> None:
         logging.getLogger(name).setLevel(logging.DEBUG)
 
 
+LogName: TypeAlias = Literal["server", "training"]
+LOG_PATHS: dict[LogName, Path] = {"server": SERVER_LOG_PATH, "training": TRAINING_LOG_PATH}
+_LOG_TAIL_BYTES = 1024 * 1024
+
+
+def read_log(path: str | Path, start: int | None = None, n: int = 10) -> tuple[str, int]:
+    """Read a log file in a way that lets a caller follow it (like `tail -f`) by polling.
+
+    Args:
+        path (str | Path): The log file. A missing file reads as empty.
+        start (int | None, optional): Byte offset to read on from (the offset a previous call
+            returned), or None for the file's last `n` lines, searched for in its last 1 MiB.
+            If the file is now shorter than `start` (rotated or cleared), it's read from the
+            beginning. Defaults to None.
+        n (int, optional): Number of lines when `start` is None. Defaults to 10.
+
+    Returns:
+        tuple[str, int]: The text read, and the offset to pass as `start` next time.
+    """
+    path = Path(path)
+    if not path.exists():
+        return "", 0
+    with open(path, "rb") as f:
+        size = f.seek(0, os.SEEK_END)
+        if start is None:
+            f.seek(max(0, size - _LOG_TAIL_BYTES))
+            lines = f.read().splitlines(keepends=True)[-n:] if n > 0 else []
+            return b"".join(lines).decode(errors="replace"), size
+        offset = start if start <= size else 0
+        f.seek(offset)
+        data = f.read()
+    return data.decode(errors="replace"), offset + len(data)
+
+
 def setup_training_logging(path: str | Path = TRAINING_LOG_PATH) -> Logger:
     """The Training logger (training/testing output, see worker.LoggerWriter), writing at INFO to
     `path` (default: Training.log) only, not to Server.log. Calling it again changes nothing."""
@@ -1543,6 +1577,10 @@ class ServerContextProtocol(Protocol):
         self, timeout: float | None = None, hard: bool = False, stop_worker: bool = False
     ) -> None: ...
     def toggle_stop_on_fail(self) -> None: ...
+    def read_log(
+        self, log: LogName, start: int | None = None, n: int = 10
+    ) -> tuple[str, int]: ...
+    def clear_log(self, log: LogName) -> None: ...
 
     # def set_state(
     #     self,

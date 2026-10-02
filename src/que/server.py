@@ -13,6 +13,7 @@ from pathlib import Path
 
 from src.que.core import (
     DAEMON_NAME,
+    LOG_PATHS,
     QUE_NAME,
     RUN_PATH,
     # ProcessNames,
@@ -20,6 +21,7 @@ from src.que.core import (
     SERVER_STATE_PATH,
     WORKER_NAME,
     DaemonStateDict,
+    LogName,
     NoSweepSet,
     Que,
     QueManager,
@@ -30,6 +32,7 @@ from src.que.core import (
     atomic_write_json,
     is_sweep_complete,
     migrate_legacy_files,
+    read_log,
     read_server_state,
     setup_server_logging,
     # Process_states
@@ -245,6 +248,16 @@ class ServerContext:
     def toggle_stop_on_fail(self) -> None:
         self.daemon.state["stop_on_fail"] = not self.daemon.state["stop_on_fail"]
         self.save_state()
+
+    def read_log(self, log: LogName, start: int | None = None, n: int = 10) -> tuple[str, int]:
+        """Read one of the server's logs (see core.read_log), so a shell can show it from any
+        machine -- over the SSH tunnel, the shell's own copy of the paths isn't the server's."""
+        return read_log(LOG_PATHS[log], start, n)
+
+    def clear_log(self, log: LogName) -> None:
+        """Empty one of the server's logs. Its open handlers append, so carry on at the start."""
+        LOG_PATHS[log].write_text("")
+        self.server_logger.info(f"Cleared the {log} log")
 
     def _set_state(
         self,

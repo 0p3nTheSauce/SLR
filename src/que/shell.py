@@ -35,14 +35,13 @@ from src.configs import get_avail_splits, get_train_parser
 from src.que.core import (
     CUR_RUN,
     QUE_LOCATIONS,
-    SERVER_LOG_PATH,
     SYNONYMS,
     SYSTEMD_NAME,
     TO_RUN,
     # WorkerState,
     # DaemonState,
-    TRAINING_LOG_PATH,
     GenExp,
+    LogName,
     Que,
     QueDupExp,
     QueLocation,
@@ -58,6 +57,9 @@ from src.que.core import (
 # from configs import get_avail_splits, ENTITY, PROJECT_BASE, get_train_parser, ZFILL
 from src.que.tmux import tmux_manager
 from src.run_types import ENTITY
+
+LOG_POLL_INTERVAL = 1.0
+"""Seconds between polls of the server while following a log (see QueShell._follow_log)."""
 
 # ---------------------------------------------------------------------------
 # Filtering
@@ -1406,63 +1408,47 @@ class QueShell(cmdLib.Cmd):
             self.tmux_man.join_session()
 
     def do_logs(self, arg):
-        """Tail the worker or daemon logs"""
+        """Follow (or clear) the server's or training log, read through the server"""
         parsed_args = self._parse_args_or_cancel("logs", arg)
         if parsed_args is None:
             return
 
-        if parsed_args.worker:
-            log_file = str(TRAINING_LOG_PATH)  # your constant
-        elif parsed_args.server:
-            log_file = str(SERVER_LOG_PATH)  # your constant
-        elif parsed_args.journalctl:
-            # Use journalctl to stream logs for the systemd service
-            if parsed_args.top_n is not None:
-                com = [
-                    "sudo",
-                    "journalctl",
-                    "-u",
-                    SYSTEMD_NAME,
-                    "-f",
-                    "-n",
-                    str(parsed_args.top_n),
-                ]
-            else:
-                com = ["sudo", "journalctl", "-u", SYSTEMD_NAME, "-f"]
-            try:
-                subprocess.run(com, check=False)
-            except KeyboardInterrupt:
-                self.console.print("\n[cyan]Stopped streaming journalctl logs[/cyan]")
-            except Exception as e:  # noqa: BLE001
-                self.console.print(f"[red]Error streaming journalctl logs: {e}[/red]")
+        if parsed_args.journalctl:
+            self._follow_journal(parsed_args.top_n)
             return
-        else:
-            raise ValueError("Please specify --worker or --server")
 
+        log: LogName = "training" if parsed_args.training else "server"
         if parsed_args.clear:
-            if Confirm.ask(f"[bold red]Clear all logs in {log_file}?[/bold red]"):
-                with (
-                    self.unwrap_exception(
-                        f"Cleared {log_file}", f"Failed to clear log file: {log_file}"
-                    ),
-                    open(log_file, "w") as f,
-                ):
-                    f.truncate(0)
-                return
+            if Confirm.ask(f"[bold red]Clear the server's {log} log?[/bold red]"):
+                with self.unwrap_exception(f"Cleared the {log} log", f"Failed to clear the {log} log"):
+                    self.server_context.clear_log(log)
             else:
                 self.console.print("[yellow]Action cancelled[/yellow].")
-                return
+            return
+        self._follow_log(log, parsed_args.top_n)
 
+    def _follow_log(self, log: LogName, n: int) -> None:
+        """Print the last `n` lines of a server log, then new lines as they arrive (polling the
+        server every LOG_POLL_INTERVAL seconds), until Ctrl+C."""
         try:
-            subprocess.run(
-                ["tail", "-f", "-n", str(parsed_args.top_n), log_file], check=False
-            )
+            text, offset = self.server_context.read_log(log, None, n)
+            while True:
+                if text:
+                    self.console.out(text, end="", highlight=False)
+                time.sleep(LOG_POLL_INTERVAL)
+                text, offset = self.server_context.read_log(log, offset)
         except KeyboardInterrupt:
-            self.console.print("\n[cyan]Stopped tailing log file[/cyan]")
-        except FileNotFoundError:
-            self.console.print(f"[red]Error: Log file not found at {log_file}[/red]")
+            self.console.print(f"\n[cyan]Stopped following the {log} log[/cyan]")
+
+    def _follow_journal(self, n: int) -> None:
+        """Stream this machine's systemd journal for the que service (needs sudo)."""
+        com = ["sudo", "journalctl", "-u", SYSTEMD_NAME, "-f", "-n", str(n)]
+        try:
+            subprocess.run(com, check=False)
+        except KeyboardInterrupt:
+            self.console.print("\n[cyan]Stopped streaming journalctl logs[/cyan]")
         except Exception as e:  # noqa: BLE001
-            self.console.print(f"[red]Error reading log file: {e}[/red]")
+            self.console.print(f"[red]Error streaming journalctl logs: {e}[/red]")
 
     # Helper functions for parsing
 
@@ -2075,22 +2061,30 @@ class QueShell(cmdLib.Cmd):
 
         group = parser.add_mutually_exclusive_group(required=True)
         group.add_argument(
-            "--worker", "-w", action="store_true", help="Tail the Worker.log file"
+            "--training",
+            "-t",
+            "--worker",
+            "-w",
+            action="store_true",
+            help="Follow the server's Training.log (training and testing output)",
         )
         group.add_argument(
-            "--server", "-s", action="store_true", help="Tail the Server.log file"
+            "--server",
+            "-s",
+            action="store_true",
+            help="Follow the server's Server.log (server, daemon and worker)",
         )
         group.add_argument(
             "--journalctl",
             "-j",
             action="store_true",
-            help=f"Tail the systemd journal for {SYSTEMD_NAME} logs (requires sudo privileges)",
+            help=f"Follow THIS machine's systemd journal for {SYSTEMD_NAME} (requires sudo)",
         )
         parser.add_argument(
             "--clear",
             "-c",
             action="store_true",
-            help="Clear the log file instead of tailing",
+            help="Clear the log instead of following it",
         )
         self._add_top_n_arg(
             parser,

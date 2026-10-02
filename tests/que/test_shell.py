@@ -354,3 +354,49 @@ class TestSaveLoad:
     ) -> None:
         harness.run("load", "server -ip snap.json")
         assert savers[1].calls == [("load", {"in_path": Path("snap.json")})]
+
+
+class FakeLogContext:
+    """Serves `chunks` from read_log, then raises KeyboardInterrupt (the user's Ctrl+C)."""
+
+    def __init__(self, chunks: list[str]) -> None:
+        self.chunks = chunks
+        self.reads: list[tuple[str, Any]] = []
+        self.cleared: list[str] = []
+
+    def read_log(self, log: str, start: Any = None, n: int = 10) -> tuple[str, int]:
+        self.reads.append((log, start))
+        if not self.chunks:
+            raise KeyboardInterrupt
+        return self.chunks.pop(0), len(self.reads)
+
+    def clear_log(self, log: str) -> None:
+        self.cleared.append(log)
+
+
+class TestLogs:
+    """Logs are read through the server, so they're the server's even over the SSH tunnel."""
+
+    @pytest.fixture
+    def context(self, harness: ShellHarness, monkeypatch: pytest.MonkeyPatch) -> FakeLogContext:
+        monkeypatch.setattr(shell_module.time, "sleep", lambda s: None)
+        context = FakeLogContext(["a\n", "", "b\n"])
+        harness.shell.server_context = context  # type: ignore[assignment]
+        return context
+
+    @pytest.mark.parametrize("flag", ["-t", "--worker"])
+    def test_follows_training_log(
+        self, harness: ShellHarness, context: FakeLogContext, flag: str
+    ) -> None:
+        out = harness.run("logs", flag)
+        assert out.startswith("a\nb\n")
+        assert "Stopped following the training log" in out
+        assert context.reads == [("training", None), ("training", 1), ("training", 2), ("training", 3)]
+
+    def test_clear_server_log(
+        self, harness: ShellHarness, context: FakeLogContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(shell_module.Confirm, "ask", lambda *a, **kw: True)
+        harness.run("logs", "-s -c")
+        assert context.cleared == ["server"]
+        assert context.reads == []
