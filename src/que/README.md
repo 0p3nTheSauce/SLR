@@ -164,7 +164,7 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 
 The Que's data and logs are kept apart from the code, in gitignored directories:
 - `state/`: `Runs.json` (the Que), `Server.json` (server state), timestamped snapshots from `save -t`, and `old_ques/` (archived Ques)
-- `logs/`: `Server.log` (server, daemon and worker) and `Training.log` (training and testing output)
+- `logs/`: `Server.log` (server, daemon and worker) and `Training.log` (training and testing output). A server installed by `setup.sh` rotates them with logrotate (weekly, or sooner past 50 MB; 8 kept, older ones gzipped)
 
 Until 2026-10-02 these lived directly in `src/que/`. The server moves them into place when it starts (`migrate_legacy_files` in `core.py`), never overwriting a file already there. On a machine that doesn't run the server (e.g. to read `Runs.json` from `src/results`), run it once by hand, from `src/`, and only while no Que server on that machine is still running the old code:
 

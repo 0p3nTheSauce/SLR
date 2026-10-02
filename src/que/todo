@@ -72,10 +72,6 @@ Server:
 - redirect testing output to log file
 
 Files & logging:
-- no log rotation: on 2026-10-02 Training.log was 26 MB and Server.log 1.7 MB, growing forever.
-    Several processes (server, supervisor, worker) append to Server.log through separate
-    FileHandlers, so RotatingFileHandler isn't safe across them -- use logrotate (copytruncate)
-    via setup.sh, or have child processes send records to the server (QueueHandler/socket).
 - the `logs` parser's --worker help says "Tail the Worker.log file", but it tails Training.log
     (TRAINING_LOG_PATH). The `logs` command also reads these paths on the shell's machine, which
     isn't the server when the shell connects over the SSH tunnel.
