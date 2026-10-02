@@ -285,8 +285,9 @@ class ServerContext:
             out_path = timestamp_path(out_path)
 
         atomic_write_json(out_path, self.get_state().model_dump())
-
-        self.server_logger.info(f"Saved state to: {out_path}")
+        # saved on every change (see ServerContext); an explicit copy is worth noting
+        level = logging.DEBUG if out_path == self.state_path else logging.INFO
+        self.server_logger.log(level, f"Saved state to: {out_path}")
 
     def load_state(self, in_path: str | Path | None = None) -> None:
         """Load a saved server state (default: `self.state_path`).

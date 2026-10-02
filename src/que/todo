@@ -10,12 +10,6 @@ Que:
     only mutations do (see core._persists). The manager serves each connection on its own thread,
     so a read can interleave with a mutation from another client (e.g. the shell listing while the
     worker moves a run). Consider locking reads too.
-- 12 Que methods wrap their whole body in `with log_and_raise(self.logger, "<task>"):`. Replace
-    it with a decorator (e.g. `@_logged("move")`), stacking with `@_persists`, so each method is
-    just its logic. While at it, revisit what it logs: every success at INFO, and every failure at
-    ERROR plus a second ERROR line with the traceback (logger.exception does both in one) --
-    including expected user errors from the shell (QueEmpty, QueIdxOOR from a mistyped index),
-    which aren't worth a traceback in Server.log.
 - Que.load_state only handles FileNotFoundError: an unparsable or invalid Runs.json (e.g. hand
     edited) raises from Que(), so the server fails to start. Saves are atomic now, so it can't be
     truncated by a crash, but consider a clear error/fallback to the latest timestamped copy.
@@ -104,8 +98,6 @@ Files & logging:
     Several processes (server, supervisor, worker) append to Server.log through separate
     FileHandlers, so RotatingFileHandler isn't safe across them -- use logrotate (copytruncate)
     via setup.sh, or have child processes send records to the server (QueueHandler/socket).
-- Que.save_state logs "Saved que to ..." at INFO, now on every mutation (see core._persists);
-    consider DEBUG for the automatic saves. Same for ServerContext.save_state.
 - the `logs` parser's --worker help says "Tail the Worker.log file", but it tails Training.log
     (TRAINING_LOG_PATH). The `logs` command also reads these paths on the shell's machine, which
     isn't the server when the shell connects over the SSH tunnel.

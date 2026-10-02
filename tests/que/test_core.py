@@ -1,6 +1,6 @@
 import logging
 import pickle
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,7 @@ from src.que.core import (
     QUE_LOCATIONS,
     Que,
     QueBusy,
+    QueEmpty,
     QueIdxOOR,
     QueLocation,
     WorkerStateDict,
@@ -313,3 +314,48 @@ def test_len_sweep_runs_counts_only_that_sweeps_runs_in_loc(que: Que) -> None:
     assert que.len_sweep_runs("abc") == 2
     assert que.len_sweep_runs("abc", "fail_runs") == 1
     assert que.len_sweep_runs("missing") == 0
+
+
+class TestLogged:
+    """Que operations log their outcome; expected user errors (QueException) without a traceback."""
+
+    @pytest.fixture
+    def log(self, que: Que, caplog: pytest.LogCaptureFixture) -> Iterator[pytest.LogCaptureFixture]:
+        """caplog, hooked up to the (non-propagating) Que logger. Read `.records` in the test:
+        caplog swaps its record list between test phases."""
+        que.logger.addHandler(caplog.handler)
+        caplog.set_level(logging.INFO, logger=que.logger.name)
+        yield caplog
+        que.logger.removeHandler(caplog.handler)
+
+    def test_success_is_logged(self, que: Que, log: pytest.LogCaptureFixture) -> None:
+        que.to_run = [exp_run("t0"), exp_run("t1")]
+        que.shuffle("to_run", 0, 1)
+        assert [r.message for r in log.records if r.levelno >= logging.INFO] == [
+            "shuffle completed successfully"
+        ]
+
+    def test_que_exception_is_one_warning_line(
+        self, que: Que, log: pytest.LogCaptureFixture
+    ) -> None:
+        with pytest.raises(QueEmpty):
+            que.remove_run("to_run", 0)
+        assert [(r.levelno, r.exc_info) for r in log.records] == [(logging.WARNING, None)]
+        assert log.records[0].message == "remove_run failed: to_run is empty"
+
+    def test_unexpected_error_is_logged_with_traceback(
+        self, que: Que, log: pytest.LogCaptureFixture
+    ) -> None:
+        que.to_run = [exp_run("t0")]
+        with pytest.raises(TypeError):
+            que.update_runs(["training", "max_epoch"], lambda e: e + "x")
+        assert [r.levelno for r in log.records] == [logging.ERROR]
+        assert log.records[0].exc_info is not None
+
+    def test_nested_failure_is_logged_once(
+        self, que: Que, log: pytest.LogCaptureFixture
+    ) -> None:
+        que.old_runs = [comp_run("o0")]
+        with pytest.raises(TypeError):
+            que.copy_runs("old_runs", [0], "to_run")  # place_runs rejects the CompExpInfo
+        assert [r.message for r in log.records] == ["place_runs failed"]

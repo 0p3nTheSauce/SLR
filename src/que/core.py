@@ -12,9 +12,7 @@ import os
 import tempfile
 import threading
 import time
-import traceback
 from collections.abc import Callable, Sequence
-from contextlib import contextmanager
 from datetime import datetime
 from logging import Logger
 from multiprocessing.managers import BaseManager, DictProxy
@@ -256,22 +254,6 @@ class ListManipulationKwargs(TypedDict, total=False):
     criterions: list[Callable[[Any], bool]]
 
 
-# ---------------------------------------------------------------------------
-# Context manager
-# ---------------------------------------------------------------------------
-
-
-@contextmanager
-def log_and_raise(logger: Logger, task: str = "Operation"):
-    try:
-        yield
-        logger.info(f"{task} completed successfully")
-    except Exception as e:
-        logger.error(f"{task} failed: {e}")
-        logger.error(traceback.format_exc())
-        raise
-
-
 def timestamp_path(path: str | Path) -> str:
     formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")  # noqa: DTZ005
     return str(path).replace(".json", f"_{formatted}.json")
@@ -308,6 +290,34 @@ def atomic_write_json(path: str | Path, data: Any, indent: int | None = None) ->
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
+
+
+def _logged(method: Callable[Concatenate["Que", _P], _R]) -> Callable[Concatenate["Que", _P], _R]:
+    """Log a Que operation's outcome to its logger, under the method's name: success at INFO, a
+    QueException (an expected, user-level error, e.g. an index out of range from the shell) as one
+    WARNING line, and anything else at ERROR with its traceback. The exception is re-raised.
+
+    An exception is only logged by the first `_logged` method it passes through, so one raised in
+    a nested operation (e.g. copy_runs -> place_runs) isn't logged twice.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self: "Que", *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        name = method.__name__
+        try:
+            result = method(self, *args, **kwargs)
+        except Exception as e:
+            if not getattr(e, "_que_logged", False):
+                if isinstance(e, QueException):
+                    self.logger.warning(f"{name} failed: {e}")
+                else:
+                    self.logger.exception(f"{name} failed")
+                e._que_logged = True  # type: ignore[attr-defined]
+            raise
+        self.logger.info(f"{name} completed successfully")
+        return result
+
+    return wrapper
 
 
 def _persists(method: Callable[Concatenate["Que", _P], _R]) -> Callable[Concatenate["Que", _P], _R]:
@@ -634,7 +644,9 @@ class Que:
                 FAIL_RUNS: [r.model_dump() for r in self.fail_runs],
             }
         atomic_write_json(out_path, all_runs, indent=4)
-        self.logger.info(f"Saved que to {out_path}")
+        # the automatic save after every mutation is routine; an explicit copy is worth noting
+        level = logging.DEBUG if out_path == self.runs_path else logging.INFO
+        self.logger.log(level, f"Saved que to {out_path}")
 
     # -----------------------------------------------------------------------
     # Worker / Daemon helpers
@@ -876,6 +888,7 @@ class Que:
 
     # Direct indexing
 
+    @_logged
     @_persists
     def add_new_run(
         self,
@@ -886,39 +899,39 @@ class Que:
     ) -> None:
         """Add a new run the the Que"""
 
-        with log_and_raise(self.logger, "add_new_run"):
-            exp_info = ExpInfo.model_validate(
-                {
-                    **config.model_dump(),
-                    "wandb": wandb_dict.model_dump(),
-                }
-            )
-            if loc == TO_RUN:
-                self.to_run.append(exp_info)
-            elif loc == CUR_RUN:
-                if len(self.cur_run) != 0:
-                    self.logger.error(
-                        "Cannot add to cur_run: already occupied, added to fail_runs instead"
-                    )
-                    self.fail_runs.append(
-                        FailedExp.model_validate(
-                            {
-                                **exp_info.model_dump(),
-                                "error": "Attempted to add to cur_run but it was already occupied",
-                            }
-                        )
-                    )
-                    raise QueBusy
-                self.cur_run.append(exp_info)
-            else:
-                raise ValueError(
-                    f"Invalid location: {loc}. Must be 'to_run' or 'cur_run'."
+        exp_info = ExpInfo.model_validate(
+            {
+                **config.model_dump(),
+                "wandb": wandb_dict.model_dump(),
+            }
+        )
+        if loc == TO_RUN:
+            self.to_run.append(exp_info)
+        elif loc == CUR_RUN:
+            if len(self.cur_run) != 0:
+                self.logger.error(
+                    "Cannot add to cur_run: already occupied, added to fail_runs instead"
                 )
-
-            self.logger.debug(
-                f"Added new run: {self._run_to_str(self._run_sum(exp_info, ndigits))}"
+                self.fail_runs.append(
+                    FailedExp.model_validate(
+                        {
+                            **exp_info.model_dump(),
+                            "error": "Attempted to add to cur_run but it was already occupied",
+                        }
+                    )
+                )
+                raise QueBusy
+            self.cur_run.append(exp_info)
+        else:
+            raise ValueError(
+                f"Invalid location: {loc}. Must be 'to_run' or 'cur_run'."
             )
 
+        self.logger.debug(
+            f"Added new run: {self._run_to_str(self._run_sum(exp_info, ndigits))}"
+        )
+
+    @_logged
     @_persists
     def create_run(
         self,
@@ -929,13 +942,13 @@ class Que:
         """Load and add a new run to the Que"""
         from src.configs import load_config
 
-        with log_and_raise(self.logger, "create"):
-            config: RunInfo = load_config(arg_dict)
-            if self._is_dup_exp(config) and not add_duplicates:
-                raise QueDupExp
+        config: RunInfo = load_config(arg_dict)
+        if self._is_dup_exp(config) and not add_duplicates:
+            raise QueDupExp
 
         self.add_new_run(config, wandb_dict)
 
+    @_logged
     def add_run(
         self,
         arg_dict: AdminInfo,
@@ -955,44 +968,44 @@ class Que:
         )
         from src.testing import full_test, load_comp_res
 
-        with log_and_raise(self.logger, "add"):
-            config: RunInfo = load_config(arg_dict)
-            if self._is_dup_exp(config) and not add_duplicates:
-                raise QueDupExp
+        config: RunInfo = load_config(arg_dict)
+        if self._is_dup_exp(config) and not add_duplicates:
+            raise QueDupExp
 
-            self.logger.debug(arg_dict.save_path[-ZFILL:])
-            checknum = (
-                int(arg_dict.save_path[-ZFILL:])
-                if arg_dict.save_path[-1].isdigit()
-                else None
-            )
-            res_dir = get_model_results_dir(
-                get_model_exp_dir(
-                    split=arg_dict.split,
-                    model=arg_dict.model,
-                    exp_no=int(arg_dict.exp_no),
-                ),
-                checkpoint_num=checknum,
-            )
+        self.logger.debug(arg_dict.save_path[-ZFILL:])
+        checknum = (
+            int(arg_dict.save_path[-ZFILL:])
+            if arg_dict.save_path[-1].isdigit()
+            else None
+        )
+        res_dir = get_model_results_dir(
+            get_model_exp_dir(
+                split=arg_dict.split,
+                model=arg_dict.model,
+                exp_no=int(arg_dict.exp_no),
+            ),
+            checkpoint_num=checknum,
+        )
 
-            try:
-                results = load_comp_res(res_dir / "best_val_loss.json")
-                self.logger.info("Successfully loaded results")
-            except FileNotFoundError:
-                results = full_test(admin=config.admin, data=config.data)
-                self.logger.info("Results not found on disk — run full_test")
+        try:
+            results = load_comp_res(res_dir / "best_val_loss.json")
+            self.logger.info("Successfully loaded results")
+        except FileNotFoundError:
+            results = full_test(admin=config.admin, data=config.data)
+            self.logger.info("Results not found on disk — run full_test")
 
-            comp_run = CompExpInfo.model_validate(
-                {
-                    **config.model_dump(),
-                    "wandb": wandb_dict.model_dump(),
-                    "results": results
-                    if isinstance(results, dict)
-                    else results.model_dump(),
-                }
-            )
+        comp_run = CompExpInfo.model_validate(
+            {
+                **config.model_dump(),
+                "wandb": wandb_dict.model_dump(),
+                "results": results
+                if isinstance(results, dict)
+                else results.model_dump(),
+            }
+        )
         self.place_runs(OLD_RUNS, [comp_run])
 
+    @_logged
     @_persists
     def recover_run(
         self,
@@ -1003,58 +1016,58 @@ class Que:
         enum_chck: bool = False,
     ) -> None:
         self.logger.debug(f"clean_slate is set to: {clean_slate}")
-        with log_and_raise(self.logger, "recover"):
-            run = self.peak_run(from_loc, index)
+        run = self.peak_run(from_loc, index)
 
-            if clean_slate:
-                self.logger.debug("running _clean_slate")
-                run = self._clean_slate(run, enum_chck)
-            else:
-                self.logger.debug("setting recover to True")
-                # model_copy preserves the concrete subtype for the nested admin model
-                run = run.model_copy(
-                    update={"admin": run.admin.model_copy(update={"recover": True})}
-                )
+        if clean_slate:
+            self.logger.debug("running _clean_slate")
+            run = self._clean_slate(run, enum_chck)
+        else:
+            self.logger.debug("setting recover to True")
+            # model_copy preserves the concrete subtype for the nested admin model
+            run = run.model_copy(
+                update={"admin": run.admin.model_copy(update={"recover": True})}
+            )
 
-            if from_loc == FAIL_RUNS:
-                # Strip the error field — re-validate as plain ExpInfo
-                run = ExpInfo.model_validate(
-                    {k: v for k, v in run.model_dump().items() if k != "error"}
-                )
-            elif not clean_slate and run.wandb.run_id is None:
-                raise QueException("Run set to recover but no run_id present")
+        if from_loc == FAIL_RUNS:
+            # Strip the error field — re-validate as plain ExpInfo
+            run = ExpInfo.model_validate(
+                {k: v for k, v in run.model_dump().items() if k != "error"}
+            )
+        elif not clean_slate and run.wandb.run_id is None:
+            raise QueException("Run set to recover but no run_id present")
 
-            _ = self._pop_run(from_loc, index)
-            self._set_run(to_loc, 0, run)
+        _ = self._pop_run(from_loc, index)
+        self._set_run(to_loc, 0, run)
 
         self.logger.info(
             f"Recovered Run: {self.run_str(to_loc, 0)} idx {index} from {from_loc} → {to_loc}"
         )
 
+    @_logged
     @_persists
     def clear_runs(self, loc: QueLocation) -> None:
         to_clear = self._fetch_state(loc)
-        with log_and_raise(self.logger, f"clear {loc}"):
-            if len(to_clear) > 0:
-                to_clear.clear()
-            else:
-                raise QueEmpty(loc)
+        if len(to_clear) > 0:
+            to_clear.clear()
+        else:
+            raise QueEmpty(loc)
 
+    @_logged
     @_persists
     def remove_run(self, loc: QueLocation, idx: int) -> None:
-        with log_and_raise(self.logger, "remove"):
-            _ = self._pop_run(loc, idx)
+        _ = self._pop_run(loc, idx)
 
+    @_logged
     @_persists
     def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
-        with log_and_raise(self.logger, "shuffle"):
-            self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
+        self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
 
     def _move(self, o_loc: QueLocation, n_loc: QueLocation, oi_idx: int) -> None:
         run = self.peak_run(o_loc, oi_idx)
         self._set_run(n_loc, 0, run)
         _ = self._pop_run(o_loc, oi_idx)
 
+    @_logged
     @_persists
     def move(
         self,
@@ -1063,18 +1076,18 @@ class Que:
         oi_idx: int,
         of_idx: int | None = None,
     ) -> None:
-        with log_and_raise(self.logger, "move"):
-            if of_idx is None:
+        if of_idx is None:
+            self._move(o_loc, n_loc, oi_idx)
+        else:
+            old_location = self._fetch_state(o_loc)
+            if oi_idx > of_idx:
+                oi_idx, of_idx = of_idx, oi_idx
+            if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
+                raise QueIdxOORR(o_loc, oi_idx, of_idx, len(old_location))
+            for _ in range(oi_idx, of_idx + 1):
                 self._move(o_loc, n_loc, oi_idx)
-            else:
-                old_location = self._fetch_state(o_loc)
-                if oi_idx > of_idx:
-                    oi_idx, of_idx = of_idx, oi_idx
-                if abs(oi_idx) >= len(old_location) or abs(of_idx) >= len(old_location):
-                    raise QueIdxOORR(o_loc, oi_idx, of_idx, len(old_location))
-                for _ in range(oi_idx, of_idx + 1):
-                    self._move(o_loc, n_loc, oi_idx)
 
+    @_logged
     @_persists
     def edit_run(
         self,
@@ -1089,24 +1102,23 @@ class Que:
         The run is dumped to a plain dict, mutated, then re-validated back to
         the appropriate pydantic model — so all field validators still run.
         """
-        with log_and_raise(self.logger, "edit"):
-            run = self.peak_run(loc, idx)
-            val = ast.literal_eval(value) if do_eval else value
+        run = self.peak_run(loc, idx)
+        val = ast.literal_eval(value) if do_eval else value
 
-            run_dict = run.model_dump()
-            run_dict = self.set_nested(run_dict, keys, val)
+        run_dict = run.model_dump()
+        run_dict = self.set_nested(run_dict, keys, val)
 
-            if loc == FAIL_RUNS:
-                run_type = FailedExp
-            elif loc == OLD_RUNS:
-                run_type = CompExpInfo
-            else:
-                run_type = ExpInfo
+        if loc == FAIL_RUNS:
+            run_type = FailedExp
+        elif loc == OLD_RUNS:
+            run_type = CompExpInfo
+        else:
+            run_type = ExpInfo
 
-            new_run = strict_validate(run_type, run_dict)
+        new_run = strict_validate(run_type, run_dict)
 
-            _ = self._pop_run(loc, idx)
-            self._set_run(loc, idx, new_run)
+        _ = self._pop_run(loc, idx)
+        self._set_run(loc, idx, new_run)
 
     # Indirect indexing
 
@@ -1149,6 +1161,7 @@ class Que:
                 raise QueIdxOOR(loc, i, len(idxs), filtered)
         return [idxs[i] for i in indexes]
 
+    @_logged
     @_persists
     def place_runs(
         self,
@@ -1160,9 +1173,8 @@ class Que:
         `NOTE:` This method is unsafe and will drop runs if there is an error.
 
         """
-        with log_and_raise(self.logger, "place_runs"):
-            for idx, run in enumerate(runs):
-                self._set_run(loc, idx + index, run)
+        for idx, run in enumerate(runs):
+            self._set_run(loc, idx + index, run)
 
     @classmethod
     def summarise(cls, runs: ExpQue, ndigits: int | None = None) -> list[Sumarised]:
@@ -1264,6 +1276,7 @@ class Que:
 
         print_config(self.peak_run(loc, idx))
 
+    @_logged
     @_persists
     def copy_runs(
         self,
@@ -1275,31 +1288,30 @@ class Que:
         enum_chck: bool = True,
         **kwargs: Unpack[ListManipulationKwargs],
     ) -> None:
-        with log_and_raise(self.logger, "copy"):
-            runs = self.select_runs(o_loc, o_indexes, **kwargs)
-            if clean_slate:
-                runs = [self._clean_slate(run, enum_chck) for run in runs]
+        runs = self.select_runs(o_loc, o_indexes, **kwargs)
+        if clean_slate:
+            runs = [self._clean_slate(run, enum_chck) for run in runs]
 
-            self.place_runs(n_loc, runs, index=n_idx)
+        self.place_runs(n_loc, runs, index=n_idx)
 
     # Meta features
 
+    @_logged
     @_persists
     def update_runs(self, key_set: list[str], transform: Callable[[Any], Any]) -> None:
         """Apply a transform to a nested field across every run in every location."""
-        with log_and_raise(self.logger, "que.update_runs"):
-            for run_list, model_cls in [
-                (self.to_run, ExpInfo),
-                (self.cur_run, ExpInfo),
-                (self.fail_runs, FailedExp),
-                (self.old_runs, CompExpInfo),
-            ]:
-                for idx, run in enumerate(run_list):
-                    run_dict = run.model_dump()
-                    run_dict = self.set_nested(
-                        run_dict, key_set, transform(self.get_nested(run_dict, key_set))
-                    )
-                    run_list[idx] = model_cls.model_validate(run_dict)  # type: ignore[index]
+        for run_list, model_cls in [
+            (self.to_run, ExpInfo),
+            (self.cur_run, ExpInfo),
+            (self.fail_runs, FailedExp),
+            (self.old_runs, CompExpInfo),
+        ]:
+            for idx, run in enumerate(run_list):
+                run_dict = run.model_dump()
+                run_dict = self.set_nested(
+                    run_dict, key_set, transform(self.get_nested(run_dict, key_set))
+                )
+                run_list[idx] = model_cls.model_validate(run_dict)  # type: ignore[index]
 
 
 # ---------------------------------------------------------------------------
