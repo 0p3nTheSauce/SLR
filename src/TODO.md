@@ -16,13 +16,22 @@ Misc TODOs:
   when next touching one of these rather than as a standalone sweep.
 - `CompRes` (src/run_types.py) doesn't record epochs trained or the epoch of the best val loss,
   so `results/sweeping/suggest_sweep.ipynb` can't show where hyperband/early stopping cut trials
-  short from the Que alone (wandb's `Epoch` summary has it). Consider adding both.
-- `CosineAnnealingLR` (training.get_scheduler) is periodic in PyTorch: after warmup + `tmax`
-  epochs the LR climbs back up. S3D sweep 7 relies on patience to stop runs first. Consider
-  ending training at warmup + `tmax`, or holding the LR at `eta_min` afterwards.
+  short from the Que alone (wandb's `Epoch` summary has it). It works around this by stashing
+  each sweep's epochs from wandb's history. Consider adding both.
+- `CosAnealInfo.hold_after_tmax` (training.cosine_then_hold) now holds the LR at `eta_min` after
+  warmup + `tmax`; it defaults to PyTorch's periodic behaviour so older configs keep their meaning.
+  Consider also ending training at warmup + `tmax` (plus a few epochs) when it's set, since with
+  `eta_min = 0` the epochs until patience fires train nothing.
+- With no warm-up, `training.get_scheduler` still wraps the main scheduler in a `SequentialLR`
+  with milestone 0, which starts it one epoch late: epoch 0 runs on the identity placeholder, so
+  the LR stays at its initial value for 2 epochs and the cosine trough lands at `tmax + 1` (see
+  `tests/test_training.py`). Returning the main scheduler directly would fix it, but shifts every
+  no-warm-up config (e.g. all of `configfiles/Satnac_2025`) by an epoch, so decide whether that's
+  acceptable first.
 - `results/seed_comparison/results.ipynb` only covers the `S3D_13idpda6.toml` seed runs (its
-  filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs
-  once they finish.
+  filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs,
+  which have finished. Their best val loss is already in `results/sweeping/suggest_sweep.ipynb`,
+  stashed as `asl100_cutoff_9_S3D_seed_comparison_czopef0v_runs.json`.
 - **Regenerate the labels before the final round of results.** `preprocess.py` now stores
   0-based frame starts (cache version 2), fixing an off-by-one where every unreset instance
   skipped its first annotated frame, but the label files on disk still have the old 1-based
@@ -41,3 +50,6 @@ Misc TODOs:
   only in which archs they keep. `results/benchmark/benchmark.ipynb` now has a typed loader
   (`load_runs`) covering every run; move it into a shared helper module and have the venue
   notebooks filter its output instead of re-parsing the JSON.
+- `configfiles/asl100/MViTv2_B_32x3/exp013.toml` says it is "same as ... but with warm up", but
+  it has no `[scheduler.warm_up]` block, and its Que run has no warmup either. Fix the comment, or
+  rerun it with the warmup it was meant to have. No MViTv2_B_32x3 run so far has used warmup.

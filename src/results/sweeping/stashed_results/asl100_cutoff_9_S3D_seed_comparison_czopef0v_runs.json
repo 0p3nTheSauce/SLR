@@ -1,0 +1,1472 @@
+[
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp113/checkpoints",
+            "seed": 10,
+            "exp_no": "113",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "ytdu9z2b",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 73.96449704142012,
+            "best_val_loss": 1.12668871644138,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6738333333333334,
+                    "top5": 0.9058333333333333,
+                    "top10": 0.945
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6666666666666666,
+                    "top5": 0.9031007751937985,
+                    "top10": 0.9418604651162791
+                },
+                "average_loss": 1.3807752472322565
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7385,
+                    "top5": 0.9283333333333335,
+                    "top10": 0.9633333333333333
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7366863905325444,
+                    "top5": 0.9289940828402367,
+                    "top10": 0.9644970414201184
+                },
+                "average_loss": 1.12668871644138
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp112/checkpoints",
+            "seed": 9,
+            "exp_no": "112",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "zakvm8oq",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 72.7810650887574,
+            "best_val_loss": 1.1432228964194535,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6835,
+                    "top5": 0.9129999999999999,
+                    "top10": 0.9316666666666665
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6782945736434108,
+                    "top5": 0.9069767441860465,
+                    "top10": 0.9302325581395349
+                },
+                "average_loss": 1.4128900512219533
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7271666666666667,
+                    "top5": 0.9175,
+                    "top10": 0.955
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.727810650887574,
+                    "top5": 0.9171597633136095,
+                    "top10": 0.9556213017751479
+                },
+                "average_loss": 1.1432228964194535
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp111/checkpoints",
+            "seed": 8,
+            "exp_no": "111",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "zhsb7pmt",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 73.07692307692308,
+            "best_val_loss": 1.3063136784912355,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6906666666666668,
+                    "top5": 0.9025,
+                    "top10": 0.9283333333333332
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6782945736434108,
+                    "top5": 0.8992248062015504,
+                    "top10": 0.9302325581395349
+                },
+                "average_loss": 1.4549573195929904
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7338333333333334,
+                    "top5": 0.9075,
+                    "top10": 0.935
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7307692307692307,
+                    "top5": 0.908284023668639,
+                    "top10": 0.9378698224852071
+                },
+                "average_loss": 1.3063136784912355
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp110/checkpoints",
+            "seed": 7,
+            "exp_no": "110",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "ctaaal5h",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 72.18934911242603,
+            "best_val_loss": 1.269720273745331,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6405000000000001,
+                    "top5": 0.8783333333333334,
+                    "top10": 0.92
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6356589147286822,
+                    "top5": 0.875968992248062,
+                    "top10": 0.9224806201550387
+                },
+                "average_loss": 1.6245605634424345
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7076666666666666,
+                    "top5": 0.8983333333333334,
+                    "top10": 0.9358333333333333
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7071005917159763,
+                    "top5": 0.8964497041420119,
+                    "top10": 0.9349112426035503
+                },
+                "average_loss": 1.269720273745331
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp109/checkpoints",
+            "seed": 6,
+            "exp_no": "109",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "gn2v3emc",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 73.66863905325444,
+            "best_val_loss": 1.185969370339371,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.691,
+                    "top5": 0.8783333333333333,
+                    "top10": 0.9116666666666667
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.686046511627907,
+                    "top5": 0.875968992248062,
+                    "top10": 0.9108527131782945
+                },
+                "average_loss": 1.4037817666275958
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7326666666666668,
+                    "top5": 0.9208333333333333,
+                    "top10": 0.9508333333333333
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.727810650887574,
+                    "top5": 0.9201183431952663,
+                    "top10": 0.9526627218934911
+                },
+                "average_loss": 1.185969370339371
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp108/checkpoints",
+            "seed": 5,
+            "exp_no": "108",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "2vbcriwl",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 75.14792899408285,
+            "best_val_loss": 1.1275440412839153,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6968333333333332,
+                    "top5": 0.9055,
+                    "top10": 0.9329999999999999
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6937984496124031,
+                    "top5": 0.8992248062015504,
+                    "top10": 0.9302325581395349
+                },
+                "average_loss": 1.387027563424235
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7505000000000002,
+                    "top5": 0.9083333333333333,
+                    "top10": 0.9458333333333333
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7485207100591716,
+                    "top5": 0.908284023668639,
+                    "top10": 0.9497041420118343
+                },
+                "average_loss": 1.1275440412839153
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp107/checkpoints",
+            "seed": 4,
+            "exp_no": "107",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "5winqroq",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 73.96449704142012,
+            "best_val_loss": 1.1628016956999774,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6821666666666667,
+                    "top5": 0.885,
+                    "top10": 0.9358333333333333
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6705426356589147,
+                    "top5": 0.8875968992248062,
+                    "top10": 0.937984496124031
+                },
+                "average_loss": 1.3928292902647492
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7271666666666667,
+                    "top5": 0.92,
+                    "top10": 0.9466666666666665
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.727810650887574,
+                    "top5": 0.9201183431952663,
+                    "top10": 0.9467455621301775
+                },
+                "average_loss": 1.1628016956999774
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp106/checkpoints",
+            "seed": 3,
+            "exp_no": "106",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "cmvajaif",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 74.85207100591715,
+            "best_val_loss": 1.1216159863180493,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6835,
+                    "top5": 0.8941666666666667,
+                    "top10": 0.9191666666666667
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6821705426356589,
+                    "top5": 0.8914728682170543,
+                    "top10": 0.9186046511627907
+                },
+                "average_loss": 1.4778556829730596
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7576666666666668,
+                    "top5": 0.9075000000000002,
+                    "top10": 0.9408333333333333
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7485207100591716,
+                    "top5": 0.9053254437869822,
+                    "top10": 0.9408284023668639
+                },
+                "average_loss": 1.1216159863180493
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp105/checkpoints",
+            "seed": 2,
+            "exp_no": "105",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "vgwihdfe",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 75.14792899408285,
+            "best_val_loss": 1.179584292954708,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7113333333333333,
+                    "top5": 0.8883333333333334,
+                    "top10": 0.9383333333333332
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7054263565891473,
+                    "top5": 0.8875968992248062,
+                    "top10": 0.9341085271317829
+                },
+                "average_loss": 1.3480582938273709
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7535000000000001,
+                    "top5": 0.9075,
+                    "top10": 0.9466666666666665
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7514792899408284,
+                    "top5": 0.9053254437869822,
+                    "top10": 0.9437869822485208
+                },
+                "average_loss": 1.179584292954708
+            }
+        }
+    },
+    {
+        "admin": {
+            "model": "S3D",
+            "dataset": "WLASL",
+            "split": "asl100_cutoff_9",
+            "save_path": "/home/luke/Code/SLR/src/runs/asl100_cutoff_9/S3D/exp104/checkpoints",
+            "seed": 1,
+            "exp_no": "104",
+            "recover": false,
+            "config_path": "/home/luke/Code/SLR/src/configfiles/SeedComparison/S3D_czopef0v.toml",
+            "weight_path": null
+        },
+        "training": {
+            "batch_size": 8,
+            "update_per_step": 1,
+            "max_epoch": 200,
+            "batch_size_equivalent": 8
+        },
+        "optimizer": {
+            "eps": 0.07935007122167449,
+            "backbone_init_lr": 0.0013741893094626253,
+            "backbone_weight_decay": 2.2962962541564985e-05,
+            "classifier_init_lr": 3.0381194460015736e-06,
+            "classifier_weight_decay": 0.011334646576702044
+        },
+        "model_params": {
+            "drop_p": 0.4521934091372405
+        },
+        "data": {
+            "train_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "type": "HORIZONTAL_FLIP",
+                        "p": 0.24358328436236576
+                    },
+                    {
+                        "frame_size": 224,
+                        "type": "Random_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "test_augs": {
+                "normalise": true,
+                "norm_dict": {
+                    "mean": [
+                        0.43216,
+                        0.394666,
+                        0.37645
+                    ],
+                    "std": [
+                        0.22803,
+                        0.22145,
+                        0.216989
+                    ]
+                },
+                "temporal_aug": [
+                    {
+                        "target_length": 32,
+                        "max_wobble": 0,
+                        "type": "uniform"
+                    }
+                ],
+                "spatial_aug": [
+                    {
+                        "frame_size": 224,
+                        "type": "Centre_crop"
+                    }
+                ],
+                "strict_size": true,
+                "target_length": 32,
+                "frame_size": 224
+            },
+            "strict_size": true,
+            "target_length": 32,
+            "frame_size": 224
+        },
+        "scheduler": null,
+        "stopping": {
+            "type": "early_stopper",
+            "metric": "loss",
+            "phase": "val",
+            "mode": "min",
+            "patience": 15,
+            "min_delta": 0.01
+        },
+        "wandb": {
+            "entity": "ljgoodall2001-rhodes-university",
+            "project": "SeedComparison",
+            "tags": [],
+            "run_id": "k2fdwl29",
+            "sweep_id": null
+        },
+        "results": {
+            "check_name": "best_val",
+            "best_val_acc": 73.37278106508876,
+            "best_val_loss": 1.3100255154133384,
+            "test": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.6459999999999999,
+                    "top5": 0.8638333333333335,
+                    "top10": 0.9075
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.6472868217054264,
+                    "top5": 0.8643410852713178,
+                    "top10": 0.9108527131782945
+                },
+                "average_loss": 1.5801478127406965
+            },
+            "val": {
+                "top_k_average_per_class_acc": {
+                    "top1": 0.7071666666666665,
+                    "top5": 0.91,
+                    "top10": 0.9425
+                },
+                "top_k_per_instance_acc": {
+                    "top1": 0.7041420118343196,
+                    "top5": 0.9112426035502958,
+                    "top10": 0.9437869822485208
+                },
+                "average_loss": 1.3100255154133384
+            }
+        }
+    }
+]

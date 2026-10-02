@@ -424,9 +424,17 @@ class WarmOnly(SchedBase):
 
 
 class CosAnealInfo(SchedBase):
+    """Cosine annealing from the initial LR to `eta_min` over `tmax` epochs (after any warm-up).
+
+    PyTorch's `CosineAnnealingLR` is periodic: past `tmax` the LR climbs back to its initial
+    value over the next `tmax` epochs. `hold_after_tmax` keeps it at `eta_min` instead. It is off
+    by default so that older configs and run records keep the behaviour they ran with.
+    """
+
     type: Literal["CosineAnnealingLR"]
     tmax: int
     eta_min: float
+    hold_after_tmax: bool = False
 
 
 class WarmRestartInfo(SchedBase):
