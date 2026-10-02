@@ -291,7 +291,7 @@ else
     echo ""
     echo "  No host configured. Please specify a server to connect to:"
     echo ""
-    echo "    que --host <server_ip> [options]"
+    echo "    que --host <server_ip> [options] [command ...]"
     echo ""
     echo "  Available options:"
     echo "    --host          Host IP or hostname to connect to"
@@ -301,6 +301,10 @@ else
     echo "    --port_server   Remote port on server (default: 50000)"
     echo "    --max_retries   Max connection retries (default: 5)"
     echo "    --retry_delay   Seconds between retries (default: 2)"
+    echo "    --yes, -y       Answer yes to confirmation prompts"
+    echo ""
+    echo "  With a command (e.g. 'que server status'), runs it and exits instead of"
+    echo "  opening the shell."
     echo ""
     exit 1
 fi
@@ -308,9 +312,10 @@ fi
 # If no --host was passed explicitly, inject the saved one
 if [ -z "\$EXPLICIT_HOST" ]; then
     ARGS=("--host" "\$HOST_TO_USE" "\${ARGS[@]}")
-    echo -e "  \033[0;36mConnecting to last-used host: \$HOST_TO_USE\033[0m"
-    echo -e "  \033[1;33m(Use --host <ip> to connect to a different server)\033[0m"
-    echo ""
+    # stderr, so a single command's stdout (\`que list ...\`) is just its output
+    echo -e "  \033[0;36mConnecting to last-used host: \$HOST_TO_USE\033[0m" >&2
+    echo -e "  \033[1;33m(Use --host <ip> to connect to a different server)\033[0m" >&2
+    echo "" >&2
 fi
 
 # Save the resolved host for next time

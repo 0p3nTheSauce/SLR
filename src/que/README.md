@@ -40,7 +40,7 @@ sudo ./unsetup.sh
 
 ### The `que` command
 
-**que --host <server_ip> [options]**
+**que --host <server_ip> [options] [command ...]**
 
 #### Available options:
 -   `--host`          Host IP or hostname to connect to
@@ -50,6 +50,7 @@ sudo ./unsetup.sh
 -   `--port_server`   Remote port on server (default: 50000)
 -   `--max_retries`   Max connection retries (default: 5)
 -   `--retry_delay`   Seconds between retries (default: 2)
+-   `--yes`, `-y`     Answer yes to confirmation prompts (see below)
 
 If running the que-shell on the server, run:
 
@@ -64,6 +65,28 @@ que --host '123.456.78.910' #example IP address
 ```
 
 after the first use the last host will be used by default.
+
+#### Running a single command
+
+Anything after the options is run as one QueShell command, and `que` then exits instead of
+opening the shell. The exit status is 0 if the command succeeded, and 1 if it failed or was
+cancelled, so this works in scripts:
+
+```bash
+que server status
+que list to_run
+que daemon set_sweep --sweep_path configfiles/sweeps/S3D/exp007/config.yaml
+```
+
+- Options for `que` itself go before the command. Everything after the command is its own
+  arguments, as in the shell.
+- Connection messages go to stderr, so stdout is just the command's output. (The
+  "Connecting to last-used host" lines come from the `que` wrapper that `setup.sh` generates,
+  so re-run `setup.sh` once to move them to stderr too.)
+- Commands that ask for confirmation (`clear`, `remove`, `logs -c`, and `create`/`add` of a
+  duplicate run) refuse when there's no terminal to ask on. Pass `--yes` to answer yes:
+  `que --yes clear fail_runs`.
+- One-shot mode doesn't show the banner or read/write `~/.que_shell_history`.
 
 ### The QueShell
 

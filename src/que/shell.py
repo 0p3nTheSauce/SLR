@@ -427,15 +427,24 @@ class QueShell(cmdLib.Cmd):
         self,
         server: QueManagerProtocol,
         auto_save: bool = True,
+        interactive: bool = True,
+        assume_yes: bool = False,
     ) -> None:
+        """`interactive=False` is for one-shot use (`run_once`): no banner, and no readline
+        history, so scripts don't touch ~/.que_shell_history. `assume_yes` answers every
+        confirmation prompt with yes (see `_confirm`)."""
 
         super().__init__()
         # Pretty stuff
         self.console = Console()
-        self._show_banner()
         self.prompt = "\x01\033[1;36m\x02(que)$\x01\033[0m\x02 "
         self.intro = ""
-        self._setup_history()
+        if interactive:
+            self._show_banner()
+            self._setup_history()
+        self.assume_yes = assume_yes
+        # Whether the current command failed or was cancelled (reset before each command).
+        self.failed = False
         # Core Objects
         self.tmux_man = tmux_manager()
         self.auto_save = auto_save
@@ -496,9 +505,10 @@ class QueShell(cmdLib.Cmd):
     def unwrap_exception(self, message: str = "", error: str = ""):
         try:
             yield
-            if message:
+            if message and not self.failed:
                 self.console.print(f"[bold green]✓ {message} [/bold green]")
         except Exception as e:  # noqa: BLE001
+            self.failed = True
             if error:
                 self.console.print(
                     f"[bold red]✗ {error} : {e} [/bold red]", style="red"
@@ -509,6 +519,29 @@ class QueShell(cmdLib.Cmd):
             # NOTE: cool idea to make this optional
             # Print full traceback for debugging
             self.console.print("[dim]" + traceback.format_exc() + "[/dim]")
+
+    def _fail(self, message: str) -> None:
+        """Print why the current command failed or was cancelled, and mark it as failed."""
+        self.failed = True
+        self.console.print(message)
+
+    def _confirm(self, question: str) -> bool:
+        """Ask a yes/no question. With `assume_yes` the answer is yes. Without a terminal to ask
+        on, the answer is no, so a one-shot command never hangs or reads its answer from piped
+        input."""
+        if self.assume_yes:
+            return True
+        if not sys.stdin.isatty():
+            self._fail(f"[yellow]Needs confirmation (pass --yes):[/yellow] {question}")
+            return False
+        return Confirm.ask(question)
+
+    def run_once(self, argv: list[str]) -> int:
+        """Run one command, given as separate arguments (e.g. `["daemon", "start"]`), and return
+        an exit status: 0 if it succeeded, 1 if it failed or was cancelled."""
+        self.failed = False
+        self.onecmd(shlex.join(argv))
+        return 1 if self.failed else 0
 
     def _reconnect_proxies(self) -> None:
         """Reconnect the server controller and que proxies"""
@@ -524,6 +557,13 @@ class QueShell(cmdLib.Cmd):
 
     # Cmd overrides
 
+    def precmd(self, line: str) -> str:
+        self.failed = False
+        return line
+
+    def default(self, line: str) -> None:
+        self._fail(f"[red]Unknown command: {line.split()[0]}[/red] (see help)")
+
     def onecmd(self, line):
         """Override to handle connection errors gracefully"""
         try:
@@ -537,7 +577,7 @@ class QueShell(cmdLib.Cmd):
                 self._reconnect_proxies()
                 self.console.print("[bold green][OK][/bold green] Reconnected!\n")
             except Exception as reconnect_error:  # noqa: BLE001
-                self.console.print(
+                self._fail(
                     f"[bold red][ERROR][/bold red] Reconnection failed: {reconnect_error}"
                 )
                 return False
@@ -548,7 +588,7 @@ class QueShell(cmdLib.Cmd):
             try:
                 return super().onecmd(line)
             except (EOFError, ConnectionError, BrokenPipeError, OSError):
-                self.console.print(
+                self._fail(
                     "[bold yellow][WARNING][/bold yellow] Command failed after reconnect — server may still be starting. Try again."
                 )
                 return False
@@ -705,12 +745,10 @@ class QueShell(cmdLib.Cmd):
                 args = shlex.split(arg)
                 maybe_args = take_args(sup_args=args)
             except SystemExit:
-                self.console.print(
-                    "[yellow]Create cancelled (incorrect arguments)[/yellow]"
-                )
+                self._fail("[yellow]Create cancelled (incorrect arguments)[/yellow]")
                 return
             except Exception as e:  # noqa: BLE001
-                self.console.print(f"[red]Create cancelled (error: {e})[/red]")
+                self._fail(f"[red]Create cancelled (error: {e})[/red]")
                 return
 
             with self.unwrap_exception(
@@ -719,17 +757,19 @@ class QueShell(cmdLib.Cmd):
                 if isinstance(maybe_args, tuple):
                     admin_info, wandb_info = maybe_args
                 else:
-                    self.console.print("[yellow]Create cancelled (by user)[/yellow]")
+                    self._fail("[yellow]Create cancelled (by user)[/yellow]")
                     return
 
                 try:
                     self.que.create_run(admin_info, wandb_info)
                 except QueDupExp:
                     # ask if want to create anyway
-                    if Confirm.ask(
+                    if self._confirm(
                         "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
                     ):
                         self.que.create_run(admin_info, wandb_info, add_duplicates=True)
+                    else:
+                        self._fail("[yellow]Create cancelled (duplicate)[/yellow]")
 
     def do_add(self, arg):
         """Add run with feedback"""
@@ -741,7 +781,7 @@ class QueShell(cmdLib.Cmd):
         try:
             parsed_args = parser.parse_args(args)
         except (SystemExit, ValueError):
-            self.console.print("[yellow]add cancelled[/yellow]")
+            self._fail("[yellow]add cancelled[/yellow]")
             return
 
         parsed_args.no_enum_chck = True  # bypass enum check
@@ -749,7 +789,7 @@ class QueShell(cmdLib.Cmd):
         try:
             maybe_args = take_args(parsed_args=parsed_args)
         except (SystemExit, ValueError):
-            self.console.print("[red]Add cancelled (incorrect arguments)[/red]")
+            self._fail("[red]Add cancelled (incorrect arguments)[/red]")
             return
 
         if isinstance(maybe_args, tuple):
@@ -765,12 +805,12 @@ class QueShell(cmdLib.Cmd):
 
             # check that checkpoint exists
             if not Path(admin_info.save_path).exists():
-                self.console.print(
+                self._fail(
                     f"[red]Add cancelled (save path: {admin_info.save_path} does not exist)[/red]"
                 )
                 return
         else:
-            self.console.print("[yellow]Add cancelled (by user)[/yellow]")
+            self._fail("[yellow]Add cancelled (by user)[/yellow]")
             return
 
         with self.unwrap_exception("Run added successfully", "Failed to add run"):
@@ -778,10 +818,12 @@ class QueShell(cmdLib.Cmd):
                 self.que.add_run(admin_info, wandb_info)
             except QueDupExp:
                 # ask if want to create anyway
-                if Confirm.ask(
+                if self._confirm(
                     "[bold yellow]A run with the same config already exists. Create duplicate?[/bold yellow]"
                 ):
                     self.que.add_run(admin_info, wandb_info, add_duplicates=True)
+                else:
+                    self._fail("[yellow]Add cancelled (duplicate)[/yellow]")
 
     def do_recover(self, arg):
         """Recover a run with status indication"""
@@ -806,14 +848,14 @@ class QueShell(cmdLib.Cmd):
             return
 
         # Confirmation prompt
-        if Confirm.ask(
+        if self._confirm(
             f"[bold red]Clear all runs from {parsed_args.location}?[/bold red]"
         ):
             with self.unwrap_exception(f"Cleared runs from {parsed_args.location}"):
                 self.que.clear_runs(parsed_args.location)
             # self.console.print(f"[bold green]✓[/bold green] Cleared runs from {parsed_args.location}")
         else:
-            self.console.print("[yellow]Clear cancelled[/yellow]")
+            self._fail("[yellow]Clear cancelled[/yellow]")
 
     def do_remove(self, arg):
         """Remove a run with confirmation"""
@@ -821,7 +863,7 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
-        if Confirm.ask(
+        if self._confirm(
             f"[bold red]Remove run {parsed_args.index} from {parsed_args.location}?[/bold red]"
         ):
             with self.unwrap_exception(
@@ -830,7 +872,7 @@ class QueShell(cmdLib.Cmd):
                 self.que.remove_run(parsed_args.location, parsed_args.index)
             # self.console.print(f"[bold green]✓[/bold green] Removed run {parsed_args.index} from {parsed_args.location}")
         else:
-            self.console.print("[yellow]Remove cancelled[/yellow]")
+            self._fail("[yellow]Remove cancelled[/yellow]")
 
     def do_shuffle(self, arg):
         """Reposition with visual confirmation"""
@@ -1164,9 +1206,7 @@ class QueShell(cmdLib.Cmd):
             used, total = gpu_manager.get_gpu_memory_usage()
             self.console.print(f"CUDA memory: {used}/{total} GiB")
         else:
-            self.console.print(
-                f"[bold red]Command not recognised: {parsed_args.command}[/bold red]"
-            )
+            self._fail(f"[bold red]Command not recognised: {parsed_args.command}[/bold red]")
 
     # Daemon
 
@@ -1419,11 +1459,11 @@ class QueShell(cmdLib.Cmd):
 
         log: LogName = "training" if parsed_args.training else "server"
         if parsed_args.clear:
-            if Confirm.ask(f"[bold red]Clear the server's {log} log?[/bold red]"):
+            if self._confirm(f"[bold red]Clear the server's {log} log?[/bold red]"):
                 with self.unwrap_exception(f"Cleared the {log} log", f"Failed to clear the {log} log"):
                     self.server_context.clear_log(log)
             else:
-                self.console.print("[yellow]Action cancelled[/yellow].")
+                self._fail("[yellow]Action cancelled[/yellow].")
             return
         self._follow_log(log, parsed_args.top_n)
 
@@ -1448,7 +1488,7 @@ class QueShell(cmdLib.Cmd):
         except KeyboardInterrupt:
             self.console.print("\n[cyan]Stopped streaming journalctl logs[/cyan]")
         except Exception as e:  # noqa: BLE001
-            self.console.print(f"[red]Error streaming journalctl logs: {e}[/red]")
+            self._fail(f"[red]Error streaming journalctl logs: {e}[/red]")
 
     # Helper functions for parsing
 
@@ -1486,11 +1526,15 @@ class QueShell(cmdLib.Cmd):
             if parser:
                 try:
                     return self._apply_synonyms(parser.parse_args(args))
-                except (SystemExit, ValueError):
-                    self.console.print(f"[yellow]{cmd} cancelled[/yellow]")
+                except SystemExit as e:
+                    if e.code != 0:  # 0 is argparse's exit after printing --help
+                        self._fail(f"[yellow]{cmd} cancelled[/yellow]")
+                    return None
+                except ValueError:
+                    self._fail(f"[yellow]{cmd} cancelled[/yellow]")
                     return None
             else:
-                self.console.print(f"[red]{cmd} not found[/red]")
+                self._fail(f"[red]{cmd} not found[/red]")
 
     def _get_parser(self, cmd: str) -> argparse.ArgumentParser | None:
         """Get argument parser for a given command"""
@@ -2187,7 +2231,14 @@ def tunnel_handler(tunnel: subprocess.Popen | None):
 
 
 def get_queshell_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="queShell command line arguments")
+    """Connection options, then an optional command. With no command, `que` opens the
+    interactive shell. With one (`que [options] daemon set_sweep ...`), it runs that command,
+    exits 0 if it succeeded and 1 if it failed or was cancelled. Options go before the command:
+    everything after it is the command's own arguments."""
+    parser = argparse.ArgumentParser(
+        description="QueShell: the interactive shell, or a single command run from the terminal",
+        allow_abbrev=False,
+    )
 
     parser.add_argument(
         "--host",
@@ -2231,50 +2282,76 @@ def get_queshell_parser() -> argparse.ArgumentParser:
         default=2,
         help="Delay in seconds between connection retries (default: 2)",
     )
+    parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Answer yes to confirmation prompts (clear, remove, duplicate runs, clearing logs). "
+        "Without it, a single command run with no terminal attached refuses them.",
+    )
+    parser.add_argument(
+        "command",
+        nargs=argparse.REMAINDER,
+        help="A shell command and its arguments, e.g. `server status`. Omit it for the "
+        "interactive shell.",
+    )
     return parser
 
 
-if __name__ == "__main__":
-    parser = get_queshell_parser()
-    args = parser.parse_args()
+def _resolve_ssh_key(ssh_key: Path | None) -> Path | None:
+    """The given SSH key (which must exist), else ~/.ssh/id_rsa or ~/.ssh/id_ed25519 if
+    present, else None (password authentication)."""
+    if ssh_key is not None:
+        ssh_key = ssh_key.expanduser()
+        if not ssh_key.exists():
+            raise ValueError(f"SSH key not found at {ssh_key}")
+        return ssh_key
+    for default in (Path.home() / ".ssh" / "id_rsa", Path.home() / ".ssh" / "id_ed25519"):
+        if default.exists():
+            return default
+    print(
+        "No SSH key provided and no default keys found, will attempt password authentication",
+        file=sys.stderr,
+    )
+    return None
 
+
+def main(argv: list[str] | None = None) -> int:
+    """Run `que`: connect (through an SSH tunnel unless the host is localhost), then either run
+    one command or the interactive shell. Returns the exit status. Connection messages go to
+    stderr, so a single command's stdout is just its output."""
+    args = get_queshell_parser().parse_args(argv)
+
+    tunnel = None
     if args.host != "localhost":
-        if args.ssh_key is not None:
-            args.ssh_key = args.ssh_key.expanduser()
-            if not args.ssh_key.exists():
-                print(f"SSH key not found at {args.ssh_key}")
-                raise ValueError("SSH key not found")
-        else:
-            id_rsa = Path.home() / ".ssh" / "id_rsa"  # default SSH key path
-            ed25519 = Path.home() / ".ssh" / "id_ed25519"
-            if id_rsa.exists():
-                args.ssh_key = id_rsa
-            elif ed25519.exists():
-                args.ssh_key = ed25519
-            else:
-                print(
-                    "No SSH key provided and no default keys found, will attempt password authentication"
-                )
-
         try:
             tunnel = ssh_tunnel_maker(
                 host_ip=args.host,
                 ssh_user=args.ssh_user,
-                ssh_key=args.ssh_key,
+                ssh_key=_resolve_ssh_key(args.ssh_key),
                 port_client=args.port_client,
                 port_server=args.port_server,
             )
-            print("SSH tunnel established successfully")
         except Exception as e:
-            print(f"Failed to establish SSH tunnel: {e}")
+            print(f"Failed to establish SSH tunnel: {e}", file=sys.stderr)
             raise
-
-    else:
-        tunnel = None  # No tunnel needed for localhost
+        print("SSH tunnel established successfully", file=sys.stderr)
 
     with tunnel_handler(tunnel):
+        server = connect_manager(
+            port=args.port_client if tunnel is not None else args.port_server,
+            max_retries=args.max_retries,
+            retry_delay=args.retry_delay,
+        )
+        if args.command:
+            shell = QueShell(server, interactive=False, assume_yes=args.yes)
+            return shell.run_once(args.command)
         try:
-            que_shell = QueShell(connect_manager())
-            que_shell.cmdloop()
+            QueShell(server, assume_yes=args.yes).cmdloop()
         except KeyboardInterrupt:
             print("\n[INFO] Exiting queShell without saving due to keyboard interrupt.")
+        return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
