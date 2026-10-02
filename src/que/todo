@@ -47,6 +47,12 @@ Worker:
     src/TODO.md's repo-wide blind-except audit item.
 
 Server:
+- the manager's authkey is still the hardcoded b"abracadabra" (server.py's --authkey default and
+    start_server, core.connect_manager), so the shell can't pass any other key. The server only
+    listens on localhost (clients come in over the SSH tunnel), so this exposes it to other
+    users of the server machine rather than the network. Revamp: e.g. a random key generated
+    by setup.sh into a user-only file (~/.config/que, mode 600), read by both the server and the
+    shell, with --authkey only as an override.
 - `server load` at runtime still restores `awake` from the file: loading awake=True starts a
     supervisor, and awake=False while a supervisor runs makes status misreport it. Either keep
     the live `awake` value when the server is already up (only restore it at startup, for
