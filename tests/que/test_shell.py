@@ -301,3 +301,56 @@ class TestSetMaxRuns:
     ) -> None:
         harness.run("daemon", f"set_max_runs {arg}")
         assert context.sweep["max_runs"] == 50
+
+
+class FakeStateSaver:
+    """Records save_state/load_state calls, as the Que and ServerContext proxies receive them."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def save_state(self, **kwargs: Any) -> None:
+        self.calls.append(("save", kwargs))
+
+    def load_state(self, in_path: Any = None) -> None:
+        self.calls.append(("load", {"in_path": in_path}))
+
+
+class TestSaveLoad:
+    """Paths default to None -- the server's own files -- since over the SSH tunnel this
+    machine's RUN_PATH/SERVER_STATE_PATH aren't the server's."""
+
+    @pytest.fixture
+    def savers(self, harness: ShellHarness) -> tuple[FakeStateSaver, FakeStateSaver]:
+        que, ctx = FakeStateSaver(), FakeStateSaver()
+        harness.shell.que = que  # type: ignore[assignment]
+        harness.shell.server_context = ctx  # type: ignore[assignment]
+        return que, ctx
+
+    def test_save_server_defaults_to_servers_file(
+        self, harness: ShellHarness, savers: tuple[FakeStateSaver, FakeStateSaver]
+    ) -> None:
+        harness.run("save", "server")
+        assert savers[1].calls == [("save", {"out_path": None, "timestamp": None})]
+
+    def test_save_server_timestamped(
+        self, harness: ShellHarness, savers: tuple[FakeStateSaver, FakeStateSaver],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(shell_module, "make_timestamp", lambda: "T")
+        harness.run("save", "server -t -op snap.json")
+        assert savers[1].calls == [("save", {"out_path": Path("snap.json"), "timestamp": "T"})]
+
+    def test_save_all_timestamps_both_files_alike(
+        self, harness: ShellHarness, savers: tuple[FakeStateSaver, FakeStateSaver]
+    ) -> None:
+        harness.run("save", "all -t")
+        [(_, que_kwargs)], [(_, ctx_kwargs)] = savers[0].calls, savers[1].calls
+        assert que_kwargs["timestamp"] is not None
+        assert que_kwargs == ctx_kwargs
+
+    def test_load_server_from_path(
+        self, harness: ShellHarness, savers: tuple[FakeStateSaver, FakeStateSaver]
+    ) -> None:
+        harness.run("load", "server -ip snap.json")
+        assert savers[1].calls == [("load", {"in_path": Path("snap.json")})]

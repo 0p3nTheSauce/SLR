@@ -274,6 +274,20 @@ class TestPersistence:
         assert locations(make_que()) == before
         assert [p.name for p in saved_que.runs_path.parent.iterdir()] == ["Runs.json"]
 
+    def test_loading_another_file_saves_it_as_the_que(
+        self, saved_que: Que, make_que: MakeQue, tmp_path: Path
+    ) -> None:
+        other = tmp_path / "other.json"
+        saved_que.save_state(other)
+        saved_que.remove_run("old_runs", 0)
+        saved_que.load_state(other)
+        assert locations(make_que()) == locations(saved_que)
+        assert make_que().len_loc("old_runs") == 2
+
+    def test_timestamped_copy(self, saved_que: Que, runs_path: Path) -> None:
+        saved_que.save_state(runs_path, timestamp="T")
+        assert (runs_path.parent / "Runs_T.json").exists()
+
     def test_pickled_copy_still_saves(self, saved_que: Que, make_que: MakeQue) -> None:
         """The Daemon and Worker, each holding the Que, are pickled into spawned processes."""
         copy = pickle.loads(pickle.dumps(saved_que))

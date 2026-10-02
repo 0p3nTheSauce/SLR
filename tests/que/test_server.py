@@ -280,3 +280,11 @@ class TestSweepProgressRecovery:
         saved = read_server_state(ctx.state_path)
         assert saved.sweep["max_runs"] == 60
         assert saved.daemon_state["stop_on_fail"] is not stop_on_fail
+
+    def test_loading_another_file_saves_it_as_the_state(self, start_server: StartServer) -> None:
+        ctx = start_server()
+        ctx.set_sweep(SWEEP)
+        ctx.save_state(timestamp="T")
+        ctx.set_sweep({})
+        ctx.load_state(Path(ctx.state_path).parent / "Server_T.json")
+        assert read_server_state(ctx.state_path).sweep == SWEEP

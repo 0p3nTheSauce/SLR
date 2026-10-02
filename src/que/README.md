@@ -165,5 +165,5 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 - `attach` attaches to tmux session (only opens on the shell side)
 - `wandb` open up wandb website
 - `logs` View the logs from the worker, server or systemd service (requires sudo).
-- `save` Save a copy of the que or server state to a .json file (state is already saved automatically, see [Recovery](#recovery))
-- `load` Load state of que or server from .json file
+- `save` Save a copy of the que or server state to a .json file (state is already saved automatically, see [Recovery](#recovery)). `-t` timestamps the file name; `save all -t` snapshots both as a matching `Runs_<ts>.json`/`Server_<ts>.json` pair.
+- `load` Load the que or server state from a .json file (`-ip`, default: the server's own), which then becomes the saved state

@@ -273,16 +273,23 @@ class ServerContext:
         if worker is not None:
             self.worker.set_state(worker)
 
-    def save_state(self, out_path: str | Path | None = None, timestamp: bool = False):
-        """Save the server state (atomically, see atomic_write_json) to `out_path`, default
-        `self.state_path`."""
+    def save_state(
+        self, out_path: str | Path | None = None, timestamp: str | None = None
+    ) -> None:
+        """Save the server state (atomically, see atomic_write_json).
+
+        Args:
+            out_path (str | Path | None, optional): Defaults to `self.state_path`.
+            timestamp (str | None, optional): Insert this timestamp (see make_timestamp) into
+                the output file name. Defaults to None.
+        """
         if out_path is None:
             out_path = self.state_path
-        elif Path(out_path).exists() and not timestamp:
+        elif Path(out_path).exists() and timestamp is None:
             self.server_logger.warning(f"Overwriting existing state file: {out_path}")
 
-        if timestamp:
-            out_path = timestamp_path(out_path)
+        if timestamp is not None:
+            out_path = timestamp_path(out_path, timestamp)
 
         atomic_write_json(out_path, self.get_state().model_dump())
         # saved on every change (see ServerContext); an explicit copy is worth noting
@@ -297,7 +304,8 @@ class ServerContext:
         file may be long gone (e.g. a snapshot taken mid-run before the server died), so the
         current values are kept. An 'awake' daemon relaunches its supervisor (see Daemon.set_state).
         The saved sweep progress isn't restored either: it's derived from the Que, and only
-        checked against it (see _check_sweep_progress).
+        checked against it (see _check_sweep_progress). Loading from a file other than
+        `self.state_path` saves the loaded state to it, as for any other change.
         """
         in_path = self.state_path if in_path is None else in_path
         if not Path(in_path).exists():
@@ -312,6 +320,8 @@ class ServerContext:
             self._check_sweep_progress(state)
             self._set_state(state)
             self.server_logger.info(f"Loaded state from: {in_path}")
+            if Path(in_path) != Path(self.state_path):
+                self.save_state()
         except Exception as e:
             self.server_logger.warning(
                 f"Ran into an error when loading state: {e}\nloading abandoned",

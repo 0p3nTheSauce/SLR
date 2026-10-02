@@ -17,13 +17,6 @@ Que:
     auto-fixable with `ruff check --fix src/que/tmux.py`.
 
 Shell:
-- `save que -t` writes a timestamped copy of Runs.json, but `save server` takes no options, so
-    the server state can't be snapshotted the same way. ServerContext.save_state already takes
-    out_path/timestamp; ServerContextProtocol.save_state just doesn't declare them, and the save
-    parser's "server" subparser has no -t/-o flags. `load server` likewise can't load from
-    another path (ServerContext.load_state takes in_path). Snapshotting both together (one -t
-    for a matching Runs_<ts>.json + Server_<ts>.json pair, as made by hand on 2026-10-02) would
-    help after incidents.
 - add more flexibility to run summarisation
 - add a flag to turn into debugging mode. Check debugging mode in unwrap_exception
 - fix argument parsing short flags

@@ -254,9 +254,15 @@ class ListManipulationKwargs(TypedDict, total=False):
     criterions: list[Callable[[Any], bool]]
 
 
-def timestamp_path(path: str | Path) -> str:
-    formatted = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")  # noqa: DTZ005
-    return str(path).replace(".json", f"_{formatted}.json")
+def make_timestamp() -> str:
+    """The current time, formatted for snapshot file names (see timestamp_path)."""
+    return datetime.now().strftime("%Y-%m-%d_%H:%M:%S")  # noqa: DTZ005
+
+
+def timestamp_path(path: str | Path, stamp: str | None = None) -> str:
+    """`path` with `_<stamp>` (default: make_timestamp()) inserted before its .json suffix."""
+    stamp = make_timestamp() if stamp is None else stamp
+    return str(path).replace(".json", f"_{stamp}.json")
 
 
 def atomic_write_json(path: str | Path, data: Any, indent: int | None = None) -> None:
@@ -576,6 +582,9 @@ class Que:
     def load_state(self, in_path: str | Path | None = None):
         """Load the queue state from a JSON file. If the file does not exist, start with an empty queue.
 
+        Loading from a file other than `runs_path` saves the loaded state to `runs_path` (with
+        `auto_save`), as for any other change to the Que.
+
         Args:
             in_path (str | Path | None, optional): The path to the JSON file containing the queue state. Defaults to None.
         """
@@ -605,11 +614,13 @@ class Que:
             self.old_runs, self.fail_runs = old_runs, fail_runs
         if data:
             self.logger.info(f"Loaded que state from {in_path}")
+        if Path(in_path) != self.runs_path and self.auto_save:
+            self.save_state()
 
     def save_state(
         self,
         out_path: str | Path | None = None,
-        timestamp: bool = False,
+        timestamp: str | None = None,
         archive: bool = False,
     ):
         """Save the state of the Que to a json file (atomically, see atomic_write_json).
@@ -619,7 +630,8 @@ class Que:
 
         Args:
             out_path (str | Path | None, optional): The output path. Defaults to `runs_path`.
-            timestamp (bool, optional): Whether to include a timestamp in the output path. Defaults to False.
+            timestamp (str | None, optional): Insert this timestamp (see make_timestamp) into the
+                output file name. Defaults to None.
             archive (bool, optional): Whether to archive the output file. Defaults to False.
         """
 
@@ -627,14 +639,14 @@ class Que:
             out_path = self.runs_path
         else:
             out_path = Path(out_path)
-            if out_path.exists() and not timestamp:
+            if out_path.exists() and timestamp is None:
                 self.logger.warning(f"Overwriting existing state file: {out_path}")
 
         if archive:
             out_path = ARCHIVE_DIR / out_path.name
 
-        if timestamp:
-            out_path = timestamp_path(out_path)
+        if timestamp is not None:
+            out_path = timestamp_path(out_path, timestamp)
 
         with self._lock:
             all_runs = {
@@ -1446,8 +1458,10 @@ class WorkerProtocol(Protocol):
 
 
 class ServerContextProtocol(Protocol):
-    def save_state(self) -> None: ...
-    def load_state(self) -> None: ...
+    def save_state(
+        self, out_path: str | Path | None = None, timestamp: str | None = None
+    ) -> None: ...
+    def load_state(self, in_path: str | Path | None = None) -> None: ...
     def get_state(self) -> ServerState: ...
     def set_sweep(self, sweep: SweepInfo | dict) -> None: ...
     def set_sweep_max_runs(self, max_runs: int | None) -> int | None: ...

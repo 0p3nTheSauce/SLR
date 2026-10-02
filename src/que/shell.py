@@ -35,7 +35,6 @@ from src.configs import get_avail_splits, get_train_parser
 from src.que.core import (
     CUR_RUN,
     QUE_LOCATIONS,
-    RUN_PATH,
     SERVER_LOG_PATH,
     SYNONYMS,
     SYSTEMD_NAME,
@@ -52,6 +51,7 @@ from src.que.core import (
     SweepInfo,
     connect_manager,
     is_sweep_complete,
+    make_timestamp,
     sweep_info_validate,
 )
 
@@ -645,18 +645,24 @@ class QueShell(cmdLib.Cmd):
         if parsed_args is None:
             return
 
+        # one timestamp for both files of `save all -t`, so the pair can be matched up
+        stamp = make_timestamp() if parsed_args.Timestamp else None
         if parsed_args.command == "que":
             with self.unwrap_exception(
                 "Queue state saved to file", "Failed to save que state"
             ):
-                self.que.save_state(
-                    out_path=parsed_args.output_path, timestamp=parsed_args.Timestamp
-                )
+                self.que.save_state(out_path=parsed_args.output_path, timestamp=stamp)
         elif parsed_args.command == "server":
             with self.unwrap_exception(
                 "Server state saved to file", "Failed to save server state"
             ):
-                self.server_context.save_state()
+                self.server_context.save_state(out_path=parsed_args.output_path, timestamp=stamp)
+        elif parsed_args.command == "all":
+            with self.unwrap_exception(
+                "Que and server state saved to file", "Failed to save state"
+            ):
+                self.que.save_state(timestamp=stamp)
+                self.server_context.save_state(timestamp=stamp)
         else:
             raise ValueError(
                 "neither Que nor Server specified, this should not be possible"
@@ -678,7 +684,7 @@ class QueShell(cmdLib.Cmd):
             with self.unwrap_exception(
                 "Server state loaded from file", "Failed to load server state from file"
             ):
-                self.server_context.load_state()
+                self.server_context.load_state(parsed_args.input_path)
         else:
             raise ValueError(
                 "neither Que nor Server specified, this should not be possible"
@@ -1710,7 +1716,7 @@ class QueShell(cmdLib.Cmd):
             "--input_path",
             "-ip",
             default=default,
-            help=f"{help} (default: {default}",
+            help=help if default is None else f"{help} (default: {default})",
             type=type,
             required=required,
         )
@@ -1728,7 +1734,7 @@ class QueShell(cmdLib.Cmd):
             "--output_path",
             "-op",
             default=default,
-            help=f"{help} (default: {default}",
+            help=help if default is None else f"{help} (default: {default})",
             type=type,
             required=required,
         )
@@ -1763,15 +1769,21 @@ class QueShell(cmdLib.Cmd):
             dest="command", required=True, help="Target to save"
         )
 
-        # Que Subparser
+        # output paths default to None: the server's own files, which (over an SSH tunnel) aren't
+        # at this machine's RUN_PATH/SERVER_STATE_PATH
         que_parser = subparsers.add_parser("que", help="Save Que state")
-        que_parser.add_argument(
-            "--Timestamp", "-t", action="store_true", help="Timestamp the output file"
+        self._add_output_file_arg(que_parser, help="Output path (default: the server's Runs.json)")
+        server_parser = subparsers.add_parser("server", help="Save Server state")
+        self._add_output_file_arg(
+            server_parser, help="Output path (default: the server's Server.json)"
         )
-        self._add_output_file_arg(que_parser, default=RUN_PATH)
-
-        # Daemon Subparser
-        subparsers.add_parser("server", help="Save Server state")
+        all_parser = subparsers.add_parser(
+            "all", help="Save Que and Server state (with -t: a matching timestamped pair)"
+        )
+        for sub in (que_parser, server_parser, all_parser):
+            sub.add_argument(
+                "--Timestamp", "-t", action="store_true", help="Timestamp the output file"
+            )
         return parser
 
     def _get_load_parser(self) -> argparse.ArgumentParser:
@@ -1782,13 +1794,12 @@ class QueShell(cmdLib.Cmd):
             dest="command", required=True, help="Target to load"
         )
 
-        # Que Subparser
         que_load = subparsers.add_parser("que", help="Load Que state")
-        self._add_input_file_arg(que_load, default=RUN_PATH)
-
-        # Daemon Subparser
-        subparsers.add_parser("server", help="Load Server state")
-        # TODO: Maybe add this if desired
+        self._add_input_file_arg(que_load, help="Input path (default: the server's Runs.json)")
+        server_load = subparsers.add_parser("server", help="Load Server state")
+        self._add_input_file_arg(
+            server_load, help="Input path (default: the server's Server.json)"
+        )
 
         return parser
 
