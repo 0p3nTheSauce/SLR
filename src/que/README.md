@@ -183,10 +183,30 @@ Otherwise, If a run fails, the `recover` command can be used.  In the event of a
 (que)$ recover -ol fail
 ```
 
+#### State history
+
+Every version of `Runs.json` and `Server.json` is kept in a git repo of their own, in `state/`, so the project's history isn't flooded with Que changes. A server installed by `setup.sh` runs `que-training-state-backup.timer`, which commits both files every 15 minutes if they changed (the message counts the runs in each location), then pushes if the repo has a remote. The snapshots from `save -t` and `old_ques/` stay untracked. See [state_backup.py](./state_backup.py).
+
+To back up off the machine, create an empty **private** repo (the Que holds every run's config), then, from the repo root:
+
+```bash
+python -m src.que.state_backup init --remote git@github.com:<user>/<repo>.git
+```
+
+Pushes run unattended, so they need an SSH key without a passphrase (or a running agent). A failed push keeps the commit, and the next run pushes it. `systemctl status que-training-state-backup` shows the last result, and `journalctl -u que-training-state-backup` the history.
+
+To restore an earlier version, find it in the log, copy it out, and `load` it (which makes it the saved state):
+
+```bash
+git -C src/que/state log --format='%h %ad %s' --date=iso -- Runs.json
+git -C src/que/state show <commit>:Runs.json > /tmp/Runs_restore.json
+que load que -ip /tmp/Runs_restore.json
+```
+
 #### Files
 
 The Que's data and logs are kept apart from the code, in gitignored directories:
-- `state/`: `Runs.json` (the Que), `Server.json` (server state), timestamped snapshots from `save -t`, and `old_ques/` (archived Ques)
+- `state/`: `Runs.json` (the Que), `Server.json` (server state), timestamped snapshots from `save -t`, and `old_ques/` (archived Ques). `state/` is also a git repo of its own, versioning `Runs.json` and `Server.json` (see [State history](#state-history))
 - `logs/`: `Server.log` (server, daemon and worker) and `Training.log` (training and testing output). A server installed by `setup.sh` rotates them with logrotate (weekly, or sooner past 50 MB; 8 kept, older ones gzipped)
 
 Until 2026-10-02 these lived directly in `src/que/`. The server moves them into place when it starts (`migrate_legacy_files` in `core.py`), never overwriting a file already there. On a machine that doesn't run the server (e.g. to read `Runs.json` from `src/results`), run it once by hand, from `src/`, and only while no Que server on that machine is still running the old code:
