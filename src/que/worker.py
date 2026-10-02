@@ -241,9 +241,7 @@ class Worker:
             wandb=fin_run.wandb,
             results=results,
         )
-        _ = self.que.pop_cur_run()
-        self.que.set_cur_run(comp_run)
-        self.que.store_fin_run()
+        self.que.store_fin_run(comp_run)
         self.server_logger.info("Exiting _test method")
 
     def _inject_sweep_config(self, config: RunInfo, run_id: str) -> None:

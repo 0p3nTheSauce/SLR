@@ -5,8 +5,12 @@ simple JSON-backed persistence.
 """
 
 import ast
+import functools
 import json
 import logging
+import os
+import tempfile
+import threading
 import time
 import traceback
 from collections.abc import Callable, Sequence
@@ -18,10 +22,13 @@ from pathlib import Path
 from typing import (
     Annotated,
     Any,
+    Concatenate,
     Literal,
+    ParamSpec,
     Protocol,
     TypeAlias,
     TypeGuard,
+    TypeVar,
 )
 
 from pydantic import BaseModel, Field, TypeAdapter
@@ -270,18 +277,92 @@ def timestamp_path(path: str | Path) -> str:
     return str(path).replace(".json", f"_{formatted}.json")
 
 
+def atomic_write_json(path: str | Path, data: Any, indent: int | None = None) -> None:
+    """Write `data` to `path` as JSON, such that `path` always holds either the old or the new
+    contents in full.
+
+    Writing in place would leave a truncated, unloadable file if the process died (e.g. a power
+    outage) mid-write. Instead the JSON goes to a temp file beside `path`, is fsynced, then
+    renamed over `path`. An existing file's permissions are kept.
+    """
+    path = Path(path)
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=indent)
+            f.flush()
+            os.fsync(f.fileno())
+        tmp.chmod(path.stat().st_mode & 0o777 if path.exists() else 0o644)
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    # make the rename itself durable
+    dir_fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _persists(method: Callable[Concatenate["Que", _P], _R]) -> Callable[Concatenate["Que", _P], _R]:
+    """Mark a Que method as a mutation: it runs under the Que's lock and is saved to disk (when
+    `auto_save` is on) as soon as it returns or raises, so disk always mirrors memory.
+
+    Only the outermost mutation saves, so one that calls others (e.g. replace_cur_run popping
+    then setting cur_run) is never saved half-done. Saving on a raise too keeps
+    partial changes from a failed mutation (e.g. add_new_run's fail_runs fallback) as well.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self: "Que", *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with self._lock:
+            self._mutation_depth += 1
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                self._mutation_depth -= 1
+                if self._mutation_depth == 0 and self.auto_save:
+                    self.save_state()
+
+    return wrapper
+
+
 # ---------------------------------------------------------------------------
 # Que class
 # ---------------------------------------------------------------------------
 
 
 class Que:
+    """The run queue: runs waiting (to_run), running (cur_run), finished (old_runs) and failed
+    (fail_runs), persisted to `runs_path`.
+
+    In the server, one Que is shared by the Worker, Daemon and Shell through the manager, which
+    serves each connection on its own thread. So every mutating method is wrapped in `_persists`:
+    mutations are serialised by a lock and, with `auto_save`, saved before they return -- the
+    server may die at any moment, and nothing should then exist only in memory. Callers never
+    need to call save_state themselves, except to write a copy elsewhere.
+    """
+
     def __init__(
         self,
         logger: Logger = QUE_LOGGER,
         runs_path: str | Path = RUN_PATH,
-        auto_save: bool = False,
+        auto_save: bool = True,
     ) -> None:
+        """
+        Args:
+            logger (Logger, optional): Defaults to QUE_LOGGER.
+            runs_path (str | Path, optional): Where the Que is loaded from and saved to. Defaults
+                to RUN_PATH, the live server's file.
+            auto_save (bool, optional): Save to `runs_path` after every mutation. Turn off for a
+                scratch copy of a Que you don't want written back. Defaults to True.
+        """
         self.runs_path: Path = Path(runs_path)
         self.old_runs: list[CompExpInfo] = []
         self.cur_run: list[ExpInfo] = []
@@ -289,7 +370,20 @@ class Que:
         self.fail_runs: list[FailedExp] = []
         self.auto_save: bool = auto_save
         self.logger = logger
+        self._lock = threading.RLock()
+        self._mutation_depth = 0
         self.load_state()
+
+    def __getstate__(self) -> dict[str, Any]:
+        # The Daemon and Worker (each holding a Que) are pickled into spawned processes, and locks
+        # can't be pickled. A copy gets a fresh lock; the processes use the manager's Que proxy anyway.
+        state = self.__dict__.copy()
+        del state["_lock"]
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._lock = threading.RLock()
 
     # -----------------------------------------------------------------------
     # General helpers
@@ -314,6 +408,17 @@ class Que:
         return to_get.pop(idx)
 
     def _set_run(self, loc: QueLocation, idx: int, run: GenExp) -> None:
+        """Insert `run` at `idx` in `loc`, enforcing the run type each location is loaded back as.
+
+        to_run/cur_run only take a plain ExpInfo: a FailedExp's error or a CompExpInfo's results
+        there would make the saved Que fail validation on the next load. Use recover_run or
+        copy_runs(clean_slate=True) to requeue one.
+        """
+        if loc in (TO_RUN, CUR_RUN) and type(run) is not ExpInfo:
+            raise TypeError(
+                f"{loc} requires a plain ExpInfo, got {type(run).__name__}: requeue it with "
+                "recover_run or copy_runs(clean_slate=True) instead"
+            )
         if loc == FAIL_RUNS:
             if not self._is_failed_exp(run):
                 raise TypeError("fail_runs requires a FailedExp instance")
@@ -404,8 +509,8 @@ class Que:
         Returns:
             ExpInfo: A fresh run without any run-specific state.
         """
-        from configs import ZFILL
-        from utils import enum_dir
+        from src.configs import ZFILL
+        from src.utils import enum_dir
 
         if enum_chck:
             # probably copying a run, so make sure the previous save path is created otherwise enum_dir will fail
@@ -475,23 +580,21 @@ class Que:
         try:
             with open(in_path, "r") as f:
                 data = json.load(f)
-            self.to_run = [ExpInfo.model_validate(r) for r in data.get(TO_RUN, [])]
-            self.cur_run = [ExpInfo.model_validate(r) for r in data.get(CUR_RUN, [])]
-            self.old_runs = [
-                CompExpInfo.model_validate(r) for r in data.get(OLD_RUNS, [])
-            ]
-            self.fail_runs = [
-                FailedExp.model_validate(r) for r in data.get(FAIL_RUNS, [])
-            ]
-            self.logger.info(f"Loaded que state from {in_path}")
         except FileNotFoundError:
             self.logger.warning(
                 f"No existing state found at {in_path}. Starting fresh."
             )
-            self.to_run = []
-            self.cur_run = []
-            self.old_runs = []
-            self.fail_runs = []
+            data = {}
+        # validate everything before replacing anything, so a bad file leaves the Que untouched
+        to_run = [ExpInfo.model_validate(r) for r in data.get(TO_RUN, [])]
+        cur_run = [ExpInfo.model_validate(r) for r in data.get(CUR_RUN, [])]
+        old_runs = [CompExpInfo.model_validate(r) for r in data.get(OLD_RUNS, [])]
+        fail_runs = [FailedExp.model_validate(r) for r in data.get(FAIL_RUNS, [])]
+        with self._lock:
+            self.to_run, self.cur_run = to_run, cur_run
+            self.old_runs, self.fail_runs = old_runs, fail_runs
+        if data:
+            self.logger.info(f"Loaded que state from {in_path}")
 
     def save_state(
         self,
@@ -499,10 +602,13 @@ class Que:
         timestamp: bool = False,
         archive: bool = False,
     ):
-        """Save the state of the Que to a json file
+        """Save the state of the Que to a json file (atomically, see atomic_write_json).
+
+        Mutations already save to `runs_path` themselves (see Que), so this is only needed to
+        write a copy elsewhere.
 
         Args:
-            out_path (str | Path | None, optional): The output path. Defaults to None.
+            out_path (str | Path | None, optional): The output path. Defaults to `runs_path`.
             timestamp (bool, optional): Whether to include a timestamp in the output path. Defaults to False.
             archive (bool, optional): Whether to archive the output file. Defaults to False.
         """
@@ -511,9 +617,8 @@ class Que:
             out_path = self.runs_path
         else:
             out_path = Path(out_path)
-
-        if out_path.exists() and not timestamp:
-            self.logger.warning(f"Overwriting existing state file: {out_path}")
+            if out_path.exists() and not timestamp:
+                self.logger.warning(f"Overwriting existing state file: {out_path}")
 
         if archive:
             out_path = ARCHIVE_DIR / out_path.name
@@ -521,14 +626,14 @@ class Que:
         if timestamp:
             out_path = timestamp_path(out_path)
 
-        all_runs = {
-            TO_RUN: [r.model_dump() for r in self.to_run],
-            CUR_RUN: [r.model_dump() for r in self.cur_run],
-            OLD_RUNS: [r.model_dump() for r in self.old_runs],
-            FAIL_RUNS: [r.model_dump() for r in self.fail_runs],
-        }
-        with open(out_path, "w") as f:
-            json.dump(all_runs, f, indent=4)
+        with self._lock:
+            all_runs = {
+                TO_RUN: [r.model_dump() for r in self.to_run],
+                CUR_RUN: [r.model_dump() for r in self.cur_run],
+                OLD_RUNS: [r.model_dump() for r in self.old_runs],
+                FAIL_RUNS: [r.model_dump() for r in self.fail_runs],
+            }
+        atomic_write_json(out_path, all_runs, indent=4)
         self.logger.info(f"Saved que to {out_path}")
 
     # -----------------------------------------------------------------------
@@ -537,6 +642,18 @@ class Que:
 
     def len_loc(self, loc: QueLocation) -> int:
         return len(self._fetch_state(loc))
+
+    def len_sweep_runs(self, sweep_id: str, loc: QueLocation = OLD_RUNS) -> int:
+        """Number of runs in `loc` that are trials of wandb sweep `sweep_id`.
+
+        The default, old_runs, counts the sweep's finished trials (trained and tested, including
+        ones wandb stopped early): the source of truth for its progress (see ServerContext).
+        """
+        return len(
+            self.list_runs(
+                loc, filter_keys=[["wandb", "sweep_id"]], criterions=[lambda s: s == sweep_id]
+            )
+        )
 
     def peak_run(self, loc: QueLocation, idx: int) -> GenExp:
         to_get = self._fetch_state(loc)
@@ -549,12 +666,22 @@ class Que:
     def peak_cur_run(self) -> ExpInfo:
         return self.peak_run(CUR_RUN, 0)  # type: ignore[return-value]
 
+    @_persists
     def pop_cur_run(self) -> ExpInfo:
         return self._pop_run(CUR_RUN, 0)  # type: ignore[return-value]
 
+    @_persists
     def set_cur_run(self, run: ExpInfo) -> None:
         self._set_run(CUR_RUN, 0, run)
 
+    @_persists
+    def replace_cur_run(self, run: ExpInfo) -> None:
+        """Swap the run in cur_run for an updated copy (e.g. with its wandb run id), as one
+        mutation -- so no save can catch cur_run empty in between."""
+        _ = self.pop_cur_run()
+        self.set_cur_run(run)
+
+    @_persists
     def stash_next_run(self) -> str:
         next_run = self._pop_run(TO_RUN, 0)
         sum_str = self._run_to_str(self._run_sum(next_run))
@@ -567,16 +694,21 @@ class Que:
             raise
         return sum_str
 
-    def store_fin_run(self):
-        """Move finished run from cur_run to old_runs.
+    @_persists
+    def store_fin_run(self, comp_run: CompExpInfo) -> None:
+        """Replace the run in cur_run with its completed (tested) copy `comp_run`, in old_runs.
 
-        NOTE: _set_run will raise TypeError if the run is not a CompExpInfo.
-        The caller is responsible for ensuring results have been attached before
-        calling this method.
+        Raises:
+            QueEmpty: If cur_run is empty.
+            TypeError: If `comp_run` isn't a CompExpInfo.
         """
-        self._set_run(OLD_RUNS, 0, self.pop_cur_run())
+        if not self._is_comp_exp_info(comp_run):
+            raise TypeError("store_fin_run requires a CompExpInfo")
+        _ = self.pop_cur_run()
+        self._set_run(OLD_RUNS, 0, comp_run)
         self.logger.info("Stored finished run")
 
+    @_persists
     def stash_failed_run(self, error: str) -> None:
         """Move the current run to fail_runs, annotated with the error message."""
         run = self.pop_cur_run()
@@ -744,6 +876,7 @@ class Que:
 
     # Direct indexing
 
+    @_persists
     def add_new_run(
         self,
         config: RunInfo,
@@ -786,6 +919,7 @@ class Que:
                 f"Added new run: {self._run_to_str(self._run_sum(exp_info, ndigits))}"
             )
 
+    @_persists
     def create_run(
         self,
         arg_dict: AdminInfo,
@@ -793,7 +927,7 @@ class Que:
         add_duplicates: bool = False,
     ) -> None:
         """Load and add a new run to the Que"""
-        from configs import load_config
+        from src.configs import load_config
 
         with log_and_raise(self.logger, "create"):
             config: RunInfo = load_config(arg_dict)
@@ -808,9 +942,18 @@ class Que:
         wandb_dict: WandbInfo,
         add_duplicates: bool = False,
     ) -> None:
-        """Add a fully-tested completed run directly into old_runs."""
-        from configs import ZFILL, get_model_exp_dir, get_model_results_dir, load_config
-        from testing import full_test, load_comp_res
+        """Add a fully-tested completed run directly into old_runs.
+
+        Not itself a `_persists` mutation, so the Que isn't locked through a possible full_test;
+        only the final insert (via place_runs) is.
+        """
+        from src.configs import (
+            ZFILL,
+            get_model_exp_dir,
+            get_model_results_dir,
+            load_config,
+        )
+        from src.testing import full_test, load_comp_res
 
         with log_and_raise(self.logger, "add"):
             config: RunInfo = load_config(arg_dict)
@@ -848,8 +991,9 @@ class Que:
                     else results.model_dump(),
                 }
             )
-            self.old_runs.insert(0, comp_run)
+        self.place_runs(OLD_RUNS, [comp_run])
 
+    @_persists
     def recover_run(
         self,
         to_loc: QueLocation = TO_RUN,
@@ -887,6 +1031,7 @@ class Que:
             f"Recovered Run: {self.run_str(to_loc, 0)} idx {index} from {from_loc} → {to_loc}"
         )
 
+    @_persists
     def clear_runs(self, loc: QueLocation) -> None:
         to_clear = self._fetch_state(loc)
         with log_and_raise(self.logger, f"clear {loc}"):
@@ -895,10 +1040,12 @@ class Que:
             else:
                 raise QueEmpty(loc)
 
+    @_persists
     def remove_run(self, loc: QueLocation, idx: int) -> None:
         with log_and_raise(self.logger, "remove"):
             _ = self._pop_run(loc, idx)
 
+    @_persists
     def shuffle(self, loc: QueLocation, o_idx: int, n_idx: int) -> None:
         with log_and_raise(self.logger, "shuffle"):
             self._set_run(loc, n_idx, self._pop_run(loc, o_idx))
@@ -908,6 +1055,7 @@ class Que:
         self._set_run(n_loc, 0, run)
         _ = self._pop_run(o_loc, oi_idx)
 
+    @_persists
     def move(
         self,
         o_loc: QueLocation,
@@ -927,6 +1075,7 @@ class Que:
                 for _ in range(oi_idx, of_idx + 1):
                     self._move(o_loc, n_loc, oi_idx)
 
+    @_persists
     def edit_run(
         self,
         loc: QueLocation,
@@ -1000,6 +1149,7 @@ class Que:
                 raise QueIdxOOR(loc, i, len(idxs), filtered)
         return [idxs[i] for i in indexes]
 
+    @_persists
     def place_runs(
         self,
         loc: QueLocation,
@@ -1110,10 +1260,11 @@ class Que:
         self.print_runs(self.summarise_runs(loc, **kwargs), exc=exc)
 
     def disp_run(self, loc: QueLocation, idx: int) -> None:
-        from configs import print_config
+        from src.configs import print_config
 
         print_config(self.peak_run(loc, idx))
 
+    @_persists
     def copy_runs(
         self,
         o_loc: QueLocation,
@@ -1133,6 +1284,7 @@ class Que:
 
     # Meta features
 
+    @_persists
     def update_runs(self, key_set: list[str], transform: Callable[[Any], Any]) -> None:
         """Apply a transform to a nested field across every run in every location."""
         with log_and_raise(self.logger, "que.update_runs"):

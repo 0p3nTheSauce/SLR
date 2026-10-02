@@ -7,9 +7,11 @@ from typing import Any
 import pytest
 from factories import MakeQue, comp_run, exp_run, failed_run
 
+from src.que import core as core_module
 from src.que.core import (
     QUE_LOCATIONS,
     Que,
+    QueBusy,
     QueIdxOOR,
     QueLocation,
     WorkerStateDict,
@@ -174,17 +176,17 @@ MUTATIONS: dict[str, Callable[[Que], object]] = {
     "stash_next_run": lambda q: q.stash_next_run(),
     "set_cur_run": lambda q: q.set_cur_run(exp_run("new")),
     "add_new_run": lambda q: q.add_new_run(exp_run("new"), SWEEP_WANDB, loc="cur_run"),
-    "store_fin_run": _with_cur(comp_run("new"), lambda q: q.store_fin_run()),
+    "replace_cur_run": _with_cur(exp_run("new"), lambda q: q.replace_cur_run(exp_run("new2"))),
+    "store_fin_run": _with_cur(exp_run("new"), lambda q: q.store_fin_run(comp_run("new"))),
     "stash_failed_run": _with_cur(exp_run("new"), lambda q: q.stash_failed_run("boom")),
     "recover_run": lambda q: q.recover_run(to_loc="to_run", from_loc="fail_runs"),
     "remove_run": lambda q: q.remove_run("old_runs", 0),
     "shuffle": lambda q: q.shuffle("to_run", 0, 1),
-    "move": lambda q: q.move("old_runs", "to_run", 0),
-    "move_range": lambda q: q.move("old_runs", "to_run", 0, 1),
+    "move": lambda q: q.move("to_run", "cur_run", 0),
     "clear_runs": lambda q: q.clear_runs("to_run"),
     "edit_run": lambda q: q.edit_run("to_run", 0, ["training", "max_epoch"], 5),
     "place_runs": lambda q: q.place_runs("to_run", [exp_run("new")]),
-    "copy_runs": lambda q: q.copy_runs("old_runs", [0], "to_run"),
+    "copy_runs": lambda q: q.copy_runs("old_runs", [0], "to_run", clean_slate=True, enum_chck=False),
     "update_runs": lambda q: q.update_runs(["training", "max_epoch"], lambda e: e + 1),
 }
 
@@ -211,7 +213,7 @@ class TestPersistence:
         assert locations(make_que()) == locations(saved_que)
 
     @pytest.mark.parametrize(
-        "name", ["stash_next_run", "store_fin_run", "stash_failed_run", "recover_run", "move_range"]
+        "name", ["stash_next_run", "replace_cur_run", "stash_failed_run", "recover_run", "move"]
     )
     def test_multi_step_mutation_never_saves_a_partial_state(
         self, saved_que: Que, monkeypatch: pytest.MonkeyPatch, name: str
@@ -230,3 +232,84 @@ class TestPersistence:
         assert saved, "the mutation was never saved"
         # these only move runs between locations, so every save should hold the final set of runs
         assert all(s == exp_nos(saved_que) for s in saved)
+
+    def test_failed_mutation_still_saves_its_partial_changes(
+        self, saved_que: Que, make_que: MakeQue
+    ) -> None:
+        """Disk mirrors memory even when a mutation raises partway (here after moving one run)."""
+        with pytest.raises(QueBusy):
+            saved_que.move("to_run", "cur_run", 0, 1)
+        assert saved_que.len_loc("cur_run") == 1
+        assert locations(make_que()) == locations(saved_que)
+
+    def test_nested_mutation_saves_once(
+        self, saved_que: Que, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        saves: list[None] = []
+        monkeypatch.setattr(Que, "save_state", lambda self: saves.append(None))
+        saved_que.cur_run = [exp_run("new")]
+        saved_que.replace_cur_run(exp_run("new2"))  # pop_cur_run + set_cur_run inside
+        assert len(saves) == 1
+
+    def test_auto_save_off_never_writes(self, runs_path: Path) -> None:
+        que = Que(logger=logging.getLogger("test_que"), runs_path=runs_path, auto_save=False)
+        que.add_new_run(exp_run("new"), SWEEP_WANDB)
+        assert not runs_path.exists()
+
+    def test_crash_mid_save_keeps_previous_file(
+        self, saved_que: Que, make_que: MakeQue, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A death mid-write must not leave a truncated, unloadable Runs.json."""
+        before = locations(saved_que)
+
+        def dump_then_die(obj: Any, f: Any, **kwargs: Any) -> None:
+            f.write('{"to_run": [')
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(core_module.json, "dump", dump_then_die)
+        with pytest.raises(KeyboardInterrupt):
+            saved_que.remove_run("old_runs", 0)
+        monkeypatch.undo()
+        assert locations(make_que()) == before
+        assert [p.name for p in saved_que.runs_path.parent.iterdir()] == ["Runs.json"]
+
+    def test_pickled_copy_still_saves(self, saved_que: Que, make_que: MakeQue) -> None:
+        """The Daemon and Worker, each holding the Que, are pickled into spawned processes."""
+        copy = pickle.loads(pickle.dumps(saved_que))
+        copy.remove_run("old_runs", 0)
+        assert make_que().len_loc("old_runs") == 1
+
+
+class TestRunTypes:
+    """Each location is loaded back as one run type, so a run of another type there would make
+    the saved Que fail to load -- and with it, the server fail to start."""
+
+    def test_to_run_rejects_completed_run(self, que: Que) -> None:
+        que.old_runs = [comp_run("o0")]
+        with pytest.raises(TypeError, match="clean_slate"):
+            que.move("old_runs", "to_run", 0)
+        assert que.len_loc("old_runs") == 1
+
+    def test_cur_run_rejects_failed_run(self, que: Que) -> None:
+        with pytest.raises(TypeError):
+            que.set_cur_run(failed_run("f0"))
+
+    def test_store_fin_run_requires_results(self, que: Que) -> None:
+        que.cur_run = [exp_run("r0")]
+        with pytest.raises(TypeError):
+            que.store_fin_run(exp_run("r0"))  # type: ignore[arg-type]
+        assert que.len_loc("cur_run") == 1
+
+    def test_store_fin_run_replaces_cur_run(self, que: Que) -> None:
+        que.cur_run = [exp_run("r0")]
+        que.store_fin_run(comp_run("r0"))
+        assert que.len_loc("cur_run") == 0
+        assert que.peak_run("old_runs", 0) == comp_run("r0")
+
+
+def test_len_sweep_runs_counts_only_that_sweeps_runs_in_loc(que: Que) -> None:
+    que.old_runs = [comp_run("a0", "abc"), comp_run("a1", "abc"), comp_run("x", "xyz"), comp_run("n")]
+    que.fail_runs = [failed_run("a2", "abc")]
+    assert que.len_sweep_runs("abc") == 2
+    assert que.len_sweep_runs("abc", "fail_runs") == 1
+    assert que.len_sweep_runs("missing") == 0

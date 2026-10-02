@@ -168,9 +168,7 @@ def finish_sweep_trial(ctx: ServerContext, exp_no: str) -> None:
     wandb = WandbInfo(entity="e", project="p", run_id=exp_no, sweep_id=SWEEP["sweep_id"])
     ctx.que.add_new_run(exp_run(exp_no), wandb, loc="cur_run")
     ctx.register_sweep_trial(SWEEP["sweep_id"])
-    ctx.que.pop_cur_run()
-    ctx.que.set_cur_run(comp_run(exp_no, SWEEP["sweep_id"]))
-    ctx.que.store_fin_run()
+    ctx.que.store_fin_run(comp_run(exp_no, SWEEP["sweep_id"]))
 
 
 class TestSweepProgressRecovery:
