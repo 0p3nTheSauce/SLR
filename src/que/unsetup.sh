@@ -112,6 +112,9 @@ if [[ "$MODE" == "server" ]]; then
         echo -e "${YELLOW}State backup timer not found — skipping.${NC}"
     fi
 
+    #lingering (enabled by setup.sh) is left on, as other services may rely on it
+    echo -e "${YELLOW}Lingering is left enabled; to disable it: sudo loginctl disable-linger ${SUDO_USER:-$USER}${NC}"
+
     #log rotation config removal (the logs themselves are kept)
     LOGROTATE_FILE="/etc/logrotate.d/${SERVICE_NAME}"
     if [ -f "$LOGROTATE_FILE" ]; then

@@ -194,6 +194,14 @@ START_SERVER_WRAPPER
     systemctl enable "$SERVICE_NAME"
     echo ""
 
+    # Keep the user's IPC alive while they're logged out. systemd-logind (RemoveIPC=yes, the
+    # default) deletes a user's POSIX semaphores when their last session ends, even those of
+    # their running services -- e.g. the DataLoader's, mid-training. Lingering users are never
+    # fully logged out.
+    loginctl enable-linger "$CURRENT_USER"
+    echo -e "${GREEN}Lingering enabled for $CURRENT_USER${NC}"
+    echo ""
+
     # Rotate the logs (logs/Server.log, logs/Training.log), which otherwise grow forever.
     # copytruncate, since the server, supervisor and worker each hold the files open; their
     # handlers append, so writes carry on at the start of the truncated file.
