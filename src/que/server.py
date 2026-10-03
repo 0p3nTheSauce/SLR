@@ -6,8 +6,8 @@ import multiprocessing as mp
 import os
 import signal
 import sys
+import threading
 from logging import Logger
-from multiprocessing import Event
 from multiprocessing.managers import DictProxy
 from pathlib import Path
 
@@ -26,6 +26,7 @@ from src.que.core import (
     Que,
     QueManager,
     ServerState,
+    StopEventProxy,
     SweepInfo,
     SweepProgressDict,
     WorkerStateDict,
@@ -82,9 +83,12 @@ class ServerContext:
         self.server_logger = server_logger
         self.server_logger.info(self.seperator("Server starting up"))
 
-        # Events for controlling Daemon and Worker
-        self.stop_worker_event = Event()
-        self.stop_daemon_event = Event()
+        # Events for controlling Daemon and Worker. Spawned processes reach these through the
+        # manager (see register_context), not as multiprocessing.Events: those are named
+        # semaphores in /dev/shm, which systemd-logind deletes when the user's last session ends
+        # (RemoveIPC), leaving the next spawned process unable to open them.
+        self.stop_worker_event = threading.Event()
+        self.stop_daemon_event = threading.Event()
 
         # Classes
         self.sweep: dict = {}
@@ -422,6 +426,18 @@ def register_context(context: ServerContext, manager_cls: type[QueManager] = Que
         "get_sweep",
         callable=lambda: context.sweep,
         proxytype=DictProxy,
+    )
+
+    manager_cls.register(
+        "get_stop_worker_event",
+        callable=lambda: context.stop_worker_event,
+        proxytype=StopEventProxy,
+    )
+
+    manager_cls.register(
+        "get_stop_daemon_event",
+        callable=lambda: context.stop_daemon_event,
+        proxytype=StopEventProxy,
     )
 
 

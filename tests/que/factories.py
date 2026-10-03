@@ -5,10 +5,14 @@ from collections.abc import Callable
 from typing import Any, TypeAlias
 
 from src.que.core import Que
+from src.que.server import ServerContext
 from src.run_types import CompExpInfo, ExpInfo, FailedExp
 
 MakeQue: TypeAlias = Callable[[], Que]
 """Builds a Que on a fixed runs path; calling it again simulates a restart."""
+
+StartServer: TypeAlias = Callable[[], ServerContext]
+"""Builds a ServerContext on fixed files; calling it again simulates a restart."""
 
 _AUGS: dict[str, Any] = {
     "normalise": True,

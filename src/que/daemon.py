@@ -6,7 +6,6 @@ import string
 import time
 from logging import Logger
 from multiprocessing import Process
-from multiprocessing.synchronize import Event as EventClass
 from typing import Any, Literal, cast
 
 # locals
@@ -22,6 +21,7 @@ from src.que.core import (
     setup_server_logging,
 )
 from src.que.worker import Worker
+from src.run_types import StopEvent
 
 
 def generate_run_id(length: int = 8) -> str:
@@ -47,8 +47,8 @@ class Daemon:
         self,
         worker: Worker,
         logger: Logger,
-        stop_worker_event: EventClass,
-        stop_daemon_event: EventClass,
+        stop_worker_event: StopEvent,
+        stop_daemon_event: StopEvent,
         state: DaemonStateDict,
         idle_poll_interval: float = 10.0,
     ) -> None:
@@ -70,6 +70,13 @@ class Daemon:
         self.supervisor_process: Process | None = None
         self.logger.info("Daemon initialized")
         self.set_state(state)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Pickle without the stop events: the server's are unpicklable threading.Events, and the
+        supervisor gets proxies of them from the manager instead (see supervise)."""
+        state = self.__dict__.copy()
+        del state["stop_worker_event"], state["stop_daemon_event"]
+        return state
 
     def _reattach_server_logger(self):
         """Set up logging to Server.log in the spawned supervisor process (see setup_server_logging)."""
@@ -177,6 +184,8 @@ class Daemon:
         self.que = manager.get_que()
         # self.worker is a pickled copy in this process, so its .state is too: write to the proxy
         self.worker_state = manager.get_worker_state()
+        self.stop_worker_event = manager.get_stop_worker_event()
+        self.stop_daemon_event = manager.get_stop_daemon_event()
         sweep = manager.get_sweep()
         server_context = manager.get_server_context()
         # handle automatic recovery

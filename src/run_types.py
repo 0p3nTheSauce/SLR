@@ -6,6 +6,7 @@ from typing import (
     Annotated,
     Any,
     Literal,
+    Protocol,
     TypeAlias,
     TypeGuard,
     TypeVar,
@@ -50,6 +51,20 @@ RESULTS_DIR = SRC_ROOT / 'results'
 RESULTS_OUTPUTS = RESULTS_DIR / 'outputs'
 # Misc
 SEED = 42
+
+
+class StopEvent(Protocol):
+    """A stop flag shared between processes, e.g. the Que's (see src/que/server.py).
+
+    The Que hands its spawned processes manager proxies of a threading.Event rather than a
+    multiprocessing.Event: the latter's named semaphores live in /dev/shm, where systemd-logind
+    deletes them when the user's last session ends.
+    """
+
+    def is_set(self) -> bool: ...
+    def set(self) -> None: ...
+    def clear(self) -> None: ...
+    def wait(self, timeout: float | None = None) -> bool: ...
 
 
 

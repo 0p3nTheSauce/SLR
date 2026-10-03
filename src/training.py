@@ -1,7 +1,6 @@
 import math
 import random
 from collections.abc import Callable
-from multiprocessing.synchronize import Event as EventClass
 from os import PathLike
 from pathlib import Path
 from typing import Any
@@ -32,6 +31,7 @@ from src.models import (
 from src.run_types import (
     OptimizerInfo,
     SchedInfo,
+    StopEvent,
 )
 from src.stopping import MaybeStopper, build_early_stopper
 from src.testing import save_test_sizes
@@ -694,7 +694,7 @@ def train_loop(
     load: StrPath | None = None,
     save_every: int = 5,
     recover: bool = False,
-    event: EventClass | None = None,
+    event: StopEvent | None = None,
 ) -> dict[str, float] | None:
     """Train loop for video classification model.
 
@@ -705,7 +705,7 @@ def train_loop(
         save_every (int, optional): Period of saving (epochs). Defaults to 5.
         recover (bool, optional): Continue from a failed run. Defaults to False.
         seed (Optional[int], optional): Random seed value, otherwise no random seed. Defaults to None.
-        event (EventClass | None, optional): Multiprocessing stopping event to pause training. Defaults to None.
+        event (StopEvent | None, optional): Stopping event to pause training. Defaults to None.
 
     Returns:
         dict[str, float] | None: Dictionary with keys: best_val_acc and best_val_loss

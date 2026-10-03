@@ -4,8 +4,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from conftest import StartServer
-from factories import comp_run, exp_run, failed_run, silent_logger
+from factories import StartServer, comp_run, exp_run, failed_run, silent_logger
 
 from src.que.core import NoSweepSet, Que, ServerState, SweepInfo, read_server_state
 from src.que.server import ServerContext

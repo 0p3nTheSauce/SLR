@@ -1,18 +1,14 @@
 """Shared Que fixtures: a Que persisted under `tmp_path` (see factories.py for runs to fill it with),
 and a real ServerContext on files under `tmp_path`."""
 
-from collections.abc import Callable
 from pathlib import Path
-from typing import TypeAlias
 
 import pytest
-from factories import MakeQue, silent_logger
+from factories import MakeQue, StartServer, silent_logger
 
 from src.que import server as server_module
 from src.que.core import Que
 from src.que.server import ServerContext
-
-StartServer: TypeAlias = Callable[[], ServerContext]
 
 
 @pytest.fixture

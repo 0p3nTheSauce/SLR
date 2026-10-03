@@ -22,8 +22,7 @@ from multiprocessing import synchronize
 from typing import Any, cast
 
 import pytest
-from conftest import StartServer
-from factories import silent_logger
+from factories import StartServer, silent_logger
 
 from src.que import core
 from src.que import daemon as daemon_module
