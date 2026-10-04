@@ -1,13 +1,11 @@
 import logging
-from collections.abc import Callable
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from factories import MakeQue, comp_run, exp_run, failed_run, silent_logger
+from factories import StartServer, comp_run, exp_run, failed_run, silent_logger
 
-from src.que import server as server_module
 from src.que.core import NoSweepSet, Que, ServerState, SweepInfo, read_server_state
 from src.que.server import ServerContext
 from src.run_types import WandbInfo
@@ -177,27 +175,6 @@ SWEEP = SweepInfo(
     base_config="base.py",
     max_runs=50,
 )
-
-StartServer = Callable[[], ServerContext]
-
-
-@pytest.fixture
-def start_server(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, make_que: MakeQue
-) -> StartServer:
-    """Builds a real ServerContext on files under `tmp_path`; calling it again simulates the
-    server restarting (e.g. under systemd after a power outage) on whatever reached disk."""
-    monkeypatch.setattr(server_module.signal, "signal", lambda *args: None)
-    monkeypatch.setattr(server_module.mp, "set_start_method", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        ServerContext,
-        "_setup_logging",
-        lambda self: tuple(silent_logger(f"test_{n}") for n in ("que", "daemon", "server", "worker")),
-    )
-    return lambda: ServerContext(
-        server_state_path=tmp_path / "Server.json", runs_path=tmp_path / "Runs.json"
-    )
-
 
 def finish_sweep_trial(ctx: ServerContext, exp_no: str) -> None:
     """What the Worker does over the manager when a trial of SWEEP finishes and is tested -- with

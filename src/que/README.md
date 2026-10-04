@@ -22,6 +22,8 @@ The script will prompt the user whether to set up the `client` side, or `server`
 
     Selecting the server option creates a systemd service: `que-training` and binds the command `que` to open the shell. This hosts the `Que Server` locally. The server needs to use the `wlasl` conda environment for the training runs. The user will be prompted to specify server initialisation flags. 
 
+    It also enables lingering for the user (`loginctl enable-linger`). Without it, systemd-logind deletes the user's semaphores in `/dev/shm` when their last session ends, including those used by a running training. On 2026-10-03 this crashed the server, because the stop events it handed to new workers were deleted. The server no longer shares semaphores between its processes, so the stop events are safe either way, but training's DataLoader still needs lingering.
+
 * `Client`:
 
     Only the `que` shell command is created. The user will be prompted to specify the conda environement, either `wlasl` or `wlasl_cpu`. The shell can be used to remotely connect to the server with ssh tunneling.

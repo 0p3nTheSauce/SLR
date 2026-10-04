@@ -6,9 +6,8 @@ import os
 import traceback
 from contextlib import redirect_stdout
 from logging import Logger
-from multiprocessing.synchronize import Event as EventClass
 from pathlib import Path
-from typing import IO, cast
+from typing import IO, Any, cast
 
 import torch
 from pydantic import ValidationError
@@ -27,7 +26,7 @@ from src.que.core import (
     setup_training_logging,
     sweep_info_validate,
 )
-from src.run_types import RunInfo, WandbInfo
+from src.run_types import RunInfo, StopEvent, WandbInfo
 from src.sweeping import create_sweep_run
 
 # locals
@@ -85,18 +84,22 @@ class Worker:
         server_logger: Logger,
         que: Que,
         state: WorkerStateDict,
-        stop_event: EventClass | None = None,
+        stop_event: StopEvent | None = None,
         do_traceback: bool = True
     ) -> None:
         self.server_logger = server_logger
         self.que = que
-        self.stop_event: EventClass | None = stop_event
+        self.stop_event: StopEvent | None = stop_event
         self.state = state
         self.do_traceback = do_traceback
         self.sweep_info: SweepInfo | None = None
         self._trial_error: Exception | None = None
         self.server_logger.info("Worker initialized")
 
+    def __getstate__(self) -> dict[str, Any]:
+        """Pickle without the stop event: the server's is an unpicklable threading.Event, and the
+        worker process gets a proxy of it from the manager instead (see start)."""
+        return self.__dict__ | {"stop_event": None}
 
     def build_exception_info(self, e: Exception) -> str:
         if self.do_traceback:
@@ -446,6 +449,7 @@ class Worker:
         manager = connect_manager()
         self.que = manager.get_que()
         self.state = manager.get_worker_state()
+        self.stop_event = manager.get_stop_worker_event()
 
         #update state
         self.state['working_pid'] = os.getpid()

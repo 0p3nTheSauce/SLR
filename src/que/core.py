@@ -16,7 +16,7 @@ import time
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from logging import Logger
-from multiprocessing.managers import BaseManager, DictProxy
+from multiprocessing.managers import BaseManager, BaseProxy, DictProxy
 from pathlib import Path
 from typing import (
     Annotated,
@@ -41,6 +41,7 @@ from src.run_types import (
     ExpInfo,
     FailedExp,  # now defined in run_types
     RunInfo,
+    StopEvent,
     Sumarised,
     SummarisedError,
     SummarisedRes,
@@ -1600,10 +1601,31 @@ class QueManagerProtocol(Protocol):
     def get_daemon_state(self) -> DaemonStateDict: ...
     def get_worker_state(self) -> WorkerStateDict: ...
     def get_server_context(self) -> ServerContextProtocol: ...
+    def get_stop_worker_event(self) -> StopEvent: ...
+    def get_stop_daemon_event(self) -> StopEvent: ...
 
 
 class QueManager(BaseManager):
     pass
+
+
+class StopEventProxy(BaseProxy):
+    """Manager proxy for a threading.Event served by the Que server (see register_context in
+    server.py); a typed equivalent of multiprocessing.managers.EventProxy."""
+
+    _exposed_ = ("is_set", "set", "clear", "wait")
+
+    def is_set(self) -> bool:
+        return bool(self._callmethod("is_set"))  # typeshed types _callmethod as -> None
+
+    def set(self) -> None:
+        self._callmethod("set")
+
+    def clear(self) -> None:
+        self._callmethod("clear")
+
+    def wait(self, timeout: float | None = None) -> bool:
+        return bool(self._callmethod("wait", (timeout,)))
 
 
 def connect_manager(
@@ -1616,6 +1638,8 @@ def connect_manager(
     QueManager.register("get_daemon_state", proxytype=DictProxy)
     QueManager.register("get_daemon")
     QueManager.register("get_server_context")
+    QueManager.register("get_stop_worker_event", proxytype=StopEventProxy)
+    QueManager.register("get_stop_daemon_event", proxytype=StopEventProxy)
 
     for _ in range(max_retries):
         try:

@@ -84,6 +84,7 @@ class TestSupervise:
     @pytest.fixture
     def setup(self, monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
         stop = mp.Event()
+        stop_worker = mp.Event()
         env = SimpleNamespace(
             to_run=[0],  # to_run length per supervisor iteration; stops after the last
             sweep={},
@@ -109,6 +110,8 @@ class TestSupervise:
             get_que=lambda: SimpleNamespace(len_loc=len_loc),
             get_worker_state=lambda: env.shared_worker_state,
             get_sweep=lambda: env.sweep,
+            get_stop_worker_event=lambda: stop_worker,
+            get_stop_daemon_event=lambda: stop,
             get_server_context=lambda: SimpleNamespace(
                 sweep_completed_runs=lambda: env.completed, save_state=save_state
             ),
@@ -125,7 +128,7 @@ class TestSupervise:
         env.daemon = Daemon(
             worker=worker,  # type: ignore[arg-type]
             logger=logger,
-            stop_worker_event=mp.Event(),
+            stop_worker_event=stop_worker,
             stop_daemon_event=stop,
             state={"awake": False, "stop_on_fail": True, "supervisor_pid": None},
             idle_poll_interval=0.0,

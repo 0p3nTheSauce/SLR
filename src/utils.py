@@ -7,7 +7,6 @@ import sys
 import time
 from argparse import ArgumentParser
 from logging import Logger
-from multiprocessing.synchronize import Event as EventClass
 from pathlib import Path
 from types import ModuleType
 
@@ -19,7 +18,7 @@ import torch
 import wandb
 
 # locals
-from src.run_types import ZFILL
+from src.run_types import ZFILL, StopEvent
 
 ################ GPU ###################
 
@@ -81,7 +80,7 @@ class gpu_manager:
         gpu_id: int = 0,
         max_util_gb: float = 1.0,  # Maximum memory usage in GB
         logger: Logger | None = None,
-        event: EventClass | None = None,
+        event: StopEvent | None = None,
     ) -> bool:
         """Wait for GPU memory to be free before proceeding
 
@@ -92,7 +91,7 @@ class gpu_manager:
                                                                         gpu_id (int, optional): CUDA GPU. Defaults to 0.
                                                                         max_util_gb (float, optional): Threshold GPU usage to trigger waiting. Defaults to 1.0 (GB).
                                                                         logger: (Logger, optional): Optionally supply a logger
-                                                                        event: (Optional[EventClass], optional): Optionally supply a multiprocessing stopping event.
+                                                                        event: (StopEvent | None, optional): Optionally supply a stopping event.
         Returns:
                                                                         bool: Whether monitoring was killed by the user, either through CTRL+C or stop event.
         """
