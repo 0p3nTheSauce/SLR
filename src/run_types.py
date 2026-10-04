@@ -500,6 +500,19 @@ class BaseRes(BaseModel):
     average_loss: float
 
 
+class InstanceTopK(BaseModel):
+    """One instance's highest-scoring classes, from `testing.test_instance_topk`.
+
+    `topk_idxs`/`topk_probs` are aligned and sorted by descending softmax
+    probability, so `topk_idxs[0]` is the top-1 prediction.
+    """
+
+    video_id: str
+    target: int
+    topk_idxs: list[int]
+    topk_probs: list[float]
+
+
 class ShuffRes(BaseRes):
     perm: list[int]
     shannon_entropy: float

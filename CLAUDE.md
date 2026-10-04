@@ -52,9 +52,10 @@ cares a lot about code quality — not just "does it run." Hold new/edited code 
   over `Any`/untyped escape hatches. Run both from the repo root (from a subdirectory, ruff's
   isort misclassifies `src.` imports):
   - `ruff check <files>`
-  - `pyright --pythonpath ~/miniconda3/envs/wlasl/bin/python <files>` — pyright is the checker
-    behind VS Code's Pylance, installed locally as a uv tool (`uv tool install pyright`); there's
-    no pyright config, so it runs in its default mode.
+  - `~/miniconda3/envs/wlasl/bin/pyright --pythonpath ~/miniconda3/envs/wlasl/bin/python <files>`
+    — pyright is the checker behind VS Code's Pylance, pip-installed into the `wlasl` env on both
+    machines (`pip install pyright`; it isn't in `wlasl_gpu.yml`); there's no pyright config, so
+    it runs in its default mode.
 - **Documented, but not over-commented.** Public functions/classes get docstrings explaining
   non-obvious behaviour, inputs/outputs, and gotchas — but avoid restating what the code already
   says. This mirrors the top-level house style (see the "Default to writing no comments" rule),

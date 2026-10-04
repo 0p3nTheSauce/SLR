@@ -1,8 +1,13 @@
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 import matplotlib
+import numpy as np
 import pytest
+import torch
+from matplotlib.colors import to_hex
+from matplotlib.container import BarContainer
 
 matplotlib.use("Agg")
 
@@ -13,8 +18,12 @@ from src.visualise2 import (
     CONTROL_COLORS,
     DEFAULT_ACCENT,
     SPLIT_NAME_MAP,
+    TRUE_CLASS_COLOR,
+    BarPosition,
+    animate_frames_topk,
     plot_bboxes_on_canvas,
     plot_dimension_distributions,
+    plot_frame_grid_topk,
     plot_metric_correlation,
     save_fig,
     split_name_mapper,
@@ -200,3 +209,98 @@ def test_plot_metric_correlation_log_x() -> None:
     line_x, line_y = ax.get_lines()[0].get_data()
     assert line_x[0] == pytest.approx(1e-5) and line_x[-1] == pytest.approx(1e-2)
     assert line_y[0] == pytest.approx(4.0) and line_y[-1] == pytest.approx(1.0)
+
+
+class TestFrameGridTopK:
+    labels: ClassVar[list[str]] = ["a", "b", "c", "d"]
+    scores: ClassVar[list[float]] = [0.1, 0.4, 0.2, 0.3]
+
+    @staticmethod
+    def _frames(t: int = 8) -> torch.Tensor:
+        return torch.rand(t, 3, 16, 16)
+
+    def test_bars_are_top_k_in_descending_order(self) -> None:
+        _, _, bar_ax = plot_frame_grid_topk(self._frames(), self.labels, self.scores, k=3)
+        assert [t.get_text() for t in bar_ax.get_yticklabels()] == ["b", "d", "c"]
+        bars = bar_ax.containers[0]
+        assert isinstance(bars, BarContainer)
+        assert np.asarray(bars.datavalues) == pytest.approx([0.4, 0.3, 0.2])
+
+    def test_true_label_highlighted(self) -> None:
+        _, _, bar_ax = plot_frame_grid_topk(
+            self._frames(), self.labels, self.scores, k=3, true_label="d"
+        )
+        colours = [to_hex(p.get_facecolor()) for p in bar_ax.patches]
+        assert colours == [DEFAULT_ACCENT.lower(), TRUE_CLASS_COLOR.lower(), DEFAULT_ACCENT.lower()]
+
+    @pytest.mark.parametrize(
+        ("position", "horizontal"),
+        [("left", True), ("right", True), ("top", False), ("bottom", False)],
+    )
+    def test_bar_position_sets_side_and_orientation(
+        self, position: BarPosition, horizontal: bool
+    ) -> None:
+        fig, frame_axes, bar_ax = plot_frame_grid_topk(
+            self._frames(), self.labels, self.scores, k=4, bar_position=position, num=8, cols=4
+        )
+        fig.canvas.draw()
+        assert frame_axes.shape == (2, 4)
+        # display coords -- get_position() is relative to each axes' own subfigure
+        bar_box = bar_ax.get_window_extent()
+        first_frame = frame_axes[0][0].get_window_extent()
+        last_frame = frame_axes[-1][-1].get_window_extent()
+        if position == "left":
+            assert bar_box.x1 < first_frame.x0
+        elif position == "right":
+            assert bar_box.x0 > last_frame.x1
+        elif position == "top":
+            assert bar_box.y0 > first_frame.y1
+        else:
+            assert bar_box.y1 < last_frame.y0
+        tick_labels = bar_ax.get_yticklabels() if horizontal else bar_ax.get_xticklabels()
+        assert [t.get_text() for t in tick_labels] == ["b", "d", "c", "a"]
+
+    @pytest.mark.parametrize(("shared_axis", "expected_max"), [(True, 1.15), (False, 0.4 * 1.15)])
+    def test_shared_axis_fixes_confidence_range(
+        self, shared_axis: bool, expected_max: float
+    ) -> None:
+        _, _, bar_ax = plot_frame_grid_topk(
+            self._frames(), self.labels, self.scores, k=3, shared_axis=shared_axis
+        )
+        assert bar_ax.get_xlim() == pytest.approx((0, expected_max))
+
+    @pytest.mark.parametrize("k", [0, 5])
+    def test_k_out_of_range_raises(self, k: int) -> None:
+        with pytest.raises(ValueError, match="k must be"):
+            plot_frame_grid_topk(self._frames(), self.labels, self.scores, k=k)
+
+    def test_misaligned_labels_raise(self) -> None:
+        with pytest.raises(ValueError, match="labels"):
+            plot_frame_grid_topk(self._frames(), self.labels[:3], self.scores)
+
+    def test_animation_plays_every_frame(self) -> None:
+        frames = self._frames(t=5)
+        _, anim, bar_ax = animate_frames_topk(frames, self.labels, self.scores, k=2)
+        assert len(bar_ax.patches) == 2
+        html = anim.to_jshtml()
+        assert html.count("data:image/png;base64") == len(frames)
+
+
+class TestInferInstanceTopK:
+    def test_runs_instance_topk_on_loaded_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        admin = MinInfo(model="S3D", split="asl100", save_path="unused")
+        fake_model, fake_loader = MagicMock(), MagicMock()
+        calls = []
+        monkeypatch.setattr(
+            v2, "_load_trained", lambda *args: (calls.append(args), (fake_model, fake_loader))[1]
+        )
+        monkeypatch.setattr(
+            v2,
+            "test_instance_topk",
+            lambda model, test_loader, max_k: (model, test_loader, max_k),
+        )
+
+        result = v2.infer_instance_topk(admin, "test", "asl100", max_k=7)
+
+        assert result == (fake_model, fake_loader, 7)
+        assert calls == [(admin, "test", "asl100", "best.pth")]
