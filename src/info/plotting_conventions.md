@@ -38,6 +38,8 @@ Reference implementations that follow these conventions: `src/results/aug_compar
 - `LINE_PALETTE` — the Okabe-Ito colourblind-safe palette, for multi-series charts (lines, grouped/
   stacked bars). Cycle with `LINE_PALETTE[i % len(LINE_PALETTE)]` if there may be more series than
   colours.
+- `TRUE_CLASS_COLOR` (`LINE_PALETTE[2]`, green) — the ground-truth class's bar among otherwise
+  `DEFAULT_ACCENT` top-k confidence bars.
 - `CONTROL_COLORS` / `suggest_palette()` — only for bar charts that need to visually distinguish a
   "control" category (matched case-insensitively against `"baseline"`/`"no_aug"`) from treatment
   bars.
@@ -81,5 +83,7 @@ Reuse `VALUE_FMT` (`"%.2f"`), `LOSS_FMT` (`"%.3f"`), `COUNT_FMT` (`"%d"`), and `
 | `plot_bboxes_on_canvas` | Per-class average (or raw) bbox outlines on a blank frame-sized canvas | One colour per class via `tab20`; not a `suggest_palette` case (too many categories) |
 | `plot_dimension_distributions` | Bbox width/height histograms with mean/median/quartile lines | Returns `(fig, axes)` with `axes` a length-2 array -- the one exception to the single-`ax` return convention |
 | `plot_frame_grid` | Grid of evenly-sampled video frames (e.g. example clips, per-gloss prediction/misprediction comparisons) | Returns `(fig, axes)` with `axes` a 2D (rows x cols) array -- another exception to the single-`ax` return convention, since it's inherently a grid of subplots; no `ax` parameter for the same reason. Supersedes `utils.plt_display_grid` for new code -- that function predates this convention and lacks the `save_fig`-friendly `(fig, axes)` return (it saves directly via its own `output` param instead) |
+| `plot_frame_grid_topk` | A `plot_frame_grid` joined to a bar chart of the model's top-k class confidences for that clip (e.g. inspecting each instance's (mis)prediction, see `results/satnac_2026/all_misspredictions.ipynb`) | Takes aligned `labels`/`scores` (unsorted, or a stored top-N `InstanceTopK`) and plots the highest `k`; `bar_position` (`"left"`/`"right"` = horizontal bars, `"top"`/`"bottom"` = vertical); the `true_label` bar is drawn in `TRUE_CLASS_COLOR`. `shared_axis=True` fixes the confidence axis to [0, 1] so charts compare across instances (default scales to the top score). Returns `(fig, frame_axes, bar_ax)`; constrained layout via subfigures, so don't call `tight_layout` on it |
+| `animate_frames_topk` | Video version of `plot_frame_grid_topk`: plays every frame beside the static top-k chart | Returns `(fig, anim, bar_ax)`; show with `HTML(anim.to_jshtml())` then `plt.close(fig)`, save with `anim.save(...)` (`save_fig` is for stills only) |
 
 Update this table whenever a function is added, renamed, or its purpose changes.

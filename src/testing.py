@@ -3,6 +3,7 @@ import json
 import re
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -22,6 +23,7 @@ from src.run_types import (
     BaseRes,
     CompRes,
     DataInfo,
+    InstanceTopK,
     MinInfo,
     ShuffleT,
     ShuffRes,
@@ -296,6 +298,43 @@ def test_topk_clsrep(
             json.dump(topk_res.model_dump(), f, indent=2)
 
     return topk_res, cls_report, all_targets, all_preds
+
+def test_instance_topk(
+    model: torch.nn.Module,
+    test_loader: DataLoader[VideoDataset],
+    max_k: int = 20,
+) -> list[InstanceTopK]:
+    """Record each instance's `max_k` most probable classes (softmax over the logits).
+
+    Unlike `test_topk_clsrep`, which keeps only the top-1 prediction, this keeps
+    the scores needed to plot a per-instance top-k confidence chart. Each result
+    is keyed by `video_id`, read from the dataset in loader order, which relies on
+    `setup_data`'s loader being unshuffled with `batch_size=1`.
+    """
+    assert isinstance(test_loader.dataset, VideoDataset), (
+        "This function uses a custom dataset"
+    )
+    instances = test_loader.dataset.data
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
+
+    results: list[InstanceTopK] = []
+    with torch.no_grad():
+        for inst, item in zip(instances, tqdm.tqdm(test_loader, desc="Testing")):
+            probs = torch.softmax(model(item["frames"].to(device))[0], dim=0)
+            top_probs, top_idxs = torch.topk(probs, k=min(max_k, probs.numel()))
+            results.append(
+                InstanceTopK(
+                    video_id=cast(dict[str, Any], inst)["video_id"],
+                    target=int(item["label_num"][0]),
+                    topk_idxs=top_idxs.cpu().tolist(),
+                    topk_probs=top_probs.cpu().tolist(),
+                )
+            )
+    return results
+
 
 def collect_results(res_p: Path):
     with open(res_p, "r") as f:

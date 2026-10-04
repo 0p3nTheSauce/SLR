@@ -22,8 +22,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from matplotlib.animation import FuncAnimation
+from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.figure import Figure
+from matplotlib.figure import Figure, FigureBase, SubFigure
+from matplotlib.image import AxesImage
 from matplotlib.patches import Rectangle
 from numpy.typing import ArrayLike
 from scipy import stats
@@ -41,12 +44,19 @@ from src.run_types import (
     AVAIL_SPLITS,
     BaseRes,
     CentreCropConfig,
+    InstanceTopK,
     MinInfo,
     OG_Sampler,
 )
-from src.testing import load_test_sizes, setup_data, test_topk_clsrep
+from src.testing import (
+    load_test_sizes,
+    setup_data,
+    test_instance_topk,
+    test_topk_clsrep,
+)
 from src.utils import load_rgb_frames_from_video
 from src.video_dataset import (
+    VideoDataset,
     get_transform,
     get_video_path,
     get_wlasl_info,
@@ -870,6 +880,36 @@ class MiniSet(Dataset):
         return self.tot_samples
 
 
+def _sample_frames(frames: Tensor, num: int) -> Tensor:
+    """Evenly sample (at most) `num` frames from a (T, C, H, W) tensor."""
+    if num < 1:
+        raise ValueError("num must be >= 1")
+    step = 1 if len(frames) <= num else len(frames) // num
+    return frames[::step][:num]
+
+
+def _to_display(frame: Tensor) -> np.ndarray:
+    """(C, H, W) frame -> min-max normalised (H, W, C) array for `imshow`."""
+    np_frame = frame.permute(1, 2, 0).cpu().numpy().astype(float)
+    return (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
+
+
+def _draw_frame_grid(fig: FigureBase, sampled: Tensor, cols: int) -> np.ndarray:
+    """Draw `sampled` frames onto a (rows x cols) grid of `fig` (a Figure or SubFigure).
+
+    Unused cells in the last row are hidden. Returns the 2D axes array.
+    """
+    rows = math.ceil(len(sampled) / cols)
+    axes = fig.subplots(rows, cols, squeeze=False)
+    for i, frame in enumerate(sampled):
+        ax = axes[i // cols][i % cols]
+        ax.imshow(_to_display(frame))
+        ax.axis("off")
+    for j in range(len(sampled), rows * cols):
+        axes[j // cols][j % cols].set_visible(False)
+    return axes
+
+
 def plot_frame_grid(
     frames: Tensor,
     num: int,
@@ -896,33 +936,16 @@ def plot_frame_grid(
     plot_dimension_distributions, since this is inherently a grid of
     subplots rather than one axes to hand back or accept.
     """
-    if num < 1:
-        raise ValueError("num must be >= 1")
+    sampled = _sample_frames(frames, num)
 
     if adapt:
         factor = 5 / 256
         w, h = frames.shape[2], frames.shape[3]
         size = (w * factor, h * factor)
 
-    num_frames = len(frames)
-    step = 1 if num_frames <= num else num_frames // num
-    sampled = frames[::step][:num]
-
     rows = math.ceil(len(sampled) / cols)
-    fig, axes = plt.subplots(
-        rows, cols, figsize=(size[0] * cols, size[1] * rows), squeeze=False,
-    )
-
-    for i, frame in enumerate(sampled):
-        np_frame = frame.permute(1, 2, 0).cpu().numpy()
-        np_frame = (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
-        ax = axes[i // cols][i % cols]
-        ax.imshow(np_frame)
-        ax.axis("off")
-
-    # Hide any unused cells in the last row
-    for j in range(len(sampled), rows * cols):
-        axes[j // cols][j % cols].set_visible(False)
+    fig = plt.figure(figsize=(size[0] * cols, size[1] * rows))
+    axes = _draw_frame_grid(fig, sampled, cols)
 
     # All axes have axis("off") -- no tick/axis labels for tight_layout to
     # account for -- so subplots_adjust with explicit margins is used
@@ -934,6 +957,202 @@ def plot_frame_grid(
         fig.subplots_adjust(left=0.005, right=0.995, top=0.995, bottom=0.005, wspace=0.02, hspace=0.02)
 
     return fig, axes
+
+
+# ---------------------------------------------------------------------------
+# Frames joined with a top-k confidence bar chart
+# ---------------------------------------------------------------------------
+
+BarPosition = Literal["left", "right", "top", "bottom"]
+
+# Highlights the ground-truth class among the otherwise DEFAULT_ACCENT top-k bars.
+TRUE_CLASS_COLOR = LINE_PALETTE[2]  # Okabe-Ito green
+
+
+def _top_k(labels: Sequence[str], scores: ArrayLike, k: int) -> tuple[list[str], np.ndarray]:
+    """The `k` highest-scoring (label, score) pairs, in descending score order."""
+    scores_arr = np.asarray(scores, dtype=float)
+    if len(labels) != len(scores_arr):
+        raise ValueError(f"{len(labels)} labels but {len(scores_arr)} scores.")
+    if not 1 <= k <= len(scores_arr):
+        raise ValueError(f"k must be in [1, {len(scores_arr)}], got {k}.")
+    order = np.argsort(scores_arr)[::-1][:k]
+    return [labels[int(i)] for i in order], scores_arr[order]
+
+
+def _join_frames_and_bars(
+    frames_size: tuple[float, float],
+    bar_position: BarPosition,
+    bar_size: float | None,
+) -> tuple[Figure, SubFigure, Axes]:
+    """Lay out a figure with a frames area and a single bar-chart axes beside it.
+
+    frames_size: (width, height) in inches of the frames area.
+    bar_size: the bar chart's extent in inches along the joining direction --
+        its width for "left"/"right", its height for "top"/"bottom". `None`
+        gives 4 and 3 inches respectively.
+
+    Uses constrained layout, so the bar chart's tick labels get room without
+    overlapping the frames.
+    """
+    frames_w, frames_h = frames_size
+    side_by_side = bar_position in ("left", "right")
+    bar_first = bar_position in ("left", "top")
+    if bar_size is None:
+        bar_size = 4.0 if side_by_side else 3.0
+    if side_by_side:
+        figsize = (frames_w + bar_size, frames_h)
+        extents = [frames_w, bar_size]
+    else:
+        figsize = (frames_w, frames_h + bar_size)
+        extents = [frames_h, bar_size]
+    if bar_first:
+        extents.reverse()
+
+    fig = plt.figure(figsize=figsize, layout="constrained")
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0.01, hspace=0.01)  # type: ignore[union-attr]
+    if side_by_side:
+        subfigs = fig.subfigures(1, 2, width_ratios=extents)
+    else:
+        subfigs = fig.subfigures(2, 1, height_ratios=extents)
+    bar_fig, frames_fig = subfigs if bar_first else subfigs[::-1]
+    return fig, frames_fig, bar_fig.subplots()
+
+
+def _draw_topk_bars(
+    ax: Axes,
+    labels: list[str],
+    scores: np.ndarray,
+    true_label: str | None,
+    horizontal: bool,
+    shared_axis: bool,
+) -> None:
+    """Draw descending top-k bars on `ax`, highlighting `true_label` if present.
+
+    Horizontal bars read top-down (top-1 at the top); vertical bars left-right.
+    The confidence axis spans [0, 1] if `shared_axis`, else [0, top score].
+    """
+    conf_max = (1.0 if shared_axis else scores.max()) * 1.15  # headroom for value labels
+    palette = [TRUE_CLASS_COLOR if lab == true_label else DEFAULT_ACCENT for lab in labels]
+    tick_labels = [lab.replace("_", " ") for lab in labels]
+    positions = np.arange(len(labels))
+    if horizontal:
+        container = ax.barh(positions, scores, color=palette)
+        ax.set_yticks(positions, tick_labels)
+        ax.invert_yaxis()
+        ax.set_xlim(0, conf_max)
+        ax.set_xlabel("Confidence")
+        ax.grid(axis="x", linestyle="--", alpha=0.3)
+    else:
+        container = ax.bar(positions, scores, color=palette)
+        ax.set_xticks(positions, tick_labels, rotation=45, ha="right")
+        ax.set_ylim(0, conf_max)
+        ax.set_ylabel("Confidence")
+        ax.grid(axis="y", linestyle="--", alpha=0.3)
+    ax.bar_label(container, fmt=VALUE_FMT, padding=3, fontsize=plt.rcParams["xtick.labelsize"])
+
+
+def plot_frame_grid_topk(
+    frames: Tensor,
+    labels: Sequence[str],
+    scores: ArrayLike,
+    k: int = 5,
+    true_label: str | None = None,
+    bar_position: BarPosition = "right",
+    shared_axis: bool = False,
+    num: int = 16,
+    cols: int = 8,
+    size: tuple[float, float] = (2.0, 2.0),
+    bar_size: float | None = None,
+    title: str | None = None,
+):
+    """
+    A `plot_frame_grid` of a clip joined to a bar chart of the model's top-k
+    class confidences for it. Intended for inspecting individual
+    (mis)predictions, e.g. what a gloss was predicted as and how confidently.
+
+    labels/scores: aligned class names and confidences (e.g. softmax
+        probabilities). Need not be sorted or complete -- a stored top-N
+        (`InstanceTopK`) works as long as k <= N.
+    k: number of bars, highest score first.
+    true_label: if given and among the top k, its bar is drawn in
+        TRUE_CLASS_COLOR instead of DEFAULT_ACCENT.
+    bar_position: side of the frames the chart sits on. "left"/"right" use
+        horizontal bars (long gloss labels read easily); "top"/"bottom" use
+        vertical bars with rotated labels.
+    shared_axis: if True, the confidence axis always spans [0, 1], so bar
+        lengths can be compared between charts (e.g. stepping through a
+        gloss's instances). If False (default), it is scaled to the top
+        score, which keeps low-confidence bars readable.
+    num/cols/size: as for plot_frame_grid (`size` is per frame cell).
+    bar_size: inches the chart takes along the joining direction -- its width
+        for "left"/"right", its height for "top"/"bottom". Defaults to 4 and
+        3 inches respectively.
+
+    Returns (fig, frame_axes, bar_ax) -- frame_axes is the 2D grid array, as
+    for plot_frame_grid; no `ax` parameter for the same reason.
+    """
+    top_labels, top_scores = _top_k(labels, scores, k)
+    sampled = _sample_frames(frames, num)
+    rows = math.ceil(len(sampled) / cols)
+
+    fig, frames_fig, bar_ax = _join_frames_and_bars(
+        (size[0] * cols, size[1] * rows), bar_position, bar_size
+    )
+    frame_axes = _draw_frame_grid(frames_fig, sampled, cols)
+    _draw_topk_bars(
+        bar_ax, top_labels, top_scores, true_label, bar_position in ("left", "right"), shared_axis
+    )
+    if title:
+        fig.suptitle(title)
+    return fig, frame_axes, bar_ax
+
+
+def animate_frames_topk(
+    frames: Tensor,
+    labels: Sequence[str],
+    scores: ArrayLike,
+    k: int = 5,
+    true_label: str | None = None,
+    bar_position: BarPosition = "right",
+    shared_axis: bool = False,
+    size: tuple[float, float] = (4.0, 4.0),
+    bar_size: float | None = None,
+    interval: int = 100,
+    title: str | None = None,
+):
+    """
+    The video counterpart of plot_frame_grid_topk: plays the clip frame by
+    frame beside the (static) top-k confidence bar chart.
+
+    frames: (T, C, H, W) tensor, RGB channel order; every frame is played.
+    size: (width, height) in inches of the video panel.
+    interval: delay between frames in milliseconds (e.g. 40 for 25 fps).
+    See plot_frame_grid_topk for the remaining parameters.
+
+    Returns (fig, anim, bar_ax). Display `anim` in a notebook with
+    `IPython.display.HTML(anim.to_jshtml())`, then `plt.close(fig)` so the
+    static figure isn't shown too; save with `anim.save(path)` (a ".gif" needs
+    pillow, ".mp4" needs ffmpeg) -- save_fig only handles still figures.
+    """
+    top_labels, top_scores = _top_k(labels, scores, k)
+
+    fig, video_fig, bar_ax = _join_frames_and_bars(size, bar_position, bar_size)
+    video_ax = video_fig.subplots()
+    video_ax.axis("off")
+    image = video_ax.imshow(_to_display(frames[0]))
+    _draw_topk_bars(
+        bar_ax, top_labels, top_scores, true_label, bar_position in ("left", "right"), shared_axis
+    )
+    if title:
+        fig.suptitle(title)
+
+    def _update(i: int) -> list[AxesImage]:
+        image.set_data(_to_display(frames[i]))
+        return [image]
+
+    anim = FuncAnimation(fig, _update, frames=len(frames), interval=interval, blit=True)
+    return fig, anim, bar_ax
 
 
 class FrameVisualiser:
@@ -961,23 +1180,41 @@ class FrameVisualiser:
 
 
 class FrameFetcher:
-    def __init__(self, **kwargs: Unpack[MiniSetKwargs]):
-        self.frames: Tensor | None = None
-        self.cur_idx : int = 0
-        dataloader = DataLoader(
-                        MiniSet(**kwargs),
-                        batch_size=1,
-                        shuffle=False,
-                        num_workers=4,
-                        pin_memory=False,
-                    )
-        
-        self.iter_loader = iter(
-            dataloader
+    """Fetch one class's instances' frames, one instance per call, in set order.
+
+    cycle: if True, wrap back to the first instance after the last, instead of
+        raising StopIteration -- for notebook cells re-run to step through a
+        class.
+
+    `cur_idx` is the 1-based position of the most recently fetched instance
+    (0 before the first call), and `current_instance` its metadata (e.g. its
+    `video_id`, to look up per-instance predictions).
+    """
+
+    def __init__(self, cycle: bool = False, **kwargs: Unpack[MiniSetKwargs]):
+        self.cycle = cycle
+        self.cur_idx: int = 0
+        self.dataset = MiniSet(**kwargs)
+        self.dataloader = DataLoader(
+            self.dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=False,
         )
-        self.len = len(dataloader)
+        self.iter_loader = iter(self.dataloader)
+        self.len = len(self.dataloader)
+
+    @property
+    def current_instance(self) -> Instance:
+        if self.cur_idx == 0:
+            raise RuntimeError("No instance fetched yet")
+        return Instance.model_validate(self.dataset.data[self.cur_idx - 1])
 
     def __call__(self) -> Tensor:
+        if self.cycle and self.cur_idx == self.len:
+            self.iter_loader = iter(self.dataloader)
+            self.cur_idx = 0
         frames = next(self.iter_loader)[0]
         self.cur_idx += 1
         if len(frames.shape) == 5:
@@ -991,6 +1228,26 @@ class FrameFetcher:
 # ---------------------------------------------------------------------------
 # Inference
 # ---------------------------------------------------------------------------
+
+def _load_trained(
+    admin: MinInfo,
+    set_name: AVAIL_SETS,
+    split_name: AVAIL_SPLITS,
+    check_name: str,
+) -> tuple[torch.nn.Module, DataLoader[VideoDataset]]:
+    """Build a run's model from its checkpoint, plus the test loader for one set.
+
+    See `infer` for why the data comes from `data_info.json`.
+    """
+    save_path = Path(admin.save_path)
+    data = load_test_sizes(save_path.parent)
+    test_loader, num_classes, _, _ = setup_data(set_name, split_name, data)
+
+    model = get_model(admin.model, num_classes, 0.0)
+    checkpoint = torch.load(save_path / check_name)
+    model.load_state_dict(checkpoint)
+    return model, test_loader
+
 
 def infer(
     admin: MinInfo,
@@ -1024,12 +1281,22 @@ def infer(
     test_topk_clsrep's return shape so existing downstream code (e.g.
     sorting cls_report by per-gloss f1-score) can be reused as-is.
     """
-    save_path = Path(admin.save_path)
-    data = load_test_sizes(save_path.parent)
-    test_loader, num_classes, _, _ = setup_data(set_name, split_name, data)
-
-    model = get_model(admin.model, num_classes, 0.0)
-    checkpoint = torch.load(save_path / check_name)
-    model.load_state_dict(checkpoint)
-
+    model, test_loader = _load_trained(admin, set_name, split_name, check_name)
     return test_topk_clsrep(model=model, test_loader=test_loader)
+
+
+def infer_instance_topk(
+    admin: MinInfo,
+    set_name: AVAIL_SETS,
+    split_name: AVAIL_SPLITS,
+    check_name: str = "best.pth",
+    max_k: int = 20,
+) -> list[InstanceTopK]:
+    """
+    Like `infer`, but returns each instance's `max_k` most probable classes
+    (via `test_instance_topk`) instead of aggregate metrics -- the input for
+    plot_frame_grid_topk/animate_frames_topk. `max_k` caps the `k` those can
+    later plot from the stashed result.
+    """
+    model, test_loader = _load_trained(admin, set_name, split_name, check_name)
+    return test_instance_topk(model=model, test_loader=test_loader, max_k=max_k)
