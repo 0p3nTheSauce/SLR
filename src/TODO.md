@@ -65,3 +65,7 @@ Misc TODOs:
   hardcoded 5 in per 256 px, unlike the dpi-based `scale` of `animate_frames`/
   `_frame_panel_size`. Its height/width were also swapped (fixed). No tracked code uses it, so
   replace `adapt` with `scale` (or a FIGSIZE-fitted default, as `plot_frame_grid_topk` has).
+- **WLASL gloss ambiguity (`before` / `former` / `past`).** See `src/info/WLASL_info.md` ("One
+  sign, several glosses"). Check whether Boston University's revised WLASL gloss labels
+  (https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf) merge or split these classes, and consider scoring against them, or counting
+  same-sign confusions as correct, when reporting per-class results.

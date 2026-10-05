@@ -1078,7 +1078,8 @@ def _clip_grid(
     rows = math.ceil(len(clips) / cols)
     if size is None:
         size = _fitted_cell_size(clips[0], cols, FIGSIZE[0])
-    title_h = 0.25 if titles else 0.0  # inches per row, for the cell titles
+    title_lines = max((t.count("\n") + 1 for t in titles), default=0) if titles else 0
+    title_h = 0.05 + 0.2 * title_lines if title_lines else 0.0  # inches per row
     suptitle_h = 0.4 if title else 0.0
     fig = plt.figure(
         figsize=(size[0] * cols, (size[1] + title_h) * rows + suptitle_h), layout="constrained"
@@ -1111,7 +1112,7 @@ def plot_clip_grid(
             figure is FIGSIZE wide, which keeps its text the same displayed size as other
             figures'.
         titles (Sequence[str] | None, optional): A title above each cell (e.g. the
-            signer), aligned with `clips`. Defaults to None.
+            signer; may span lines), aligned with `clips`. Defaults to None.
         title (str | None, optional): Figure suptitle. Defaults to None.
 
     Returns:

@@ -485,6 +485,15 @@ class TestClipGrid:
         with pytest.raises(ValueError, match="titles"):
             plot_clip_grid(self._clips(2), titles=["a"])
 
+    def test_multiline_titles_get_taller_rows(self) -> None:
+        one, _ = plot_clip_grid(self._clips(2), titles=["a", "b"])
+        two, _ = plot_clip_grid(self._clips(2), titles=["a\nx", "b"])
+        assert two.get_size_inches()[1] == pytest.approx(one.get_size_inches()[1] + 0.2)
+
+    def test_no_clips_raise(self) -> None:
+        with pytest.raises(ValueError, match="No clips"):
+            plot_clip_grid([])
+
     def test_animation_plays_longest_clip(self) -> None:
         _, anim = animate_clip_grid(self._clips(2, lengths=[2, 5]))
         assert anim.to_jshtml().count("data:image/png;base64") == 5

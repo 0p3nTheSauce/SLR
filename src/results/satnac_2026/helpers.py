@@ -4,6 +4,7 @@ or videos, per the notebook's `as_video` setting."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 from IPython.display import display
 from matplotlib.figure import Figure
@@ -34,13 +35,33 @@ def true_rank(pred: InstanceTopK, max_k: int) -> str:
     return str(pred.topk_idxs.index(pred.target) + 1)
 
 
+SortBy = Literal["none", "signer", "variation"]
+
+
+def sort_instances(
+    fetched: Sequence[tuple[Instance, Tensor]], sort_by: SortBy
+) -> list[tuple[Instance, Tensor]]:
+    """`fetched` ordered by ascending signer or variation id (set order among equal
+    ids), or left in set order for "none"."""
+    if sort_by == "none":
+        return list(fetched)
+    if sort_by == "signer":
+        return sorted(fetched, key=lambda pair: pair[0].signer_id)
+    return sorted(fetched, key=lambda pair: pair[0].variation_id)
+
+
+def instance_label(inst: Instance, sep: str = ", ") -> str:
+    return f"signer {inst.signer_id}{sep}variation {inst.variation_id}"
+
+
 @dataclass(frozen=True)
 class ClipView:
     """How the notebook shows clips: as videos if `as_video`, else frame grids.
 
     `num_frames` is how many frames a frame grid samples; `grid_cell_size` sizes a
     plain (chart-less) frame grid, the others size themselves. `video_scale`/
-    `video_interval` are `animate_frames_topk`'s `scale`/`interval`.
+    `video_interval` are `animate_frames_topk`'s `scale`/`interval`. `grid_cols` is how
+    many clips a row of `show_instances` holds.
     """
 
     classes: Sequence[str]
@@ -52,6 +73,7 @@ class ClipView:
     as_video: bool
     video_scale: float
     video_interval: int
+    grid_cols: int = 6
 
     def show_topk(self, clip: Tensor, pred: InstanceTopK, true_label: str) -> Figure | None:
         """`clip` with `pred`'s top-k chart. Returns the frame grid's figure, to save, or
@@ -92,18 +114,23 @@ class ClipView:
             plot_frame_grid(clip, num=self.num_frames, size=self.grid_cell_size)
 
     def show_instances(
-        self, fetched: Sequence[tuple[Instance, Tensor]], title: str
+        self,
+        fetched: Sequence[tuple[Instance, Tensor]],
+        title: str,
+        sort_by: SortBy = "none",
     ) -> Figure | None:
         """Every fetched clip (e.g. `FrameFetcher.fetch_all()`), one per cell, titled by
-        signer. Stills show each clip's middle frame. Returns the still figure, or None
-        for a video (already displayed)."""
-        clips = [frames for _, frames in fetched]
-        titles = [f"signer {inst.signer_id}" for inst, _ in fetched]
+        signer and variation, ordered by `sort_by`. Stills show each
+        clip's middle frame. Returns the still figure, or None for a video (already
+        displayed)."""
+        ordered = sort_instances(fetched, sort_by)
+        clips = [frames for _, frames in ordered]
+        titles = [instance_label(inst, sep="\n") for inst, _ in ordered]
         if self.as_video:
             fig, anim = animate_clip_grid(
-                clips, interval=self.video_interval, titles=titles, title=title
+                clips, self.grid_cols, interval=self.video_interval, titles=titles, title=title
             )
             display(animation_html(fig, anim))
             return None
-        fig, _ = plot_clip_grid(clips, titles=titles, title=title)
+        fig, _ = plot_clip_grid(clips, self.grid_cols, titles=titles, title=title)
         return fig
