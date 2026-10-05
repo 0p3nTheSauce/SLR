@@ -902,19 +902,37 @@ def _to_display(frame: Tensor) -> np.ndarray:
     return (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
 
 
+def _fitted_cell_size(frames: Tensor, cols: int, width: float) -> tuple[float, float]:
+    """(width, height) in inches of each cell of a `cols`-wide grid of `frames`-shaped
+    images that is `width` inches wide.
+
+    Text is sized in points, so a figure only shows it at the same size as others (e.g.
+    a video beside it, or a thesis page) if it's drawn near the size it's displayed at,
+    not shrunk to fit -- hence fitting grids to a fixed width such as FIGSIZE's.
+    """
+    cell_w = width / cols
+    return cell_w, cell_w * frames.shape[-2] / frames.shape[-1]
+
+
+def _frame_grid_axes(fig: FigureBase, n: int, cols: int) -> np.ndarray:
+    """A 2D (rows x cols) axes array on `fig` (a Figure or SubFigure) with room for `n`
+    images, axes hidden; cells past the `n`th, in the last row, are invisible."""
+    rows = math.ceil(n / cols)
+    axes = fig.subplots(rows, cols, squeeze=False)
+    for i, ax in enumerate(axes.flat):
+        ax.axis("off")
+        ax.set_visible(i < n)
+    return axes
+
+
 def _draw_frame_grid(fig: FigureBase, sampled: Tensor, cols: int) -> np.ndarray:
     """Draw `sampled` frames onto a (rows x cols) grid of `fig` (a Figure or SubFigure).
 
     Unused cells in the last row are hidden. Returns the 2D axes array.
     """
-    rows = math.ceil(len(sampled) / cols)
-    axes = fig.subplots(rows, cols, squeeze=False)
-    for i, frame in enumerate(sampled):
-        ax = axes[i // cols][i % cols]
+    axes = _frame_grid_axes(fig, len(sampled), cols)
+    for ax, frame in zip(axes.flat, sampled):
         ax.imshow(_to_display(frame))
-        ax.axis("off")
-    for j in range(len(sampled), rows * cols):
-        axes[j // cols][j % cols].set_visible(False)
     return axes
 
 
@@ -948,7 +966,7 @@ def plot_frame_grid(
 
     if adapt:
         factor = 5 / 256
-        w, h = frames.shape[2], frames.shape[3]
+        h, w = frames.shape[2], frames.shape[3]
         size = (w * factor, h * factor)
 
     rows = math.ceil(len(sampled) / cols)
@@ -973,16 +991,27 @@ def plot_frame_grid(
 # Frames as a video
 # ---------------------------------------------------------------------------
 
-def _animate(fig: Figure, ax: Axes, frames: Tensor, interval: int) -> FuncAnimation:
-    """Play `frames` ((T, C, H, W), RGB) one per `interval` ms on `ax`, with its axis hidden."""
-    ax.axis("off")
-    image = ax.imshow(_to_display(frames[0]))
+def _frame_panel_size(frames: Tensor, scale: float) -> tuple[float, float]:
+    """(width, height) in inches at which `frames` show at `scale` x their own pixels."""
+    dpi = plt.rcParams["figure.dpi"]
+    return frames.shape[-1] * scale / dpi, frames.shape[-2] * scale / dpi
+
+
+def _animate(fig: Figure, panels: Sequence[tuple[Axes, Tensor]], interval: int) -> FuncAnimation:
+    """Play each (ax, (T, C, H, W) RGB frames) clip on its axes in step, one frame per
+    `interval` ms, with the axes hidden. Shorter clips hold their last frame."""
+    images: list[AxesImage] = []
+    for ax, frames in panels:
+        ax.axis("off")
+        images.append(ax.imshow(_to_display(frames[0])))
 
     def _update(i: int) -> list[AxesImage]:
-        image.set_data(_to_display(frames[i]))
-        return [image]
+        for image, (_, frames) in zip(images, panels):
+            image.set_data(_to_display(frames[min(i, len(frames) - 1)]))
+        return images
 
-    return FuncAnimation(fig, _update, frames=len(frames), interval=interval, blit=True)
+    length = max(len(frames) for _, frames in panels)
+    return FuncAnimation(fig, _update, frames=length, interval=interval, blit=True)
 
 
 def animate_frames(
@@ -1006,15 +1035,13 @@ def animate_frames(
     ".gif" needs pillow, ".mp4" needs ffmpeg) -- save_fig only handles still
     figures.
     """
-    dpi = plt.rcParams["figure.dpi"]
-    frame_w = frames.shape[-1] * scale / dpi
-    frame_h = frames.shape[-2] * scale / dpi
+    frame_w, frame_h = _frame_panel_size(frames, scale)
     title_h = 0.3 if title else 0.0  # inches
-    fig = plt.figure(figsize=(frame_w, frame_h + title_h), dpi=dpi)
+    fig = plt.figure(figsize=(frame_w, frame_h + title_h), dpi=plt.rcParams["figure.dpi"])
     ax = fig.add_axes((0.0, 0.0, 1.0, frame_h / (frame_h + title_h)))
     if title:
         fig.suptitle(title, y=1 - 0.05 / (frame_h + title_h), va="top")
-    return fig, _animate(fig, ax, frames, interval)
+    return fig, _animate(fig, [(ax, frames)], interval)
 
 
 def animation_html(fig: Figure, anim: FuncAnimation) -> HTML:
@@ -1032,13 +1059,188 @@ def animation_html(fig: Figure, anim: FuncAnimation) -> HTML:
 
 
 # ---------------------------------------------------------------------------
+# Clip grids: one sign per cell
+# ---------------------------------------------------------------------------
+
+def _clip_grid(
+    clips: Sequence[Tensor],
+    cols: int,
+    size: tuple[float, float] | None,
+    titles: Sequence[str] | None,
+    title: str | None,
+) -> tuple[Figure, np.ndarray]:
+    """The figure and 2D axes array shared by `plot_clip_grid`/`animate_clip_grid`."""
+    if not clips:
+        raise ValueError("No clips to show.")
+    if titles is not None and len(titles) != len(clips):
+        raise ValueError(f"{len(titles)} titles but {len(clips)} clips.")
+    cols = min(cols, len(clips))
+    rows = math.ceil(len(clips) / cols)
+    if size is None:
+        size = _fitted_cell_size(clips[0], cols, FIGSIZE[0])
+    title_lines = max((t.count("\n") + 1 for t in titles), default=0) if titles else 0
+    title_h = 0.05 + 0.2 * title_lines if title_lines else 0.0  # inches per row
+    suptitle_h = 0.4 if title else 0.0
+    fig = plt.figure(
+        figsize=(size[0] * cols, (size[1] + title_h) * rows + suptitle_h), layout="constrained"
+    )
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0.01, hspace=0.01)  # type: ignore[union-attr]
+    axes = _frame_grid_axes(fig, len(clips), cols)
+    for ax, cell_title in zip(axes.flat, titles or []):
+        ax.set_title(cell_title, fontsize=plt.rcParams["xtick.labelsize"])
+    if title:
+        fig.suptitle(title)
+    return fig, axes
+
+
+def plot_clip_grid(
+    clips: Sequence[Tensor],
+    cols: int = 6,
+    size: tuple[float, float] | None = None,
+    titles: Sequence[str] | None = None,
+    title: str | None = None,
+):
+    """A grid of clips (e.g. every instance of a gloss), one per cell, each shown by its
+    middle frame -- the still counterpart of `animate_clip_grid`.
+
+    Args:
+        clips (Sequence[Tensor]): (T, C, H, W) RGB clips, one per cell in reading order.
+        cols (int, optional): Max cells per row; fewer clips than this make one row of
+            them. Defaults to 6.
+        size (tuple[float, float] | None, optional): (width, height) in inches of each
+            cell. Defaults to None: sized from the first clip's aspect ratio so the
+            figure is FIGSIZE wide, which keeps its text the same displayed size as other
+            figures'.
+        titles (Sequence[str] | None, optional): A title above each cell (e.g. the
+            signer; may span lines), aligned with `clips`. Defaults to None.
+        title (str | None, optional): Figure suptitle. Defaults to None.
+
+    Returns:
+        tuple[Figure, np.ndarray]: (fig, axes), axes a 2D (rows x cols) array as for
+            `plot_frame_grid`.
+    """
+    fig, axes = _clip_grid(clips, cols, size, titles, title)
+    for ax, clip in zip(axes.flat, clips):
+        ax.imshow(_to_display(clip[len(clip) // 2]))
+    return fig, axes
+
+
+def animate_clip_grid(
+    clips: Sequence[Tensor],
+    cols: int = 6,
+    size: tuple[float, float] | None = None,
+    interval: int = 40,
+    titles: Sequence[str] | None = None,
+    title: str | None = None,
+):
+    """Play a grid of clips (e.g. every instance of a gloss) in step, one per cell.
+    Shorter clips hold their last frame until the longest ends.
+
+    Args:
+        clips (Sequence[Tensor]): As for `plot_clip_grid`.
+        cols (int, optional): As for `plot_clip_grid`. Defaults to 6.
+        size (tuple[float, float] | None, optional): As for `plot_clip_grid`.
+            Defaults to None.
+        interval (int, optional): Delay between frames in milliseconds, as for
+            `animate_frames`. Defaults to 40 (25 fps).
+        titles (Sequence[str] | None, optional): As for `plot_clip_grid`.
+            Defaults to None.
+        title (str | None, optional): Figure suptitle. Defaults to None.
+
+    Returns:
+        tuple[Figure, FuncAnimation]: (fig, anim), shown and saved as for `animate_frames`.
+    """
+    fig, axes = _clip_grid(clips, cols, size, titles, title)
+    return fig, _animate(fig, list(zip(axes.flat, clips)), interval)
+
+
+# ---------------------------------------------------------------------------
+# Joining panels
+# ---------------------------------------------------------------------------
+
+PanelPosition = Literal["left", "right", "top", "bottom"]
+
+
+def _is_side_by_side(position: PanelPosition) -> bool:
+    return position in ("left", "right")
+
+
+def _centre_in(slot: SubFigure, extent: float, full: float, vertical: bool) -> SubFigure:
+    """The part of `slot` that is `extent` of its `full` inches long, centred, along
+    the vertical (else horizontal) axis -- or `slot` itself if it isn't shorter."""
+    if extent >= full:
+        return slot
+    pad = (full - extent) / 2
+    ratios = [pad, extent, pad]
+    if vertical:
+        return slot.subfigures(3, 1, height_ratios=ratios)[1]
+    return slot.subfigures(1, 3, width_ratios=ratios)[1]
+
+
+def join_panels(
+    first_size: tuple[float, float],
+    second_size: tuple[float, float],
+    position: PanelPosition,
+) -> tuple[Figure, SubFigure, SubFigure]:
+    """Lay out a figure of two panels, the second on the `position` side of the first.
+
+    A building block for figures that pair two plots, e.g. a clip and its top-k chart,
+    or two clips compared side by side. Draw into each panel with its `subplots()`.
+
+    Args:
+        first_size (tuple[float, float]): (width, height) in inches of the first panel.
+        second_size (tuple[float, float]): (width, height) in inches of the second panel.
+        position (PanelPosition): Side of the first panel the second sits on.
+
+    Returns:
+        tuple[Figure, SubFigure, SubFigure]: (fig, first, second). Where the panels'
+            sizes differ across the joining direction (heights for "left"/"right",
+            widths for "top"/"bottom"), the smaller one is centred, padded to the
+            larger. The figure uses constrained layout, so tick labels get room without
+            overlapping the other panel; don't call `tight_layout` on it.
+    """
+    side_by_side = _is_side_by_side(position)
+    (first_w, first_h), (second_w, second_h) = first_size, second_size
+    if side_by_side:
+        figsize = (first_w + second_w, max(first_h, second_h))
+        extents = [first_w, second_w]
+    else:
+        figsize = (max(first_w, second_w), first_h + second_h)
+        extents = [first_h, second_h]
+    second_first = position in ("left", "top")
+    if second_first:
+        extents.reverse()
+
+    fig = plt.figure(figsize=figsize, layout="constrained")
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0.01, hspace=0.01)  # type: ignore[union-attr]
+    if side_by_side:
+        slots = fig.subfigures(1, 2, width_ratios=extents)
+    else:
+        slots = fig.subfigures(2, 1, height_ratios=extents)
+    second_slot, first_slot = slots if second_first else slots[::-1]
+
+    def _centred(slot: SubFigure, size: tuple[float, float]) -> SubFigure:
+        if side_by_side:
+            return _centre_in(slot, size[1], figsize[1], vertical=True)
+        return _centre_in(slot, size[0], figsize[0], vertical=False)
+
+    return fig, _centred(first_slot, first_size), _centred(second_slot, second_size)
+
+
+# ---------------------------------------------------------------------------
 # Frames joined with a top-k confidence bar chart
 # ---------------------------------------------------------------------------
 
-BarPosition = Literal["left", "right", "top", "bottom"]
-
 # Highlights the ground-truth class among the otherwise DEFAULT_ACCENT top-k bars.
 TRUE_CLASS_COLOR = LINE_PALETTE[2]  # Okabe-Ito green
+
+# Least inches a top-k chart takes along the joining direction, so its tick labels
+# (gloss names, or the confidence axis) still leave room for the bars.
+MIN_CHART_EXTENT = 2.5
+# Least inches per bar across a top-k chart, so neighbouring labels don't overlap.
+# Vertical bars need more, as their value labels sit side by side.
+MIN_HBAR_PITCH = 0.2
+MIN_VBAR_PITCH = 0.35
 
 
 def _top_k(labels: Sequence[str], scores: ArrayLike, k: int) -> tuple[list[str], np.ndarray]:
@@ -1052,76 +1254,105 @@ def _top_k(labels: Sequence[str], scores: ArrayLike, k: int) -> tuple[list[str],
     return [labels[int(i)] for i in order], scores_arr[order]
 
 
-def _join_frames_and_bars(
-    frames_size: tuple[float, float],
-    bar_position: BarPosition,
-    bar_size: float | None,
-) -> tuple[Figure, SubFigure, Axes]:
-    """Lay out a figure with a frames area and a single bar-chart axes beside it.
-
-    frames_size: (width, height) in inches of the frames area.
-    bar_size: the bar chart's extent in inches along the joining direction --
-        its width for "left"/"right", its height for "top"/"bottom". `None`
-        gives 4 and 3 inches respectively.
-
-    Uses constrained layout, so the bar chart's tick labels get room without
-    overlapping the frames.
-    """
-    frames_w, frames_h = frames_size
-    side_by_side = bar_position in ("left", "right")
-    bar_first = bar_position in ("left", "top")
-    if bar_size is None:
-        bar_size = 4.0 if side_by_side else 3.0
-    if side_by_side:
-        figsize = (frames_w + bar_size, frames_h)
-        extents = [frames_w, bar_size]
-    else:
-        figsize = (frames_w, frames_h + bar_size)
-        extents = [frames_h, bar_size]
-    if bar_first:
-        extents.reverse()
-
-    fig = plt.figure(figsize=figsize, layout="constrained")
-    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0.01, hspace=0.01)  # type: ignore[union-attr]
-    if side_by_side:
-        subfigs = fig.subfigures(1, 2, width_ratios=extents)
-    else:
-        subfigs = fig.subfigures(2, 1, height_ratios=extents)
-    bar_fig, frames_fig = subfigs if bar_first else subfigs[::-1]
-    return fig, frames_fig, bar_fig.subplots()
-
-
-def _draw_topk_bars(
+def draw_topk_chart(
     ax: Axes,
-    labels: list[str],
-    scores: np.ndarray,
-    true_label: str | None,
-    horizontal: bool,
-    shared_axis: bool,
+    labels: Sequence[str],
+    scores: ArrayLike,
+    k: int = 5,
+    true_label: str | None = None,
+    horizontal: bool = True,
+    shared_axis: bool = False,
 ) -> None:
-    """Draw descending top-k bars on `ax`, highlighting `true_label` if present.
+    """Draw a bar chart of the `k` highest `scores` on `ax`, highest first.
 
-    Horizontal bars read top-down (top-1 at the top); vertical bars left-right.
-    The confidence axis spans [0, 1] if `shared_axis`, else [0, top score].
+    Args:
+        ax (Axes): Axes to draw on.
+        labels (Sequence[str]): Class names, aligned with `scores`. Need not be sorted or
+            complete -- a stored top-N (`InstanceTopK`) works as long as k <= N.
+        scores (ArrayLike): Confidences (e.g. softmax probabilities), aligned with `labels`.
+        k (int, optional): Number of bars. Defaults to 5.
+        true_label (str | None, optional): If given and among the top k, its bar is drawn
+            in TRUE_CLASS_COLOR instead of DEFAULT_ACCENT. Defaults to None.
+        horizontal (bool, optional): If True, horizontal bars reading top-down (long gloss
+            labels read easily); else vertical bars reading left-right, with rotated
+            labels. Defaults to True.
+        shared_axis (bool, optional): If True, the confidence axis always spans [0, 1], so
+            bar lengths can be compared between charts (e.g. stepping through a gloss's
+            instances). If False, it is scaled to the top score, which keeps
+            low-confidence bars readable. Defaults to False.
+
+    Raises:
+        ValueError: If `labels` and `scores` differ in length, or k is out of range.
     """
-    conf_max = (1.0 if shared_axis else scores.max()) * 1.15  # headroom for value labels
-    palette = [TRUE_CLASS_COLOR if lab == true_label else DEFAULT_ACCENT for lab in labels]
-    tick_labels = [lab.replace("_", " ") for lab in labels]
-    positions = np.arange(len(labels))
+    top_labels, top_scores = _top_k(labels, scores, k)
+    conf_max = (1.0 if shared_axis else top_scores.max()) * 1.15  # headroom for value labels
+    palette = [TRUE_CLASS_COLOR if lab == true_label else DEFAULT_ACCENT for lab in top_labels]
+    tick_labels = [lab.replace("_", " ") for lab in top_labels]
+    positions = np.arange(len(top_labels))
     if horizontal:
-        container = ax.barh(positions, scores, color=palette)
+        container = ax.barh(positions, top_scores, color=palette)
         ax.set_yticks(positions, tick_labels)
         ax.invert_yaxis()
         ax.set_xlim(0, conf_max)
         ax.set_xlabel("Confidence")
         ax.grid(axis="x", linestyle="--", alpha=0.3)
     else:
-        container = ax.bar(positions, scores, color=palette)
+        container = ax.bar(positions, top_scores, color=palette)
         ax.set_xticks(positions, tick_labels, rotation=45, ha="right")
         ax.set_ylim(0, conf_max)
         ax.set_ylabel("Confidence")
         ax.grid(axis="y", linestyle="--", alpha=0.3)
     ax.bar_label(container, fmt=VALUE_FMT, padding=3, fontsize=plt.rcParams["xtick.labelsize"])
+
+
+def _matched_chart_size(
+    frames_size: tuple[float, float], position: PanelPosition, k: int
+) -> tuple[float, float]:
+    """The frames area's own size, so chart and frames each take half the figure.
+
+    Raised where that's too small to read: to MIN_CHART_EXTENT along the joining
+    direction, and across it (the side the `k` bars spread along) to k x
+    MIN_HBAR_PITCH/MIN_VBAR_PITCH, in which case `join_panels` centres the frames.
+    """
+    width, height = frames_size
+    if _is_side_by_side(position):
+        return max(width, MIN_CHART_EXTENT), max(height, k * MIN_HBAR_PITCH)
+    return max(width, k * MIN_VBAR_PITCH), max(height, MIN_CHART_EXTENT)
+
+
+def _topk_grid_width(position: PanelPosition) -> float:
+    """Inches a frame grid can take so that it plus its default (matched) top-k chart
+    make a FIGSIZE-wide figure."""
+    fig_w = FIGSIZE[0]
+    if not _is_side_by_side(position):
+        return fig_w
+    # beside the grid the chart matches its width, but takes at least MIN_CHART_EXTENT
+    return min(fig_w / 2, fig_w - MIN_CHART_EXTENT)
+
+
+def _join_frames_and_chart(
+    frames_size: tuple[float, float],
+    labels: Sequence[str],
+    scores: ArrayLike,
+    k: int,
+    true_label: str | None,
+    bar_position: PanelPosition,
+    shared_axis: bool,
+    chart_size: tuple[float, float] | None,
+    title: str | None,
+) -> tuple[Figure, SubFigure, Axes]:
+    """`join_panels` of a frames area and a `draw_topk_chart` beside it (matched to the
+    frames' size if `chart_size` is None). Returns (fig, frames_panel, bar_ax)."""
+    if chart_size is None:
+        chart_size = _matched_chart_size(frames_size, bar_position, k)
+    fig, frames_panel, chart_panel = join_panels(frames_size, chart_size, bar_position)
+    bar_ax = chart_panel.subplots()
+    draw_topk_chart(
+        bar_ax, labels, scores, k, true_label, _is_side_by_side(bar_position), shared_axis
+    )
+    if title:
+        fig.suptitle(title)
+    return fig, frames_panel, bar_ax
 
 
 def plot_frame_grid_topk(
@@ -1130,54 +1361,58 @@ def plot_frame_grid_topk(
     scores: ArrayLike,
     k: int = 5,
     true_label: str | None = None,
-    bar_position: BarPosition = "right",
+    bar_position: PanelPosition = "right",
     shared_axis: bool = False,
     num: int = 16,
     cols: int = 8,
-    size: tuple[float, float] = (2.0, 2.0),
-    bar_size: float | None = None,
+    size: tuple[float, float] | None = None,
+    chart_size: tuple[float, float] | None = None,
     title: str | None = None,
 ):
-    """
-    A `plot_frame_grid` of a clip joined to a bar chart of the model's top-k
-    class confidences for it. Intended for inspecting individual
-    (mis)predictions, e.g. what a gloss was predicted as and how confidently.
+    """A `plot_frame_grid` of a clip joined to a bar chart of the model's top-k class
+    confidences for it. Intended for inspecting individual (mis)predictions, e.g. what a
+    gloss was predicted as and how confidently.
 
-    labels/scores: aligned class names and confidences (e.g. softmax
-        probabilities). Need not be sorted or complete -- a stored top-N
-        (`InstanceTopK`) works as long as k <= N.
-    k: number of bars, highest score first.
-    true_label: if given and among the top k, its bar is drawn in
-        TRUE_CLASS_COLOR instead of DEFAULT_ACCENT.
-    bar_position: side of the frames the chart sits on. "left"/"right" use
-        horizontal bars (long gloss labels read easily); "top"/"bottom" use
-        vertical bars with rotated labels.
-    shared_axis: if True, the confidence axis always spans [0, 1], so bar
-        lengths can be compared between charts (e.g. stepping through a
-        gloss's instances). If False (default), it is scaled to the top
-        score, which keeps low-confidence bars readable.
-    num/cols/size: as for plot_frame_grid (`size` is per frame cell).
-    bar_size: inches the chart takes along the joining direction -- its width
-        for "left"/"right", its height for "top"/"bottom". Defaults to 4 and
-        3 inches respectively.
+    Args:
+        frames (Tensor): The clip, as for `plot_frame_grid`.
+        labels (Sequence[str]): Class names, aligned with `scores`, as for
+            `draw_topk_chart`.
+        scores (ArrayLike): Confidences, aligned with `labels`, as for `draw_topk_chart`.
+        k (int, optional): Number of bars, highest score first. Defaults to 5.
+        true_label (str | None, optional): If given and among the top k, its bar is drawn
+            in TRUE_CLASS_COLOR instead of DEFAULT_ACCENT. Defaults to None.
+        bar_position (PanelPosition, optional): Side of the frames the chart sits on.
+            "left"/"right" use horizontal bars (long gloss labels read easily);
+            "top"/"bottom" use vertical bars with rotated labels. Defaults to "right".
+        shared_axis (bool, optional): Fix the confidence axis to [0, 1], as for
+            `draw_topk_chart`. Defaults to False.
+        num (int, optional): Number of frames sampled, as for `plot_frame_grid`.
+            Defaults to 16.
+        cols (int, optional): Frame-grid columns, as for `plot_frame_grid`. Defaults to 8.
+        size (tuple[float, float] | None, optional): (width, height) in inches of each
+            frame cell. Defaults to None: sized so that, with the default `chart_size`,
+            the figure is FIGSIZE wide, which keeps its text the same displayed size as
+            other figures' rather than shrunk with an oversized figure.
+        chart_size (tuple[float, float] | None, optional): (width, height) in inches of
+            the chart; centred against the grid if it's smaller across the joining
+            direction. Defaults to None: the grid's own size, so each takes half the
+            figure, but enlarged where k bars wouldn't fit (see `_matched_chart_size`).
+        title (str | None, optional): Figure suptitle. Defaults to None.
 
-    Returns (fig, frame_axes, bar_ax) -- frame_axes is the 2D grid array, as
-    for plot_frame_grid; no `ax` parameter for the same reason.
+    Returns:
+        tuple[Figure, np.ndarray, Axes]: (fig, frame_axes, bar_ax). frame_axes is the 2D
+            grid array, as for `plot_frame_grid`; there's no `ax` parameter for the same
+            reason.
     """
-    top_labels, top_scores = _top_k(labels, scores, k)
     sampled = _sample_frames(frames, num)
     rows = math.ceil(len(sampled) / cols)
-
-    fig, frames_fig, bar_ax = _join_frames_and_bars(
-        (size[0] * cols, size[1] * rows), bar_position, bar_size
+    if size is None:
+        size = _fitted_cell_size(frames, cols, _topk_grid_width(bar_position))
+    fig, frames_panel, bar_ax = _join_frames_and_chart(
+        (size[0] * cols, size[1] * rows),
+        labels, scores, k, true_label, bar_position, shared_axis, chart_size, title,
     )
-    frame_axes = _draw_frame_grid(frames_fig, sampled, cols)
-    _draw_topk_bars(
-        bar_ax, top_labels, top_scores, true_label, bar_position in ("left", "right"), shared_axis
-    )
-    if title:
-        fig.suptitle(title)
-    return fig, frame_axes, bar_ax
+    return fig, _draw_frame_grid(frames_panel, sampled, cols), bar_ax
 
 
 def animate_frames_topk(
@@ -1186,35 +1421,43 @@ def animate_frames_topk(
     scores: ArrayLike,
     k: int = 5,
     true_label: str | None = None,
-    bar_position: BarPosition = "right",
+    bar_position: PanelPosition = "right",
     shared_axis: bool = False,
-    size: tuple[float, float] = (4.0, 4.0),
-    bar_size: float | None = None,
+    scale: float = 1.0,
+    chart_size: tuple[float, float] | None = None,
     interval: int = 100,
     title: str | None = None,
 ):
+    """The video counterpart of `plot_frame_grid_topk`: plays the clip frame by frame
+    beside the (static) top-k confidence bar chart.
+
+    Args:
+        frames (Tensor): (T, C, H, W) tensor, RGB channel order; every frame is played.
+        labels (Sequence[str]): As for `plot_frame_grid_topk`.
+        scores (ArrayLike): As for `plot_frame_grid_topk`.
+        k (int, optional): As for `plot_frame_grid_topk`. Defaults to 5.
+        true_label (str | None, optional): As for `plot_frame_grid_topk`. Defaults to None.
+        bar_position (PanelPosition, optional): As for `plot_frame_grid_topk`.
+            Defaults to "right".
+        shared_axis (bool, optional): As for `plot_frame_grid_topk`. Defaults to False.
+        scale (float, optional): Video size relative to the frames' own resolution, as
+            for `animate_frames`. With the default `chart_size`, this sizes the chart
+            too, so raise it if the chart's labels crowd. Defaults to 1.0.
+        chart_size (tuple[float, float] | None, optional): As for
+            `plot_frame_grid_topk`, matching the video's size by default.
+        interval (int, optional): Delay between frames in milliseconds (e.g. 40 for
+            25 fps). Defaults to 100.
+        title (str | None, optional): Figure suptitle. Defaults to None.
+
+    Returns:
+        tuple[Figure, FuncAnimation, Axes]: (fig, anim, bar_ax), shown and saved as for
+            `animate_frames`.
     """
-    The video counterpart of plot_frame_grid_topk: plays the clip frame by
-    frame beside the (static) top-k confidence bar chart.
-
-    frames: (T, C, H, W) tensor, RGB channel order; every frame is played.
-    size: (width, height) in inches of the video panel.
-    interval: delay between frames in milliseconds (e.g. 40 for 25 fps).
-    See plot_frame_grid_topk for the remaining parameters.
-
-    Returns (fig, anim, bar_ax), shown and saved as for animate_frames
-    (animation_html renders it at the figure's dpi).
-    """
-    top_labels, top_scores = _top_k(labels, scores, k)
-
-    fig, video_fig, bar_ax = _join_frames_and_bars(size, bar_position, bar_size)
-    _draw_topk_bars(
-        bar_ax, top_labels, top_scores, true_label, bar_position in ("left", "right"), shared_axis
+    fig, video_panel, bar_ax = _join_frames_and_chart(
+        _frame_panel_size(frames, scale),
+        labels, scores, k, true_label, bar_position, shared_axis, chart_size, title,
     )
-    if title:
-        fig.suptitle(title)
-    anim = _animate(fig, video_fig.subplots(), frames, interval)
-    return fig, anim, bar_ax
+    return fig, _animate(fig, [(video_panel.subplots(), frames)], interval), bar_ax
 
 
 class FrameVisualiser:
@@ -1272,6 +1515,19 @@ class FrameFetcher:
         if self.cur_idx == 0:
             raise RuntimeError("No instance fetched yet")
         return Instance.model_validate(self.dataset.data[self.cur_idx - 1])
+
+    def fetch_all(self) -> list[tuple[Instance, Tensor]]:
+        """Every instance's (metadata, frames), in set order, restarting from the first.
+
+        Afterwards the fetcher is at the last instance, as if called `len` times.
+        """
+        self.iter_loader = iter(self.dataloader)
+        self.cur_idx = 0
+        fetched = []
+        for _ in range(self.len):
+            frames = self()
+            fetched.append((self.current_instance, frames))
+        return fetched
 
     def __call__(self) -> Tensor:
         if self.cycle and self.cur_idx == self.len:

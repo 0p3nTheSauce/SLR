@@ -90,6 +90,57 @@ raw annotation with the frame count OpenCV decodes from its video:
 * Every `frame_end` in the kept data is within its clip: 20725 instances end exactly at the last
   frame, and 74 are annotated shorter than the clip (by up to 91 frames).
 
+### One sign, several glosses (e.g. `before` / `former` / `past`)
+
+WLASL is labelled by English gloss, and the gloss-to-sign mapping isn't one-to-one:
+
+* **One gloss, several signs.** `variation_id` numbers the distinct sign forms filed under a
+  gloss. `before` has two: variation 0 is a backward movement over the shoulder, variation 1 is
+  one flat hand moving back from the other.
+* **One sign, several glosses.** Lifeprint glosses the over-the-shoulder sign as
+  "PAST | PAST-[before] | PAST-[former]" ([before][lp-before], [past][lp-past]), and the MSU ASL
+  Browser describes [FORMER][msu-former] with the same movement. So `before` (variation 0),
+  `former` and `past` can hold the same sign.
+* **A known WLASL problem.** Neidle and colleagues at Boston University show that WLASL
+  sometimes files one sign under several glosses and several signs under one gloss
+  ([Neidle & Ballard 2022][asllrp21]; [Neidle et al. 2022][lrec22]), and have published
+  [revised gloss labels][asllrp-glosses] for about 19,700 WLASL videos. The WLASL paper itself
+  admits gloss ambiguity, and the NLA-SLR paper calls such pairs "visually indistinguishable
+  signs".
+
+What this looks like in our data (asl2000_cutoff_9 labels and MViTv2_S exp000's stashed test
+predictions, `results/satnac_2026/all_misspredictions.ipynb`; checked 2026-10-05):
+
+| Gloss | Train / val / test instances | Variations |
+|---|---|---|
+| `before` | 18 / 4 / 4 | 0 and 1 (10 / 8 in train) |
+| `former` | 5 / 1 / 1 | 0 only |
+| `past` | 10 / 3 / 2 | 0 only |
+
+All 4 `before` test instances are mispredicted, split by variation: both variation-0 instances
+are predicted as `former` (0.37) and `past` (0.74), the over-the-shoulder glosses above; the
+variation-1 ones as `beside` and `next`. The `former` test instance is predicted correctly. Such
+errors say more about the labels than the model, so treat confusions between these glosses
+with care when reading per-class results.
+
+Still open: whether this is an annotation clash or signers using the forms interchangeably, and
+whether the Boston University labels merge or split these classes (tracked in `src/TODO.md`).
+
+Sources (links added 2026-10-05):
+
+* Lifeprint: [before][lp-before], [past][lp-past]
+* MSU ASL Browser: [former][msu-former]
+* Neidle & Ballard 2022, [ASLLRP Report 21][asllrp21]
+* [Revised WLASL gloss labels (ASLLRP)][asllrp-glosses]
+* Neidle et al. 2022, [LREC sign language workshop][lrec22]
+
+[lp-before]: https://www.lifeprint.com/asl101/pages-signs/b/before.htm
+[lp-past]: https://www.lifeprint.com/asl101/pages-signs/p/past.htm
+[msu-former]: https://commtechlab.msu.edu/sites/aslweb/F/W1337.htm
+[asllrp21]: https://www.bu.edu/asllrp/rpt21/asllrp21.pdf
+[asllrp-glosses]: https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf
+[lrec22]: https://aclanthology.org/2022.signlang-1.26.pdf
+
 ## Naming conventions
 
 ### Split vs Set

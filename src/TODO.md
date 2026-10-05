@@ -56,3 +56,16 @@ Misc TODOs:
 - `configfiles/asl100/MViTv2_B_32x3/exp013.toml` says it is "same as ... but with warm up", but
   it has no `[scheduler.warm_up]` block, and its Que run has no warmup either. Fix the comment, or
   rerun it with the warmup it was meant to have. No MViTv2_B_32x3 run so far has used warmup.
+- **mp4 export for `visualise2` animations.** `animate_frames`/`animate_frames_topk` are only
+  shown inline (`animation_html`); their docstrings point at `anim.save(path, dpi=fig.dpi)`,
+  untested. Add a `save_animation` counterpart to `save_fig` (mkdir the parent, figure dpi, close
+  the figure) and check `ffmpeg` is there: it's in `wlasl_gpu.yml` but not `wlasl_cpu.yml`
+  (pillow, for ".gif", is in both).
+- `visualise2.plot_frame_grid`'s `adapt=True` sizes cells from the frames' pixels with a
+  hardcoded 5 in per 256 px, unlike the dpi-based `scale` of `animate_frames`/
+  `_frame_panel_size`. Its height/width were also swapped (fixed). No tracked code uses it, so
+  replace `adapt` with `scale` (or a FIGSIZE-fitted default, as `plot_frame_grid_topk` has).
+- **WLASL gloss ambiguity (`before` / `former` / `past`).** See `src/info/WLASL_info.md` ("One
+  sign, several glosses"). Check whether Boston University's revised WLASL gloss labels
+  (https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf) merge or split these classes, and consider scoring against them, or counting
+  same-sign confusions as correct, when reporting per-class results.
