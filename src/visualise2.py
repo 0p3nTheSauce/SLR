@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from logging import Logger
 from pathlib import Path
 from typing import Any, Literal
@@ -210,6 +210,40 @@ def plot_bar_chart(
         ax.set_title(title)
 
     fig.tight_layout()
+    return fig, ax
+
+
+def plot_count_distribution(
+    counts: Mapping[Any, int],
+    title: str | None = None,
+    xlabel: str | None = None,
+    ylabel: str = "Count",
+    tick_step: int | None = None,
+    figsize: tuple[float, float] = FIGSIZE,
+    ax: Axes | None = None,
+) -> tuple[Figure, Axes]:
+    """
+    Bar-chart a value -> count mapping (e.g. a `src.stats.HistoGram`), one bar
+    per value in ascending key order, without per-bar value labels.
+
+    counts: keys are the x categories (stringified for display), values their counts.
+    tick_step: show only every `tick_step`-th x tick label, to keep a long axis
+        (e.g. 100 glosses or video lengths) legible. None shows every label.
+    """
+    sorted_items = sorted(counts.items(), key=lambda item: item[0])
+    fig, ax = plot_bar_chart(
+        [str(value) for value, _ in sorted_items],
+        [count for _, count in sorted_items],
+        title=title,
+        xlabel=xlabel,
+        ylabel=ylabel,
+        figsize=figsize,
+        show_values=False,
+        ax=ax,
+    )
+    if tick_step is not None:
+        for i, tick_label in enumerate(ax.get_xticklabels()):
+            tick_label.set_visible(i % tick_step == 0)
     return fig, ax
 
 
