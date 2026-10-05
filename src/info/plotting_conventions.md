@@ -72,6 +72,7 @@ Reuse `VALUE_FMT` (`"%.2f"`), `LOSS_FMT` (`"%.3f"`), `COUNT_FMT` (`"%d"`), and `
 | Function | Use for | Notes |
 |---|---|---|
 | `plot_bar_chart` | Single-series bar chart (e.g. config vs. test loss) | `horizontal=True` for long category labels |
+| `plot_count_distribution` | Bar chart of a value -> count mapping, e.g. a `src.stats.HistoGram` (video lengths, signers, instances per gloss) | Bars in ascending key order, no value labels; `tick_step` shows only every n-th x label for long axes |
 | `add_iqr_lines` | Overlay mean±std and lower/upper quartile lines on a `plot_bar_chart` axes (e.g. variance across seeds) | Computes stats from raw values; calls `ax.legend(...)` itself, placed outside the axes |
 | `plot_grouped_bar_chart` | Multiple series per category (e.g. top-1/5/10 acc per split) | |
 | `plot_stacked_bar_chart` | Series summing to a per-category total (e.g. train/test/val instance counts) | `value_fmt` defaults to `COUNT_FMT` |
