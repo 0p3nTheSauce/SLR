@@ -1,13 +1,17 @@
+import base64
+import io
 from pathlib import Path
 from typing import ClassVar
 from unittest.mock import MagicMock
 
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import torch
 from matplotlib.colors import to_hex
 from matplotlib.container import BarContainer
+from PIL import Image
 
 matplotlib.use("Agg")
 
@@ -20,7 +24,10 @@ from src.visualise2 import (
     SPLIT_NAME_MAP,
     TRUE_CLASS_COLOR,
     BarPosition,
+    animate_frames,
     animate_frames_topk,
+    animation_html,
+    load_instance_frames,
     plot_bboxes_on_canvas,
     plot_dimension_distributions,
     plot_frame_grid_topk,
@@ -206,7 +213,7 @@ def test_plot_metric_correlation_log_x() -> None:
     assert ax.get_xscale() == "log"
     assert tau == pytest.approx(-1.0)
     # linear in log10(x), so the fit line passes exactly through the points
-    line_x, line_y = ax.get_lines()[0].get_data()
+    line_x, line_y = (np.asarray(d) for d in ax.get_lines()[0].get_data())
     assert line_x[0] == pytest.approx(1e-5) and line_x[-1] == pytest.approx(1e-2)
     assert line_y[0] == pytest.approx(4.0) and line_y[-1] == pytest.approx(1.0)
 
@@ -284,6 +291,53 @@ class TestFrameGridTopK:
         assert len(bar_ax.patches) == 2
         html = anim.to_jshtml()
         assert html.count("data:image/png;base64") == len(frames)
+
+
+class TestAnimateFrames:
+    def test_plays_every_frame(self) -> None:
+        frames = torch.rand(5, 3, 16, 16)
+        _, anim = animate_frames(frames)
+        assert anim.to_jshtml().count("data:image/png;base64") == len(frames)
+
+    @pytest.mark.parametrize(("scale", "expected"), [(1.0, (16, 24)), (2.0, (32, 48))])
+    def test_figure_matches_frame_pixels(self, scale: float, expected: tuple[int, int]) -> None:
+        fig, _ = animate_frames(torch.rand(2, 3, 24, 16), scale=scale)
+        assert tuple(np.round(fig.get_size_inches() * fig.dpi)) == expected
+        assert fig.axes[0].get_position().bounds == (0.0, 0.0, 1.0, 1.0)
+
+    def test_title_adds_strip_above_frames(self) -> None:
+        fig, _ = animate_frames(torch.rand(2, 3, 24, 16), title="t")
+        _, frame_bottom, _, frame_height = fig.axes[0].get_position().bounds
+        assert frame_bottom == 0.0 and frame_height < 1.0
+        assert round(fig.get_size_inches()[1] * fig.dpi * frame_height) == 24
+
+    def test_html_renders_at_figure_dpi(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(plt.rcParams, "savefig.dpi", 300)
+        fig, anim = animate_frames(torch.rand(2, 3, 24, 16))
+        html = animation_html(fig, anim).data
+        assert isinstance(html, str)
+        jpeg = base64.b64decode(html.split("data:image/jpeg;base64,")[1].split('"')[0].replace("\\n", ""))
+        assert Image.open(io.BytesIO(jpeg)).size == (16, 24)
+
+    def test_html_closes_figure(self) -> None:
+        fig, anim = animate_frames(torch.rand(2, 3, 16, 16))
+        html = animation_html(fig, anim)
+        assert not plt.fignum_exists(fig.number)
+        assert isinstance(html.data, str) and "data:image/jpeg;base64" in html.data
+
+
+def test_load_instance_frames_uses_labelled_range(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls = []
+    monkeypatch.setattr(
+        v2, "load_rgb_frames_from_video", lambda *args: (calls.append(args), torch.zeros(1))[1]
+    )
+    inst = _instance([0, 0, 1, 1], "a").model_copy(update={"frame_start": 3, "frame_end": 7})
+    video = tmp_path / f"{inst.video_id}.mp4"
+    video.touch()
+    load_instance_frames(inst, tmp_path)
+    assert calls == [(video, 3, 7)]
 
 
 class TestInferInstanceTopK:

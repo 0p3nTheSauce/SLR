@@ -166,7 +166,7 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
   - `sweeping` — `suggest_sweep.ipynb`: compares wandb sweeps' Que trials and suggests the next
     sweep's parameter ranges (helpers in `sweeping/helpers.py`).
   - `dataset_analysis` — exploratory notebooks (class viewer, worst/fewest instances, F1
-    correlation).
+    correlation, frame ranges: videos vs annotations vs preprocessed labels).
   - `outputs` — final rendered `.tex`/`.pdf` figures/tables, organised by venue subfolder.
 
 ### Root env/config files

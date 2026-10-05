@@ -10,7 +10,7 @@ Misc TODOs:
   directly via its own `output` param, and doesn't mkdir the parent dir first -- unlike
   `save_fig`). `src/results/satnac_2026/eda_performers.ipynb` and `visualise2.FrameVisualiser`
   have been migrated; still on the old `utils.plt_display_grid` directly:
-  `src/results/dataset_analysis/{view_dataset_by_admin_info,class_viewer}.ipynb`,
+  `src/results/dataset_analysis/view_dataset_by_admin_info.ipynb`,
   `src/results/augmentation_demos/{autoaugment,cropping_norms,randaugment}.ipynb`,
   `src/results/bottom_worst_splits/{100_worst,100_fewest}.ipynb`. Migrate opportunistically
   when next touching one of these rather than as a standalone sweep.
@@ -38,7 +38,10 @@ Misc TODOs:
   starts so in-progress experiments (SATNAC, sweeps) stay comparable. When ready:
   `python -m src.preprocess all -ve` and `python -m src.preprocess all -ve -lc 9`. This is a full
   YOLO run, because the new `instance_cache_v2.json` starts empty. Then update the numbers in
-  `src/info/WLASL_info.md` from the new logs, and delete the old `instance_cache.json` (it only
+  `src/info/WLASL_info.md` from the new logs, rerun
+  `src/results/dataset_analysis/frame_ranges.ipynb` against the new labels (its `labels_dir`
+  defaults to where the rerun writes them; every label should then "match annotation" and lose
+  no frames, with the 296 resets unchanged), and delete the old `instance_cache.json` (it only
   matters for reproducing the old labels, together with the commit before this change). See
   `src/info/WLASL_info.md` ("What the rerun will change") for what to expect.
   Decision (2026-09-26): the final results should not remove any short clips, to match the

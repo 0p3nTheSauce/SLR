@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
+from IPython.display import HTML
 from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
 from matplotlib.colors import LinearSegmentedColormap
@@ -42,6 +43,7 @@ from src.preprocess import Instance
 from src.run_types import (
     AVAIL_SETS,
     AVAIL_SPLITS,
+    RAW_DIR,
     BaseRes,
     CentreCropConfig,
     InstanceTopK,
@@ -819,6 +821,17 @@ class MiniSetKwargs(MiniSetKwargsRequired, total=False):
 
 visualise_logger = logging.getLogger(__name__)
 
+
+def load_instance_frames(instance: Instance, video_dir: Path = RAW_DIR) -> Tensor:
+    """Every frame of an instance's labelled range, untransformed: (T, C, H, W), RGB, uint8.
+
+    Unlike `MiniSet`/`FrameFetcher`, nothing is subsampled or cropped, so this is the
+    clip to pass to `animate_frames` to watch it at its real length and speed.
+    """
+    return load_rgb_frames_from_video(
+        get_video_path(instance.video_id, video_dir), instance.frame_start, instance.frame_end
+    )
+
 class MiniSet(Dataset):
     def __init__(
         self,
@@ -866,15 +879,10 @@ class MiniSet(Dataset):
         self.logger.info(f"Instance: {idx + 1}/{self.tot_samples}")
 
         next_example = Instance.model_validate(self.data[idx])
-        ex_path = get_video_path(next_example.video_id, self.set_path_info["root"])
-
-        self.logger.info(f"Next example video path: {ex_path}")
-
-        return self.transform(
-            load_rgb_frames_from_video(
-                ex_path, next_example.frame_start, next_example.frame_end
-            )
+        self.logger.info(
+            f"Next example video path: {get_video_path(next_example.video_id, self.set_path_info['root'])}"
         )
+        return self.transform(load_instance_frames(next_example, self.set_path_info["root"]))
 
     def __len__(self):
         return self.tot_samples
@@ -949,14 +957,78 @@ def plot_frame_grid(
 
     # All axes have axis("off") -- no tick/axis labels for tight_layout to
     # account for -- so subplots_adjust with explicit margins is used
-    # directly instead, leaving room at the top only when there's a title.
+    # directly instead, leaving room at the top only when there's a title. That
+    # room is a fixed height in inches, as a fraction would overlap the title
+    # with a short (e.g. single-row) grid.
+    top = 0.995
     if title:
         fig.suptitle(title)
-        fig.subplots_adjust(left=0.005, right=0.995, top=0.92, bottom=0.005, wspace=0.02, hspace=0.02)
-    else:
-        fig.subplots_adjust(left=0.005, right=0.995, top=0.995, bottom=0.005, wspace=0.02, hspace=0.02)
+        top = 1 - 0.45 / fig.get_figheight()
+    fig.subplots_adjust(left=0.005, right=0.995, top=top, bottom=0.005, wspace=0.02, hspace=0.02)
 
     return fig, axes
+
+
+# ---------------------------------------------------------------------------
+# Frames as a video
+# ---------------------------------------------------------------------------
+
+def _animate(fig: Figure, ax: Axes, frames: Tensor, interval: int) -> FuncAnimation:
+    """Play `frames` ((T, C, H, W), RGB) one per `interval` ms on `ax`, with its axis hidden."""
+    ax.axis("off")
+    image = ax.imshow(_to_display(frames[0]))
+
+    def _update(i: int) -> list[AxesImage]:
+        image.set_data(_to_display(frames[i]))
+        return [image]
+
+    return FuncAnimation(fig, _update, frames=len(frames), interval=interval, blit=True)
+
+
+def animate_frames(
+    frames: Tensor,
+    scale: float = 1.0,
+    interval: int = 40,
+    title: str | None = None,
+):
+    """
+    Play a clip frame by frame -- the video counterpart of plot_frame_grid.
+
+    frames: (T, C, H, W) tensor, RGB channel order; every frame is played.
+    scale: size relative to the frames' own resolution. At 1 (default), a
+        256x256 clip plays at 256x256 pixels, with no border.
+    interval: delay between frames in milliseconds. The default, 40, is
+        WLASL's 25 fps; raise it to slow down a short, subsampled clip.
+    title: drawn in a strip above the frames, which makes the figure taller.
+
+    Returns (fig, anim). Show it in a notebook with `animation_html(fig, anim)`,
+    which keeps the pixel size; save with `anim.save(path, dpi=fig.dpi)` (a
+    ".gif" needs pillow, ".mp4" needs ffmpeg) -- save_fig only handles still
+    figures.
+    """
+    dpi = plt.rcParams["figure.dpi"]
+    frame_w = frames.shape[-1] * scale / dpi
+    frame_h = frames.shape[-2] * scale / dpi
+    title_h = 0.3 if title else 0.0  # inches
+    fig = plt.figure(figsize=(frame_w, frame_h + title_h), dpi=dpi)
+    ax = fig.add_axes((0.0, 0.0, 1.0, frame_h / (frame_h + title_h)))
+    if title:
+        fig.suptitle(title, y=1 - 0.05 / (frame_h + title_h), va="top")
+    return fig, _animate(fig, ax, frames, interval)
+
+
+def animation_html(fig: Figure, anim: FuncAnimation) -> HTML:
+    """Render `anim` as an inline notebook player, closing `fig`.
+
+    Frames are embedded as JPEGs (about 4x smaller than PNG for video) at the
+    figure's own dpi rather than `savefig.dpi` (300 under set_thesis_style), so
+    the player is the figure's on-screen size. Without closing `fig`, a notebook
+    also shows its static first frame below the player. Display the result with
+    `display(...)`, or as a cell's last expression.
+    """
+    plt.close(fig)
+    with plt.rc_context({"savefig.dpi": "figure", "animation.frame_format": "jpeg"}):
+        return HTML(anim.to_jshtml())
 
 
 # ---------------------------------------------------------------------------
@@ -1130,28 +1202,18 @@ def animate_frames_topk(
     interval: delay between frames in milliseconds (e.g. 40 for 25 fps).
     See plot_frame_grid_topk for the remaining parameters.
 
-    Returns (fig, anim, bar_ax). Display `anim` in a notebook with
-    `IPython.display.HTML(anim.to_jshtml())`, then `plt.close(fig)` so the
-    static figure isn't shown too; save with `anim.save(path)` (a ".gif" needs
-    pillow, ".mp4" needs ffmpeg) -- save_fig only handles still figures.
+    Returns (fig, anim, bar_ax), shown and saved as for animate_frames
+    (animation_html renders it at the figure's dpi).
     """
     top_labels, top_scores = _top_k(labels, scores, k)
 
     fig, video_fig, bar_ax = _join_frames_and_bars(size, bar_position, bar_size)
-    video_ax = video_fig.subplots()
-    video_ax.axis("off")
-    image = video_ax.imshow(_to_display(frames[0]))
     _draw_topk_bars(
         bar_ax, top_labels, top_scores, true_label, bar_position in ("left", "right"), shared_axis
     )
     if title:
         fig.suptitle(title)
-
-    def _update(i: int) -> list[AxesImage]:
-        image.set_data(_to_display(frames[i]))
-        return [image]
-
-    anim = FuncAnimation(fig, _update, frames=len(frames), interval=interval, blit=True)
+    anim = _animate(fig, video_fig.subplots(), frames, interval)
     return fig, anim, bar_ax
 
 

@@ -45,6 +45,34 @@ Checked against `data/WLASL/splits/asl2000.json` and `data/WLASL/WLASL2000/` on 
 * `frame_start` is 1 for 20791 instances. Most of the rest are offsets into the original,
   uncut video (see [frame-range resets](#frame-range-resets)).
 
+### Are the clips pre-cut?
+
+Almost entirely, yes: for 21014 of the 21095 instances the annotated frame range changes nothing.
+Computed on 2026-10-05 by
+[`frame_ranges.ipynb`](../results/dataset_analysis/frame_ranges.ipynb), which compares each
+raw annotation with the frame count OpenCV decodes from its video:
+
+| Annotated range vs clip | Instances |
+|---|---|
+| Whole clip (start 1, end at the last frame) | 20718 |
+| Outside the clip, so preprocessing resets it to the whole clip | 296 |
+| Trims 1-2 frames off the start (`handspeak` x2, `aslpro`, `signschool`, `spreadthesign`, `asllex`) | 6 |
+| Trims real footage: 74 `lillybauer` clips, plus `69512` "today" (`aslbrick`, 12 frames) | 75 |
+
+* The 75 real trims cut a lot of footage: `lillybauer` trims 24-108 frames (median 64), and the
+  median clip is only 52% annotated. 73 end early, `68722` "water" starts 73 frames late, and
+  `68770` "now" does both (frames 49-116 of 175).
+* The cut frames are often not rest: `lillybauer` clips seem to show the sign twice, and the
+  annotation picks one repetition. Checked by eye (2026-10-05) on 5 of the 74: in `68770` "now",
+  `68560` "throw", `68372` "when" and `68722` "water", the cut frames show the same sign again
+  (in "now", the annotated repetition has a facial expression and the cut one doesn't);
+  `69022` "morning" was unclear from thumbnails. Not checked across all 74.
+* So the frame ranges matter for only 75 instances, but for those they change what the model
+  sees a lot (often one repetition of the sign instead of two). Keep them.
+* `CAP_PROP_FRAME_COUNT` (what `preprocess.fix_bad_frame_range` reads, rather than decoding)
+  equals the decoded frame count for all 21095 videos, so the frame counts preprocessing
+  checks against are exact.
+
 ### Gotchas
 
 * **There is a gloss called `empty`.** Don't use `"empty"` as a placeholder or sentinel gloss

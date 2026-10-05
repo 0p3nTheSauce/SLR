@@ -316,6 +316,35 @@ def cv_load(
         raise ValueError(f"No frames were loaded for file {video_path}")
 
 
+def header_frame_count(video_path: str | Path) -> int:
+    """A video's frame count as stored in its container header (`CAP_PROP_FRAME_COUNT`).
+
+    Fast, as nothing is decoded, but the header can disagree with the number of frames
+    `cv_load` actually returns -- use `decoded_frame_count` when that matters.
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Could not open video {video_path}")
+    count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    return count
+
+
+def decoded_frame_count(video_path: str | Path) -> int:
+    """The number of frames OpenCV decodes from a video, i.e. `len(cv_load(..., all=True))`.
+
+    Slow (every frame is decoded), but exact, unlike `header_frame_count`.
+    """
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Could not open video {video_path}")
+    count = 0
+    while cap.grab():
+        count += 1
+    cap.release()
+    return count
+
+
 ################## Saving #####################
 
 
