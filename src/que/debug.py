@@ -99,7 +99,7 @@ def to_one_indexed_split(admin: dict[str, Any]) -> dict[str, Any]:
     """Move a run on a plain asl split to its `*_1_indexed` split and run dir; others unchanged.
 
     For the 2026-10-05 rename of the 1-based labels and `src/runs/asl100` ahead of the 0-based
-    preprocessing rerun (see src/info/WLASL_info.md, "What the rerun will change").
+    preprocessing rerun (see src/info/WLASL_info.md, "The 0-based rerun").
     """
     split = admin["split"]
     if split not in get_args(ORIGINAL_SPLITS):

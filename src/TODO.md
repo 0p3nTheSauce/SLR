@@ -32,22 +32,37 @@ Misc TODOs:
   filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs,
   which have finished. Their best val loss is already in `results/sweeping/suggest_sweep.ipynb`,
   stashed as `asl100_cutoff_9_S3D_seed_comparison_czopef0v_runs.json`.
-- **Regenerate the labels before the final round of results.** `preprocess.py` now stores
-  0-based frame starts (cache version 2), fixing an off-by-one where every unreset instance
-  skipped its first annotated frame, but the label files on disk still have the old 1-based
-  starts so in-progress experiments (SATNAC, sweeps) stay comparable. When ready:
-  `python -m src.preprocess all -ve` and `python -m src.preprocess all -ve -lc 9`. This is a full
-  YOLO run, because the new `instance_cache_v2.json` starts empty. Then update the numbers in
-  `src/info/WLASL_info.md` from the new logs, rerun
-  `src/results/dataset_analysis/frame_ranges.ipynb` against the new labels (its `labels_dir`
-  defaults to where the rerun writes them; every label should then "match annotation" and lose
-  no frames, with the 296 resets unchanged), and delete the old `instance_cache.json` (it only
-  matters for reproducing the old labels, together with the commit before this change). See
-  `src/info/WLASL_info.md` ("What the rerun will change") for what to expect.
+- **Finish the switch to the 0-based labels.** The plain splits (`asl100`/.../`asl2000`) were
+  regenerated on 2026-10-05, with the old 1-based ones kept as `*_1_indexed` (see
+  `src/info/WLASL_info.md`, "The 0-based rerun"). Remaining:
+  - Rerun `src/results/dataset_analysis/frame_ranges.ipynb` against the new labels: every label
+    should "match annotation" and lose no frames, with the 296 resets unchanged.
+  - Regenerate the dataset figures (`num_instance_splits.ipynb`, `wlasl_stats_set_level.ipynb`)
+    from the plain splits.
+  - Switch the configs/`CUTOFF_9_NAMES` users over to the plain splits (see decisions below).
+
   Decision (2026-09-26): the final results should not remove any short clips, to match the
-  original WLASL loader, which only skips videos under 9 frames, and no clip is that short. So train
-  on the no-cutoff splits (`asl100`/.../`asl2000`), not `*_cutoff_9` (which after the rerun still
-  removes `15144`, 9 frames). Switching the configs/`CUTOFF_9_NAMES` users over is part of this.
+  original WLASL loader, which only skips videos under 9 frames, and no clip is that short. So
+  train on the no-cutoff splits, not `*_cutoff_9` (which after a 0-based rerun would still remove
+  `15144`, 9 frames).
+  Decision (2026-10-06), for the thesis: dataset figures describe the plain splits, i.e. no
+  instance removed, but with the necessary fixes (corrected, 0-based frame ranges and our YOLO
+  bboxes; WLASL's own bboxes are in the original videos' coordinates, so unusable). Results that
+  would need retraining are not rerun, but get a footnote on the preprocessing differences
+  (1-based starts, `cutoff_9`).
+- **Keep the 1-based `*_cutoff_9` labels before regenerating them.** Every SATNAC/SACAIR
+  experiment, and the paused sweep `510lhysg` (asl100_cutoff_9), trained on them. Once the sweep
+  is done, repeat what was done for asl100: rename `labels/asl*_cutoff_9` and
+  `src/runs/asl*_cutoff_9` to `*_cutoff_9_1_indexed`, add the names to `ONE_INDEXED_SPLITS`
+  (`src/run_types.py`) and `SPLIT_NAME_MAP`, and move their Que runs with
+  `que/debug.py`'s `move_to_one_indexed_splits` (it only handles the plain splits so far), writing
+  `Runs_updated.json` and validating it before swapping it in. Only then run
+  `python -m src.preprocess all -ve -lc 9`.
+- **Release the 1-based labels**, as a GitHub release like v1.0 (`splits.zip`, `WLASL2000.zip`),
+  so the earlier experiments can be reproduced: zip the `*_1_indexed`, (once renamed)
+  `*_cutoff_9_1_indexed`, `asl100_bottom` and `asl100_worst` label dirs, and link them from the README's data setup with what they
+  are for. After that, delete `labels/instance_cache.json`, which is only needed to rebuild those
+  labels.
 - The per-venue benchmark notebooks (`results/{satnac_2025,sacair_2026,satnac_2026}/benchmark.ipynb`)
   each copy-paste the same untyped `all_benchmark.json` loader and LaTeX formatting, differing
   only in which archs they keep. `results/benchmark/benchmark.ipynb` now has a typed loader

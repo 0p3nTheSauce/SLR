@@ -77,16 +77,16 @@ raw annotation with the frame count OpenCV decodes from its video:
 
 * **There is a gloss called `empty`.** Don't use `"empty"` as a placeholder or sentinel gloss
   name. `stats.reverse_preproc_format` did, and silently dropped 6 instances of it.
-* **The label files on disk are off by one frame; a rerun is due.** WLASL's `frame_start` is
-  1-based, but the current labels store it as-is, and `utils.cv_load` returns
-  `frames[frame_start:frame_end]` (0-based). So each of the 20799 asl2000 instances whose range
-  wasn't reset skips its first annotated frame, while the 296 reset instances (reset to 0-based
-  `0` to frame count) keep every frame. Lengths (`frame_end - frame_start`) are one short too, so
-  the current `cutoff_9` splits remove clips of 10 or fewer real frames. `preprocess.py` now
-  converts starts to 0-based (cache version 2), but the labels have deliberately not been
-  regenerated, so every experiment in progress uses the same inputs. Regenerate them before the
-  final round of results (tracked in `src/TODO.md`); see
-  [what the rerun will change](#what-the-rerun-will-change).
+* **Labels made before 2026-10-05 are off by one frame.** WLASL's `frame_start` is 1-based, but
+  those labels store it as-is, and `utils.cv_load` returns `frames[frame_start:frame_end]`
+  (0-based). So each of the 20799 asl2000 instances whose range wasn't reset skips its first
+  annotated frame, while the 296 reset instances (reset to 0-based `0` to frame count) keep every
+  frame. Lengths (`frame_end - frame_start`) are one short too, so those `cutoff_9` splits remove
+  clips of 10 or fewer real frames. `preprocess.py` now converts starts to 0-based (cache
+  version 2), and the plain splits have been regenerated (see
+  [the 0-based rerun](#the-0-based-rerun-2026-10-05)). Still 1-based: `*_1_indexed` (kept on
+  purpose), `*_cutoff_9` (every SATNAC/SACAIR experiment, and the paused sweep), `asl100_bottom`
+  and `asl100_worst`.
 * Every `frame_end` in the kept data is within its clip: 20725 instances end exactly at the last
   frame, and 74 are annotated shorter than the clip (by up to 91 frames).
 
@@ -151,16 +151,21 @@ For the naming of different functions, 'set' and 'split' can somtimes be used in
 
 ## Preprocessing
 
-The numbers below describe the current label files (1-based starts, see [Gotchas](#gotchas)), and
-come from each split's
+The numbers below describe the plain-split labels as regenerated on 2026-10-05 (0-based starts),
+and come from each split's
 `data/WLASL/preprocessed/labels/<split>/preprocess_log.json`, which lists every instance that was
 reset or removed and why. Those logs are the source of truth: if you rerun `preprocess.py`,
-update this section from them.
+update this section from them. The 1-based labels (`*_1_indexed`, `*_cutoff_9`) have the same
+counts and resets.
+
+A log's `counts` counts fixes, not instances: since the rerun, a frame-range reset logs two fixes
+(start and end), so `counts` is double the number of reset instances. Count the `instances` list
+instead.
 
 Settings: `--strictness reset reset` (bad frame ranges and bboxes are reset rather than removed),
 YOLOv8n bboxes, and `--length_cutoff` 0 or 9.
 
-| Split | Train | Val | Test | Total | Frame-range resets | Removed by `cutoff_9` |
+| Split | Train | Val | Test | Total | Frame-range resets | Removed by 1-based `cutoff_9` |
 |---|---|---|---|---|---|---|
 | asl100 | 1442 | 338 | 258 | 2038 | 52 | 0 |
 | asl300 | 3549 | 901 | 668 | 5118 | 124 | 0 |
@@ -194,20 +199,22 @@ Samples with 9 or fewer frames by the old, off-by-one length calculation (see
 | 59958 | turkey | val | 1-10 | asl1000, asl2000 |
 | 15144 | deduct | val | 1-9 | asl2000 |
 
-### What the rerun will change
+### The 0-based rerun (2026-10-05)
 
-Previewed on 2026-09-26 by running the new frame-range code on the raw splits against the real
-videos (no labels written):
+`python -m src.preprocess all -ve` (no cutoff). Checked on 2026-10-06 by comparing every new
+label with its `*_1_indexed` counterpart:
 
-* The same 296 instances are reset, to the same ranges.
+* No instance is removed, and the same 296 instances are reset, to the same ranges.
 * Every other `frame_start` goes down by one (1 to 0 for 20791 asl2000 instances), so each clip
-  gains its first annotated frame.
-* `cutoff_9` keeps `18223` and `59958` (10 frames each), and removes only `15144` "deduct"
-  (9 frames), so asl1000_cutoff_9 loses nothing and asl2000_cutoff_9 loses 1.
-* Bboxes are recomputed by YOLO over the corrected ranges, because the version-2 cache starts
+  gains its first annotated frame. No `frame_end` changed.
+* Bboxes are recomputed by YOLO over the corrected ranges, because the version-2 cache started
   empty, so they may shift slightly.
 
-Before the rerun (2026-10-05), the old `asl100`/.../`asl2000` labels were renamed to
+Not yet run: a 0-based `cutoff_9` would keep `18223` and `59958` (10 frames each), and remove only
+`15144` "deduct" (9 frames), so asl1000_cutoff_9 would lose nothing and asl2000_cutoff_9 would
+lose 1 (previewed on 2026-09-26).
+
+Before the rerun, the old `asl100`/.../`asl2000` labels were renamed to
 `asl100_1_indexed`/.../`asl2000_1_indexed` (and `src/runs/asl100` to `src/runs/asl100_1_indexed`,
 with its Que runs updated), so runs trained on the 1-based labels can still be tested on them. The
 rerun only rewrites the plain splits: the `*_cutoff_9` labels stay 1-based for now, so the paused
