@@ -11,6 +11,7 @@ import pytest
 import torch
 from matplotlib.colors import to_hex
 from matplotlib.container import BarContainer
+from matplotlib.figure import SubFigure
 from PIL import Image
 
 matplotlib.use("Agg")
@@ -21,12 +22,18 @@ from src.run_types import MinInfo
 from src.visualise2 import (
     CONTROL_COLORS,
     DEFAULT_ACCENT,
+    FIGSIZE,
+    MIN_CHART_EXTENT,
+    MIN_HBAR_PITCH,
+    MIN_VBAR_PITCH,
     SPLIT_NAME_MAP,
     TRUE_CLASS_COLOR,
-    BarPosition,
+    PanelPosition,
     animate_frames,
     animate_frames_topk,
     animation_html,
+    draw_topk_chart,
+    join_panels,
     load_instance_frames,
     plot_bboxes_on_canvas,
     plot_dimension_distributions,
@@ -36,6 +43,12 @@ from src.visualise2 import (
     split_name_mapper,
     suggest_palette,
 )
+
+
+@pytest.fixture(autouse=True)
+def _close_figures():
+    yield
+    plt.close("all")
 
 
 def _instance(bbox: list[int], label_name: str) -> Instance:
@@ -245,7 +258,7 @@ class TestFrameGridTopK:
         [("left", True), ("right", True), ("top", False), ("bottom", False)],
     )
     def test_bar_position_sets_side_and_orientation(
-        self, position: BarPosition, horizontal: bool
+        self, position: PanelPosition, horizontal: bool
     ) -> None:
         fig, frame_axes, bar_ax = plot_frame_grid_topk(
             self._frames(), self.labels, self.scores, k=4, bar_position=position, num=8, cols=4
@@ -292,6 +305,107 @@ class TestFrameGridTopK:
         html = anim.to_jshtml()
         assert html.count("data:image/png;base64") == len(frames)
 
+    def test_animation_video_panel_scales_with_frame_pixels(self) -> None:
+        fig, _, _ = animate_frames_topk(
+            torch.rand(2, 3, 24, 16), self.labels, self.scores, k=2, scale=2.0,
+            chart_size=(1.0, 0.1),
+        )
+        assert tuple(np.round(fig.get_size_inches() * fig.dpi)) == (32 + fig.dpi, 48)
+
+    @pytest.mark.parametrize(
+        ("position", "expected"),
+        [("right", (16.0, 8.0)), ("bottom", (8.0, 16.0))],
+    )
+    def test_chart_matches_grid_by_default(
+        self, position: PanelPosition, expected: tuple[float, float]
+    ) -> None:
+        fig, _, _ = plot_frame_grid_topk(
+            self._frames(16), self.labels, self.scores, k=2, bar_position=position, cols=4,
+            size=(2.0, 2.0),
+        )
+        assert tuple(fig.get_size_inches()) == pytest.approx(expected)
+
+    @pytest.mark.parametrize(("position", "cols"), [("right", 4), ("bottom", 8), ("left", 8)])
+    def test_default_figure_is_figsize_wide(self, position: PanelPosition, cols: int) -> None:
+        fig, _, _ = plot_frame_grid_topk(
+            self._frames(16), self.labels, self.scores, k=2, bar_position=position, cols=cols
+        )
+        assert fig.get_size_inches()[0] == pytest.approx(FIGSIZE[0])
+
+    @pytest.mark.parametrize(
+        ("position", "pitch"), [("right", MIN_HBAR_PITCH), ("bottom", MIN_VBAR_PITCH)]
+    )
+    def test_matched_chart_grows_to_fit_k_bars(self, position: PanelPosition, pitch: float) -> None:
+        fig, _, _ = animate_frames_topk(
+            torch.rand(2, 3, 10, 10), self.labels, self.scores, k=4, bar_position=position
+        )
+        cross = fig.get_size_inches()[1 if position == "right" else 0]
+        assert cross == pytest.approx(4 * pitch)
+
+    def test_matched_chart_has_minimum_extent(self) -> None:
+        fig, _, _ = plot_frame_grid_topk(
+            self._frames(), self.labels, self.scores, k=2, bar_position="bottom", size=(0.1, 0.1)
+        )
+        assert fig.get_size_inches()[1] == pytest.approx(0.1 + MIN_CHART_EXTENT)
+
+
+class TestDrawTopkChart:
+    def test_vertical_bars_read_left_to_right(self) -> None:
+        _, ax = plt.subplots()
+        draw_topk_chart(ax, ["a", "b", "c"], [0.1, 0.6, 0.3], k=2, horizontal=False)
+        assert [t.get_text() for t in ax.get_xticklabels()] == ["b", "c"]
+        assert ax.get_ylim() == pytest.approx((0, 0.6 * 1.15))
+
+    def test_underscores_shown_as_spaces(self) -> None:
+        _, ax = plt.subplots()
+        draw_topk_chart(ax, ["thank_you", "b"], [0.6, 0.4], k=1)
+        assert [t.get_text() for t in ax.get_yticklabels()] == ["thank you"]
+
+
+class TestJoinPanels:
+    @staticmethod
+    def _extent(panel: SubFigure) -> tuple[float, float, float, float]:
+        """(x0, y0, x1, y1) of a panel, in inches."""
+        fig = panel.get_figure(root=True)
+        assert fig is not None
+        fig.canvas.draw()
+        box = panel.bbox
+        dpi = fig.dpi
+        return box.x0 / dpi, box.y0 / dpi, box.x1 / dpi, box.y1 / dpi
+
+    @pytest.mark.parametrize(
+        ("position", "figsize"),
+        [("left", (5, 2)), ("right", (5, 2)), ("top", (3, 4)), ("bottom", (3, 4))],
+    )
+    def test_second_panel_on_position_side(
+        self, position: PanelPosition, figsize: tuple[float, float]
+    ) -> None:
+        second_size = (2, 2) if position in ("left", "right") else (3, 2)
+        fig, first, second = join_panels((3, 2), second_size, position)
+        assert tuple(fig.get_size_inches()) == pytest.approx(figsize)
+        f, s = self._extent(first), self._extent(second)
+        if position == "left":
+            assert s[2] <= f[0] + 0.05
+        elif position == "right":
+            assert s[0] >= f[2] - 0.05
+        elif position == "top":
+            assert s[1] >= f[3] - 0.05
+        else:
+            assert s[3] <= f[1] + 0.05
+
+    @pytest.mark.parametrize("position", ["right", "bottom"])
+    def test_smaller_panel_is_centred(self, position: PanelPosition) -> None:
+        fig, first, second = join_panels((4, 4), (2, 2), position)
+        f, s = self._extent(first), self._extent(second)
+        if position == "right":
+            assert fig.get_size_inches()[1] == pytest.approx(4)
+            assert (s[1] + s[3]) / 2 == pytest.approx((f[1] + f[3]) / 2, abs=0.05)
+            assert s[3] - s[1] == pytest.approx(2, abs=0.1)
+        else:
+            assert fig.get_size_inches()[0] == pytest.approx(4)
+            assert (s[0] + s[2]) / 2 == pytest.approx((f[0] + f[2]) / 2, abs=0.05)
+            assert s[2] - s[0] == pytest.approx(2, abs=0.1)
+
 
 class TestAnimateFrames:
     def test_plays_every_frame(self) -> None:
@@ -304,6 +418,17 @@ class TestAnimateFrames:
         fig, _ = animate_frames(torch.rand(2, 3, 24, 16), scale=scale)
         assert tuple(np.round(fig.get_size_inches() * fig.dpi)) == expected
         assert fig.axes[0].get_position().bounds == (0.0, 0.0, 1.0, 1.0)
+
+    def test_shorter_clip_holds_last_frame(self) -> None:
+        fig, (ax_a, ax_b) = plt.subplots(1, 2)
+        short = torch.zeros(2, 3, 4, 4)
+        short[:, 0, 0, 0] = 1.0  # keep min-max normalisation non-degenerate
+        short[1, :, 1, 1] = 1.0
+        anim = v2._animate(fig, [(ax_a, torch.rand(5, 3, 4, 4)), (ax_b, short)], interval=40)
+        assert anim._save_count == 5  # type: ignore[attr-defined]
+        anim._func(4)  # type: ignore[attr-defined]
+        held = ax_b.images[0].get_array()
+        assert held is not None and held[1, 1, 0] == 1.0
 
     def test_title_adds_strip_above_frames(self) -> None:
         fig, _ = animate_frames(torch.rand(2, 3, 24, 16), title="t")
