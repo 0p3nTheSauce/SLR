@@ -1,5 +1,6 @@
 import base64
 import io
+from collections.abc import Sequence
 from pathlib import Path
 from typing import ClassVar
 from unittest.mock import MagicMock
@@ -28,7 +29,9 @@ from src.visualise2 import (
     MIN_VBAR_PITCH,
     SPLIT_NAME_MAP,
     TRUE_CLASS_COLOR,
+    FrameFetcher,
     PanelPosition,
+    animate_clip_grid,
     animate_frames,
     animate_frames_topk,
     animation_html,
@@ -36,6 +39,7 @@ from src.visualise2 import (
     join_panels,
     load_instance_frames,
     plot_bboxes_on_canvas,
+    plot_clip_grid,
     plot_dimension_distributions,
     plot_frame_grid_topk,
     plot_metric_correlation,
@@ -449,6 +453,57 @@ class TestAnimateFrames:
         html = animation_html(fig, anim)
         assert not plt.fignum_exists(fig.number)
         assert isinstance(html.data, str) and "data:image/jpeg;base64" in html.data
+
+
+class TestClipGrid:
+    @staticmethod
+    def _clips(n: int, lengths: Sequence[int] | None = None) -> list[torch.Tensor]:
+        return [torch.rand(t, 3, 24, 16) for t in (lengths or [3] * n)]
+
+    @pytest.mark.parametrize(("n", "shape"), [(3, (1, 3)), (6, (1, 6)), (7, (2, 6))])
+    def test_grid_shape_and_hidden_cells(self, n: int, shape: tuple[int, int]) -> None:
+        _, axes = plot_clip_grid(self._clips(n))
+        assert axes.shape == shape
+        assert [ax.get_visible() for ax in axes.flat] == [i < n for i in range(axes.size)]
+
+    def test_default_figure_is_figsize_wide(self) -> None:
+        fig, _ = plot_clip_grid(self._clips(8), cols=4)
+        assert fig.get_size_inches()[0] == pytest.approx(FIGSIZE[0])
+
+    def test_still_shows_middle_frame(self) -> None:
+        clip = torch.zeros(5, 3, 4, 4)
+        clip[2, :, 0, 0] = 1.0
+        _, axes = plot_clip_grid([clip])
+        shown = axes[0][0].images[0].get_array()
+        assert shown is not None and shown[0, 0, 0] == 1.0
+
+    def test_titles_label_cells(self) -> None:
+        _, axes = plot_clip_grid(self._clips(2), titles=["a", "b"])
+        assert [ax.get_title() for ax in axes.flat] == ["a", "b"]
+
+    def test_misaligned_titles_raise(self) -> None:
+        with pytest.raises(ValueError, match="titles"):
+            plot_clip_grid(self._clips(2), titles=["a"])
+
+    def test_animation_plays_longest_clip(self) -> None:
+        _, anim = animate_clip_grid(self._clips(2, lengths=[2, 5]))
+        assert anim.to_jshtml().count("data:image/png;base64") == 5
+
+
+def test_fetch_all_returns_every_instance_in_order() -> None:
+    insts = [_instance([0, 0, 1, 1], "a").model_copy(update={"video_id": v}) for v in "xyz"]
+    clips = [torch.full((1, 2, 3, 4, 4), float(i)) for i in range(3)]  # batched, (T, C, ...)
+    fetcher = FrameFetcher.__new__(FrameFetcher)
+    fetcher.cycle = True
+    fetcher.cur_idx = 2  # mid-way through: fetch_all still starts from the first
+    fetcher.dataset = MagicMock(data=[i.model_dump() for i in insts])
+    fetcher.dataloader = clips  # type: ignore[assignment]
+    fetcher.len = 3
+    fetched = fetcher.fetch_all()
+    assert [inst.video_id for inst, _ in fetched] == ["x", "y", "z"]
+    assert [int(frames[0, 0, 0, 0]) for _, frames in fetched] == [0, 1, 2]
+    assert fetched[0][1].shape == (2, 3, 4, 4)  # T and C swapped back
+    assert fetcher.cur_idx == 3
 
 
 def test_load_instance_frames_uses_labelled_range(

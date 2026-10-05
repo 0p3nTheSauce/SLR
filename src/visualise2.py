@@ -902,19 +902,37 @@ def _to_display(frame: Tensor) -> np.ndarray:
     return (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
 
 
+def _fitted_cell_size(frames: Tensor, cols: int, width: float) -> tuple[float, float]:
+    """(width, height) in inches of each cell of a `cols`-wide grid of `frames`-shaped
+    images that is `width` inches wide.
+
+    Text is sized in points, so a figure only shows it at the same size as others (e.g.
+    a video beside it, or a thesis page) if it's drawn near the size it's displayed at,
+    not shrunk to fit -- hence fitting grids to a fixed width such as FIGSIZE's.
+    """
+    cell_w = width / cols
+    return cell_w, cell_w * frames.shape[-2] / frames.shape[-1]
+
+
+def _frame_grid_axes(fig: FigureBase, n: int, cols: int) -> np.ndarray:
+    """A 2D (rows x cols) axes array on `fig` (a Figure or SubFigure) with room for `n`
+    images, axes hidden; cells past the `n`th, in the last row, are invisible."""
+    rows = math.ceil(n / cols)
+    axes = fig.subplots(rows, cols, squeeze=False)
+    for i, ax in enumerate(axes.flat):
+        ax.axis("off")
+        ax.set_visible(i < n)
+    return axes
+
+
 def _draw_frame_grid(fig: FigureBase, sampled: Tensor, cols: int) -> np.ndarray:
     """Draw `sampled` frames onto a (rows x cols) grid of `fig` (a Figure or SubFigure).
 
     Unused cells in the last row are hidden. Returns the 2D axes array.
     """
-    rows = math.ceil(len(sampled) / cols)
-    axes = fig.subplots(rows, cols, squeeze=False)
-    for i, frame in enumerate(sampled):
-        ax = axes[i // cols][i % cols]
+    axes = _frame_grid_axes(fig, len(sampled), cols)
+    for ax, frame in zip(axes.flat, sampled):
         ax.imshow(_to_display(frame))
-        ax.axis("off")
-    for j in range(len(sampled), rows * cols):
-        axes[j // cols][j % cols].set_visible(False)
     return axes
 
 
@@ -1038,6 +1056,101 @@ def animation_html(fig: Figure, anim: FuncAnimation) -> HTML:
     plt.close(fig)
     with plt.rc_context({"savefig.dpi": "figure", "animation.frame_format": "jpeg"}):
         return HTML(anim.to_jshtml())
+
+
+# ---------------------------------------------------------------------------
+# Clip grids: one sign per cell
+# ---------------------------------------------------------------------------
+
+def _clip_grid(
+    clips: Sequence[Tensor],
+    cols: int,
+    size: tuple[float, float] | None,
+    titles: Sequence[str] | None,
+    title: str | None,
+) -> tuple[Figure, np.ndarray]:
+    """The figure and 2D axes array shared by `plot_clip_grid`/`animate_clip_grid`."""
+    if not clips:
+        raise ValueError("No clips to show.")
+    if titles is not None and len(titles) != len(clips):
+        raise ValueError(f"{len(titles)} titles but {len(clips)} clips.")
+    cols = min(cols, len(clips))
+    rows = math.ceil(len(clips) / cols)
+    if size is None:
+        size = _fitted_cell_size(clips[0], cols, FIGSIZE[0])
+    title_h = 0.25 if titles else 0.0  # inches per row, for the cell titles
+    suptitle_h = 0.4 if title else 0.0
+    fig = plt.figure(
+        figsize=(size[0] * cols, (size[1] + title_h) * rows + suptitle_h), layout="constrained"
+    )
+    fig.get_layout_engine().set(w_pad=0.01, h_pad=0.01, wspace=0.01, hspace=0.01)  # type: ignore[union-attr]
+    axes = _frame_grid_axes(fig, len(clips), cols)
+    for ax, cell_title in zip(axes.flat, titles or []):
+        ax.set_title(cell_title, fontsize=plt.rcParams["xtick.labelsize"])
+    if title:
+        fig.suptitle(title)
+    return fig, axes
+
+
+def plot_clip_grid(
+    clips: Sequence[Tensor],
+    cols: int = 6,
+    size: tuple[float, float] | None = None,
+    titles: Sequence[str] | None = None,
+    title: str | None = None,
+):
+    """A grid of clips (e.g. every instance of a gloss), one per cell, each shown by its
+    middle frame -- the still counterpart of `animate_clip_grid`.
+
+    Args:
+        clips (Sequence[Tensor]): (T, C, H, W) RGB clips, one per cell in reading order.
+        cols (int, optional): Max cells per row; fewer clips than this make one row of
+            them. Defaults to 6.
+        size (tuple[float, float] | None, optional): (width, height) in inches of each
+            cell. Defaults to None: sized from the first clip's aspect ratio so the
+            figure is FIGSIZE wide, which keeps its text the same displayed size as other
+            figures'.
+        titles (Sequence[str] | None, optional): A title above each cell (e.g. the
+            signer), aligned with `clips`. Defaults to None.
+        title (str | None, optional): Figure suptitle. Defaults to None.
+
+    Returns:
+        tuple[Figure, np.ndarray]: (fig, axes), axes a 2D (rows x cols) array as for
+            `plot_frame_grid`.
+    """
+    fig, axes = _clip_grid(clips, cols, size, titles, title)
+    for ax, clip in zip(axes.flat, clips):
+        ax.imshow(_to_display(clip[len(clip) // 2]))
+    return fig, axes
+
+
+def animate_clip_grid(
+    clips: Sequence[Tensor],
+    cols: int = 6,
+    size: tuple[float, float] | None = None,
+    interval: int = 40,
+    titles: Sequence[str] | None = None,
+    title: str | None = None,
+):
+    """Play a grid of clips (e.g. every instance of a gloss) in step, one per cell.
+    Shorter clips hold their last frame until the longest ends.
+
+    Args:
+        clips (Sequence[Tensor]): As for `plot_clip_grid`.
+        cols (int, optional): As for `plot_clip_grid`. Defaults to 6.
+        size (tuple[float, float] | None, optional): As for `plot_clip_grid`.
+            Defaults to None.
+        interval (int, optional): Delay between frames in milliseconds, as for
+            `animate_frames`. Defaults to 40 (25 fps).
+        titles (Sequence[str] | None, optional): As for `plot_clip_grid`.
+            Defaults to None.
+        title (str | None, optional): Figure suptitle. Defaults to None.
+
+    Returns:
+        tuple[Figure, FuncAnimation]: (fig, anim), shown and saved as for `animate_frames`.
+    """
+    fig, axes = _clip_grid(clips, cols, size, titles, title)
+    return fig, _animate(fig, list(zip(axes.flat, clips)), interval)
 
 
 # ---------------------------------------------------------------------------
@@ -1206,21 +1319,14 @@ def _matched_chart_size(
     return max(width, k * MIN_VBAR_PITCH), max(height, MIN_CHART_EXTENT)
 
 
-def _fitted_cell_size(
-    frames: Tensor, cols: int, position: PanelPosition
-) -> tuple[float, float]:
-    """Frame-cell (width, height) in inches at which a `cols`-wide grid of `frames` plus
-    its default (matched) top-k chart make a FIGSIZE-wide figure.
-
-    Text is sized in points, so a figure only shows it at the same size as others
-    (e.g. an `animate_frames_topk` video, or a thesis page) if it's drawn near the size
-    it's displayed at, not shrunk to fit.
-    """
+def _topk_grid_width(position: PanelPosition) -> float:
+    """Inches a frame grid can take so that it plus its default (matched) top-k chart
+    make a FIGSIZE-wide figure."""
     fig_w = FIGSIZE[0]
+    if not _is_side_by_side(position):
+        return fig_w
     # beside the grid the chart matches its width, but takes at least MIN_CHART_EXTENT
-    grid_w = min(fig_w / 2, fig_w - MIN_CHART_EXTENT) if _is_side_by_side(position) else fig_w
-    cell_w = grid_w / cols
-    return cell_w, cell_w * frames.shape[-2] / frames.shape[-1]
+    return min(fig_w / 2, fig_w - MIN_CHART_EXTENT)
 
 
 def _join_frames_and_chart(
@@ -1300,7 +1406,7 @@ def plot_frame_grid_topk(
     sampled = _sample_frames(frames, num)
     rows = math.ceil(len(sampled) / cols)
     if size is None:
-        size = _fitted_cell_size(frames, cols, bar_position)
+        size = _fitted_cell_size(frames, cols, _topk_grid_width(bar_position))
     fig, frames_panel, bar_ax = _join_frames_and_chart(
         (size[0] * cols, size[1] * rows),
         labels, scores, k, true_label, bar_position, shared_axis, chart_size, title,
@@ -1408,6 +1514,19 @@ class FrameFetcher:
         if self.cur_idx == 0:
             raise RuntimeError("No instance fetched yet")
         return Instance.model_validate(self.dataset.data[self.cur_idx - 1])
+
+    def fetch_all(self) -> list[tuple[Instance, Tensor]]:
+        """Every instance's (metadata, frames), in set order, restarting from the first.
+
+        Afterwards the fetcher is at the last instance, as if called `len` times.
+        """
+        self.iter_loader = iter(self.dataloader)
+        self.cur_idx = 0
+        fetched = []
+        for _ in range(self.len):
+            frames = self()
+            fetched.append((self.current_instance, frames))
+        return fetched
 
     def __call__(self) -> Tensor:
         if self.cycle and self.cur_idx == self.len:
