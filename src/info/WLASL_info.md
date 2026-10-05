@@ -206,3 +206,9 @@ videos (no labels written):
   (9 frames), so asl1000_cutoff_9 loses nothing and asl2000_cutoff_9 loses 1.
 * Bboxes are recomputed by YOLO over the corrected ranges, because the version-2 cache starts
   empty, so they may shift slightly.
+
+Before the rerun (2026-10-05), the old `asl100`/.../`asl2000` labels were renamed to
+`asl100_1_indexed`/.../`asl2000_1_indexed` (and `src/runs/asl100` to `src/runs/asl100_1_indexed`,
+with its Que runs updated), so runs trained on the 1-based labels can still be tested on them. The
+rerun only rewrites the plain splits: the `*_cutoff_9` labels stay 1-based for now, so the paused
+asl100_cutoff_9 sweep can finish on the labels it started with.

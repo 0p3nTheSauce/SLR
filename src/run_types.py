@@ -85,8 +85,13 @@ CUTOFF_SPLITS : TypeAlias = Literal["asl100_cutoff_9", "asl300_cutoff_9", "asl10
 CUTOFF_9_NAMES : list[CUTOFF_SPLITS] = ["asl100_cutoff_9", "asl300_cutoff_9", "asl1000_cutoff_9", "asl2000_cutoff_9"]
 #Splits reconstructed from the worst and fewest classes
 WORST_SPLITS : TypeAlias = Literal["asl100_bottom", "asl100_worst"]
+#Original splits as labelled before the 0-indexed frame-start fix (preprocess.py cache version 2),
+#kept so runs trained on them can still be tested against the labels they were trained on
+ONE_INDEXED_SPLITS : TypeAlias = Literal[
+    "asl100_1_indexed", "asl300_1_indexed", "asl1000_1_indexed", "asl2000_1_indexed"
+]
 
-AVAIL_SPLITS : TypeAlias =  ORIGINAL_SPLITS | CUTOFF_SPLITS | WORST_SPLITS
+AVAIL_SPLITS : TypeAlias =  ORIGINAL_SPLITS | CUTOFF_SPLITS | WORST_SPLITS | ONE_INDEXED_SPLITS
 
 ### Samplers
 
