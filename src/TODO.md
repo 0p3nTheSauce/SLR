@@ -69,3 +69,7 @@ Misc TODOs:
   sign, several glosses"). Check whether Boston University's revised WLASL gloss labels
   (https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf) merge or split these classes, and consider scoring against them, or counting
   same-sign confusions as correct, when reporting per-class results.
+- `asl100_bottom`/`asl100_worst` labels are still 1-based: they aren't made by `preprocess.py`, so
+  the 0-based rerun doesn't touch them, unlike the plain splits (whose old labels were kept as
+  `*_1_indexed`, see `src/info/WLASL_info.md`). Rebuild them from the new labels (and keep the
+  old ones alongside, as for the plain splits) if they're used for final results.
