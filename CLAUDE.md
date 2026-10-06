@@ -51,11 +51,14 @@ cares a lot about code quality — not just "does it run." Hold new/edited code 
   code you touch. Prefer precise types (e.g. `Literal` over bare `str` for closed sets of names)
   over `Any`/untyped escape hatches. Run both from the repo root (from a subdirectory, ruff's
   isort misclassifies `src.` imports):
-  - `ruff check <files>`
+  - `~/miniconda3/envs/wlasl/bin/ruff check <files>`
   - `~/miniconda3/envs/wlasl/bin/pyright --pythonpath ~/miniconda3/envs/wlasl/bin/python <files>`
-    — pyright is the checker behind VS Code's Pylance, pip-installed into the `wlasl` env on both
-    machines (`pip install pyright`; it isn't in `wlasl_gpu.yml`); there's no pyright config, so
-    it runs in its default mode.
+    — pyright is the checker behind VS Code's Pylance; there's no pyright config, so it runs in
+    its default mode.
+
+  Both are pip-installed into the `wlasl` env (`pip install ruff pyright`; neither is in
+  `wlasl_gpu.yml`) and aren't on the PATH outside it. Pyright is installed on both machines; ruff
+  was added to this machine's env on 2026-10-06 (the server's may still lack it).
 - **Documented, but not over-commented.** Public functions/classes get docstrings explaining
   non-obvious behaviour, inputs/outputs, and gotchas — but avoid restating what the code already
   says. This mirrors the top-level house style (see the "Default to writing no comments" rule),
