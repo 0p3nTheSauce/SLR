@@ -410,12 +410,16 @@ def sample_speed_perturbed(
 	target_length: int,
 	speed_range: tuple[float, float] = (0.8, 1.2),
 ) -> Tensor:
-	"""Uniformly sample with varying speed
+	"""Resample a random window of about `target_length * speed` consecutive frames.
+
+	Not a speed change of the whole clip: at `target_length = 16` the window is only about 12-19
+	frames (for the default range), so this is effectively a short random temporal crop. Kept only
+	so existing configs/Que runs still load; it is due to be removed (see `src/TODO.md`).
 
 	Args:
 					frames (Tensor): TxCxHxW
 					target_length (int): T frames
-					speed_range (tuple[float, float], optional): _description_. Defaults to (0.8, 1.2).
+					speed_range (tuple[float, float], optional): Range `speed` is drawn from uniformly. Defaults to (0.8, 1.2).
 
 	Returns:
 					Tensor: Sampled frames of shape (target_length, C, H, W).

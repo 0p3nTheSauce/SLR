@@ -32,6 +32,11 @@ Misc TODOs:
   filters.py now pins `admin.config_path`). Extend it to compare `S3D_czopef0v.toml`'s seed runs,
   which have finished. Their best val loss is already in `results/sweeping/suggest_sweep.ipynb`,
   stashed as `asl100_cutoff_9_S3D_seed_comparison_czopef0v_runs.json`.
+- **Remove the speed sampler and the AugComparison experiments.** `sample_speed_perturbed` only
+  resamples a short window of consecutive frames, not the whole sign (see its docstring), so its
+  runs are already left out of `results/aug_comparison` (and the thesis). The full removal (code,
+  configs, results, Que runs, run dirs) is planned in `src/remove_speed_sampler_plan.md` on the
+  `feat/remove-speed-sampler` branch, with three decisions still open.
 - **Finish the switch to the 0-based labels.** The plain splits (`asl100`/.../`asl2000`) were
   regenerated on 2026-10-05, with the old 1-based ones kept as `*_1_indexed` (see
   `src/info/WLASL_info.md`, "The 0-based rerun"). Remaining:
@@ -88,3 +93,7 @@ Misc TODOs:
   the 0-based rerun doesn't touch them, unlike the plain splits (whose old labels were kept as
   `*_1_indexed`, see `src/info/WLASL_info.md`). Rebuild them from the new labels (and keep the
   old ones alongside, as for the plain splits) if they're used for final results.
+- `src/video_transforms.py` has 38 pre-existing ruff errors (as of 2026-10-06): old `typing`
+  aliases (`List`/`Tuple`/`Optional`), unused `run_types` imports, mutable defaults in
+  `get_transform`, bare `raise Exception`. Most are `ruff --fix`-able; do it when next working there
+  (the speed-sampler removal, see above, touches this file).
