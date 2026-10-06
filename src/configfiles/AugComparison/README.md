@@ -17,3 +17,7 @@ The following sweep was performed:
 | Control | Baseline       | -             | -                            |
 
 See the [results](../../results/aug_comparison/results.ipynb).
+
+The Speed Sampler runs (`Temporal/speed/`) are left out of the results: the sampler only takes a
+short window of consecutive frames (about 11-20 frames of a median 59), not a speed change of the
+whole sign. See `video_transforms.sample_speed_perturbed`.
