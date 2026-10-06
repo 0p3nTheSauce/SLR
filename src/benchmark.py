@@ -26,8 +26,9 @@ Rigor fixes vs. the previous version, for thesis/SACAIR-paper-grade results:
    so it's always explicit and always logged.
 5. Every run's config (batch size, frame count, frame size, iterations,
    trials, full_step, cudnn.benchmark) and environment (torch/cuda/cudnn
-   versions, GPU name + driver, git commit, timestamp, current vs. max SM
-   clock) is written alongside the metrics. Results are appended into a
+   versions, GPU name + driver, git commit and any uncommitted paths other
+   than the output file, timestamp, current vs. max SM clock) is written
+   alongside the metrics. Results are appended into a
    shared JSON file keyed by a composite key of arch + config, so repeated
    runs at different configs accumulate instead of clobbering each other.
    NOTE: re-running the *exact same* config overwrites the previous entry
@@ -38,7 +39,9 @@ Rigor fixes vs. the previous version, for thesis/SACAIR-paper-grade results:
    current SM clock is well below the card's max, a warning is printed and
    logged, since that usually means clocks aren't locked
    (`sudo nvidia-smi -lgc <freq>`) and thermal/power throttling could add
-   noise between trials or between architectures.
+   noise between trials or between architectures. The SM and memory clocks
+   are also sampled during each monitoring pass, and their range under load
+   is stored with the results.
 """
 
 import argparse
@@ -56,6 +59,7 @@ from datetime import datetime, timezone
 
 import pynvml
 import torch
+import torch.version
 from torch import optim
 from torch.profiler import ProfilerActivity, profile, record_function
 from torch.utils.data import DataLoader
@@ -94,20 +98,36 @@ def _decode(x):
 # shared JSON file (accumulated over weeks) are traceable to exact
 # code/hardware/driver state.
 # --------------------------------------------------------------------------- #
-def get_run_metadata() -> dict:
+def _git(*args: str) -> str | None:
+    """Output of a git command run in this file's repo, or None if git fails."""
     try:
-        commit = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.abspath(__file__))
-        ).decode().strip()
+        return subprocess.check_output(
+            ["git", *args], stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.abspath(__file__))
+        ).decode()
     except (subprocess.CalledProcessError, OSError):
-        commit = None
+        return None
 
-    try:
-        dirty = bool(subprocess.check_output(
-            ["git", "status", "--porcelain"], stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.abspath(__file__))
-        ).decode().strip())
-    except (subprocess.CalledProcessError, OSError):
-        dirty = None
+
+def _dirty_paths(out_path: str) -> list[str] | None:
+    """Repo-relative paths with uncommitted changes (untracked included), except `out_path`.
+
+    The output JSON is left out because it is usually tracked, so once the first model of a
+    batch has written to it, every later model would look dirty. Entries written before
+    2026-10-06 have no `git_dirty_paths`, and their `git_dirty` does count the output JSON.
+    """
+    status = _git("status", "--porcelain")
+    root = _git("rev-parse", "--show-toplevel")
+    if status is None or root is None:
+        return None
+    out_rel = os.path.relpath(os.path.abspath(out_path), root.strip())
+    paths = [line[3:].split(" -> ")[-1] for line in status.splitlines()]
+    return [p for p in paths if p != out_rel]
+
+
+def get_run_metadata(out_path: str) -> dict:
+    commit = _git("rev-parse", "HEAD")
+    commit = commit.strip() if commit is not None else None
+    dirty_paths = _dirty_paths(out_path)
 
     clocks = {}
     try:
@@ -131,7 +151,8 @@ def get_run_metadata() -> dict:
     return {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "git_commit": commit,
-        "git_dirty": dirty,
+        "git_dirty": bool(dirty_paths) if dirty_paths is not None else None,
+        "git_dirty_paths": dirty_paths,
         "torch_version": torch.__version__,
         "cuda_version": torch.version.cuda,
         "cudnn_version": torch.backends.cudnn.version(),
@@ -154,16 +175,23 @@ class GPUMonitor:
         self.interval = interval
         self._util_samples: list[float] = []
         self._mem_samples: list[float] = []  # MB
+        self._sm_clock_samples: list[int] = []  # MHz
+        self._mem_clock_samples: list[int] = []  # MHz
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+
+    def _sample(self):
+        util = pynvml.nvmlDeviceGetUtilizationRates(self.handle)
+        mem = pynvml.nvmlDeviceGetMemoryInfo(self.handle)
+        self._util_samples.append(util.gpu)  # type: ignore
+        self._mem_samples.append(mem.used / 1024**2)  # type: ignore
+        self._sm_clock_samples.append(pynvml.nvmlDeviceGetClockInfo(self.handle, pynvml.NVML_CLOCK_SM))
+        self._mem_clock_samples.append(pynvml.nvmlDeviceGetClockInfo(self.handle, pynvml.NVML_CLOCK_MEM))
 
     def _run(self):
         while not self._stop_event.is_set():
             try:
-                util = pynvml.nvmlDeviceGetUtilizationRates(self.handle)
-                mem = pynvml.nvmlDeviceGetMemoryInfo(self.handle)
-                self._util_samples.append(util.gpu)  # type: ignore
-                self._mem_samples.append(mem.used / 1024**2)  # type: ignore
+                self._sample()
             except pynvml.NVMLError:
                 pass
             self._stop_event.wait(self.interval)
@@ -171,6 +199,8 @@ class GPUMonitor:
     def start(self):
         self._util_samples = []
         self._mem_samples = []
+        self._sm_clock_samples = []
+        self._mem_clock_samples = []
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
@@ -180,15 +210,16 @@ class GPUMonitor:
         if self._thread is not None:
             self._thread.join(timeout=2 * self.interval + 1)
         if not self._util_samples:
-            util = pynvml.nvmlDeviceGetUtilizationRates(self.handle)
-            mem = pynvml.nvmlDeviceGetMemoryInfo(self.handle)
-            self._util_samples = [util.gpu]  # type: ignore
-            self._mem_samples = [mem.used / 1024**2]  # type: ignore
+            self._sample()
         return {
             "util_mean": statistics.mean(self._util_samples),
             "util_max": max(self._util_samples),
             "mem_mean_mb": statistics.mean(self._mem_samples),
             "mem_max_mb": max(self._mem_samples),
+            "sm_clock_min_mhz": min(self._sm_clock_samples),
+            "sm_clock_max_mhz": max(self._sm_clock_samples),
+            "mem_clock_min_mhz": min(self._mem_clock_samples),
+            "mem_clock_max_mhz": max(self._mem_clock_samples),
             "n_samples": len(self._util_samples),
         }
 
@@ -274,6 +305,16 @@ def _summarise_trials(trials: list[TrialResult]) -> dict:
         "gpu_utilisation_percent": mean_std(util_means),
         "gpu_utilisation_peak_percent": max(util_maxes),
         "peak_memory_mb": mean_std(mem_maxes),
+        # Range over every monitoring-pass sample of every trial: a locked SM clock shows as
+        # min == max, which the start-of-run reading in metadata can't show.
+        "sm_clock_under_load_mhz": {
+            "min": min(t.gpu_stats["sm_clock_min_mhz"] for t in trials),
+            "max": max(t.gpu_stats["sm_clock_max_mhz"] for t in trials),
+        },
+        "mem_clock_under_load_mhz": {
+            "min": min(t.gpu_stats["mem_clock_min_mhz"] for t in trials),
+            "max": max(t.gpu_stats["mem_clock_max_mhz"] for t in trials),
+        },
         "raw_trial_latencies_ms": latencies_ms,
     }
 
@@ -610,7 +651,7 @@ def single_benchmark(
     out_path = out_path or OUTPUT
     train_bs = train_bs or [2]
     test_bs = test_bs or [2]
-    metadata = get_run_metadata()
+    metadata = get_run_metadata(out_path)
     gpu_info = get_gpu_static_info()
 
     # Training batch-size sweep. Same OOM-stops-the-rest logic as inference:
