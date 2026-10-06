@@ -49,7 +49,8 @@ NUM_THUMBS = 4
 DEFAULT_THRESHOLD = 2.0
 CACHE_VERSION = 1
 DEFAULT_CACHE = WLASL_ROOT / f"preprocessed/duplicate_fingerprints_v{CACHE_VERSION}.npz"
-DEFAULT_REPORT = RESULTS_DIR / "dataset_analysis/duplicates_asl2000.json"
+# `stashed_results` is `src.results.STASH_DIR_NAME`, not imported for the reason in the docstring.
+DEFAULT_REPORT = RESULTS_DIR / "dataset_analysis/stashed_results/duplicates_asl2000.json"
 KNOWN_DUPLICATES: list[set[str]] = [{"05741", "41452"}, {"05743", "41454"}]
 
 DuplicateKind: TypeAlias = Literal["exact", "near", "same_url_and_range"]
