@@ -2,9 +2,10 @@
 show clips (with their top-k chart, alone, or a gloss's every instance) as frame grids
 or videos, per the notebook's `as_video` setting."""
 
+from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from IPython.display import display
 from matplotlib.figure import Figure
@@ -52,6 +53,49 @@ def sort_instances(
 
 def instance_label(inst: Instance, sep: str = ", ") -> str:
     return f"signer {inst.signer_id}{sep}variation {inst.variation_id}"
+
+
+class VariationPick(NamedTuple):
+    """One clip picked by `VariationStepper`: the `position`-th (1-based) of its
+    variation's `total` instances."""
+
+    instance: Instance
+    frames: Tensor
+    position: int
+    total: int
+
+
+class VariationStepper:
+    """Step through a gloss's fetched clips (e.g. `FrameFetcher.fetch_all()`) one instance
+    per variation at a time, so its different signs (`variation_id`) can be compared.
+
+    Each call returns the next instance of every variation, in ascending variation id (set
+    order within a variation). A variation with no instances left drops out until the one
+    with the most has run out too; the next call then restarts every variation from its
+    first instance.
+    """
+
+    def __init__(self, fetched: Sequence[tuple[Instance, Tensor]]) -> None:
+        groups: dict[int, list[tuple[Instance, Tensor]]] = defaultdict(list)
+        for inst, frames in fetched:
+            groups[inst.variation_id].append((inst, frames))
+        self.groups = dict(sorted(groups.items()))
+        self.num_steps = max((len(group) for group in self.groups.values()), default=0)
+        self.step = 0  # 1-based index of the most recent step, 0 before the first
+
+    def counts(self) -> dict[int, int]:
+        """Instances per variation id."""
+        return {variation: len(group) for variation, group in self.groups.items()}
+
+    def __call__(self) -> list[VariationPick]:
+        if self.step == self.num_steps:
+            self.step = 0
+        self.step += 1
+        return [
+            VariationPick(*group[self.step - 1], position=self.step, total=len(group))
+            for group in self.groups.values()
+            if self.step <= len(group)
+        ]
 
 
 @dataclass(frozen=True)
@@ -105,13 +149,15 @@ class ClipView:
         )
         return fig
 
-    def show_clip(self, clip: Tensor) -> None:
-        """`clip` alone, for instances with no stored predictions to chart."""
+    def show_clip(self, clip: Tensor) -> Figure | None:
+        """`clip` alone, for instances with no stored predictions to chart. Returns the
+        frame grid's figure, to save, or None for a video (already displayed)."""
         if self.as_video:
             fig, anim = animate_frames(clip, scale=self.video_scale, interval=self.video_interval)
             display(animation_html(fig, anim))
-        else:
-            plot_frame_grid(clip, num=self.num_frames, size=self.grid_cell_size)
+            return None
+        fig, _ = plot_frame_grid(clip, num=self.num_frames, size=self.grid_cell_size)
+        return fig
 
     def show_instances(
         self,
