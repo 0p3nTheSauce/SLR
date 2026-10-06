@@ -4,6 +4,7 @@
 *.pyth
 *.pyc
 *.zip
+*.tar.gz
 data/
 .venv
 *.jpg
