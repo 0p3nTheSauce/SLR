@@ -935,9 +935,11 @@ def _sample_frames(frames: Tensor, num: int) -> Tensor:
 
 
 def _to_display(frame: Tensor) -> np.ndarray:
-    """(C, H, W) frame -> min-max normalised (H, W, C) array for `imshow`."""
+    """(C, H, W) frame -> min-max normalised (H, W, C) array for `imshow`. A flat frame
+    (e.g. a clip's black fade-out) becomes all zeros rather than NaN."""
     np_frame = frame.permute(1, 2, 0).cpu().numpy().astype(float)
-    return (np_frame - np_frame.min()) / (np_frame.max() - np_frame.min())
+    span = np_frame.max() - np_frame.min()
+    return (np_frame - np_frame.min()) / span if span else np.zeros_like(np_frame)
 
 
 def _fitted_cell_size(frames: Tensor, cols: int, width: float) -> tuple[float, float]:
@@ -1069,9 +1071,8 @@ def animate_frames(
     title: drawn in a strip above the frames, which makes the figure taller.
 
     Returns (fig, anim). Show it in a notebook with `animation_html(fig, anim)`,
-    which keeps the pixel size; save with `anim.save(path, dpi=fig.dpi)` (a
-    ".gif" needs pillow, ".mp4" needs ffmpeg) -- save_fig only handles still
-    figures.
+    which keeps the pixel size; save with `save_animation(fig, anim, path)` --
+    save_fig only handles still figures.
     """
     frame_w, frame_h = _frame_panel_size(frames, scale)
     title_h = 0.3 if title else 0.0  # inches
@@ -1094,6 +1095,24 @@ def animation_html(fig: Figure, anim: FuncAnimation) -> HTML:
     plt.close(fig)
     with plt.rc_context({"savefig.dpi": "figure", "animation.frame_format": "jpeg"}):
         return HTML(anim.to_jshtml())
+
+
+def save_animation(fig: Figure, anim: FuncAnimation, path: str | Path) -> Path:
+    """
+    Save an `animate_*` result as a video, creating parent directories as needed --
+    the video counterpart of save_fig.
+
+    The format follows the suffix: ".mp4" is H.264 via ffmpeg (plays in browsers,
+    email previews and slides), ".gif" uses pillow. Like `animation_html`, frames are
+    rendered at the figure's own dpi rather than `savefig.dpi` (300 under
+    set_thesis_style), so the video is the size shown in the notebook, and play one
+    per `interval` ms. H.264 needs even pixel dimensions, so matplotlib may grow the
+    figure by a pixel. Works after `animation_html` has closed `fig`.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    anim.save(path, writer="pillow" if path.suffix == ".gif" else "ffmpeg", dpi=fig.dpi)
+    return path
 
 
 # ---------------------------------------------------------------------------
