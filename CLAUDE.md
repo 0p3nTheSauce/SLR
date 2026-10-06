@@ -57,8 +57,7 @@ cares a lot about code quality — not just "does it run." Hold new/edited code 
     its default mode.
 
   Both are pip-installed into the `wlasl` env (`pip install ruff pyright`; neither is in
-  `wlasl_gpu.yml`) and aren't on the PATH outside it. Pyright is installed on both machines; ruff
-  was added to this machine's env on 2026-10-06 (the server's may still lack it).
+  `wlasl_gpu.yml`) and aren't on the PATH outside it. Both are installed on both machines.
 - **Documented, but not over-commented.** Public functions/classes get docstrings explaining
   non-obvious behaviour, inputs/outputs, and gotchas — but avoid restating what the code already
   says. This mirrors the top-level house style (see the "Default to writing no comments" rule),
