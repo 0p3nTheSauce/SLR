@@ -1,15 +1,15 @@
 import json
 import logging
 import sys
-from pathlib import Path
+from collections.abc import Callable
 from typing import Any, get_args
 
 # from .server import connect_manager
 # from que.shell import QueShell
 from src.que.core import QUE_LOCATIONS, RUN_PATH, GenExp, Que
 from src.run_types import (
+    CUTOFF_SPLITS,
     ORIGINAL_SPLITS,
-    RUNS_PATH,
     CompExpInfo,
     ExpInfo,
     FailedExp,
@@ -95,24 +95,48 @@ def update_runs_json():
         json.dump(all_runs, f, indent=4)
 
 
-def to_one_indexed_split(admin: dict[str, Any]) -> dict[str, Any]:
-    """Move a run on a plain asl split to its `*_1_indexed` split and run dir; others unchanged.
+def _to_one_indexed_dir(path: str, splits: tuple[str, ...]) -> str:
+    """Rename the `runs/<split>/` component of `path` for each of `splits` to `<split>_1_indexed`.
 
-    For the 2026-10-05 rename of the 1-based labels and `src/runs/asl100` ahead of the 0-based
-    preprocessing rerun (see src/info/WLASL_info.md, "The 0-based rerun").
+    Matches the component rather than a prefix, since paths may be relative (`runs/...`) and a
+    run's `weight_path` can point into another split's run dir (transfer from a smaller split).
     """
-    split = admin["split"]
-    if split not in get_args(ORIGINAL_SPLITS):
-        return admin
-    new_split = f"{split}_1_indexed"
-    run_dir = Path(admin["save_path"]).relative_to(RUNS_PATH / split)
-    return {**admin, "split": new_split, "save_path": str(RUNS_PATH / new_split / run_dir)}
+    for split in splits:
+        path = path.replace(f"runs/{split}/", f"runs/{split}_1_indexed/")
+    return path
 
 
-def move_to_one_indexed_splits() -> None:
-    """Apply `to_one_indexed_split` to every run, writing Runs_updated.json (not Runs.json)."""
+def to_one_indexed_split(
+    admin: dict[str, Any], splits: tuple[str, ...] = get_args(ORIGINAL_SPLITS)
+) -> dict[str, Any]:
+    """Move a run on one of `splits` to its `*_1_indexed` split and run dir; others unchanged.
+
+    For renaming the 1-based labels and their `src/runs` dirs ahead of a 0-based preprocessing
+    rerun (see src/info/WLASL_info.md, "The 0-based rerun"). `splits` defaults to the plain
+    splits (done 2026-10-05); the `*_cutoff_9` splits use `to_one_indexed_cutoff_split`. A run's
+    `weight_path` is rewritten for any of `splits`, even when it isn't the run's own split, so a
+    run on an unmoved split that loads a moved checkpoint still finds it.
+    """
+    moved = dict(admin)
+    if admin["split"] in splits:
+        moved["split"] = f"{admin['split']}_1_indexed"
+    moved["save_path"] = _to_one_indexed_dir(admin["save_path"], splits)
+    if admin.get("weight_path"):
+        moved["weight_path"] = _to_one_indexed_dir(admin["weight_path"], splits)
+    return moved
+
+
+def to_one_indexed_cutoff_split(admin: dict[str, Any]) -> dict[str, Any]:
+    """`to_one_indexed_split` for the `*_cutoff_9` splits."""
+    return to_one_indexed_split(admin, get_args(CUTOFF_SPLITS))
+
+
+def move_to_one_indexed_splits(
+    move: Callable[[dict[str, Any]], dict[str, Any]] = to_one_indexed_cutoff_split,
+) -> None:
+    """Apply `move` to every run's admin, writing Runs_updated.json (not Runs.json)."""
     q = Que(auto_save=False)
-    q.update_runs(["admin"], to_one_indexed_split)
+    q.update_runs(["admin"], move)
     q.save_state(RUN_PATH.with_name("Runs_updated.json"))
 
 

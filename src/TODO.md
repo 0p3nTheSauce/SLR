@@ -56,13 +56,21 @@ Misc TODOs:
   would need retraining are not rerun, but get a footnote on the preprocessing differences
   (1-based starts, `cutoff_9`).
 - **Keep the 1-based `*_cutoff_9` labels before regenerating them.** Every SATNAC/SACAIR
-  experiment, and the sweep `510lhysg` (asl100_cutoff_9), trained on them. The sweep finished
-  (2026-10-14) and is stashed, so this is unblocked: repeat what was done for asl100: rename `labels/asl*_cutoff_9` and
-  `src/runs/asl*_cutoff_9` to `*_cutoff_9_1_indexed`, add the names to `ONE_INDEXED_SPLITS`
-  (`src/run_types.py`) and `SPLIT_NAME_MAP`, and move their Que runs with
-  `que/debug.py`'s `move_to_one_indexed_splits` (it only handles the plain splits so far), writing
-  `Runs_updated.json` and validating it before swapping it in. Only then run
-  `python -m src.preprocess all -ve -lc 9`.
+  experiment, and the sweep `510lhysg` (asl100_cutoff_9, finished 2026-10-14), trained on them.
+  Done in code: `*_cutoff_9_1_indexed` is in `ONE_INDEXED_SPLITS` and `SPLIT_NAME_MAP`, and
+  `que/debug.py`'s `move_to_one_indexed_splits` writes a validated `Runs_updated.json` (it also
+  rewrites `weight_path`, which points into other splits' run dirs for transfer runs).
+  Remaining, with `que-training.service` stopped (it rewrites `Runs.json` from memory):
+  1. Rename `data/WLASL/preprocessed/labels/asl*_cutoff_9` and `src/runs/asl*_cutoff_9` to
+     `*_cutoff_9_1_indexed`.
+  2. Re-run `move_to_one_indexed_splits()` (the Que is unchanged), then swap `Runs_updated.json`
+     in for `Runs.json` and restart the service.
+  3. Update `src/info/WLASL_info.md` ("Still 1-based" and "The 0-based rerun", which call the
+     sweep paused).
+  4. Switch `results/satnac_2026/filters.py` and `results/bottom_worst_splits/filters.py`
+     (`include_splits`) to the `_1_indexed` names before re-stashing; the stashes already made are
+     unaffected. Check the other `cutoff_9` users (`CUTOFF_9_NAMES`, notebook stash names).
+  5. Only then run `python -m src.preprocess all -ve -lc 9`.
 - **Release the 1-based labels**, as a GitHub release like v1.0 (`splits.zip`, `WLASL2000.zip`),
   so the earlier experiments can be reproduced: zip the `*_1_indexed`, (once renamed)
   `*_cutoff_9_1_indexed`, `asl100_bottom` and `asl100_worst` label dirs, and link them from the README's data setup with what they
@@ -97,7 +105,3 @@ Misc TODOs:
   aliases (`List`/`Tuple`/`Optional`), unused `run_types` imports, mutable defaults in
   `get_transform`, bare `raise Exception`. Most are `ruff --fix`-able; do it when next working there
   (the speed-sampler removal, see above, touches this file).
-- `plot_param_effects` (`results/sweeping/suggest_sweep.ipynb`) saves via the notebook's global
-  `asset_path`, whose stub names the S3D sweeps, so the MViTv2_S sweep 1 figure is saved under an
-  `..._S3D_exp004-exp005-exp006-exp007_` filename. Pass the stub in (or move the function into
-  `results/sweeping/helpers.py`) when next touching it.

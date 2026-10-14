@@ -834,6 +834,10 @@ SPLIT_NAME_MAP: dict[AVAIL_SPLITS, str] = {
     'asl300_1_indexed': 'WLASL-300',
     'asl1000_1_indexed': 'WLASL-1000',
     'asl2000_1_indexed': 'WLASL-2000',
+    'asl100_cutoff_9_1_indexed': 'WLASL-100',
+    'asl300_cutoff_9_1_indexed': 'WLASL-300',
+    'asl1000_cutoff_9_1_indexed': 'WLASL-1000',
+    'asl2000_cutoff_9_1_indexed': 'WLASL-2000',
 }
 
 def split_name_mapper(split: AVAIL_SPLITS) -> str:
