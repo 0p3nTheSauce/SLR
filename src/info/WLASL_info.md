@@ -141,6 +141,27 @@ Sources (links added 2026-10-05):
 [asllrp-glosses]: https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf
 [lrec22]: https://aclanthology.org/2022.signlang-1.26.pdf
 
+### Duplicate clips
+
+Some clips are byte-identical copies of each other, filed under different `video_id`s. Checked on
+2026-10-15 by hashing all 21095 files (MD5) in
+[`duplicate_clips.ipynb`](../results/dataset_analysis/duplicate_clips.ipynb) (helpers in
+`duplicates.py` beside it, hashes stashed in its `stashed_results/clip_md5.json`). Exact copies
+only, so this is a lower bound: a re-encode of the same video is not found.
+
+* 1985 instances (9.4%) are one of 900 groups of identical clips (745 pairs, up to 5 copies).
+* 1877 are a **label conflict**: the same clip under two or more glosses (846 clips, 523 distinct
+  gloss sets, mostly synonyms such as `doctor` / `physician`). 849 of the 2000 glosses are in one.
+  They are concentrated in the `signingsavvy` (36% of its instances) and `aslsearch` (20%) sources.
+* 68 are a **leak**: a twin with the same gloss in a different set (14 in test, 29 in train).
+* 184 of the 2879 test instances (6.4%) have a twin in train or val, 180 of them under another
+  gloss. On WLASL-1000, 62 of 1876; WLASL-300, 12 of 668; WLASL-100, 1 of 258.
+* Effect on the results (`MViTv2_S` exp000, WLASL-2000): the conflicted test instances are right
+  6.1% of the time against 41.1% for the rest, and 87.8% are predicted as the twin's other gloss.
+  Glosses in a conflict have a mean test F1 of 0.19 against 0.39, which holds within class-size
+  bins. So much of the low F1 on those glosses is label ambiguity, and each copy also counts as a
+  separate train instance.
+
 ## Naming conventions
 
 ### Split vs Set

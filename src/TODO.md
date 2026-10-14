@@ -81,6 +81,14 @@ Misc TODOs:
   sign, several glosses"). Check whether Boston University's revised WLASL gloss labels
   (https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf) merge or split these classes, and consider scoring against them, or counting
   same-sign confusions as correct, when reporting per-class results.
+- **Duplicate clips (see `src/info/WLASL_info.md`, "Duplicate clips").** 9.4% of WLASL-2000 are
+  byte-identical copies, 1877 of them one clip under several glosses, and 184 test instances have a
+  twin in train/val. Decide how the final results treat them (drop the conflicted instances from
+  test, merge the glosses, or report both), and whether the train copies should be removed.
+  Near-duplicates (re-encodes) are not found by the MD5 hashing: try perceptual hashing or
+  frame-level matching. Compare the conflicting gloss pairs with the Boston University revised
+  labels (the item above).
+
 - `asl100_bottom`/`asl100_worst` labels are still 1-based: they aren't made by `preprocess.py`, so
   the 0-based rerun doesn't touch them, unlike the plain splits (whose old labels were kept as
   `*_1_indexed`, see `src/info/WLASL_info.md`). Rebuild them from the new labels (and keep the
