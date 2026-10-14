@@ -56,8 +56,8 @@ Misc TODOs:
   would need retraining are not rerun, but get a footnote on the preprocessing differences
   (1-based starts, `cutoff_9`).
 - **Keep the 1-based `*_cutoff_9` labels before regenerating them.** Every SATNAC/SACAIR
-  experiment, and the paused sweep `510lhysg` (asl100_cutoff_9), trained on them. Once the sweep
-  is done, repeat what was done for asl100: rename `labels/asl*_cutoff_9` and
+  experiment, and the sweep `510lhysg` (asl100_cutoff_9), trained on them. The sweep finished
+  (2026-10-14) and is stashed, so this is unblocked: repeat what was done for asl100: rename `labels/asl*_cutoff_9` and
   `src/runs/asl*_cutoff_9` to `*_cutoff_9_1_indexed`, add the names to `ONE_INDEXED_SPLITS`
   (`src/run_types.py`) and `SPLIT_NAME_MAP`, and move their Que runs with
   `que/debug.py`'s `move_to_one_indexed_splits` (it only handles the plain splits so far), writing
@@ -97,3 +97,7 @@ Misc TODOs:
   aliases (`List`/`Tuple`/`Optional`), unused `run_types` imports, mutable defaults in
   `get_transform`, bare `raise Exception`. Most are `ruff --fix`-able; do it when next working there
   (the speed-sampler removal, see above, touches this file).
+- `plot_param_effects` (`results/sweeping/suggest_sweep.ipynb`) saves via the notebook's global
+  `asset_path`, whose stub names the S3D sweeps, so the MViTv2_S sweep 1 figure is saved under an
+  `..._S3D_exp004-exp005-exp006-exp007_` filename. Pass the stub in (or move the function into
+  `results/sweeping/helpers.py`) when next touching it.

@@ -29,7 +29,9 @@ restarts. Changes from Sweep 0:
 - **A backbone LR up to 6e-4.** MViTv2_B_32x3 diverged at 4e-4, but with no warmup. Sweep 0's
   finished trials reached 3.5e-4, with the best trial at that value.
 - **The LR is held at `eta_min` after the cycle** (`hold_after_tmax`, set in base.py), so
-  patience ends each trial soon after warmup + `tmax`. In S3D sweep 7, where PyTorch's periodic
+  patience ends each trial soon after warmup + `tmax`. `eta_min` is 0 here, which was a mistake:
+  the LR is exactly 0 for the rest of each trial, so those epochs train nothing and only patience
+  stops it. Future sweeps should use a small positive `eta_min`. In S3D sweep 7, where PyTorch's periodic
   `CosineAnnealingLR` let the LR rise again, 13 of the 50 trials found their best only in a later
   cycle. They trained for a median of 140 epochs, against 56-61 for the others, and none of them
   was the best trial. `max_epoch` is 55 (warmup + `tmax` is at most 38, plus patience 15), which
@@ -41,4 +43,5 @@ restarts. Changes from Sweep 0:
 Sweep 0's trials took a median of 0.25 h per epoch (wandb `_runtime`, checked 2026-10-02), against
 0.35 h for MViTv2_B_32x3. A typical trial here (warmup + `tmax` + patience ≈ 40 epochs) should
 take about 10 h, and `max_epoch = 55` caps one at about 14 h. With the LR held at `eta_min` =
-0, the epochs between the end of the cycle and the patience stop train nothing. 20 trials is roughly 8 days.
+0, the epochs between the end of the cycle and the patience stop train nothing, so about 10-15
+epochs of each trial were wasted. 20 trials took about 8 days (758 epochs).
