@@ -6,6 +6,8 @@ from src.results.dataset_analysis.duplicates import (
     class_duplicate_table,
     flag_twins,
     hash_clips,
+    merge_signs,
+    shared_clip_counts,
 )
 
 
@@ -66,3 +68,35 @@ class TestHashClips:
         (tmp_path / "3.mp4").write_bytes(b"other")
         hashes = hash_clips(tmp_path, ["1", "2", "3"], workers=2)
         assert hashes["1"] == hashes["2"] != hashes["3"]
+
+
+def with_variations(rows: list[tuple[str, str, int, str]]) -> pd.DataFrame:
+    return pd.DataFrame(rows, columns=["video_id", "gloss", "variation_id", "md5"])
+
+
+SIGN_ROWS = [
+    ("1", "doctor", 0, "x"),
+    ("2", "physician", 0, "x"),
+    ("3", "doctor", 0, "y"),
+    ("4", "physician", 0, "y"),
+    ("5", "past", 0, "z"),
+    ("6", "before", 0, "z"),
+    ("7", "doctor", 1, "w"),
+]
+
+
+class TestMergeSigns:
+    def test_shared_clips_are_counted_per_node_pair(self) -> None:
+        counts = shared_clip_counts(with_variations(SIGN_ROWS))
+        assert counts[(("doctor", 0), ("physician", 0))] == 2
+        assert counts[(("before", 0), ("past", 0))] == 1
+
+    def test_min_shared_keeps_a_one_off_pair_apart(self) -> None:
+        signs = merge_signs(with_variations(SIGN_ROWS), min_shared=2)
+        assert signs[0] == signs[1] == signs[2] == signs[3]  # doctor:0 and physician:0 share 2 clips
+        assert signs[4] != signs[5]  # before and past share only one
+        assert signs[6] != signs[0]  # a different variation of doctor stays its own sign
+
+    def test_min_shared_one_merges_everything_connected(self) -> None:
+        signs = merge_signs(with_variations(SIGN_ROWS), min_shared=1)
+        assert signs[4] == signs[5]

@@ -88,6 +88,12 @@ Misc TODOs:
   Near-duplicates (re-encodes) are not found by the MD5 hashing: try perceptual hashing or
   frame-level matching. Compare the conflicting gloss pairs with the Boston University revised
   labels (the item above).
+- **Cleaned dataset with variation-level classes (feasibility in
+  `results/dataset_analysis/custom_dataset_feasibility.ipynb`).** Needs: a reviewed merge list (338
+  class pairs share 2+ clips), a re-split rule, a per-dataset class list in place of the global
+  `info/wlasl_class_list.json` (read by `stats.py`, `visualise.py`, `visualise2.py`), and a check that
+  variation labels are not just the source site (guessing from gloss and source gets 81%, from the
+  gloss alone 60%).
 
 - `asl100_bottom`/`asl100_worst` labels are still 1-based: they aren't made by `preprocess.py`, so
   the 0-based rerun doesn't touch them, unlike the plain splits (whose old labels were kept as

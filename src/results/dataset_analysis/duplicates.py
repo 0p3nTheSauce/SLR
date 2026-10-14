@@ -8,8 +8,10 @@ same video hashes differently.
 """
 
 import hashlib
+from collections import Counter
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
+from itertools import combinations
 from pathlib import Path
 
 import pandas as pd
@@ -82,3 +84,53 @@ def class_duplicate_table(flagged: pd.DataFrame) -> pd.DataFrame:
     ).fillna(0.0)
     table["conflict_flag"] = table.conflict_all > 0
     return table
+
+
+Node = tuple[str, int]  # a (gloss, variation_id) pair: WLASL's finest class
+
+
+def shared_clip_counts(instances: pd.DataFrame) -> Counter[tuple[Node, Node]]:
+    """For each pair of (gloss, variation) nodes, the number of distinct clips filed under both.
+
+    `instances` needs `md5`, `gloss` and `variation_id` columns. Pairs are sorted tuples.
+    """
+    counts: Counter[tuple[Node, Node]] = Counter()
+    nodes = list(zip(instances.gloss, instances.variation_id))
+    for clip_nodes in pd.Series(nodes).groupby(instances.md5.to_numpy()):
+        for pair in combinations(sorted(set(clip_nodes[1])), 2):
+            counts[pair] += 1
+    return counts
+
+
+def merge_signs(instances: pd.DataFrame, min_shared: int) -> pd.Series:
+    """Label each instance with its merged sign: (gloss, variation) nodes joined when they share
+    at least `min_shared` clips, as connected components.
+
+    A single shared clip joins unrelated signs into long chains (one component spans `across`,
+    `over`, `repeat`, `again`, `after`, `before`, `last`, `past`), so `min_shared` should be 2 or
+    more. The sign id is the smallest `gloss:variation` string in its component.
+    """
+    parent: dict[Node, Node] = {}
+
+    def find(node: Node) -> Node:
+        parent.setdefault(node, node)
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    for node in zip(instances.gloss, instances.variation_id):
+        find(node)
+    for (a, b), shared in shared_clip_counts(instances).items():
+        if shared >= min_shared:
+            parent[find(a)] = find(b)
+
+    members: dict[Node, list[str]] = {}
+    for node in list(parent):
+        members.setdefault(find(node), []).append(f"{node[0]}:{node[1]}")
+    sign_of = {root: min(names) for root, names in members.items()}
+    return pd.Series(
+        [sign_of[find(node)] for node in zip(instances.gloss, instances.variation_id)],
+        index=instances.index,
+        name="sign",
+    )
