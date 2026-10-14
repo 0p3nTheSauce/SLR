@@ -84,9 +84,9 @@ raw annotation with the frame count OpenCV decodes from its video:
   frame. Lengths (`frame_end - frame_start`) are one short too, so those `cutoff_9` splits remove
   clips of 10 or fewer real frames. `preprocess.py` now converts starts to 0-based (cache
   version 2), and the plain splits have been regenerated (see
-  [the 0-based rerun](#the-0-based-rerun-2026-10-05)). Still 1-based: `*_1_indexed` (kept on
-  purpose), `*_cutoff_9` (every SATNAC/SACAIR experiment, and the paused sweep), `asl100_bottom`
-  and `asl100_worst`.
+  [the 0-based rerun](#the-0-based-rerun-2026-10-05)). Still 1-based: `*_1_indexed` and
+  `*_cutoff_9_1_indexed` (kept on purpose; the latter are every SATNAC/SACAIR experiment and
+  sweeps 0-1), `asl100_bottom` and `asl100_worst`.
 * Every `frame_end` in the kept data is within its clip: 20725 instances end exactly at the last
   frame, and 74 are annotated shorter than the clip (by up to 91 frames).
 
@@ -217,5 +217,7 @@ lose 1 (previewed on 2026-09-26).
 Before the rerun, the old `asl100`/.../`asl2000` labels were renamed to
 `asl100_1_indexed`/.../`asl2000_1_indexed` (and `src/runs/asl100` to `src/runs/asl100_1_indexed`,
 with its Que runs updated), so runs trained on the 1-based labels can still be tested on them. The
-rerun only rewrites the plain splits: the `*_cutoff_9` labels stay 1-based for now, so the paused
-asl100_cutoff_9 sweep can finish on the labels it started with.
+rerun only rewrote the plain splits. Once the asl100_cutoff_9 sweep (`510lhysg`) finished, the
+1-based `*_cutoff_9` labels and `src/runs/*_cutoff_9` dirs were renamed to `*_cutoff_9_1_indexed` too
+(2026-10-15, with their Que runs updated, including the `weight_path`s of transfer runs). No
+0-based `cutoff_9` split has been made.

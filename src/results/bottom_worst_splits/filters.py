@@ -38,7 +38,7 @@ else:
 
 acc_cuttoff = 10
 
-include_splits = ["asl100_cutoff_9", "asl100_bottom", "asl100_worst"]
+include_splits = ["asl100_cutoff_9_1_indexed", "asl100_bottom", "asl100_worst"]
 
 filters = {
     "training": lambda x: match(x, run.training),
