@@ -93,6 +93,11 @@ ONE_INDEXED_SPLITS : TypeAlias = Literal[
     "asl1000_cutoff_9_1_indexed", "asl2000_cutoff_9_1_indexed",
 ]
 
+CUTOFF_9_1_INDEXED_NAMES : list[ONE_INDEXED_SPLITS] = [
+    "asl100_cutoff_9_1_indexed", "asl300_cutoff_9_1_indexed",
+    "asl1000_cutoff_9_1_indexed", "asl2000_cutoff_9_1_indexed",
+]
+
 AVAIL_SPLITS : TypeAlias =  ORIGINAL_SPLITS | CUTOFF_SPLITS | WORST_SPLITS | ONE_INDEXED_SPLITS
 
 ### Samplers

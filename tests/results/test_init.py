@@ -2,7 +2,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from src.results import format_exp_label, get_asset_path, match, same_augs
+from src.results import (
+    format_exp_label,
+    get_asset_path,
+    get_out_stub,
+    match,
+    same_augs,
+    stash_split_name,
+)
 
 
 class _Aug(BaseModel):
@@ -61,6 +68,29 @@ class TestFormatExpLabel:
 
     def test_sweep_run_id_left_as_is(self) -> None:
         assert format_exp_label("3f8a1b2c") == "3f8a1b2c"
+
+
+class TestStashSplitName:
+    def test_cutoff_1_indexed_maps_back(self) -> None:
+        assert stash_split_name("asl100_cutoff_9_1_indexed") == "asl100_cutoff_9"
+
+    def test_others_unchanged(self) -> None:
+        for split in ("asl100_cutoff_9", "asl100_1_indexed", "asl2000", "asl100_worst"):
+            assert stash_split_name(split) == split
+
+
+class TestGetOutStub:
+    def test_plain_split(self) -> None:
+        assert get_out_stub("asl100", "S3D", "exp001") == "asl100_S3D_exp001_"
+
+    def test_cutoff_1_indexed_keeps_the_old_stub(self) -> None:
+        """Existing stash files were named before the `*_cutoff_9` splits were renamed."""
+        old = get_out_stub("asl2000_cutoff_9", "MViTv2_S", "exp002")
+        assert get_out_stub("asl2000_cutoff_9_1_indexed", "MViTv2_S", "exp002") == old
+        assert old == "asl2000_cutoff_9_MViTv2_S_exp002_"
+
+    def test_plain_1_indexed_split_unchanged(self) -> None:
+        assert get_out_stub("asl100_1_indexed", "S3D", "exp001") == "asl100_1_indexed_S3D_exp001_"
 
 
 class TestGetAssetPath:

@@ -224,7 +224,7 @@ def retrieve_split_data(
 
 	split_dir = labels_dir / split
 	objects = {}
-	for file in split_dir.glob(pattern):
+	for file in sorted(split_dir.glob(pattern)):
 		with open(file, "r") as f:
 			objects[file.name] = json.load(f)
 

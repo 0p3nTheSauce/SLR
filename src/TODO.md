@@ -55,13 +55,6 @@ Misc TODOs:
   bboxes; WLASL's own bboxes are in the original videos' coordinates, so unusable). Results that
   would need retraining are not rerun, but get a footnote on the preprocessing differences
   (1-based starts, `cutoff_9`).
-- **Notebooks that still use the old `*_cutoff_9` names for labels or live Que runs** break now
-  that those splits are `*_cutoff_9_1_indexed` (2026-10-15): `augmentation_demos/cropping_norms`
-  (`split_name`), `bottom_worst_splits/100_worst` and `different_100s` (`load_split_set`, Que run
-  filter), `dataset_analysis/reproduce_f1_correlation` (`split_name`), and the commented stash block
-  in `sweeping/suggest_sweep.ipynb`. Notebooks that only read stashes are unaffected, since the
-  stash file names keep the old stub. Decide per notebook whether it should use the 1-based labels
-  (to match the stashed runs) or the plain 0-based splits.
 - **Release the 1-based labels**, as a GitHub release like v1.0 (`splits.zip`, `WLASL2000.zip`),
   so the earlier experiments can be reproduced: zip the `*_1_indexed`, (once renamed)
   `*_cutoff_9_1_indexed`, `asl100_bottom` and `asl100_worst` label dirs, and link them from the README's data setup with what they
