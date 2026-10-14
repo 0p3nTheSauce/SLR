@@ -82,6 +82,7 @@ __all__ = [
     "search_old_runs",
     "stash_from_saved",
     "stash_json",
+    "stash_split_name",
     "unpack_filters",
 ]
 
@@ -280,9 +281,23 @@ def format_exp_label(exp_no: str) -> str:
     return f"exp{exp_no}" if exp_no.isdigit() else exp_no
 
 
+def stash_split_name(split: str) -> str:
+    """The split as existing stash and asset files, and LaTeX labels, name it.
+
+    `*_cutoff_9_1_indexed` splits keep the `*_cutoff_9` name: they were renamed on 2026-10-15
+    (see `src/info/WLASL_info.md`), after every existing file was named. Other splits are unchanged.
+    """
+    return split.removesuffix("_1_indexed") if "_cutoff_9" in split else split
+
+
 def get_out_stub(
     split: str, model: str, exp: str, checkpoint_num: int | str | None = None
 ) -> str:
+    """Filename stub for a run's stash/assets: `<split>_<model>_<exp>_[<checkpoint>_]`.
+
+    See `stash_split_name` for how the split is written.
+    """
+    split = stash_split_name(split)
     checknum = str(checkpoint_num) + "_" if checkpoint_num is not None else ""
     return f"{split}_{model}_{exp}_{checknum}"
 
