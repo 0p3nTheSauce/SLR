@@ -199,6 +199,11 @@ Samples with 9 or fewer frames by the old, off-by-one length calculation (see
 | 59958 | turkey | val | 1-10 | asl1000, asl2000 |
 | 15144 | deduct | val | 1-9 | asl2000 |
 
+Removing them makes no measurable difference: none is in a test set, and adding the val clips back
+moves the val accuracy of 5 trained models by at most 0.03 points (under one instance) and the val
+loss by about 0.001. Checked on 2026-10-15 in
+[`short_clip_cutoff.ipynb`](../results/dataset_analysis/short_clip_cutoff.ipynb).
+
 ### The 0-based rerun (2026-10-05)
 
 `python -m src.preprocess all -ve` (no cutoff). Checked on 2026-10-06 by comparing every new
