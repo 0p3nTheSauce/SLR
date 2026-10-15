@@ -58,3 +58,25 @@ class TestSuggestRanges:
         result = suggest_ranges(df, params, top_k=2)
         assert list(result.index) == ["n"]
         assert (result.loc["n"].suggested_min, result.loc["n"].suggested_max) == (7.0, 13.0)
+
+
+class TestEnsembleScores:
+    def test_topk_accuracy(self) -> None:
+        import numpy as np
+
+        from src.results.sweeping.ensemble import topk_accuracy
+
+        probs = np.array([[0.7, 0.2, 0.1], [0.1, 0.3, 0.6]])
+        targets = np.array([0, 1])
+        assert topk_accuracy(probs, targets, 1) == 50.0
+        assert topk_accuracy(probs, targets, 2) == 100.0
+
+    def test_averaging_can_fix_what_each_member_gets_wrong(self) -> None:
+        import numpy as np
+
+        from src.results.sweeping.ensemble import ensemble_scores
+
+        a = np.array([[0.6, 0.4, 0.0]])  # predicts class 0
+        b = np.array([[0.0, 0.5, 0.5]])  # predicts class 1 (ties with 2)
+        scores = ensemble_scores([a, b], np.array([1]))
+        assert scores[1] == 100.0  # the mean puts class 1 first
