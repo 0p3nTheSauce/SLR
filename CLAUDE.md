@@ -125,7 +125,8 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
   timing/NVML monitoring for thesis/paper-grade throughput & memory results).
 - `stats.py` — Computes/summarises WLASL dataset statistics and generates LaTeX tables (legacy,
   tied to the original WLASL JSON format).
-- `utils.py` — Grab-bag of shared utilities: GPU memory manager, video-frame loading, misc.
+- `utils.py` — Grab-bag of shared utilities: GPU memory manager, video-frame loading, the runs-dir
+  cleaner (`python -m src.utils`, dry run unless `--delete`), misc.
 - `visualise.py` / `visualise2.py` — see [below](#srcvisualisepy---srcvisualise2py).
 - `debug.py` — Ad-hoc manual debug scripts (as is `que/debug.py`); not a formal test suite — see
   [Testing](#testing) for the real one.

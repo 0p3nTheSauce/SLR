@@ -1,4 +1,12 @@
 Misc TODOs:
+- `training.py` keeps the final resume checkpoint (`checkpoint_NNN.pth`, ~3x `best.pth`) after a
+  run finishes, though only `best.pth` is used afterwards; `python -m src.utils --only resume`
+  clears them in bulk. Consider deleting it when a run completes successfully (keep it on a
+  crash so the Que can recover the run).
+- Runs predating `best.pth` (e.g. `runs/asl100_cutoff_9_1_indexed/S3D/exp008`, `exp009`,
+  `runs/asl300_cutoff_9_1_indexed/{S3D,Resnet3D_18,Resnet2D_1D_18}/exp000`) only have a full
+  resume checkpoint, which the runs cleaner deliberately skips. Converting each to a `best.pth`
+  (its `model_state_dict`) would save ~2/3 of their size and make them loadable like the rest.
 - Repo-wide: audit blind `except Exception` blocks (training.py, que/worker.py, etc.) and
   replace with handling for specific exception types instead of blanket-catch + str(e).
   Concrete motivating case documented in src/que/todo (Worker section): a bare, message-less

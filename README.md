@@ -335,7 +335,10 @@ runs
 
 ## Features
 
-- Run [utils.py](./src/utils.py) to automatically clean up checkpoints.
+- Free space in `src/runs` with `python -m src.utils` (from the repo root): it deletes resume
+  checkpoints beside a `best.pth`, the weights of sweep trials outside each sweep's top 10 by
+  validation loss (unless named in code/notebooks/configs), and runs that never trained. It is a
+  dry run unless `--delete` is given; see `--help`.
 - Use the [Que](./src/que/README.md) feature to schedule and automatically train + test runs.
 
 
