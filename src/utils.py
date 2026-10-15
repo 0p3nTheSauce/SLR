@@ -773,7 +773,11 @@ def resume_checkpoint_removals(run_dir: Path) -> list[Removal]:
 
 
 def abandoned_run_removals(run_dir: Path) -> list[Removal]:
-    """The whole run directory, if it holds no files but `data_info.json` (it never trained)."""
+    """The whole run directory, if it holds no files but `data_info.json`.
+
+    That is a run that never trained, or an untested sweep trial (e.g. stopped by hyperband)
+    whose weights `sweep_weight_removals` already deleted, so a second pass catches those.
+    """
     if all(f.name == DATA_INFO for f in run_dir.rglob("*") if f.is_file()):
         return [_removal(run_dir, "abandoned run")]
     return []
