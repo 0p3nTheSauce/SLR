@@ -103,3 +103,10 @@ Misc TODOs:
   aliases (`List`/`Tuple`/`Optional`), unused `run_types` imports, mutable defaults in
   `get_transform`, bare `raise Exception`. Most are `ruff --fix`-able; do it when next working there
   (the speed-sampler removal, see above, touches this file).
+- **Next up (as of 2026-10-15).** Thesis table: replace the stale `MViTv2-B*` stub entry (a test-selected
+  pick) with val-loss-selected runs, and add the 5-trial sweep-1 ensemble (label it an ensemble) from
+  `results/sweeping/stashed_results/asl100_cutoff_9_MViTv2_S_16x4_e_510lhysg_ensemble_.json`. Then the next
+  sweep: draft `configfiles/sweeps/MViTv2_S_e/exp000` on plain `asl100` with a small positive `eta_min`
+  (about 6 days for 20 trials). Optional GPU work for stronger thesis numbers: the sweep-1 best config on
+  asl300 (about 16 h, initialised from trial `5mzfq88e`'s checkpoint), then asl1000 and asl2000.
+  Clear the stale sweep (`510lhysg`, 20/20) in `src/que/state/Server.json` when the next one is set.
