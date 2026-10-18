@@ -22,3 +22,14 @@ outputs = ["src/runs/{split}/{model}/{run_name}"]
 # Largest batch-size-1 training peak in src/results/all_benchmark.json (2026-09-12, RTX 3060) is
 # 6.4 GB (Swin3D_B, 32 frames); 8 leaves room for dataloader and CUDA context overhead.
 min_gpu_mem_gb = 8
+
+# A stage of a chain: like `train`, but initialised from the best checkpoint of the job it runs
+# after (submit with `--after <previous stage's job id>`; one dependency, the previous stage).
+[templates.train_chained]
+command = "python -m src.train_and_test {model} {split} {config} --seed {seed} --run_name {run_name} -w {after.0.outputs.0}/checkpoints/best.pth"
+preemptible = true
+grace_seconds = 120
+run_name = "{config_stem}_s{seed}"
+defaults = { seed = 0 }
+outputs = ["src/runs/{split}/{model}/{run_name}"]
+min_gpu_mem_gb = 8

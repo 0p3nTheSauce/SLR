@@ -2,9 +2,8 @@
 # MViTv2_S_16x4_e_5mzfq88e.toml (job 1), under its own name so the chained runs get their own run
 # dirs. Stage 1 is job 1's asl100 run (from K400); asl300, asl1000 and asl2000 each start from the
 # previous stage's best.pth on the corrected 0-based splits, e.g.
-#   que2 submit base train model=MViTv2_S_16x4_e split=asl300 seed=42 \
-#     config=src/configfiles/thesis_final/MViTv2_S_16x4_e_5mzfq88e_chained.toml \
-#     -w src/runs/asl100/MViTv2_S_16x4_e/MViTv2_S_16x4_e_5mzfq88e_s42/checkpoints/best.pth
+#   que2 submit base train_chained model=MViTv2_S_16x4_e split=asl300 seed=42 --after <asl100 job> \
+#     config=src/configfiles/thesis_final/MViTv2_S_16x4_e_5mzfq88e_chained.toml
 
 [training]
 batch_size = 2
