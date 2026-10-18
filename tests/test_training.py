@@ -7,7 +7,13 @@ from torch import nn, optim
 
 from src.run_types import CosAnealInfo
 from src.stopping import NullEarlyStopper
-from src.training import get_scheduler, save_training
+from src.training import (
+    get_scheduler,
+    latest_resume_checkpoint,
+    load_training,
+    save_checkpoint,
+    save_training,
+)
 
 BASE_LRS = (1e-3, 1e-2)  # two param groups, like the backbone and classifier
 
@@ -118,3 +124,50 @@ def test_save_training_saves_on_interval_and_final_epoch(
     )
 
     assert (tmp_path / f"checkpoint_{epoch:03d}.pth").exists() == saved
+
+
+def _checkpoint(epoch: int) -> dict[str, object]:
+    return {"epoch": epoch, "steps": 0, "model_state_dict": nn.Linear(1, 1).state_dict()}
+
+
+def test_save_checkpoint_keeps_only_the_newest(tmp_path: Path) -> None:
+    (tmp_path / ".checkpoint_002.pth.tmp").touch()  # from a save that was killed
+    for epoch in (1, 2, 3):
+        save_checkpoint(_checkpoint(epoch), tmp_path)
+
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["checkpoint_003.pth"]
+    assert latest_resume_checkpoint(tmp_path) == tmp_path / "checkpoint_003.pth"
+
+
+def test_latest_resume_checkpoint_ignores_best(tmp_path: Path) -> None:
+    (tmp_path / "best.pth").touch()
+
+    assert latest_resume_checkpoint(tmp_path) is None
+
+
+def test_load_training_resumes_after_the_saved_epoch(tmp_path: Path) -> None:
+    model = nn.Linear(1, 1)
+    optimizer = optim.AdamW(model.parameters())
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1)
+    save_checkpoint(
+        {
+            "epoch": 3,
+            "steps": 30,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
+        },
+        tmp_path,
+    )
+
+    loaded = load_training(
+        tmp_path / "checkpoint_003.pth",
+        torch.device("cpu"),
+        model,
+        optimizer,
+        scheduler,
+        NullEarlyStopper(),
+    )
+
+    # train_loop increments before training, so epoch 3 being done means epoch 4 runs next
+    assert loaded[4] == 3

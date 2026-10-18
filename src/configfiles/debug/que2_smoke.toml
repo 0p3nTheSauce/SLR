@@ -1,9 +1,9 @@
-# One-epoch smoke test for the Que_v2 job (que.toml's `train` template), e.g.
+# Three-epoch smoke test (long enough to preempt and resume) for the Que_v2 job (que.toml's `train` template), e.g.
 #   que2 submit base train model=S3D split=asl100 config=src/configfiles/debug/que2_smoke.toml
 [training]
 batch_size = 8
 update_per_step = 1
-max_epoch = 1
+max_epoch = 3
 
 [optimizer]
 eps = 1e-05

@@ -7,10 +7,15 @@ env = "wlasl"
 shared = ["data", "src/runs", "src/models/mvit/weights"]
 
 # One run: train, then test the best-val-loss checkpoint (src/train_and_test.py). Outputs go to
-# src/runs/<split>/<model>/<run_name>/, with the results summary in run.json. A rerun of the same
-# run_name fails while its checkpoints exist. No SIGTERM handler, so not preemptible.
+# src/runs/<split>/<model>/<run_name>/, with the results summary in run.json. A resume checkpoint
+# is saved every epoch, and every attempt resumes from it, so a failed run is retried by
+# resubmitting it unchanged (refused if its config changed). Preemptible: on SIGTERM the
+# unfinished epoch is dropped and the job exits 75, so a preemption costs up to one epoch.
 [templates.train]
 command = "python -m src.train_and_test {model} {split} {config} --seed {seed} --run_name {run_name}"
+preemptible = true
+# Stopping is quick (no save on SIGTERM); this covers wandb finishing the run.
+grace_seconds = 120
 run_name = "{config_stem}_s{seed}"
 defaults = { seed = 0 }
 outputs = ["src/runs/{split}/{model}/{run_name}"]

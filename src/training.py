@@ -238,7 +238,21 @@ def get_optimizer(model: torch.nn.Module, conf: OptimizerInfo) -> optim.AdamW:
     return optim.AdamW(param_groups, eps=conf.eps)
 
 
+RESUME_CHECKPOINT_GLOB = "checkpoint_*.pth"
+
+
+def latest_resume_checkpoint(save_path: Path) -> Path | None:
+    """The newest resume checkpoint (`checkpoint_NNN.pth`) in a run's checkpoint dir, if any."""
+    checkpoints = sorted(save_path.glob(RESUME_CHECKPOINT_GLOB))
+    return checkpoints[-1] if checkpoints else None
+
+
 def save_checkpoint(checkpoint_data: dict[str, Any], save_path: Path):
+    """Save a resume checkpoint, then delete the older ones (only the newest is ever resumed from).
+
+    The file is written under a temporary name and renamed into place, so a process killed
+    mid-save never leaves a truncated checkpoint that recovery would pick up.
+    """
     checkpoint = checkpoint_data | {
         # RNG states
         "rng_torch": torch.get_rng_state(),
@@ -247,8 +261,14 @@ def save_checkpoint(checkpoint_data: dict[str, Any], save_path: Path):
         "rng_python": random.getstate(),
     }
     checkpoint_path = save_path / f"checkpoint_{str(checkpoint['epoch']).zfill(3)}.pth"
+    tmp_path = checkpoint_path.with_name(f".{checkpoint_path.name}.tmp")
 
-    torch.save(checkpoint, checkpoint_path)
+    torch.save(checkpoint, tmp_path)
+    tmp_path.replace(checkpoint_path)
+    # older checkpoints, and temporary files left by saves that were killed
+    for old in [*save_path.glob(RESUME_CHECKPOINT_GLOB), *save_path.glob(f".{RESUME_CHECKPOINT_GLOB}.tmp")]:
+        if old != checkpoint_path:
+            old.unlink()
 
     print(f"Checkpoint saved: {checkpoint_path}")
 
@@ -338,9 +358,9 @@ def _handle_recovery(
     load: StrPath | None = None,
 ) -> StrPath | None:
     if recover:
-        files = sorted([f.name for f in save_path.iterdir() if f.is_file()])
-        if len(files) > 0:
-            load = save_path / files[-1]
+        latest = latest_resume_checkpoint(save_path)
+        if latest is not None:
+            load = latest
     else:
         save_path.mkdir(parents=True, exist_ok=True)
 
@@ -406,7 +426,9 @@ def load_training(
     if "stopping_metrics" in checkpoint:
         stopping_metrics = checkpoint["stopping_metrics"]
 
-    epoch = checkpoint["epoch"] + 1
+    # The saved epoch is complete, and the loop increments before training, so it carries on at
+    # the next one.
+    epoch = checkpoint["epoch"]
     steps = checkpoint["steps"]
     # best_val_loss = checkpoint["best_val_score"]
     best_val_loss = float("inf")
