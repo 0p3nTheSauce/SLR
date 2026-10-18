@@ -1,0 +1,50 @@
+# The SACAIR 2026 / thesis §5.3 protocol (tuned optimiser values, no LR scheduler, patience 15):
+# the content of configfiles/asl100/MViTv2_B_32x3/exp007.toml, which configfiles/{asl300,asl1000,asl2000}/
+# MViTv2_B_32x3/exp000.toml repeat. Thesis run list job 3 (18 Oct 2026) runs MViTv2-S^I (MViTv2_S_16x4_e)
+# with it on asl300/1000/2000_cutoff_9_1_indexed, chained like the MViTv2-B runs: each split starts from
+# the previous split's best.pth, and asl300 from the asl100 run wifpnh92 (78.68 test top-1), e.g.
+#   que2 submit base train model=MViTv2_S_16x4_e split=asl300_cutoff_9_1_indexed seed=42 \
+#     config=src/configfiles/thesis_final/MViTv2_S_16x4_e_sacair_protocol.toml \
+#     -w src/runs/asl100_cutoff_9_1_indexed/MViTv2_S_16x4_e/exp000/checkpoints000/best.pth
+
+[training]
+batch_size = 1
+update_per_step = 8
+max_epoch = 200
+
+[optimizer]
+eps = 1e-05
+backbone_init_lr = 0.0001
+backbone_weight_decay = 0.001
+classifier_init_lr = 0.001
+classifier_weight_decay = 0.001
+
+[model_params]
+drop_p = 0.5
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Random_crop" },
+    { type = "HORIZONTAL_FLIP", p = 0.5 },
+]
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "og", randomise = false },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
