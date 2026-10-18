@@ -1,4 +1,12 @@
 Misc TODOs:
+- `training.py` keeps the final resume checkpoint (`checkpoint_NNN.pth`, ~3x `best.pth`) after a
+  run finishes, though only `best.pth` is used afterwards; `python -m src.utils --only resume`
+  clears them in bulk. Consider deleting it when a run completes successfully (keep it on a
+  crash so the Que can recover the run).
+- Runs predating `best.pth` (e.g. `runs/asl100_cutoff_9_1_indexed/S3D/exp008`, `exp009`,
+  `runs/asl300_cutoff_9_1_indexed/{S3D,Resnet3D_18,Resnet2D_1D_18}/exp000`) only have a full
+  resume checkpoint, which the runs cleaner deliberately skips. Converting each to a `best.pth`
+  (its `model_state_dict`) would save ~2/3 of their size and make them loadable like the rest.
 - Repo-wide: audit blind `except Exception` blocks (training.py, que/worker.py, etc.) and
   replace with handling for specific exception types instead of blanket-catch + str(e).
   Concrete motivating case documented in src/que/todo (Worker section): a bare, message-less
@@ -76,6 +84,20 @@ Misc TODOs:
   sign, several glosses"). Check whether Boston University's revised WLASL gloss labels
   (https://www.bu.edu/asllrp/wlasl-alt-glosses.pdf) merge or split these classes, and consider scoring against them, or counting
   same-sign confusions as correct, when reporting per-class results.
+- **Duplicate clips (see `src/info/WLASL_info.md`, "Duplicate clips").** 9.4% of WLASL-2000 are
+  byte-identical copies, 1877 of them one clip under several glosses, and 184 test instances have a
+  twin in train/val. Decide how the final results treat them (drop the conflicted instances from
+  test, merge the glosses, or report both), and whether the train copies should be removed.
+  Near-duplicates (re-encodes) are not found by the MD5 hashing: try perceptual hashing or
+  frame-level matching. Compare the conflicting gloss pairs with the Boston University revised
+  labels (the item above).
+- **Cleaned dataset with variation-level classes (feasibility in
+  `results/dataset_analysis/custom_dataset_feasibility.ipynb`).** Needs: a reviewed merge list (338
+  class pairs share 2+ clips), a re-split rule, a per-dataset class list in place of the global
+  `info/wlasl_class_list.json` (read by `stats.py`, `visualise.py`, `visualise2.py`), and a check that
+  variation labels are not just the source site (guessing from gloss and source gets 81%, from the
+  gloss alone 60%).
+
 - `asl100_bottom`/`asl100_worst` labels are still 1-based: they aren't made by `preprocess.py`, so
   the 0-based rerun doesn't touch them, unlike the plain splits (whose old labels were kept as
   `*_1_indexed`, see `src/info/WLASL_info.md`). Rebuild them from the new labels (and keep the

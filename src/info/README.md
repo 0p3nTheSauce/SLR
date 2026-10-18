@@ -7,7 +7,7 @@ before writing up something that notebooks or code would otherwise each repeat.
 
 | File | What it covers |
 |---|---|
-| [WLASL_info.md](WLASL_info.md) | WLASL fields, facts about our copy of the data, gotchas, split/set naming, and what preprocessing did to each split |
+| [WLASL_info.md](WLASL_info.md) | WLASL fields, facts about our copy of the data, gotchas, duplicate clips and gloss conflicts, split/set naming, and what preprocessing did to each split |
 | [plotting_conventions.md](plotting_conventions.md) | How to write and use `visualise2.py` plotting functions: signatures, colours, styling, legend placement, function catalog |
 | [environment.md](environment.md) | The `wlasl` / `wlasl_cpu` conda envs, and the history of the detectron2 cleanup |
 

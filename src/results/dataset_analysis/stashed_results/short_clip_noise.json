@@ -1,0 +1,79 @@
+{
+  "configs_on_plain_and_cutoff": [
+    [
+      "MViTv2_S_16x4",
+      "asl100",
+      "asl100/MViTv2_S_16x4/exp003.toml"
+    ],
+    [
+      "MViTv2_B_32x3_r",
+      "asl100",
+      "asl100/MViTv2_S_16x4/exp003.toml"
+    ],
+    [
+      "S3D",
+      "asl100",
+      "asl100/S3D/exp082.toml"
+    ],
+    [
+      "MViTv2_S",
+      "asl100",
+      "asl100/MViTv2_S/exp016.toml"
+    ]
+  ],
+  "plain_split_runs": {
+    "asl100_1_indexed": 9,
+    "asl100_worst": 1,
+    "asl100_bottom": 1
+  },
+  "replicates": [
+    {
+      "model": "S3D",
+      "split": "asl100",
+      "config": "SeedComparison/S3D_czopef0v.toml",
+      "runs": 10,
+      "val_acc_std": 1.0081384763442258,
+      "val_acc_range": 2.958579881656817
+    },
+    {
+      "model": "S3D",
+      "split": "asl100",
+      "config": "asl100/S3D/exp101.toml",
+      "runs": 3,
+      "val_acc_std": 2.3107247561854023,
+      "val_acc_range": 4.142011834319526
+    },
+    {
+      "model": "MViTv2_S",
+      "split": "asl100",
+      "config": "asl100/MViTv2_S/exp010.toml",
+      "runs": 4,
+      "val_acc_std": 1.8555116096870559,
+      "val_acc_range": 4.437869822485197
+    },
+    {
+      "model": "S3D",
+      "split": "asl100",
+      "config": "SeedComparison/S3D_13idpda6.toml",
+      "runs": 10,
+      "val_acc_std": 1.607222784020778,
+      "val_acc_range": 5.325443786982248
+    },
+    {
+      "model": "S3D",
+      "split": "asl100",
+      "config": "asl100/S3D/exp082.toml",
+      "runs": 5,
+      "val_acc_std": 1.5085856549091117,
+      "val_acc_range": 3.550295857988175
+    },
+    {
+      "model": "S3D",
+      "split": "asl100",
+      "config": "generic2/hframe_hwd_warmrestarts_hbs/tmult2.toml",
+      "runs": 4,
+      "val_acc_std": 1.6995747474964564,
+      "val_acc_range": 3.5502958579881607
+    }
+  ]
+}

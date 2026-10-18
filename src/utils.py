@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import math
 import re
 import shutil
@@ -6,9 +7,11 @@ import subprocess
 import sys
 import time
 from argparse import ArgumentParser
+from dataclasses import dataclass
 from logging import Logger
 from pathlib import Path
 from types import ModuleType
+from typing import Literal, get_args
 
 import cv2
 import matplotlib.pyplot as plt
@@ -18,7 +21,7 @@ import torch
 import wandb
 
 # locals
-from src.run_types import ZFILL, StopEvent
+from src.run_types import RUNS_PATH, SRC_ROOT, StopEvent
 
 ################ GPU ###################
 
@@ -664,33 +667,6 @@ def plot_from_lists(
 ##################### Misc ###################################
 
 
-def extract_num(fname):
-    num_substrs = re.findall(r"\d+", fname)
-    if len(num_substrs) > 1:
-        num_str_concat = " ".join(sub for sub in num_substrs)
-        print("fname has multuple number substrings: ")
-        print(num_str_concat)
-        idx = -1
-        while True:
-            ans = input("zfill which substring? [-1]")
-            if ans == "":
-                break
-            elif ans.isdigit():
-                idx = int(ans)
-                if -len(num_substrs) <= idx < len(num_substrs):
-                    break
-                else:
-                    print(f"invalid index: {idx} for {len(num_substrs)} substrings")
-            else:
-                print(f"{ans} is not a digit")
-        return num_substrs[idx]
-    elif len(num_substrs) == 0:
-        print(f"No valid number substrings found in {fname}")
-        return
-    else:
-        return num_substrs[0]
-
-
 def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
     """Enumerate until the next available directory name
 
@@ -729,207 +705,264 @@ def enum_dir(path: str | Path, make: bool = False, decimals: int = 3) -> Path:
     return path
 
 
-def is_removable(f: Path, rem_files: list[str]) -> bool:
-    if not f.is_file():
-        return False
-    for r in rem_files:
-        if f.name.endswith(r):
-            return True
-    return False
+##################### Runs cleaning ###################################
+
+CleanReason = Literal["resume checkpoint", "sweep trial outside top-k", "abandoned run"]
+
+CHECKPOINT_DIR_RE = re.compile(r"checkpoints\d*")
+BEST_WEIGHTS = "best.pth"
+DATA_INFO = "data_info.json"
+SWEEP_DIR_PREFIX = "sweep_"
+REFERENCE_SUFFIXES = (".py", ".ipynb", ".toml", ".md")
 
 
-def is_empty(path):
-    return not any(Path(path).iterdir())
+@dataclass(frozen=True)
+class Removal:
+    """A file or directory the runs cleaner would delete, why, and its size in bytes."""
+
+    path: Path
+    reason: CleanReason
+    size: int
 
 
-def clean_checkpoint_dirs(
-    path: Path,
-    ask: bool = False,
-    add_zfill: bool = True,
-    decimals: int = ZFILL,
-    rem_empty: bool = False,
-    rem_files: list[str] | None = None,
-    key_word: str = "checkpoint",
-    ignore_keywords: list[str] | None = None,
-) -> None:
-    """Clean run checkpoint directories in an experiment folder, keeping only the last checkpoint and any with ignore_keywords in the name. Optionally remove empty directories and files with specified suffixes.
+def _size(path: Path) -> int:
+    if path.is_file():
+        return path.stat().st_size
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
-    Args:
-        path (Path): Experiment directory containing checkpoint subdirectories
-        ask (bool, optional): Whether to ask for confirmation before removing files. Defaults to False.
-        add_zfill (bool, optional): Whether to zfill the checkpoint numbers. Defaults to True.
-        decimals (int, optional): Number of digits to zfill by. Defaults to 3.
-        rem_empty (bool, optional): Whether to remove empty directories. Defaults to False.
-        rem_files (list[str], optional): list of file suffixes to remove. Defaults to [str].
-        key_word (str, optional): Keyword to identify checkpoint directories. Defaults to "checkpoint".
-        ignore_keywords (list[str], optional): list of keywords to ignore when selecting checkpoint directories. Defaults to ["best"].
+
+def _removal(path: Path, reason: CleanReason) -> Removal:
+    return Removal(path, reason, _size(path))
+
+
+def checkpoint_dirs(run_dir: Path) -> list[Path]:
+    """A run's `checkpoints`/`checkpointsNNN` directories (several if the run was re-run)."""
+    return sorted(
+        p
+        for p in run_dir.iterdir()
+        if p.is_dir() and CHECKPOINT_DIR_RE.fullmatch(p.name)
+    )
+
+
+def find_run_dirs(runs_dir: Path) -> list[Path]:
+    """Every run directory under `runs_dir`: one holding a checkpoints directory."""
+    return sorted(
+        {
+            p.parent
+            for p in runs_dir.rglob("checkpoints*")
+            if p.is_dir() and CHECKPOINT_DIR_RE.fullmatch(p.name)
+        }
+    )
+
+
+def resume_checkpoint_removals(run_dir: Path) -> list[Removal]:
+    """The run's resume checkpoints (`checkpoint_NNN.pth`), wherever `best.pth` sits beside them.
+
+    A resume checkpoint adds the optimizer, scheduler and RNG state to the weights (about 3x the
+    size of `best.pth`), which only matters for resuming the run; testing, ensembling and
+    initialising new runs (`training.load_pretrained`) all use `best.pth`. Checkpoint directories
+    without a `best.pth` are left alone: in runs predating it, the last checkpoint is the run's
+    only copy of its weights.
     """
-
-    if ignore_keywords is None:
-        ignore_keywords = ["best"]
-    if rem_files is None:
-        rem_files = []
-    remove = rem_empty
-    path_obj = Path(path)
-    check_point_dirs = [
-        item.name
-        for item in path_obj.iterdir()
-        if item.is_dir() and key_word in item.name
+    return [
+        _removal(f, "resume checkpoint")
+        for d in checkpoint_dirs(run_dir)
+        if (d / BEST_WEIGHTS).is_file()
+        for f in sorted(d.glob("checkpoint_*.pth"))
     ]
 
-    # Remove files with specified suffixes in rem_files
-    if rem_files:
-        to_rem = [p for p in path_obj.iterdir() if is_removable(p, rem_files)]
-        for f in to_rem:
-            remove = True
-            if ask:
-                ans = "none"
-                print(f"{f} is set to be removed")
-                while ans not in ("y", "", "n"):
-                    ans = input("Delete [y]/n: ")
-                remove = ans != "n"
-            if remove:
-                print(f"Deleting {f}")
-                f.unlink()
-            else:
-                print(f"Skipping {f}")
 
-    # Removing empty directories
-    if len(check_point_dirs) == 0 or all(
-        is_empty(path_obj / d) for d in check_point_dirs
-    ):
-        if ask and rem_empty:
-            print(f"No checkpoints found in {path}")
-            ans = "none"
-            while ans not in ("y", "", "n"):
-                ans = input("Delete [y]/n: ")
+def abandoned_run_removals(run_dir: Path) -> list[Removal]:
+    """The whole run directory, if it holds no files but `data_info.json`.
 
-            if ans == "n":
-                remove = False
-        else:
-            print(f"Warning, no checkpoints found in {path}")
-
-        if rem_empty:
-            try:
-                shutil.rmtree(path)
-                print(f"Removed directory and all contents: {path}")
-            except OSError as e:
-                print(f"Error removing {path}: {e}")
-        else:
-            print(f"Warning, no checkpoints found in {path}")
-        return
-
-    # Remove checkpoint files, keeping only the last one and any with ignore_keywords in the name
-    for check in check_point_dirs:
-        to_empty = path_obj / check
-
-        dirty = sorted([item.name for item in to_empty.iterdir() if item.is_file()])
-        files = [
-            file
-            for file in dirty
-            if file.endswith(".pth")
-            and not any(keyword in file for keyword in ignore_keywords)
-        ]
-
-        if add_zfill:
-            for i, f in enumerate(files):
-                num = extract_num(f)
-                if num is None:
-                    continue
-                files[i] = f.replace(num, num.zfill(decimals))
-
-        if len(files) <= 2:
-            continue
-
-        # leave best.pth and the last checkpoint
-        to_remove = files[:-1]
-        if ask:
-            ans = "none"
-            while ans != "y" and ans != "" and ans != "n":
-                print(
-                    f"Only keep checkpoint {files[-1]} in {to_empty} (excluding best.pth and non pth files)?"
-                )
-                ans = input(f"Delete up to {files[-2]}[y]/n: ")
-
-            if ans == "n":
-                continue
-
-        for file in to_remove:
-            file_path = to_empty / file
-            file_path.unlink()
-            print(f"removed {file} in {to_empty}")
+    That is a run that never trained, or an untested sweep trial (e.g. stopped by hyperband)
+    whose weights `sweep_weight_removals` already deleted, so a second pass catches those.
+    """
+    if all(f.name == DATA_INFO for f in run_dir.rglob("*") if f.is_file()):
+        return [_removal(run_dir, "abandoned run")]
+    return []
 
 
-def recursive_cleaner(
-    path: str | Path,
-    ask: bool = False,
-    rem_empty: bool = False,
-    rem_files: list[str] | None = None,
-    stopping_keyword="checkpoints",
-):
-    """Recursively clean runs checkpoints and miscilaneaous files
+def best_val_loss(run_dir: Path) -> float | None:
+    """Lowest best validation loss over the run's `results*/best_val_loss.json`, if tested."""
+    losses = [
+        float(json.loads(p.read_text())["best_val_loss"])
+        for p in run_dir.glob("results*/best_val_loss.json")
+    ]
+    return min(losses, default=None)
+
+
+def sweep_weight_removals(
+    sweep_dir: Path, keep_top: int, keep_ids: set[str]
+) -> list[Removal]:
+    """Weights (`*.pth`) of a sweep's trials, except its `keep_top` best and those in `keep_ids`.
+
+    Trials are ranked by best validation loss, as `results/sweeping/ensemble.py` picks its
+    members; untested trials rank last. Only weights are removed, so each trial's results stay.
+    """
+    trials = [d for d in sweep_dir.iterdir() if d.is_dir()]
+    losses = {t: best_val_loss(t) for t in trials}
+    ranked = sorted(trials, key=lambda t: (losses[t] is None, losses[t] or 0.0))
+    return [
+        _removal(f, "sweep trial outside top-k")
+        for t in ranked[keep_top:]
+        if t.name not in keep_ids
+        for f in sorted(t.rglob("*.pth"))
+    ]
+
+
+def referenced_run_ids(run_ids: set[str], search_dir: Path = SRC_ROOT) -> set[str]:
+    """The `run_ids` named in any code, notebook, config or markdown file under `search_dir`.
+
+    JSON is not searched: sweep stashes list every trial, so would protect them all.
+    """
+    found: set[str] = set()
+    for f in search_dir.rglob("*"):
+        if f.suffix in REFERENCE_SUFFIXES and f.is_file():
+            words = re.findall(r"[a-z0-9]+", f.read_text(errors="ignore"))
+            found |= run_ids & set(words)
+    return found
+
+
+def queued_run_dirs() -> set[Path]:
+    """Run directories of the Que's queued and running runs, which must not be cleaned."""
+    from src.que.core import Que
+
+    que = Que(auto_save=False)
+    return {Path(r.admin.save_path).parent for r in [*que.to_run, *que.cur_run]}
+
+
+def plan_cleanup(
+    runs_dir: Path,
+    reasons: set[CleanReason],
+    keep_top: int,
+    keep_ids: set[str],
+    protected: set[Path],
+) -> list[Removal]:
+    """Everything the cleaner would delete under `runs_dir`, for the strategies in `reasons`.
 
     Args:
-        path (str | Path): Base runs directory to clean
-        ask (bool, optional): Whether to ask for confirmation before removing files. Defaults to False.
-        rem_empty (bool, optional): Whether to remove empty directories. Defaults to False.
-        rem_files (list[str], optional): list of file suffixes to remove. Defaults to [].
-        stopping_keyword (str, optional): Keyword to identify checkpoint directories. Defaults to "checkpoints".
+        runs_dir: Base runs directory (normally `RUNS_PATH`).
+        reasons: Which strategies to apply.
+        keep_top: Trials per sweep whose weights are kept (see `sweep_weight_removals`).
+        keep_ids: Sweep trial ids whose weights are kept regardless of rank (e.g. those from
+            `referenced_run_ids`).
+        protected: Run directories never cleaned (e.g. `queued_run_dirs()`); a sweep holding
+            one is skipped entirely.
 
-    Raises:
-        FileNotFoundError: If the provided path does not exist
+    Returns:
+        list[Removal]: One entry per path, so a file is never counted twice.
     """
-    if rem_files is None:
-        rem_files = []
-    path_obj = Path(path)
+    run_dirs = [
+        r
+        for r in find_run_dirs(runs_dir)
+        if r.resolve() not in {p.resolve() for p in protected}
+    ]
+    removals: dict[Path, Removal] = {}
 
-    if not path_obj.exists():
-        raise FileNotFoundError(f"Runs directory: {path} was not found")
+    def add(found: list[Removal]) -> None:
+        for r in found:
+            removals.setdefault(r.path, r)
 
-    sub_paths = [item for item in path_obj.iterdir() if item.is_dir()]
+    for run_dir in run_dirs:
+        if "abandoned run" in reasons:
+            add(abandoned_run_removals(run_dir))
+        if "resume checkpoint" in reasons:
+            add(resume_checkpoint_removals(run_dir))
+    if "sweep trial outside top-k" in reasons:
+        protected_sweeps = {p.resolve().parent for p in protected}
+        for sweep_dir in sorted(
+            {r.parent for r in run_dirs if r.parent.name.startswith(SWEEP_DIR_PREFIX)}
+        ):
+            if sweep_dir.resolve() not in protected_sweeps:
+                add(sweep_weight_removals(sweep_dir, keep_top, keep_ids))
+    return list(removals.values())
 
-    check_pnt_dirs = [poss_c for poss_c in sub_paths if stopping_keyword in poss_c.name]
 
-    if len(check_pnt_dirs) > 0:
-        clean_checkpoint_dirs(
-            path_obj,
-            ask=ask,
-            rem_empty=rem_empty,
-            rem_files=rem_files,
-            key_word=stopping_keyword,
+def sweep_trial_ids(runs_dir: Path) -> set[str]:
+    """The ids (directory names) of every sweep trial under `runs_dir`."""
+    return {
+        r.name
+        for r in find_run_dirs(runs_dir)
+        if r.parent.name.startswith(SWEEP_DIR_PREFIX)
+    }
+
+
+def summarise_removals(
+    removals: list[Removal], runs_dir: Path, verbose: bool = False
+) -> str:
+    """Count and size of the removals per reason (and each path, if `verbose`)."""
+    lines: list[str] = []
+    for reason in get_args(CleanReason):
+        group = [r for r in removals if r.reason == reason]
+        if verbose:
+            lines += [
+                f"  {r.path.relative_to(runs_dir)} ({r.size / 1e6:.0f} MB)"
+                for r in group
+            ]
+        lines.append(
+            f"{reason}: {len(group)} paths, {sum(r.size for r in group) / 1e9:.1f} GB"
         )
-    elif len(sub_paths) > 0:
-        for p in sub_paths:
-            recursive_cleaner(p, ask, rem_empty, rem_files, stopping_keyword)
+    lines.append(f"total: {sum(r.size for r in removals) / 1e9:.1f} GB")
+    return "\n".join(lines)
 
 
-def main():
-    # TODO: the output for empty runs has an issue
-    parser = ArgumentParser(description="utils.py")
-    parser.add_argument(
-        "-da",
-        "--dont_ask",
-        action="store_true",
-        help="Clean files and directories without confirming first",
+def apply_removals(removals: list[Removal]) -> None:
+    """Delete each removal's path (directories with their contents)."""
+    for r in removals:
+        if r.path.is_dir():
+            shutil.rmtree(r.path)
+        else:
+            r.path.unlink(missing_ok=True)
+
+
+def main() -> None:
+    reason_flags: dict[str, CleanReason] = {
+        "resume": "resume checkpoint",
+        "sweeps": "sweep trial outside top-k",
+        "abandoned": "abandoned run",
+    }
+    parser = ArgumentParser(
+        description="Free space in the runs directory. Dry run unless --delete is given."
     )
+    parser.add_argument("--runs_dir", type=Path, default=RUNS_PATH)
     parser.add_argument(
-        "-re", "--remove_empty", action="store_true", help="Remove empty directories"
-    )
-    parser.add_argument(
-        "-rf",
-        "--remove_files",
+        "--only",
         nargs="+",
-        type=str,
-        help="Remove files with provided suffixes (e.g. .png .txt) ",
+        choices=list(reason_flags),
+        help="Strategies to apply (default: all)",
+    )
+    parser.add_argument(
+        "-k",
+        "--keep_top",
+        type=int,
+        default=10,
+        help="Trials per sweep to keep weights for",
+    )
+    parser.add_argument(
+        "--keep",
+        nargs="+",
+        default=[],
+        help="Sweep trial ids to keep weights for, besides those named in code",
+    )
+    parser.add_argument("-v", "--verbose", action="store_true", help="List every path")
+    parser.add_argument("--delete", action="store_true", help="Actually delete")
+    parser.add_argument(
+        "-y", "--yes", action="store_true", help="Delete without confirming"
     )
     args = parser.parse_args()
 
-    recursive_cleaner(
-        path="runs",
-        ask=not args.dont_ask,
-        rem_empty=args.remove_empty,
-        rem_files=args.remove_files,
+    reasons: set[CleanReason] = {reason_flags[f] for f in (args.only or reason_flags)}
+    keep_ids = set(args.keep) | referenced_run_ids(sweep_trial_ids(args.runs_dir))
+    removals = plan_cleanup(
+        args.runs_dir, reasons, args.keep_top, keep_ids, queued_run_dirs()
     )
+    print(summarise_removals(removals, args.runs_dir, args.verbose))
+    if not args.delete or not removals:
+        return
+    if args.yes or input("Delete all of the above? [y/N]: ").strip().lower() == "y":
+        apply_removals(removals)
+        print("Deleted.")
 
 
 if __name__ == "__main__":
