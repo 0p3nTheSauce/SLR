@@ -1,0 +1,19 @@
+# Job templates for Que_v2 (~/Code/Que). Submit with, for example:
+#   que2 submit base train model=MViTv2_S_e split=asl100 config=src/configfiles/asl100/MViTv2_S_e/exp000.toml --seeds 0,1,2
+# Paths in key=value arguments are relative to the repo root (the job's working directory).
+project = "base"
+env = "wlasl"
+# Gitignored; symlinked into each worktree. Labels/videos, run outputs, slowfast MViT weights.
+shared = ["data", "src/runs", "src/models/mvit/weights"]
+
+# One run: train, then test the best-val-loss checkpoint (src/train_and_test.py). Outputs go to
+# src/runs/<split>/<model>/<run_name>/, with the results summary in run.json. A rerun of the same
+# run_name fails while its checkpoints exist. No SIGTERM handler, so not preemptible.
+[templates.train]
+command = "python -m src.train_and_test {model} {split} {config} --seed {seed} --run_name {run_name}"
+run_name = "{config_stem}_s{seed}"
+defaults = { seed = 0 }
+outputs = ["src/runs/{split}/{model}/{run_name}"]
+# Largest batch-size-1 training peak in src/results/all_benchmark.json (2026-09-12, RTX 3060) is
+# 6.4 GB (Swin3D_B, 32 frames); 8 leaves room for dataloader and CUDA context overhead.
+min_gpu_mem_gb = 8

@@ -120,6 +120,9 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
   RandAugment, normalisation) built on `torchvision.transforms.v2`.
 - `training.py` / `testing.py` — Core training loop and evaluation/inference; back the CLIs
   documented in the README.
+- `train_and_test.py` — Trains then tests one run from a config and seed, into
+  `runs/<split>/<model>/<run_name>/` with a `run.json` summary; the job command for Que_v2
+  (`que.toml` at the repo root, `que2 submit base train ...`).
 - `stopping.py` — `EarlyStopper`: halts training on a monitored metric plateau.
 - `sweeping.py` — Wandb hyperparameter-sweep helpers; used both by the Que `Worker` and as a
   standalone CLI entrypoint for `wandb agent`.

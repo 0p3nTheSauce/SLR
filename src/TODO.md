@@ -1,4 +1,8 @@
 Misc TODOs:
+- `train_and_test.py` (the Que_v2 job) has no SIGTERM handler, so its `que.toml` template is
+  not preemptible and a stopped run restarts from scratch (after its checkpoints dir is deleted).
+  Saving a checkpoint on SIGTERM, exiting 75 and adding a `--resume` (`resume_args`) would let
+  low-priority runs fill idle GPU time.
 - `training.py` keeps the final resume checkpoint (`checkpoint_NNN.pth`, ~3x `best.pth`) after a
   run finishes, though only `best.pth` is used afterwards; `python -m src.utils --only resume`
   clears them in bulk. Consider deleting it when a run completes successfully (keep it on a
