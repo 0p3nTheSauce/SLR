@@ -435,6 +435,7 @@ def load_training(
 def save_training(
     save_path: Path,
     save_every: int,
+    max_epoch: int,
     early_stopper: MaybeStopper,
     model: nn.Module,
     optimizer: optim.Optimizer,
@@ -445,9 +446,13 @@ def save_training(
     best_val_acc: float,
     stopping_metrics: dict[str, dict[str, float]],
 ) -> None:
-    """Save training state checkpoint"""
+    """Save a resume checkpoint every `save_every` epochs and on the run's last epoch.
 
-    if epoch % save_every == 0 or early_stopper.should_stop():
+    The last epoch's save matters beyond resuming: `testing.full_test` reads the run's best val
+    loss/acc from the newest checkpoint, so a run ending between saves would report stale values.
+    """
+
+    if epoch % save_every == 0 or epoch >= max_epoch or early_stopper.should_stop():
         checkpoint_data = {
             "epoch": epoch,
             "steps": steps,
@@ -812,6 +817,7 @@ def train_loop(
         save_training(
             save_path=save_path,
             save_every=save_every,
+            max_epoch=config.training.max_epoch,
             early_stopper=early_stopper,
             model=model,
             optimizer=optimizer,

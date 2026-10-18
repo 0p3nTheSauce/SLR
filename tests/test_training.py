@@ -1,10 +1,13 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 import torch
 from torch import nn, optim
 
 from src.run_types import CosAnealInfo
-from src.training import get_scheduler
+from src.stopping import NullEarlyStopper
+from src.training import get_scheduler, save_training
 
 BASE_LRS = (1e-3, 1e-2)  # two param groups, like the backbone and classifier
 
@@ -88,3 +91,30 @@ class TestCosineHold:
         np.testing.assert_allclose(
             _lr_trajectory(resumed_optimizer, resumed_scheduler, 17), full[8:], rtol=1e-6
         )
+
+
+@pytest.mark.parametrize(
+    ("epoch", "saved"),
+    [(3, False), (5, True), (7, True)],  # off-interval, on-interval, final epoch (max_epoch 7)
+)
+def test_save_training_saves_on_interval_and_final_epoch(
+    tmp_path: Path, epoch: int, saved: bool
+) -> None:
+    model = nn.Linear(1, 1)
+    optimizer = optim.AdamW(model.parameters())
+    save_training(
+        save_path=tmp_path,
+        save_every=5,
+        max_epoch=7,
+        early_stopper=NullEarlyStopper(),
+        model=model,
+        optimizer=optimizer,
+        scheduler=optim.lr_scheduler.StepLR(optimizer, step_size=1),
+        epoch=epoch,
+        steps=0,
+        best_val_loss=1.0,
+        best_val_acc=50.0,
+        stopping_metrics={},
+    )
+
+    assert (tmp_path / f"checkpoint_{epoch:03d}.pth").exists() == saved
