@@ -1,0 +1,82 @@
+# Final results for the thesis SOTA comparison (thesis run list job 1, 18 Oct 2026): the best
+# trial of MViTv2_S_16x4_e sweep 1 (510lhysg, trial 5mzfq88e) on the corrected 0-based plain splits,
+# each from Kinetics-400 weights (the model's default), one run per split, e.g.
+#   que2 submit base train model=MViTv2_S_16x4_e split=asl100 seed=42 \
+#     config=src/configfiles/thesis_final/MViTv2_S_16x4_e_5mzfq88e.toml
+# Same as the trial except max_epoch (55 there): eta_min is 0 and held after warmup + tmax, so
+# the LR is 0 from epoch 26 and later epochs cannot change the model.
+
+[training]
+batch_size = 2
+update_per_step = 4
+max_epoch = 25
+
+[optimizer]
+eps = 3e-06
+backbone_init_lr = 0.0005139309866610777
+backbone_weight_decay = 0.07883203473559676
+classifier_init_lr = 5.2330642634422045e-05
+classifier_weight_decay = 1.2051253640411729e-05
+
+[model_params]
+drop_p = 0.19214689390037337
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 3, type = "chunked" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.4
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 3
+magnitude = 11
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 20
+eta_min = 0.0
+hold_after_tmax = true
+
+[scheduler.warm_up]
+start_factor = 0.1
+end_factor = 1.0
+warmup_epochs = 5
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
