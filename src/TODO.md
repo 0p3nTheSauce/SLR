@@ -113,3 +113,10 @@ Misc TODOs:
   (about 6 days for 20 trials). Optional GPU work for stronger thesis numbers: the sweep-1 best config on
   asl300 (about 16 h, initialised from trial `5mzfq88e`'s checkpoint), then asl1000 and asl2000.
   Clear the stale sweep (`510lhysg`, 20/20) in `src/que/state/Server.json` when the next one is set.
+- **Two duplicate-clip analyses (as of 2026-10-18).** The two `main`s diverged and each did one:
+  `results/dataset_analysis/find_duplicates.py` (exact + near-duplicate frame fingerprints, writes
+  `stashed_results/duplicates_asl2000.json`, used by `satnac_2026/duplicate_accuracy.ipynb`) and
+  `results/dataset_analysis/duplicates.py` (byte-identical MD5 copies, for `duplicate_clips.ipynb`).
+  Compare their findings, then keep one module (or make one build on the other) and one stash.
+- `results/dataset_analysis/duplicates.py` and `tests/results/test_duplicates.py` have 8 pyright errors
+  (as of 2026-10-18): pandas groupby/`DataFrame(columns=list)` typing. Fix with explicit casts/types.
