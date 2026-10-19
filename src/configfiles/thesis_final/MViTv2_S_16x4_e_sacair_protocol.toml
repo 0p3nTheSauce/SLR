@@ -2,10 +2,11 @@
 # the content of configfiles/asl100/MViTv2_B_32x3/exp007.toml, which configfiles/{asl300,asl1000,asl2000}/
 # MViTv2_B_32x3/exp000.toml repeat. Thesis run list job 3 (18 Oct 2026) runs MViTv2-S^I (MViTv2_S_16x4_e)
 # with it on asl300/1000/2000_cutoff_9_1_indexed, chained like the MViTv2-B runs: each split starts from
-# the previous split's best.pth, and asl300 from the asl100 run wifpnh92 (78.68 test top-1), e.g.
+# the previous split's best.pth, and asl300 from the asl100 run due3auwd (seed 42, best val loss
+# 0.8995; the thesis selects on val loss), e.g.
 #   que2 submit base train model=MViTv2_S_16x4_e split=asl300_cutoff_9_1_indexed seed=42 \
 #     config=src/configfiles/thesis_final/MViTv2_S_16x4_e_sacair_protocol.toml \
-#     -w src/runs/asl100_cutoff_9_1_indexed/MViTv2_S_16x4_e/exp000/checkpoints000/best.pth
+#     -w src/runs/asl100_cutoff_9_1_indexed/MViTv2_S_16x4_e/exp000/checkpoints/best.pth
 
 [training]
 batch_size = 1
