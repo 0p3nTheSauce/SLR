@@ -43,10 +43,13 @@ def extract_args_from_command(command: list[str]) -> argparse.Namespace:
     literal_args = [c for c in command if not (isinstance(c, str) and c.startswith("${"))]
     if not literal_args:
         raise SweepConfigError("Sweep yaml `command` block has no literal args to parse from.")
-    # literal_args[0] is the interpreter (e.g. "python"); the rest are
-    # get_sweep_parser's own positionals/options, so reuse it rather than
-    # re-deriving the arg order by hand.
-    parsed = get_sweep_parser().parse_args(literal_args[1:])
+    # literal_args[0] is the interpreter (e.g. "python"), optionally followed by
+    # `-m src.sweeping`; the rest are get_sweep_parser's own positionals/options,
+    # so reuse it rather than re-deriving the arg order by hand.
+    script_args = literal_args[1:]
+    if script_args[:1] == ["-m"]:
+        script_args = script_args[2:]
+    parsed = get_sweep_parser().parse_args(script_args)
     return parsed
 
 def args_from_sweep_yaml(sweep_path: Path) -> argparse.Namespace:

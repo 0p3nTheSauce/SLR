@@ -5,6 +5,7 @@ import pytest
 from src.sweeping import (
     SweepConfigError,
     apply_sweep_overrides,
+    extract_args_from_command,
     extract_sweep_values,
     validate_sweep_key_map,
 )
@@ -53,3 +54,16 @@ class TestValidateSweepKeyMap:
         bad = KEY_MAP | {"frame_size": ["augs.spatial.type:CROP.size", "test.nope.size"]}
         with pytest.raises(SweepConfigError, match="test.nope.size"):
             validate_sweep_key_map(self._write_base(tmp_path, bad))
+
+
+class TestExtractArgsFromCommand:
+    ARGS = ("MViTv2_S_e", "asl100", "base.py")
+
+    @pytest.mark.parametrize(
+        "launcher",
+        [["python", "${program}"], ["python", "-m", "src.sweeping"]],
+        ids=["script", "module"],
+    )
+    def test_parses_trial_args(self, launcher: list[str]) -> None:
+        args = extract_args_from_command(["${env}", *launcher, *self.ARGS])
+        assert (args.model, args.split, args.config_path) == ("MViTv2_S_e", "asl100", Path("base.py"))

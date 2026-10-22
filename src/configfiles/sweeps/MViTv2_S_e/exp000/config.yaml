@@ -1,0 +1,73 @@
+program: src/sweeping.py
+method: bayes
+metric:
+  name: Best/Val_loss
+  goal: minimize
+entity: ljgoodall2001-rhodes-university
+project: Sweeps
+
+# No early_terminate, as in sweep 1: base.py holds the LR at eta_min after warmup + tmax, so
+# patience ends each trial soon after the cycle (see README).
+
+parameters:
+  # --- tuned ---
+  # Ranges follow sweep 1's conclusions (suggest_sweep.ipynb, 2026-10-14), widened where sweep 1's
+  # best sat at a bound, since that was a different implementation (PySlowFast MViTv2_S_16x4_e).
+  #Optimizer params
+  backbone_init_lr:
+    distribution: log_uniform_values
+    min: 0.0001
+    max: 0.0012 # sweep 1's best (5.1e-4) and top 5 were against its 6e-4 cap; below 2.5e-4 was poor
+  classifier_init_lr:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.003 # flat in sweep 1, but kept: its best (5.2e-5) didn't transfer to asl1000 (README)
+  backbone_weight_decay:
+    distribution: log_uniform_values
+    min: 0.001
+    max: 0.3 # sweep 1's best (0.079) was near its 0.1 cap
+  #model params
+  drop_p:
+    distribution: uniform
+    min: 0.1
+    max: 0.5 # flat in sweep 1 (0.1-0.6)
+  #Scheduler params
+  tmax:
+    distribution: int_uniform
+    min: 15
+    max: 30 # flat in sweep 1 except tmax 10, which was poor
+  #Augmentation params
+  magnitude:
+    distribution: int_uniform
+    min: 7
+    max: 15 # sweep 1's top 5 used 11-15
+
+  # --- fixed ---
+  eps: {value: 0.000003}
+  classifier_weight_decay: {value: 0.0001} # flat in sweep 1
+  warmup_epochs: {value: 5} # sweep 1's top 15 all used 5
+  start_factor: {value: 0.1}
+  end_factor: {value: 1.0}
+  eta_min: {value: 0.000001} # > 0 so the held tail still trains; below classifier_init_lr's min
+  hflip_p: {value: 0.4}
+  max_wobble: {value: 3}
+  num_ops: {value: 3}
+  batch_size: {value: 2}
+  update_per_step: {value: 4}
+  frame_size: {value: 224}
+  target_length: {value: 32}
+  num_magnitude_bins: {value: 31}
+  max_epoch: {value: 50} # warmup + tmax (at most 35) + patience; only a backstop
+  patience: {value: 15}
+  min_delta: {value: 0.01}
+
+# Run by `wandb agent --count 1` in each Que_v2 `sweep` job (que.toml), from the job's worktree.
+# `-m` keeps the imports in that worktree: the editable `slr` install points at the main checkout.
+command:
+  - ${env}
+  - python
+  - -m
+  - src.sweeping
+  - MViTv2_S_e
+  - asl100
+  - src/configfiles/sweeps/MViTv2_S_e/exp000/base.py
