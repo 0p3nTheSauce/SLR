@@ -32,6 +32,7 @@ from types import FrameType, TracebackType
 from typing import Any
 
 from typing_extensions import Self
+from wandb.sdk.wandb_run import Run
 
 from src.configs import get_model_checkpoint_dir, load_config
 from src.models import avail_models
@@ -197,6 +198,16 @@ def run_job(args: argparse.Namespace) -> None:
         exp = ExpInfo(**config.model_dump(), wandb=wandb_info)
         (save_path.parent / RESUME_INFO_FNAME).write_text(exp.model_dump_json(indent=2))
 
+    train_test_and_record(config, wandb_info, run)
+
+
+def train_test_and_record(config: RunInfo, wandb_info: WandbInfo, run: Run) -> None:
+    """Train `config` in the already set-up wandb `run` (resuming from the newest epoch checkpoint
+    when `config.admin.recover` is set), test its best checkpoint, and write the run's `run.json`.
+
+    A resume checkpoint is saved every epoch. The working directory must already be `src/`.
+    """
+    admin = config.admin
     try:
         train_loop(admin.model, config, run, save_every=1, recover=admin.recover)
     except BaseException:
@@ -206,21 +217,26 @@ def run_job(args: argparse.Namespace) -> None:
 
     results = full_test(admin=admin, data=config.data, re_test=True)
     comp = CompExpInfo(**config.model_dump(), wandb=wandb_info, results=results)
-    run_info_path = save_path.parent / RUN_INFO_FNAME
+    run_info_path = Path(admin.save_path).parent / RUN_INFO_FNAME
     run_info_path.write_text(comp.model_dump_json(indent=2))
     print(f"Saved {run_info_path}")
 
 
-def main() -> None:
-    args = get_parser().parse_args()
+def run_preemptible(job: Callable[[argparse.Namespace], None], args: argparse.Namespace) -> None:
+    """Run `job(args)` under Que_v2's exit-code contract: if it is stopped by SIGTERM, exit
+    `EXIT_RESUME` so Que_v2 resumes it later; any other failure propagates."""
     with SigtermGuard() as guard:
         try:
-            run_job(args)
+            job(args)
         except BaseException:
             if not guard.received:
                 raise
             print(f"Stopped by SIGTERM; exiting {EXIT_RESUME} to be resumed from the last epoch")
             sys.exit(EXIT_RESUME)
+
+
+def main() -> None:
+    run_preemptible(run_job, get_parser().parse_args())
 
 
 if __name__ == "__main__":

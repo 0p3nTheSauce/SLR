@@ -44,16 +44,18 @@ these ranges are in
 
 ## Running it
 
-The sweep runs on Que_v2, one job per trial, from the `sweep` template in [que.toml](../../../../../que.toml).
-Each job runs `wandb agent --count 1`, which runs the yaml's `command` (`python -m src.sweeping`)
-in the job's worktree:
+The sweep runs on Que_v2, one job per trial, from the `sweep` template in [que.toml](../../../../../que.toml),
+which runs [`src/sweep_trial.py`](../../../../sweep_trial.py). A job's first attempt asks wandb for
+a trial and saves the trial's resolved config. Every attempt then trains that trial like a `train`
+job, resuming it from its last epoch, so the jobs are preemptible. Trials go to
+`src/runs/asl100/MViTv2_S_e/sweep_flx99idx/job<Que_v2 job id>/`.
 
     wandb sweep src/configfiles/sweeps/MViTv2_S_e/exp000/config.yaml   # prints the sweep id
     for i in $(seq 20); do que2 submit base sweep sweep_id=<id> --group sweep2-<id> --priority <p>; done
 
-Then record the id at the top of this file, in `config.yaml` and in `sweep_meta.json`. A trial can't
-resume, so the jobs aren't preemptible. A higher-priority job waits for the current trial to end
-(up to about 9 h), and a GPU reservation has to stop one with `--force`, which loses that trial.
+Then record the id at the top of this file, in `config.yaml` and in `sweep_meta.json`.
+`suggest_sweep.ipynb` can't read these trials yet: it reads the v1 Que's records (see
+`src/TODO.md`).
 
 ## Cost
 

@@ -264,6 +264,38 @@ def get_sweep_exp_dir(split: str, model: str, sweep_id: str, run_id: str,
     return Path(runs_path) / split / model / f"sweep_{sweep_id}" / run_id
 
 
+def build_trial_config(
+    model: str,
+    split: AVAIL_SPLITS,
+    config_path: Path,
+    sweep_values: dict[str, Any],
+    save_path: Path,
+    exp_no: str,
+    dataset: str = "WLASL",
+) -> RunInfo:
+    """A sweep trial's full RunInfo: `config_path`'s base_config skeleton, filled in with the
+    trial's flat `sweep_values` (wandb's `run.config`) via its sweep_key_map.
+
+    Raises:
+        SweepConfigError: If the key map doesn't resolve, or a skeleton leaf gets no value.
+    """
+    validate_sweep_key_map(config_path)
+    attributes = build_base_config(config_path)
+    raw = apply_sweep_overrides(attributes[BASE_CONFIG_ATTR], sweep_values, attributes[SWEEP_KEY_MAP_ATTR])
+    validate_resolved(raw)
+    admin = AdminInfo(
+        model=model,
+        dataset=dataset,
+        split=split,
+        exp_no=exp_no,
+        recover=False,
+        config_path=str(config_path),  # save the original sweep file
+        save_path=str(save_path),
+        weight_path=None,
+    )
+    return strict_validate(RunInfo, {"admin": admin.model_dump(), **raw})
+
+
 def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset: str = "WLASL"):
     """Build a fresh RunInfo + wandb Run for one sweep trial.
 
@@ -283,34 +315,16 @@ def create_sweep_run(model: str, split: AVAIL_SPLITS, config_path: Path, dataset
 
     run = wandb.init()
 
-    attributes = build_base_config(config_path)
-    raw = attributes[BASE_CONFIG_ATTR]
-    key_map = attributes[SWEEP_KEY_MAP_ATTR]
-    sweep_overrides = dict(run.config)
-    if sweep_overrides:
-        raw = apply_sweep_overrides(raw, sweep_overrides, key_map)
-
-    validate_resolved(raw)
-
     sweep_id = run.sweep_id or "manual"
     exp_dir = get_sweep_exp_dir(split, model, sweep_id, run.id)
     save_path = get_model_checkpoint_dir(exp_dir)
     save_path.mkdir(parents=True, exist_ok=True)
 
-    admin = AdminInfo(
-        model=model,
-        dataset=dataset,
-        split=split,
-        exp_no=run.id,
-        recover=False,
-        config_path=str(config_path),  # save the original sweep file
-        save_path=str(save_path),
-        weight_path=None,
+    config = build_trial_config(
+        model, split, config_path, dict(run.config), save_path, exp_no=run.id, dataset=dataset
     )
 
-    config = strict_validate(RunInfo, {"admin": admin.model_dump(), **raw})
-
-    run.name = f"{admin.model}_{admin.split}_{run.id}"
+    run.name = f"{model}_{split}_{run.id}"
     run.config.update(config.model_dump(), allow_val_change=True)  # log resolved config
 
     return config, run

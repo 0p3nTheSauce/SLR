@@ -36,10 +36,12 @@ min_gpu_mem_gb = 8
 
 # One trial of a wandb sweep in the Sweeps project, e.g. 20 trials of sweep <id>:
 #   for i in $(seq 20); do que2 submit base sweep sweep_id=<id> --group sweep-<id>; done
-# The agent asks wandb for the trial's parameters and runs the sweep yaml's `command`
-# (`python -m src.sweeping ...`) in this job's worktree; outputs go to
-# src/runs/<split>/<model>/sweep_<id>/<wandb run id>/. A trial can't resume, so the job isn't
-# preemptible: higher-priority jobs wait for it, and stopping it loses the trial.
+# The first attempt asks wandb for the trial's parameters and saves its resolved config; every
+# attempt then trains it like `train`, resuming the same trial from its last epoch
+# (src/sweep_trial.py), so the job is preemptible. Outputs go to
+# src/runs/<split>/<model>/sweep_<id>/job<job id>/.
 [templates.sweep]
-command = "wandb agent --count 1 ljgoodall2001-rhodes-university/Sweeps/{sweep_id}"
+command = "python -m src.sweep_trial {sweep_id}"
+preemptible = true
+grace_seconds = 120
 min_gpu_mem_gb = 8

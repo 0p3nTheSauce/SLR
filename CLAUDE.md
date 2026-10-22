@@ -124,6 +124,8 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
   `runs/<split>/<model>/<run_name>/` with a `run.json` summary, resuming from the run's last epoch
   checkpoint if one exists; the (preemptible) job command for Que_v2 (`que.toml` at the repo
   root, `que2 submit base train ...`).
+- `sweep_trial.py` — One wandb sweep trial as a resumable Que_v2 job (the `sweep` template in
+  `que.toml`): samples the trial once, then trains/tests it like `train_and_test.py`.
 - `stopping.py` — `EarlyStopper`: halts training on a monitored metric plateau.
 - `sweeping.py` — Wandb hyperparameter-sweep helpers; used both by the Que `Worker` and as a
   standalone CLI entrypoint for `wandb agent`.

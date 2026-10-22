@@ -124,3 +124,10 @@ Misc TODOs:
   Compare their findings, then keep one module (or make one build on the other) and one stash.
 - `results/dataset_analysis/duplicates.py` and `tests/results/test_duplicates.py` have 8 pyright errors
   (as of 2026-10-18): pandas groupby/`DataFrame(columns=list)` typing. Fix with explicit casts/types.
+- Experiment tracking for Que_v2 (agreed 2026-10-22: build this rather than revive the v1 Que
+  for it). Que_v2 only schedules; results live in each run's `run.json` (a `CompExpInfo`,
+  written by `train_and_test.py` / `sweep_trial.py`) under `src/runs/`. `results/sweeping/helpers.py`
+  and `suggest_sweep.ipynb` still read the v1 Que's `old_runs`, so they can't see MViTv2_S_e
+  sweep 2's trials (`src/runs/asl100/MViTv2_S_e/sweep_flx99idx/job*/run.json`). Needed before
+  sweep 2 is analysed: a reader that collects `run.json` files (by sweep id, or any glob) into
+  `CompExpInfo`s; longer term, an index over `src/runs/**/run.json`.

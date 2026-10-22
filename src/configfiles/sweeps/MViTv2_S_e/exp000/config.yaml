@@ -61,8 +61,9 @@ parameters:
   patience: {value: 15}
   min_delta: {value: 0.01}
 
-# Run by `wandb agent --count 1` in each Que_v2 `sweep` job (que.toml), from the job's worktree.
-# `-m` keeps the imports in that worktree: the editable `slr` install points at the main checkout.
+# Que_v2 `sweep` jobs (que.toml, src/sweep_trial.py) read the model, split and base config from
+# here and don't run it. It still runs as is under a plain `wandb agent` (CLI mode); `-m` keeps the
+# imports in the current checkout, since the editable `slr` install points at the main one.
 command:
   - ${env}
   - python
