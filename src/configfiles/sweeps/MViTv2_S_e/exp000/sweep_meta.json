@@ -1,0 +1,13 @@
+[
+  {
+    "recorded": "2026-10-22 23:20:00",
+    "sweep_id": "flx99idx",
+    "sweep_project": "Sweeps",
+    "sweep_entity": "ljgoodall2001-rhodes-university",
+    "model": "MViTv2_S_e",
+    "dataset": "WLASL",
+    "split": "asl100",
+    "base_config": "src/configfiles/sweeps/MViTv2_S_e/exp000/base.py",
+    "max_runs": 20
+  }
+]

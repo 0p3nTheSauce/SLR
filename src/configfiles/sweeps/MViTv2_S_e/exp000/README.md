@@ -1,6 +1,7 @@
-# MViTv2_S_e sweep 2
+# MViTv2_S_e sweep 2 : flx99idx
 
-Not created yet. Planned for 20 trials on `asl100` (see [Running it](#running-it) and [Cost](#cost)).
+Created 2026-10-22 for 20 trials on `asl100` (see [Running it](#running-it) and [Cost](#cost)), queued as Que_v2
+group `sweep2-flx99idx` : [wandb](https://wandb.ai/ljgoodall2001-rhodes-university/Sweeps/sweeps/flx99idx)
 
 This sweep reruns [MViTv2_S_16x4_e sweep 1](../../MViTv2_S_16x4_e/exp001/README.md) with both of
 its caveats fixed (thesis run list job 5, 18 Oct 2026). Sweep 1's results and the reasoning for
@@ -50,7 +51,7 @@ in the job's worktree:
     wandb sweep src/configfiles/sweeps/MViTv2_S_e/exp000/config.yaml   # prints the sweep id
     for i in $(seq 20); do que2 submit base sweep sweep_id=<id> --group sweep2-<id> --priority <p>; done
 
-Then record the id at the top of this file and in `config.yaml`, as sweep 1 does. A trial can't
+Then record the id at the top of this file, in `config.yaml` and in `sweep_meta.json`. A trial can't
 resume, so the jobs aren't preemptible. A higher-priority job waits for the current trial to end
 (up to about 9 h), and a GPU reservation has to stop one with `--force`, which loses that trial.
 
