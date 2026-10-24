@@ -95,6 +95,11 @@ Misc TODOs:
   Near-duplicates (re-encodes) are not found by the MD5 hashing: try perceptual hashing or
   frame-level matching. Compare the conflicting gloss pairs with the Boston University revised
   labels (the item above).
+- **Signer shortcut on the final models (`results/satnac_2026/signer_shortcut.ipynb`).** Done for
+  asl2000 `MViTv2_S` exp000/exp002 (2026-10-24). Rerun it on thesis job 4's final asl2000 model once
+  it is tested: stash its test top-k (`run_topk_inference` in `all_misspredictions.ipynb`) and add
+  it to `other_exps`. A model trained on the 0-based plain split needs `load_split`'s signer data
+  only, but its stash name won't be `asl2000_cutoff_9`.
 - **Cleaned dataset with variation-level classes (feasibility in
   `results/dataset_analysis/custom_dataset_feasibility.ipynb`).** Needs: a reviewed merge list (338
   class pairs share 2+ clips), a re-split rule, a per-dataset class list in place of the global
