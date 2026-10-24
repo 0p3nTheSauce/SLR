@@ -45,3 +45,13 @@ command = "python -m src.sweep_trial {sweep_id}"
 preemptible = true
 grace_seconds = 120
 min_gpu_mem_gb = 8
+
+# A headless Claude Code session (`claude -p`) that follows the prompt file {prompt}, usually as
+# an event-driven follow-up to other jobs, e.g.
+#   que2 submit base agent prompt=<file.md> --after-group <group> --priority <p>
+# It may also change the main checkout, the hub and this project's Claude memory (--add-dir).
+# Not preemptible, so it holds the worker while it runs: jobs it submits are queued before
+# anything else starts. The job log is its full transcript (stream-json).
+[templates.agent]
+command = "/home/luke/.local/bin/claude -p --permission-mode acceptEdits --allowedTools Read Glob Grep Edit Write Bash --output-format stream-json --verbose --max-turns 200 --add-dir /home/luke/Code/SLR /home/luke/claude-hub /home/luke/.claude/projects/-home-luke-Code-SLR/memory < {prompt}"
+grace_seconds = 60
