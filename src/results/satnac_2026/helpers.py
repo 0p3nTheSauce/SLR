@@ -1,12 +1,12 @@
-"""Helpers for `all_misspredictions.ipynb`: read an instance's stored predictions, and
-show clips (with their top-k chart, alone, or a gloss's every instance) as frame grids
-or videos, per the notebook's `as_video` setting, and save what was shown."""
+"""Helpers for `all_misspredictions.ipynb`: read an instance's stored predictions, fetch a
+video by id, show clips (with their top-k chart, alone, or a gloss's every instance) as
+frame grids or videos, per the notebook's `as_video` setting, and save what was shown."""
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, NamedTuple, TypeAlias
+from typing import Any, Literal, NamedTuple, TypeAlias, get_args
 
 from IPython.display import display
 from matplotlib.animation import FuncAnimation
@@ -15,8 +15,9 @@ from torch import Tensor
 
 from src.preprocess import Instance
 from src.results import get_asset_path
-from src.run_types import InstanceTopK
+from src.run_types import AVAIL_SETS, AVAIL_SPLITS, InstanceTopK
 from src.visualise2 import (
+    FrameFetcher,
     PanelPosition,
     animate_clip_grid,
     animate_frames,
@@ -58,6 +59,39 @@ def sort_instances(
 
 def instance_label(inst: Instance, sep: str = ", ") -> str:
     return f"signer {inst.signer_id}{sep}variation {inst.variation_id}"
+
+
+def find_video(
+    all_sets: Mapping[str, Sequence[Mapping[str, Any]]], video_id: str
+) -> tuple[AVAIL_SETS, int]:
+    """The set and class index of `video_id` in `all_sets` (as `get_all_sets` returns).
+
+    Raises:
+        KeyError: If no set holds the video.
+    """
+    for set_name in get_args(AVAIL_SETS):
+        for cls_idx, gloss in enumerate(all_sets.get(set_name, [])):
+            if any(Instance.model_validate(i).video_id == video_id for i in gloss["instances"]):
+                return set_name, cls_idx
+    raise KeyError(f"video {video_id} is in no set")
+
+
+def fetch_video(
+    all_sets: Mapping[str, Sequence[Mapping[str, Any]]],
+    video_id: str,
+    split_name: AVAIL_SPLITS,
+    target_length: int,
+) -> tuple[Instance, Tensor]:
+    """One video's metadata and frames, sampled as `FrameFetcher` samples them."""
+    set_name, cls_idx = find_video(all_sets, video_id)
+    fetched = FrameFetcher(
+        cls_idx=cls_idx,
+        all_sets=dict(all_sets),
+        set_name=set_name,
+        split_name=split_name,
+        target_length=target_length,
+    ).fetch_all()
+    return next(pair for pair in fetched if pair[0].video_id == video_id)
 
 
 class VariationPick(NamedTuple):

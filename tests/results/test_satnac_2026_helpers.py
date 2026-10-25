@@ -1,7 +1,8 @@
+import pytest
 import torch
 
 from src.preprocess import Instance
-from src.results.satnac_2026.helpers import VariationStepper
+from src.results.satnac_2026.helpers import VariationStepper, find_video
 
 
 def _fetched(video_id: str, variation_id: int) -> tuple[Instance, torch.Tensor]:
@@ -48,3 +49,14 @@ def test_no_instances_gives_empty_steps() -> None:
     stepper = VariationStepper([])
     assert stepper.num_steps == 0
     assert stepper() == []
+
+
+def test_find_video_gives_its_set_and_class_index() -> None:
+    all_sets = {
+        "train": [{"instances": [_fetched("a", 0)[0]]}, {"instances": [_fetched("b", 0)[0]]}],
+        "test": [{"instances": []}, {"instances": [_fetched("c", 0)[0].model_dump()]}],
+    }
+    assert find_video(all_sets, "b") == ("train", 1)
+    assert find_video(all_sets, "c") == ("test", 1)
+    with pytest.raises(KeyError):
+        find_video(all_sets, "missing")
