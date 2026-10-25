@@ -1,0 +1,83 @@
+# Thesis final S3D results (25 Oct 2026, replacing §5.2's S3D comparison): S3D sweep 7's best
+# trial cs9lwmiy (u8yashg8, asl100_cutoff_9), unchanged except for a fixed epoch budget, to mirror
+# job 4's protocol: the LR holds at eta_min after warmup + tmax, and max_epoch = 5 + 38 stops the run
+# there. One config for every stage of the chain, asl100 from K400 then asl300 -> asl1000 -> asl2000,
+# each from the previous stage's best.pth on the corrected 0-based splits, e.g.
+#   que2 submit base train model=S3D split=asl100 seed=42 config=src/configfiles/thesis_final/S3D_cs9lwmiy.toml
+#   que2 submit base train_chained model=S3D split=asl300 seed=42 --after <asl100 job> \
+#     config=src/configfiles/thesis_final/S3D_cs9lwmiy.toml
+
+[training]
+batch_size = 8
+update_per_step = 1
+max_epoch = 43
+
+[optimizer]
+eps = 8.968538616086552e-06
+backbone_init_lr = 0.0004610845104680897
+backbone_weight_decay = 0.026715959377333908
+classifier_init_lr = 2.2286120949738445e-05
+classifier_weight_decay = 2.697653960458971e-05
+
+[model_params]
+drop_p = 0.7007581710730469
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 8, type = "chunked" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.3920965300575425
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 4
+magnitude = 5
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 38
+eta_min = 0.0
+hold_after_tmax = true
+
+[scheduler.warm_up]
+start_factor = 0.34694788316648284
+end_factor = 1.0
+warmup_epochs = 5
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 20
+min_delta = 0.01
