@@ -1,4 +1,9 @@
 Misc TODOs:
+- Thesis S3D finals (Que_v2 jobs 72-75, `thesis_final/S3D_cs9lwmiy.toml`, chained asl100 -> 2000):
+  stash each stage's test top-k and report it to the thesis. When job 75 (asl2000) finishes, add it
+  as the comparison model in `satnac_2026/` `correlation_f1`, `eda_performers`,
+  `all_misspredictions` (the same video ids), `duplicate_accuracy` and `signer_shortcut` (full
+  analysis): the notebooks take one run each, so either rerun them per run or give them a run list.
 - Before e0c4521 (2026-10-18), a run that reached `max_epoch` between resume saves (every 5 epochs)
   kept a stale newest checkpoint, so `full_test` recorded `best_val_loss`/`best_val_acc` from up to
   4 epochs before the end (test/val accuracies are unaffected: they come from `best.pth`). Find
