@@ -718,6 +718,7 @@ def plot_correlation_bars(
     palette: Sequence[str] | None = None,
     xlabel: str = r"Kendall $\tau$",
     title: str | None = None,
+    legend_loc: str | None = None,
     figsize: tuple[float, float] = FIGSIZE,
     ax: Axes | None = None,
 ) -> tuple[Figure, Axes]:
@@ -727,7 +728,8 @@ def plot_correlation_bars(
     row to compare them (e.g. one series per sweep).
 
     names: one row each, top to bottom in the given order (sort first, e.g. by |tau|).
-        Underscores are replaced for the cmr10 font.
+        Underscores are replaced for the cmr10 font, except in names holding mathtext (`$`),
+        e.g. `$T_{warmup}$`, which are drawn as given.
     correlations: series name -> values aligned to `names`, on a fixed [-1, 1] axis. A NaN leaves
         a gap (e.g. a parameter that sweep fixed). One series is coloured by sign
         (`CORR_NEGATIVE_COLOR` below zero, so for a loss green means higher values went with lower
@@ -735,8 +737,12 @@ def plot_correlation_bars(
         `LINE_PALETTE`), and the sign is read from the bar's direction.
     p_values: aligned like `correlations`; bars with p >= `alpha` are drawn hatched and lighter,
         and a legend says so.
+    legend_loc: a matplotlib `loc` to put the legend inside the axes (check the rendered figure
+        for a free corner), or `"below"` for two columns under the x label (series, then the
+        significance key), which keeps the figure's width for the bars; by default it sits
+        outside, to the right.
     """
-    labels = [n.replace("_", " ") for n in names]
+    labels = [n if "$" in n else n.replace("_", " ") for n in names]
     series = list(correlations)
     if palette is None:
         palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(len(series))]
@@ -794,7 +800,11 @@ def plot_correlation_bars(
                 label=rf"$p \geq {alpha:g}$",
             ),
         ]
-    if handles:
+    if handles and legend_loc == "below":
+        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
+    elif handles and legend_loc is not None:
+        ax.legend(handles=handles, loc=legend_loc)
+    elif handles:
         ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
     if title:
         ax.set_title(title)
