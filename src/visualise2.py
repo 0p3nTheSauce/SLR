@@ -89,6 +89,10 @@ LINE_PALETTE = [
     "#F0E442",  # yellow
     "#000000",  # black
 ]
+# Signed correlation bars (`plot_param_importance`); green for negative suits a loss target
+CORR_NEGATIVE_COLOR = LINE_PALETTE[2]  # green
+CORR_POSITIVE_COLOR = LINE_PALETTE[1]  # vermillion
+
 VALUE_FMT = "%.2f"
 LOSS_FMT = "%.3f"
 COUNT_FMT = "%d"
@@ -640,6 +644,70 @@ def plot_metric_correlation(
 
     fig.tight_layout()
     return fig, ax, tau, p_value
+
+
+def plot_param_importance(
+    names: Sequence[str],
+    importance: ArrayLike,
+    correlation: ArrayLike,
+    importance_interval: tuple[ArrayLike, ArrayLike] | None = None,
+    importance_label: str = "Importance",
+    correlation_label: str = r"Kendall $\tau$",
+    title: str | None = None,
+    figsize: tuple[float, float] = FIGSIZE,
+) -> tuple[Figure, np.ndarray]:
+    """
+    One row per parameter, with an importance bar and a signed correlation bar side by side, like
+    W&B's sweep "parameter importance" panel (see `results/sweeping/param_importance.ipynb`).
+
+    names: parameter names, one row each, drawn top to bottom in the given order (sort first,
+        e.g. by importance). Underscores are replaced for the cmr10 font.
+    importance_interval: (low, high) per parameter, drawn as error bars on the importance bars
+        (e.g. a bootstrap interval); the value labels sit past the high end.
+    correlation: drawn on a fixed [-1, 1] axis, `CORR_NEGATIVE_COLOR` below zero and
+        `CORR_POSITIVE_COLOR` above, so for a loss a green bar means higher values went with
+        lower loss.
+
+    Returns `(fig, axes)` with `axes` the (importance, correlation) pair.
+    """
+    labels = [n.replace("_", " ") for n in names]
+    imp = np.asarray(importance, dtype=float)
+    corr = np.asarray(correlation, dtype=float)
+    rows = np.arange(len(labels))
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize, sharey=True)
+    imp_ax, corr_ax = axes
+
+    xerr = None
+    label_at = imp
+    if importance_interval is not None:
+        low, high = (np.asarray(v, dtype=float) for v in importance_interval)
+        xerr = np.vstack([imp - low, high - imp])
+        label_at = high
+    imp_ax.barh(rows, imp, color=DEFAULT_ACCENT, xerr=xerr, error_kw={"elinewidth": 1, "capsize": 3})
+    for row, value, x in zip(rows, imp, label_at):
+        imp_ax.annotate(
+            VALUE_FMT % value, (x, row), xytext=(4, 0), textcoords="offset points",
+            va="center", fontsize=plt.rcParams["ytick.labelsize"],
+        )
+    imp_ax.set_xlim(0, float(label_at.max()) * 1.25)  # headroom for labels
+    imp_ax.set_xlabel(importance_label)
+    imp_ax.set_yticks(rows, labels)
+    imp_ax.invert_yaxis()
+
+    colours = [CORR_NEGATIVE_COLOR if c < 0 else CORR_POSITIVE_COLOR for c in corr]
+    container = corr_ax.barh(rows, corr, color=colours)
+    corr_ax.bar_label(container, fmt="%+.2f", padding=3, fontsize=plt.rcParams["ytick.labelsize"])
+    corr_ax.axvline(0, color="black", linewidth=0.8)
+    corr_ax.set_xlim(-1, 1)
+    corr_ax.set_xlabel(correlation_label)
+
+    for ax in axes:
+        ax.grid(axis="x", linestyle="--", alpha=0.3)
+    if title:
+        fig.suptitle(title)
+    fig.tight_layout()
+    return fig, axes
 
 
 def save_fig(

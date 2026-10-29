@@ -40,6 +40,7 @@ Reference implementations that follow these conventions: `src/results/aug_compar
   colours.
 - `TRUE_CLASS_COLOR` (`LINE_PALETTE[2]`, green) — the ground-truth class's bar among otherwise
   `DEFAULT_ACCENT` top-k confidence bars.
+- `CORR_NEGATIVE_COLOR` / `CORR_POSITIVE_COLOR` (green / vermillion) — signed correlation bars.
 - `CONTROL_COLORS` / `suggest_palette()` — only for bar charts that need to visually distinguish a
   "control" category (matched case-insensitively against `"baseline"`/`"no_aug"`) from treatment
   bars.
@@ -78,6 +79,7 @@ Reuse `VALUE_FMT` (`"%.2f"`), `LOSS_FMT` (`"%.3f"`), `COUNT_FMT` (`"%d"`), and `
 | `plot_stacked_bar_chart` | Series summing to a per-category total (e.g. train/test/val instance counts) | `value_fmt` defaults to `COUNT_FMT` |
 | `plot_loss_curves` | One line per series over a shared x-axis (e.g. train/val loss curves) | NaNs dropped per-series so lines stay continuous |
 | `plot_metric_correlation` | Scatter of a metric against another variable, with linear fit + Kendall's tau (e.g. per-gloss F1 vs. instance/signer count) | `shade_by_density` toggles density-shaded vs. flat scatter; `y_clip` (e.g. `(0, 1)` for F1) truncates the fit line's x-range at the clip bound rather than clamping y (avoids a flat horizontal segment); legend is placed `loc="lower right"` **inside** the axes -- a deliberate exception to the outside-axes legend convention below, since a positive-trend scatter typically leaves that corner clear (verify against the rendered figure, don't assume); `legend_top_y` raises the legend so its top edge aligns with a given y-axis data value, to clear a cluster of low points still poking into the bottom-right corner; `log_x` log-scales the x-axis and fits against log10(x) (e.g. log-uniform sweep hyperparameters). When the points that matter sit along the bottom (e.g. lowest-loss sweep trials), remove the legend and put tau in the axes title instead (see `results/sweeping/suggest_sweep.ipynb`) |
+| `plot_param_importance` | W&B-style sweep parameter importance: per parameter, an importance bar (with an optional interval) beside a signed correlation bar (see `results/sweeping/param_importance.ipynb`) | Rows in the given order, top first; correlation on a fixed [-1, 1] axis coloured by sign (`CORR_NEGATIVE_COLOR` green, `CORR_POSITIVE_COLOR` vermillion, so green = lower loss for a loss target). Returns `(fig, axes)` with the two axes; no `ax` parameter, as it is inherently two panels |
 | `save_fig` | Save any of the above figures | Creates parent dirs; use instead of `fig.savefig` directly |
 | `suggest_palette` | Generate a per-category colour list for `plot_bar_chart` | Recognises `"baseline"`/`"no_aug"` as controls |
 | `split_name_mapper` | Map a raw split key (`"asl100_cutoff_9"`) to its display name (`"WLASL-100"`) | Backed by `SPLIT_NAME_MAP` |

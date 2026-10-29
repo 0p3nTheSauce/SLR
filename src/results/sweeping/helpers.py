@@ -1,6 +1,7 @@
-"""Helpers for `suggest_sweep.ipynb`: flatten a wandb sweep's finished Que runs into a
-DataFrame of sampled hyperparameters vs. results, and suggest refined parameter ranges
-for the next sweep iteration."""
+"""Helpers for `suggest_sweep.ipynb` and `param_importance.ipynb`: flatten a wandb sweep's
+finished runs (from the v1 Que or Que_v2's run.json files) into a DataFrame of sampled
+hyperparameters vs. results, suggest refined parameter ranges for the next sweep iteration,
+and rate each parameter's importance."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from typing import Any, Literal, get_args
 import numpy as np
 import pandas as pd
 import yaml
+from scipy import stats
+from sklearn.ensemble import RandomForestRegressor
 
 from src.que.core import CompExpInfo
 from src.sweeping import (
@@ -72,6 +75,14 @@ def load_sweep_key_map(base_py: Path) -> SweepKeyMap:
     return build_base_config(base_py, [SWEEP_KEY_MAP_ATTR])[SWEEP_KEY_MAP_ATTR]
 
 
+def load_sweep_run_jsons(sweep_runs_dir: Path) -> list[CompExpInfo]:
+    """The finished trials of a Que_v2 sweep, from each trial's `run.json` under
+    `src/runs/<split>/<model>/sweep_<id>/job<job id>/` (unfinished trials have none), in job
+    order. Que_v2 sweeps aren't in the v1 Que's `old_runs`, so `find_runs` doesn't see them."""
+    paths = sorted(sweep_runs_dir.glob("job*/run.json"), key=lambda p: int(p.parent.name[3:]))
+    return [CompExpInfo.model_validate_json(p.read_text()) for p in paths]
+
+
 def sweep_frame(
     runs: Sequence[CompExpInfo], sweep_key_map: SweepKeyMap, param_names: list[str]
 ) -> pd.DataFrame:
@@ -92,6 +103,94 @@ def sweep_frame(
             for run in runs
         ]
     )
+
+
+def _param_matrix(df: pd.DataFrame, params: dict[str, TunedParam]) -> np.ndarray:
+    """The swept parameters as a float matrix, categoricals as their index in `values`."""
+    columns = [
+        df[p.name].map(list(p.values).index) if p.values is not None else df[p.name]
+        for p in params.values()
+    ]
+    return np.column_stack(columns).astype(float)
+
+
+def param_importance(
+    df: pd.DataFrame,
+    params: dict[str, TunedParam],
+    metric: str = "best_val_loss",
+    n_boot: int = 200,
+    n_trees: int = 300,
+    interval: tuple[float, float] = (5, 95),
+    seed: int = 0,
+) -> pd.DataFrame:
+    """Each swept parameter's random-forest importance for `metric`, and its Kendall tau with it.
+
+    Importance is a random-forest regressor's impurity importance (mean decrease in variance,
+    summing to 1 over the parameters), as in W&B's parameter-importance panel. With few trials
+    one forest's importances are unstable, so a forest is fitted to each of `n_boot` bootstrap
+    resamples of the trials: `importance` is their mean and `importance_low`/`_high` the
+    `interval` percentiles. Impurity importance under-rates a parameter with few distinct
+    values (e.g. a two-valued categorical); `oob_permutation_importance` doesn't. `tau`/`tau_p`
+    are on all trials; negative means higher values went with lower `metric`. Categoricals are
+    encoded by their position in `values`. Rows are sorted by importance.
+    """
+    x, y = _param_matrix(df, params), df[metric].to_numpy(dtype=float)
+    rng = np.random.default_rng(seed)
+    boot = np.array(
+        [
+            RandomForestRegressor(n_estimators=n_trees, random_state=b)
+            .fit(x[idx], y[idx])
+            .feature_importances_
+            for b, idx in enumerate(rng.integers(0, len(y), (n_boot, len(y))))
+        ]
+    )
+    taus = [tuple(map(float, stats.kendalltau(x[:, j], y))) for j in range(x.shape[1])]
+    return pd.DataFrame(
+        {
+            "importance": boot.mean(axis=0),
+            "importance_low": np.percentile(boot, interval[0], axis=0),
+            "importance_high": np.percentile(boot, interval[1], axis=0),
+            "tau": [tau for tau, _ in taus],
+            "tau_p": [p for _, p in taus],
+        },
+        index=pd.Index(list(params), name="param"),
+    ).sort_values("importance", ascending=False)
+
+
+def oob_permutation_importance(
+    df: pd.DataFrame,
+    params: dict[str, TunedParam],
+    metric: str = "best_val_loss",
+    n_boot: int = 100,
+    n_trees: int = 100,
+    n_repeats: int = 5,
+    seed: int = 0,
+) -> pd.Series:
+    """Out-of-bag permutation importance, a check on `param_importance`'s impurity importance.
+
+    For each bootstrap resample, a forest is fitted to it, and each parameter is shuffled among
+    the trials left out of it; the importance is the mean increase in squared error that causes,
+    as a share of `metric`'s variance. Unlike impurity importance it doesn't favour parameters
+    with many distinct values, and it can be negative (the parameter doesn't help predict).
+    """
+    x, y = _param_matrix(df, params), df[metric].to_numpy(dtype=float)
+    rng = np.random.default_rng(seed)
+    increases: list[np.ndarray] = []
+    for b in range(n_boot):
+        idx = rng.integers(0, len(y), len(y))
+        oob = np.setdiff1d(np.arange(len(y)), idx)
+        if len(oob) < 2:
+            continue
+        forest = RandomForestRegressor(n_estimators=n_trees, random_state=b).fit(x[idx], y[idx])
+        base = np.mean((forest.predict(x[oob]) - y[oob]) ** 2)
+        row = np.zeros(x.shape[1])
+        for j in range(x.shape[1]):
+            for _ in range(n_repeats):
+                shuffled = x[oob].copy()
+                shuffled[:, j] = rng.permutation(shuffled[:, j])
+                row[j] += np.mean((forest.predict(shuffled) - y[oob]) ** 2) - base
+        increases.append(row / n_repeats)
+    return pd.Series(np.mean(increases, axis=0) / y.var(), index=pd.Index(list(params), name="param"))
 
 
 def _to_search_space(p: TunedParam, v: float) -> float:
@@ -126,7 +225,7 @@ def suggest_ranges(
         if p.distribution == "categorical" or p.low is None or p.high is None:
             continue
         lo, hi = _to_search_space(p, p.low), _to_search_space(p, p.high)
-        t_lo, t_hi = _to_search_space(p, top[p.name].min()), _to_search_space(p, top[p.name].max())
+        t_lo, t_hi = _to_search_space(p, float(top[p.name].min())), _to_search_space(p, float(top[p.name].max()))
         b = _to_search_space(p, best[p.name])
         pad = margin * (hi - lo)
 

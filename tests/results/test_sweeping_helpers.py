@@ -1,9 +1,16 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
-from src.results.sweeping.helpers import TunedParam, load_tuned_params, suggest_ranges
+from src.results.sweeping.helpers import (
+    TunedParam,
+    load_tuned_params,
+    oob_permutation_importance,
+    param_importance,
+    suggest_ranges,
+)
 
 
 def test_load_tuned_params_skips_fixed_and_single_values(tmp_path: Path) -> None:
@@ -80,3 +87,40 @@ class TestEnsembleScores:
         b = np.array([[0.0, 0.5, 0.5]])  # predicts class 1 (ties with 2)
         scores = ensemble_scores([a, b], np.array([1]))
         assert scores[1] == 100.0  # the mean puts class 1 first
+
+
+def _importance_frame() -> tuple[pd.DataFrame, dict[str, TunedParam]]:
+    """`lr` drives the loss down; `noise` and the categorical `warmup` don't matter."""
+    rng = np.random.default_rng(0)
+    lr = rng.uniform(0, 1, 40)
+    df = pd.DataFrame(
+        {
+            "lr": lr,
+            "noise": rng.uniform(0, 1, 40),
+            "warmup": rng.choice([5, 8], 40),
+            "best_val_loss": 1 - lr + rng.normal(0, 0.02, 40),
+        }
+    )
+    params = {
+        "lr": TunedParam("lr", "uniform", low=0, high=1),
+        "noise": TunedParam("noise", "uniform", low=0, high=1),
+        "warmup": TunedParam("warmup", "categorical", values=(5, 8)),
+    }
+    return df, params
+
+
+def test_param_importance_ranks_the_driving_parameter_first_with_its_sign() -> None:
+    df, params = _importance_frame()
+    table = param_importance(df, params, n_boot=20, n_trees=50)
+    assert table.index[0] == "lr"
+    assert table["importance"].sum() == pytest.approx(1.0)
+    assert (table["importance_low"] <= table["importance"]).all()
+    assert (table["importance"] <= table["importance_high"]).all()
+    assert table.loc["lr", "tau"] < -0.8
+
+
+def test_oob_permutation_importance_is_largest_for_the_driving_parameter() -> None:
+    df, params = _importance_frame()
+    importance = oob_permutation_importance(df, params, n_boot=20, n_trees=50, n_repeats=2)
+    assert importance.idxmax() == "lr"
+    assert importance["lr"] > 0.5

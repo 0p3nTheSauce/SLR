@@ -1,9 +1,8 @@
 Misc TODOs:
-- Thesis S3D finals (Que_v2 jobs 72-75, `thesis_final/S3D_cs9lwmiy.toml`, chained asl100 -> 2000):
-  stash each stage's test top-k and report it to the thesis. When job 75 (asl2000) finishes, add it
-  as the comparison model in `satnac_2026/` `correlation_f1`, `eda_performers`,
-  `all_misspredictions` (the same video ids), `duplicate_accuracy` and `signer_shortcut` (full
-  analysis): the notebooks take one run each, so either rerun them per run or give them a run list.
+- The S3D comparison (`S3D_cs9lwmiy_s42`, asl2000) of the satnac_2026 error analyses was run on
+  2026-10-30 by executing `correlation_f1`, `eda_performers`, `duplicate_accuracy` and
+  `signer_shortcut` with S3D's parameters substituted (documented in each Setup cell); the
+  committed notebooks show job 4. If the thesis keeps both, give the notebooks a run list instead.
 - Before e0c4521 (2026-10-18), a run that reached `max_epoch` between resume saves (every 5 epochs)
   kept a stale newest checkpoint, so `full_test` recorded `best_val_loss`/`best_val_acc` from up to
   4 epochs before the end (test/val accuracies are unaffected: they come from `best.pth`). Find
@@ -133,6 +132,6 @@ Misc TODOs:
   for it). Que_v2 only schedules; results live in each run's `run.json` (a `CompExpInfo`,
   written by `train_and_test.py` / `sweep_trial.py`) under `src/runs/`. `results/sweeping/helpers.py`
   and `suggest_sweep.ipynb` still read the v1 Que's `old_runs`, so they can't see MViTv2_S_e
-  sweep 2's trials (`src/runs/asl100/MViTv2_S_e/sweep_flx99idx/job*/run.json`). Needed before
-  sweep 2 is analysed: a reader that collects `run.json` files (by sweep id, or any glob) into
-  `CompExpInfo`s; longer term, an index over `src/runs/**/run.json`.
+  sweep 2's trials (`src/runs/asl100/MViTv2_S_e/sweep_flx99idx/job*/run.json`). A sweep reader
+  exists since 2026-10-30 (`helpers.load_sweep_run_jsons`, used by `param_importance.ipynb`); still
+  to do: use it in `suggest_sweep.ipynb`, and longer term an index over `src/runs/**/run.json`.
