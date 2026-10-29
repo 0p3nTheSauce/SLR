@@ -710,6 +710,98 @@ def plot_param_importance(
     return fig, axes
 
 
+def plot_correlation_bars(
+    names: Sequence[str],
+    correlations: Mapping[str, ArrayLike],
+    p_values: Mapping[str, ArrayLike] | None = None,
+    alpha: float = 0.05,
+    palette: Sequence[str] | None = None,
+    xlabel: str = r"Kendall $\tau$",
+    title: str | None = None,
+    figsize: tuple[float, float] = FIGSIZE,
+    ax: Axes | None = None,
+) -> tuple[Figure, Axes]:
+    """
+    Signed correlation bars, one row per variable (e.g. each swept parameter's Kendall tau with
+    best val loss, see `results/sweeping/param_importance.ipynb`), with one bar per series in each
+    row to compare them (e.g. one series per sweep).
+
+    names: one row each, top to bottom in the given order (sort first, e.g. by |tau|).
+        Underscores are replaced for the cmr10 font.
+    correlations: series name -> values aligned to `names`, on a fixed [-1, 1] axis. A NaN leaves
+        a gap (e.g. a parameter that sweep fixed). One series is coloured by sign
+        (`CORR_NEGATIVE_COLOR` below zero, so for a loss green means higher values went with lower
+        loss) with no series legend; several take one `palette` colour each (default
+        `LINE_PALETTE`), and the sign is read from the bar's direction.
+    p_values: aligned like `correlations`; bars with p >= `alpha` are drawn hatched and lighter,
+        and a legend says so.
+    """
+    labels = [n.replace("_", " ") for n in names]
+    series = list(correlations)
+    if palette is None:
+        palette = [LINE_PALETTE[i % len(LINE_PALETTE)] for i in range(len(series))]
+    elif len(palette) != len(series):
+        raise ValueError(f"palette has {len(palette)} colours but there are {len(series)} series.")
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    else:
+        fig = ax.get_figure(root=True)
+        assert fig is not None
+
+    height = 0.8 / len(series)
+    fontsize = plt.rcParams["ytick.labelsize"]
+    for i, name in enumerate(series):
+        values = np.asarray(correlations[name], dtype=float)
+        significant = (
+            np.asarray(p_values[name], dtype=float) < alpha
+            if p_values is not None
+            else np.ones(len(values), dtype=bool)
+        )
+        rows = np.arange(len(labels)) - 0.4 + (i + 0.5) * height
+        if len(series) == 1:
+            colours = [CORR_NEGATIVE_COLOR if v < 0 else CORR_POSITIVE_COLOR for v in values]
+        else:
+            colours = [palette[i]] * len(values)
+        for row, value, colour, sig in zip(rows, values, colours, significant):
+            if np.isnan(value):
+                continue
+            ax.barh(
+                row, value, height, color=colour, edgecolor=colour,
+                alpha=1.0 if sig else 0.4, hatch=None if sig else "///", linewidth=0.8,
+            )
+            ax.annotate(
+                f"{value:+.2f}", (value, row), xytext=(3 if value >= 0 else -3, 0),
+                textcoords="offset points", ha="left" if value >= 0 else "right", va="center",
+                fontsize=fontsize,
+            )
+
+    ax.axvline(0, color="black", linewidth=0.8)
+    ax.set_xlim(-1, 1)
+    ax.set_xlabel(xlabel)
+    ax.set_yticks(np.arange(len(labels)), labels)
+    ax.set_ylim(len(labels) - 0.5, -0.5)  # first row on top
+    ax.grid(axis="x", linestyle="--", alpha=0.3)
+
+    handles: list[Rectangle] = []
+    if len(series) > 1:
+        handles += [Rectangle((0, 0), 1, 1, color=c, label=s) for s, c in zip(series, palette)]
+    if p_values is not None:
+        handles += [
+            Rectangle((0, 0), 1, 1, facecolor="grey", edgecolor="grey", label=f"$p < {alpha:g}$"),
+            Rectangle(
+                (0, 0), 1, 1, facecolor="grey", edgecolor="grey", alpha=0.4, hatch="///",
+                label=rf"$p \geq {alpha:g}$",
+            ),
+        ]
+    if handles:
+        ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
+    if title:
+        ax.set_title(title)
+    fig.tight_layout()
+    return fig, ax
+
+
 def save_fig(
     fig: Figure,
     path: str | Path,

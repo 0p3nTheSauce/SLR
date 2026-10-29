@@ -144,17 +144,32 @@ def param_importance(
             for b, idx in enumerate(rng.integers(0, len(y), (n_boot, len(y))))
         ]
     )
+    return (
+        pd.DataFrame(
+            {
+                "importance": boot.mean(axis=0),
+                "importance_low": np.percentile(boot, interval[0], axis=0),
+                "importance_high": np.percentile(boot, interval[1], axis=0),
+            },
+            index=pd.Index(list(params), name="param"),
+        )
+        .join(kendall_taus(df, params, metric))
+        .sort_values("importance", ascending=False)
+    )
+
+
+def kendall_taus(
+    df: pd.DataFrame, params: dict[str, TunedParam], metric: str = "best_val_loss"
+) -> pd.DataFrame:
+    """Each swept parameter's Kendall tau (`tau`) and its p-value (`tau_p`) with `metric`, in
+    `params` order; negative means higher values went with lower `metric`. Categoricals are
+    encoded by their position in `values`, so they should be listed in ascending order."""
+    x, y = _param_matrix(df, params), df[metric].to_numpy(dtype=float)
     taus = [tuple(map(float, stats.kendalltau(x[:, j], y))) for j in range(x.shape[1])]
     return pd.DataFrame(
-        {
-            "importance": boot.mean(axis=0),
-            "importance_low": np.percentile(boot, interval[0], axis=0),
-            "importance_high": np.percentile(boot, interval[1], axis=0),
-            "tau": [tau for tau, _ in taus],
-            "tau_p": [p for _, p in taus],
-        },
+        {"tau": [tau for tau, _ in taus], "tau_p": [p for _, p in taus]},
         index=pd.Index(list(params), name="param"),
-    ).sort_values("importance", ascending=False)
+    )
 
 
 def oob_permutation_importance(

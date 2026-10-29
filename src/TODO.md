@@ -3,6 +3,12 @@ Misc TODOs:
   2026-10-30 by executing `correlation_f1`, `eda_performers`, `duplicate_accuracy` and
   `signer_shortcut` with S3D's parameters substituted (documented in each Setup cell); the
   committed notebooks show job 4. If the thesis keeps both, give the notebooks a run list instead.
+- Idea (Luke, 2026-10-30): ensemble the best S3D sweep trial (sweep 7, `u8yashg8`: `cs9lwmiy`)
+  with the best MViTv2-S sweep trial (sweep 1's `5mzfq88e`, or sweep 2's best once `flx99idx`
+  finishes), averaging softmaxes as `results/sweeping/ensemble.py` does for one sweep's top trials.
+  That script ranks within one sweep, so it needs a variant taking explicit runs. Check both
+  checkpoints were trained and are tested on the same split and class indexing (sweeps 0-1 ran on
+  the 1-indexed `asl100_cutoff_9`, sweep 2 on the corrected `asl100`).
 - Before e0c4521 (2026-10-18), a run that reached `max_epoch` between resume saves (every 5 epochs)
   kept a stale newest checkpoint, so `full_test` recorded `best_val_loss`/`best_val_acc` from up to
   4 epochs before the end (test/val accuracies are unaffected: they come from `best.pth`). Find
