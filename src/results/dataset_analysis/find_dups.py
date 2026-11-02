@@ -162,13 +162,12 @@ def _compare_pf_hashes(
 
 
 def report(all_trims: dict[str, Callable], original: np.ndarray, augmented: np.ndarray):
-    og_prepped = _prep_vid(original)
-    o_gH = _pHash_global(og_prepped)
-    o_pfH = _pHash(og_prepped)
+    o_gH = _pHash_global(original)
+    o_pfH = _pHash(original)
     for k, f in all_trims.items():
         print()
         print(f"{' '.join(k.split('_'))}:")
-        auged = _prep_vid(f(augmented))
+        auged = f(augmented)
         gH = _pHash_global(auged)
         pfH = _pHash(auged)
         g_d = _hamming(o_gH[0], gH[0])
@@ -292,9 +291,9 @@ def compare_hashes():
     v = "05741"  # (before, test) signer 11
     fname = _build_fpath(v)
     frames = cv_load(fname, 0, 0, all=True)
-    # preproc = _prep_vid(frames)
+    preproc = _prep_vid(frames)
 
-    T = frames.shape[0]
+    T = preproc.shape[0]
     frame_deviations = [d for d in (5, 10, 20, round(0.25 * T)) if 2 * d < T]
     starts = {f"trim_start_{d}": lambda f, d=d: f[d:] for d in frame_deviations}
     ends = {f"trim_end_{d}": lambda f, d=d: f[:-d] for d in frame_deviations}
@@ -313,28 +312,26 @@ def compare_hashes():
     top_bottom_start_end = {f"crop top_and_bottom_start_end_{d}": lambda f, d=d: f[d:-d, d:-d, d:-d] for d in frame_deviations}
     all_trims_and_crops = all_trims | all_crops | top_bottom_start_end
 
-    og_prepped = _prep_vid(frames)
-    o_gH = _pHash_global(og_prepped)
-    o_pfH = _pHash(og_prepped)
+    o_gH = _pHash_global(preproc)
+    o_pfH = _pHash(preproc)
     # print(f"Origninal global: {ogH}")
     # print(f"Original frame-wise: {ofH}")
 
     print("-" * 10)
-    report(all_trims_and_crops, frames, frames)
+    report(all_trims_and_crops, preproc, preproc)
     print("-" * 10)
     print()
     
-    recoded = _round_trip_compress(frames)
-    recoded_preped = _prep_vid(recoded)
-    rgH = _pHash_global(recoded_preped)
+    recoded = _prep_vid(_round_trip_compress(frames))
+    rgH = _pHash_global(recoded)
     # print(f"Recoded pHash: {rgH}")
     print(f"Hamming global recoded: {_hamming(rgH[0], o_gH[0])}")
-    pfH = _pHash(recoded_preped)
+    pfH = _pHash(recoded)
     pf_d, pf_k = _compare_pf_hashes(o_pfH, pfH)
     print(f"Best mean per-frame hamming recoded: {pf_d} offset: {pf_k}")
     print("-" * 10)
 
-    report(all_trims_and_crops, frames, recoded)
+    report(all_trims_and_crops, preproc, recoded)
     print("-" * 10)
     print()
     
