@@ -13,7 +13,9 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 from pathlib import Path
+from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 TWIN_COLUMNS = ["has_twin", "twin_other_gloss", "twin_other_set", "twin_same_gloss_other_set"]
@@ -53,6 +55,64 @@ def flag_twins(instances: pd.DataFrame) -> pd.DataFrame:
     out["twin_other_gloss"] = by_clip["gloss"].transform("nunique") > 1
     out["twin_other_set"] = by_clip["set"].transform("nunique") > 1
     out["twin_same_gloss_other_set"] = by_clip_gloss["set"].transform("nunique") > 1
+    return out
+
+
+SETS = ("train", "val", "test")
+TwinRelation = Literal["same_gloss", "other_gloss"]
+TWIN_KINDS = {
+    "repeat": "same gloss, same set",
+    "leak": "same gloss, other set",
+    "conflict_same_set": "other gloss, same set",
+    "conflict_other_set": "other gloss, other set",
+}
+
+
+def twin_set_column(relation: TwinRelation, set_name: str) -> str:
+    """Name of `flag_twins_by_set`'s column for a twin with `relation` in `set_name`."""
+    return f"{relation}_in_{set_name}"
+
+
+def flag_twins_by_set(instances: pd.DataFrame) -> pd.DataFrame:
+    """Add, per instance, which sets its twins are in, and the kind of each twin.
+
+    `instances` needs `video_id` (unique), `md5`, `gloss` and `set` columns. Added boolean
+    columns:
+
+    - `same_gloss_in_<set>`, `other_gloss_in_<set>` for each of train/val/test: some other
+      instance with the same clip, and the same / a different gloss, is in that set.
+    - One per `TWIN_KINDS` key, relative to the instance's own set: `repeat` (same gloss, same
+      set), `leak` (same gloss, other set), `conflict_same_set` and `conflict_other_set` (a
+      different gloss). An instance in a group of 3+ can have several.
+
+    As for `flag_twins`, twins are only looked for within `instances`.
+    """
+    cols = ["video_id", "md5", "gloss", "set"]
+    pairs = instances[cols].merge(instances[cols], on="md5", suffixes=("", "_twin"))
+    pairs = pairs[pairs.video_id != pairs.video_id_twin]
+    relation = (pairs.gloss == pairs.gloss_twin).map({True: "same_gloss", False: "other_gloss"})
+    relations: tuple[TwinRelation, ...] = ("same_gloss", "other_gloss")
+    keys: list[tuple[TwinRelation, str]] = [(r, s) for r in relations for s in SETS]
+    found = (pd.crosstab(pairs.video_id, [relation, pairs.set_twin]) > 0).reindex(
+        index=instances.video_id, columns=pd.MultiIndex.from_tuples(keys), fill_value=False
+    )
+
+    out = instances.copy()
+    for r, s in keys:
+        out[twin_set_column(r, s)] = found[r, s].to_numpy()
+
+    own_set = out.set.to_numpy()
+
+    def twin_in(relation: TwinRelation, own: bool) -> np.ndarray:
+        """Whether a twin with `relation` is in the instance's own set (`own`) or another."""
+        return np.logical_or.reduce(
+            [((own_set == s) == own) & out[twin_set_column(relation, s)].to_numpy() for s in SETS]
+        )
+
+    out["repeat"] = twin_in("same_gloss", own=True)
+    out["leak"] = twin_in("same_gloss", own=False)
+    out["conflict_same_set"] = twin_in("other_gloss", own=True)
+    out["conflict_other_set"] = twin_in("other_gloss", own=False)
     return out
 
 

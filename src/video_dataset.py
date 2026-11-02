@@ -7,6 +7,7 @@ from typing import (
     Literal,
     TypeAlias,
     cast,
+    get_args,
 )
 
 import torch
@@ -161,6 +162,19 @@ def load_split_set(
     return load_data_from_json(
         get_labels_path(set_name, split_set["labels"], split_set["label_suff"]), policy
     )
+
+
+def load_split_instances(split: AVAIL_SPLITS) -> dict[str, Instance]:
+    """Every labelled instance of a split, across train/val/test, keyed by `video_id`.
+
+    Each instance's set is its `split` field. Instances that preprocessing removed from the
+    labels are absent, so not every video in the split's annotation file is here.
+    """
+    return {
+        inst.video_id: inst
+        for set_name in get_args(AVAIL_SETS)
+        for inst in cast(list[Instance], load_split_set(split, set_name, "strict"))
+    }
 
 
 def get_example_videos(

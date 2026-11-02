@@ -119,6 +119,9 @@ Misc TODOs:
   the 0-based rerun doesn't touch them, unlike the plain splits (whose old labels were kept as
   `*_1_indexed`, see `src/info/WLASL_info.md`). Rebuild them from the new labels (and keep the
   old ones alongside, as for the plain splits) if they're used for final results.
+- `src/video_dataset.py` (as of 2026-11-03): `load_data_from_json` is annotated `list[Instance]` but
+  returns raw dicts under `policy="accepting"`, and `load_split_set` passes the mismatch on as
+  `list[Instance] | list[dict]`, so callers `cast`. Overload both on the policy `Literal`.
 - `src/video_transforms.py` has 38 pre-existing ruff errors (as of 2026-10-06): old `typing`
   aliases (`List`/`Tuple`/`Optional`), unused `run_types` imports, mutable defaults in
   `get_transform`, bare `raise Exception`. Most are `ruff --fix`-able; do it when next working there
