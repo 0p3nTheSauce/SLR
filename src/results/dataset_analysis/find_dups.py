@@ -8,6 +8,7 @@
 
 # We might also expect that near duplicates have the same signer ID
 
+import itertools
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from pathlib import Path
@@ -19,6 +20,7 @@ from scipy.fft import dctn
 
 from src.run_types import RAW_DIR
 from src.utils import cv_load
+from src.results import get_stash_path, load_json, stash_json
 
 
 def _build_fpath(vid: str) -> Path:
@@ -39,17 +41,17 @@ def _resize_area(grey: np.ndarray, h_out: int, w_out: int | None = None) -> np.n
     """Batched area resize of TxHxW -> Tx h_out x w_out (float32)."""
     w_out = w_out or h_out
     _, h, w = grey.shape
-    r_h = _area_matrix(h, h_out)   # (h_out, H)
-    r_w = _area_matrix(w, w_out)   # (w_out, W)
-    return r_h @ grey @ r_w.T      # broadcasts over T
+    r_h = _area_matrix(h, h_out)  # (h_out, H)
+    r_w = _area_matrix(w, w_out)  # (w_out, W)
+    return r_h @ grey @ r_w.T  # broadcasts over T
 
 
 def _prep_vid(frames: np.ndarray, h_out: int = 64, canon: int = 256) -> np.ndarray:
     """Greyscale (average), area-resize to canon x canon, then block-average to h_out."""
     grey = frames.mean(axis=-1, dtype=np.float32)
-    grey = _resize_area(grey, canon)               # guarantees a consistent shape
+    grey = _resize_area(grey, canon)  # guarantees a consistent shape
     t = grey.shape[0]
-    q = canon // h_out                             # requires canon % h_out == 0
+    q = canon // h_out  # requires canon % h_out == 0
     small = grey.reshape(t, h_out, q, h_out, q).mean(axis=(2, 4))
     return np.rint(small).astype(np.uint8)
 
@@ -170,8 +172,8 @@ def _compare_pf_hashes(
 
 
 def report(all_trims: dict[str, Callable], original: np.ndarray, augmented: np.ndarray):
-    """Compare a series of provided crops/trims on the global and per frame pHashes. 
-    Video preparation is applied internally (do not call _prep_vid before calling this function). 
+    """Compare a series of provided crops/trims on the global and per frame pHashes.
+    Video preparation is applied internally (do not call _prep_vid before calling this function).
 
     Args:
         all_trims (dict[str, Callable]): Dictionary containing lambda augmentations
@@ -226,81 +228,63 @@ def build_frame_dictionary(video_ids: list[str]) -> dict[int, list[tuple[str, in
 
     return frame_dict
 
-Run = tuple[int, int, int]  # (hash, start, length)
-RunIndex = dict[int, list[tuple[str, int, int]]]  # hash -> [(video_id, start, length)]
+
+RunIndex = dict[int, list[tuple[str, list[int]]]]  # hash -> [(video_id, [indexes])]
 
 
 def hash_videos(video_ids: list[str]) -> dict[str, np.ndarray]:
-    """Decode each video and return its per-frame pHashes (the step to cache later)."""
-    return {vid : pHash(cv_load(_build_fpath(vid), 0,0,all=True)) for vid in video_ids}
+    """Decode each video and return its per-frame pHashes"""
+    return {vid: pHash(cv_load(_build_fpath(vid), 0, 0, all=True)) for vid in video_ids}
 
-def to_runs(pf_hashes: np.ndarray) -> list[Run]:                     # step 1
-    """Collapse consecutive identical hashes into (hash, start, length)."""
-    runs = []
-    h = -1
-    s = 0
-    l = 0
-    
-    for i, p in enumerate(pf_hashes):
-        if h == -1:
-            h = p
-        if p == h:
-            l += 1
-        else:
-            #save previous 
-            runs.append((h,s,l))
-            #reset for new hash
-            h = p
-            s = i
-            l = 1
-    
-    return runs
 
-def build_run_index(video_runs: dict[str, list[Run]]) -> RunIndex:   # step 1
-    """hash -> [(video_id, start, length)], i.e. build_frame_dictionary over runs."""
-    frame_dict: RunIndex = defaultdict(list)
-    for vid, runs in video_runs.items():
-        for r in runs:
-            frame_dict[r[0]].append((vid, r[1], r[2]))
-    return frame_dict
-        
+def aggregate_hashes(vids_to_pf_hashes: dict[str, list[int]]) -> RunIndex:
+    """Index [(video_id, [frame_indexes])] under frame hash keys
+
+    Args:
+        vids_to_pf_hashes (dict[str, np.ndarray]): video_id (key) to frame_hash (value)
+
+    Returns:
+        RunIndex: frame_hash (key) to video entries (video_id, [frame_indexes])
+    """
+    index = defaultdict(list[tuple[str, list[int]]])
+    for vid, pfHashes in vids_to_pf_hashes.items():
+        uhashes = defaultdict(list[int])  # hash -> [indexes]
+        for i, pfH in enumerate(pfHashes):
+            uhashes[int(pfH)].append(i)
+
+        for uhash, idexes in uhashes.items():
+            index[uhash].append((vid, idexes))
+    return index
+
 
 def stoplist(index: RunIndex, max_videos: int) -> tuple[RunIndex, RunIndex]:  # step 2
     """Split into (kept, dropped) by distinct videos per bucket."""
     kept: RunIndex = defaultdict(list)
     dropped: RunIndex = defaultdict(list)
-    for hash, vid_run in index.items():
-        if len({x[0] for x in vid_run}) > max_videos:
-            dropped[hash] = vid_run
+    for ph, vid_entries in index.items():
+        if len(vid_entries) > max_videos or len(vid_entries) == 1:
+            dropped[ph].extend(vid_entries)
         else:
-            kept[hash] = vid_run
+            kept[ph].extend(vid_entries)
     return kept, dropped
-        
-    
-
-def vote(index: RunIndex) -> Counter[tuple[str, str, int]]:          # step 3
-    """(a, b, k) -> frames matched, for every cross-video pair within each bucket."""
-    votes = defaultdict(int)
-    for runs in index.values():
-        for i, e in enumerate(runs):
-            for j, p in enumerate(runs):
-                if i == j:
-                    continue
-                votes[(e[0], p[0], e[1] - e[1])] += min(e[2], e[2])
-    return votes
-
-            
 
 
-def _summarise(fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[str, str]]):
-    
-    black = _pHash(np.zeros([1, 64,64]))[0]
-    white = _pHash(np.ones([1, 64,64])* 255)[0]
+# def count_shared(kept: RunIndex):
+#     for ph, vid_entries in kept.items():
+#         for (va, indexesa), (vb, indexesb) in itertools.combinations(vid_entries, 2):
 
-    bucket_lengths = {} #size buckets
-    video_to_hash = defaultdict(list) # inverse dict
-    indexes_to_hash = defaultdict(list[int]) # inverse dict
-    
+
+def _summarise(
+    fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[str, str]]
+):
+
+    black = _pHash(np.zeros([1, 64, 64]))[0]
+    white = _pHash(np.ones([1, 64, 64]) * 255)[0]
+
+    bucket_lengths = {}  # size buckets
+    video_to_hash = defaultdict(list)  # inverse dict
+    indexes_to_hash = defaultdict(list[int])  # inverse dict
+
     for pH, elem in fdict.items():
         bucket_lengths[pH] = len(elem)
         for vid, idx in elem:
@@ -308,18 +292,21 @@ def _summarise(fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[
             indexes_to_hash[idx].append(pH)
 
     # lengths_to_hash = {v : k for k, v in bucket_lengths.items()}
-    largest_bucket = max([(pH, len_elem) for pH, len_elem in bucket_lengths.items()], key=lambda x: x[1])
-    smallest_bucket = min([(pH, len_elem) for pH, len_elem in bucket_lengths.items()], key=lambda x: x[1])
-    
-    
-    print(f"Largest bucket ({largest_bucket[0]}): {largest_bucket[1]}")   
+    largest_bucket = max(
+        [(pH, len_elem) for pH, len_elem in bucket_lengths.items()], key=lambda x: x[1]
+    )
+    smallest_bucket = min(
+        [(pH, len_elem) for pH, len_elem in bucket_lengths.items()], key=lambda x: x[1]
+    )
+
+    print(f"Largest bucket ({largest_bucket[0]}): {largest_bucket[1]}")
     for vid, idx in fdict[largest_bucket[0]]:
         print(f"Video: {vid} Idx: {idx}")
-    print('-'*10)
+    print("-" * 10)
     print(f"Smallest bucket ({smallest_bucket[0]}): {smallest_bucket[1]}")
     for vid, idx in fdict[smallest_bucket[0]]:
         print(f"Video: {vid} Idx: {idx}")
-    print('-'*10)
+    print("-" * 10)
     print()
     for v1, v2 in known_pairs:
         for v in [v1, v2]:
@@ -332,11 +319,10 @@ def _summarise(fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[
                     f"Bucket {ph}: {len(frames_per_vid)} distinct videos; "
                     f"most frames from {top_vid} ({n_frames})"
                 )
-        print('-'*10)
+        print("-" * 10)
     print()
     print(f"Number of black ({black}) frames: {len(fdict[black])}")
     print(f"Number of white ({white}) frames: {len(fdict[white])}")
-    
 
 
 def initial_tests():
@@ -372,11 +358,15 @@ def initial_tests():
     print(f"(C) Distance different signer, same action: {_hamming(hams[0], hams[3])}")
     print(f"Redundency check, should be same as (C): {_hamming(hams[1], hams[3])}")
 
+
 def _crop_frac(
     f: np.ndarray,
-    start: float = 0.0, end: float = 0.0,
-    top: float = 0.0, bottom: float = 0.0,
-    left: float = 0.0, right: float = 0.0,
+    start: float = 0.0,
+    end: float = 0.0,
+    top: float = 0.0,
+    bottom: float = 0.0,
+    left: float = 0.0,
+    right: float = 0.0,
 ) -> np.ndarray:
     """Trim a TxHxWxC clip by a fraction of each axis' length, per side."""
     t, h, w, _ = f.shape
@@ -385,28 +375,33 @@ def _crop_frac(
     x0, x1 = round(left * w), w - round(right * w)
     return f[t0:t1, y0:y1, x0:x1]
 
+
 def _make_aug(sides: tuple[str, ...], p: float):
     # factory function, so sides and p are bound per augmentation
     return lambda f: _crop_frac(f, **{s: p for s in sides})
 
 
 def _build_augs(ops: dict[str, tuple[str, ...]], fracs) -> dict:
-    return {f"{name}_{p:.2f}": _make_aug(sides, p)
-            for name, sides in ops.items() for p in fracs}
+    return {
+        f"{name}_{p:.2f}": _make_aug(sides, p)
+        for name, sides in ops.items()
+        for p in fracs
+    }
+
 
 # name -> which sides get trimmed by the same fraction p
 TEMPORAL_OPS = {
-    "trim_start":     ("start",),
-    "trim_end":       ("end",),
+    "trim_start": ("start",),
+    "trim_end": ("end",),
     "trim_start_end": ("start", "end"),
 }
 SPATIAL_OPS = {
-    "crop_left":           ("left",),
-    "crop_right":          ("right",),
-    "crop_left_right":     ("left", "right"),
-    "crop_top":            ("top",),
-    "crop_bottom":         ("bottom",),
-    "crop_top_bottom":     ("top", "bottom"),
+    "crop_left": ("left",),
+    "crop_right": ("right",),
+    "crop_left_right": ("left", "right"),
+    "crop_top": ("top",),
+    "crop_bottom": ("bottom",),
+    "crop_top_bottom": ("top", "bottom"),
 }
 COMBINED_OPS = {
     "trim_crop_all": ("start", "end", "top", "bottom", "left", "right"),
@@ -415,6 +410,7 @@ COMBINED_OPS = {
 FRACS = (0.05, 0.10, 0.20, 0.25)
 IDENTITY = {"identity": lambda f: f}
 
+
 def compare_hashes():
     v = "05741"  # (before, test) signer 11
     fname = _build_fpath(v)
@@ -422,10 +418,8 @@ def compare_hashes():
 
     all_trims = IDENTITY | _build_augs(TEMPORAL_OPS, FRACS)
     all_crops = IDENTITY | _build_augs(SPATIAL_OPS, FRACS)
-    all_trims_and_crops = (
-        all_trims | all_crops | _build_augs(COMBINED_OPS, FRACS)
-    )
-    
+    all_trims_and_crops = all_trims | all_crops | _build_augs(COMBINED_OPS, FRACS)
+
     o_preped = _prep_vid(frames)
     o_gH = _pHash_global(o_preped)
     o_pfH = _pHash(o_preped)
@@ -436,7 +430,7 @@ def compare_hashes():
     report(all_trims_and_crops, frames, frames)
     print("-" * 10)
     print()
-    
+
     jpeg_recoded = _round_trip_compress(frames)
     recoded_preped = _prep_vid(jpeg_recoded)
     rgH = _pHash_global(recoded_preped)
@@ -450,7 +444,7 @@ def compare_hashes():
     report(all_trims_and_crops, frames, jpeg_recoded)
     print("-" * 10)
     print()
-    
+
 
 def small_set_test():
     vid1 = "05741"  # (before, test) signer 11
@@ -468,19 +462,68 @@ def small_set_test():
         vids.add(p.stem)
 
     fdict = build_frame_dictionary(list(vids))
-    
-    
+
     _summarise(fdict, [(vid1, vid2), (vid5, vid6)])
-    
+
     # for pH, elem in fdict.items():
     #     print(f"pHash: {pH}")
     #     for vid, idx in elem:
     #         print(f"Video: {vid} Idx: {idx}")
     #     print()
 
+
+def build_example_vids() -> set[str]:
+    vid1 = "05741"  # (before, test) signer 11
+    vid2 = "41452"  # (past, train) signer 11
+    vid3 = "00381"  # (able, train) signer 11: same signer, different action
+    vid4 = "41448"  # (past, test) signer 4: different signer, same action (relative to past)
+    vid5 = "05743"
+    vid6 = "41454"
+    num_vids = 26
+    vids = {vid1, vid2, vid3, vid4, vid5, vid6}
+
+    for p in RAW_DIR.iterdir():
+        if len(vids) == num_vids:
+            break
+        vids.add(p.stem)
+
+    return vids
+
+
+def stash_hashes(stub: str, vids: list[str]) -> Path:
+    return stash_json(
+        {v: list(map(int, idxes)) for v, idxes in hash_videos(vids).items()},
+        get_stash_path(stub),
+    )
+
+
+def test_pairs():
+    max_vids = 50
+    # stash_p = stash_hashes("test_vids", list(build_example_vids()))
+    # print(stash_p) stashed_results/test_vidsresults.json
+    vid_hashes: dict[str, list[int]] = load_json(
+        Path("./stashed_results/test_vidsresults.json")
+    )
+    index = aggregate_hashes(vid_hashes)
+    print("Index[h0]:")
+    for pH, vid_entries in index.items():
+        print(f"{pH} : {vid_entries}")
+        break
+    kept, dropped = stoplist(index, max_vids)
+    print("Kept[h0]:")
+    for pH, vid_entries in kept.items():
+        print(f"{pH} : {vid_entries}")
+        break
+    print("Dropped[h0]:")
+    for pH, vid_entries in dropped.items():
+        print(f"{pH} : {vid_entries}")
+        break
+    
+
+
 if __name__ == "__main__":
     # initial_tests()
     # compare_hashes()
-    print('\n'*2, '-'*10, '\n'*2)
-    small_set_test()
-    
+    # print("\n" * 2, "-" * 10, "\n" * 2)
+    # small_set_test()
+    test_pairs()
