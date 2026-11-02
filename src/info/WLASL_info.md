@@ -154,13 +154,21 @@ only, so this is a lower bound: a re-encode of the same video is not found.
   gloss sets, mostly synonyms such as `doctor` / `physician`). 849 of the 2000 glosses are in one.
   They are concentrated in the `signingsavvy` (36% of its instances) and `aslsearch` (20%) sources.
 * 68 are a **leak**: a twin with the same gloss in a different set (14 in test, 29 in train).
-* 184 of the 2879 test instances (6.4%) have a twin in train or val, 180 of them under another
-  gloss. On WLASL-1000, 62 of 1876; WLASL-300, 12 of 668; WLASL-100, 1 of 258.
-* Effect on the results (`MViTv2_S` exp000, WLASL-2000): the conflicted test instances are right
-  6.1% of the time against 41.1% for the rest, and 87.8% are predicted as the twin's other gloss.
-  Glosses in a conflict have a mean test F1 of 0.19 against 0.39, which holds within class-size
-  bins. So much of the low F1 on those glosses is label ambiguity, and each copy also counts as a
-  separate train instance.
+* 184 of the 2879 test instances (6.4%) have a twin in train or val (156 in train, 45 in val), 174
+  of them under another gloss there. On WLASL-1000, 62 of 1876; WLASL-300, 12 of 668; WLASL-100,
+  1 of 258. Most conflicting pairs are within train (652 of 1232), where they give contradictory
+  training targets.
+* No group spans two sources. 11 groups give one file several `signer_id`s (all in `handspeak`,
+  `aslpro` and `asldeafined`, with the same id pairs recurring), so those sources' signer ids are
+  unreliable. Checked 2026-11-03 in `duplicate_clips.ipynb`.
+* Effect on the results (job 4's final `MViTv2_S_16x4_e` model, WLASL-2000, 2026-11-03, in
+  [`duplicate_accuracy.ipynb`](../results/satnac_2026/duplicate_accuracy.ipynb)): all 147 test
+  instances whose only training copies carry another gloss are predicted as that gloss. Glosses in
+  a conflict have a mean test F1 of 0.27 against 0.58 for glosses with no copy, which holds within
+  training-signer bins, and the share of a gloss in a conflict correlates with F1 more strongly
+  (Kendall τ -0.34) than its training signer count does (+0.19). A test-train conflict costs one
+  gloss recall and the other precision. So much of the low F1 on those glosses is label ambiguity,
+  and each copy also counts as a separate train instance.
 
 Non-identical copies (re-encoded, trimmed or cropped) were searched for with per-frame perceptual
 hashes on 2026-11-02, and none have been found so far. The `near` groups in

@@ -3,22 +3,28 @@ from pathlib import Path
 import pandas as pd
 
 from src.results.dataset_analysis.duplicates import (
-    class_duplicate_table,
+    GLOSS_MEASURES,
+    TWIN_KINDS,
     flag_twins,
+    flag_twins_by_set,
+    gloss_collisions,
+    gloss_measures,
     hash_clips,
     merge_signs,
+    set_pair_counts,
     shared_clip_counts,
+    twin_set_column,
 )
 
 
 def instances(rows: list[tuple[str, str, str, str]]) -> pd.DataFrame:
-    return pd.DataFrame(rows, columns=["video_id", "gloss", "set", "md5"])
+    return pd.DataFrame(rows, columns=pd.Index(["video_id", "gloss", "set", "md5"]))
 
 
 class TestFlagTwins:
     def test_unique_clip_has_no_twin(self) -> None:
         flagged = flag_twins(instances([("1", "a", "train", "x"), ("2", "b", "test", "y")]))
-        assert not flagged[["has_twin", "twin_other_gloss", "twin_other_set"]].any().any()
+        assert not flagged[["has_twin", "twin_other_gloss", "twin_other_set"]].to_numpy().any()
 
     def test_same_clip_under_two_glosses_in_one_set_is_a_label_conflict(self) -> None:
         flagged = flag_twins(instances([("1", "a", "train", "x"), ("2", "b", "train", "x")]))
@@ -39,26 +45,85 @@ class TestFlagTwins:
         assert not flagged.twin_same_gloss_other_set.any()  # a's twin of the same gloss is in train too
 
 
-class TestClassDuplicateTable:
-    def test_fractions_and_flag(self) -> None:
-        flagged = flag_twins(
+class TestFlagTwinsBySet:
+    def test_each_kind_is_relative_to_the_instances_own_set(self) -> None:
+        flagged = flag_twins_by_set(
             instances(
                 [
                     ("1", "a", "train", "x"),
-                    ("2", "b", "test", "x"),
-                    ("3", "a", "train", "y"),
-                    ("4", "a", "test", "z"),
-                    ("5", "a", "train", "z"),
+                    ("2", "a", "train", "x"),
+                    ("3", "a", "test", "x"),
+                    ("4", "b", "test", "x"),
+                ]
+            )
+        ).set_index("video_id")
+        assert flagged.loc["1", "repeat"] and flagged.loc["1", "leak"]
+        assert flagged.loc["1", "conflict_other_set"] and not flagged.loc["1", "conflict_same_set"]
+        assert flagged.loc["3", "conflict_same_set"] and not flagged.loc["3", "repeat"]
+        assert flagged.loc["4", twin_set_column("other_gloss", "train")]
+        assert not flagged.loc["4", twin_set_column("same_gloss", "train")]
+
+    def test_unique_clip_has_no_flags(self) -> None:
+        flagged = flag_twins_by_set(instances([("1", "a", "train", "x"), ("2", "a", "test", "y")]))
+        assert not flagged[list(TWIN_KINDS)].to_numpy().any()
+
+
+class TestSetPairCounts:
+    def test_unordered_pairs_by_sets_and_gloss(self) -> None:
+        counts = set_pair_counts(
+            instances([("1", "a", "test", "x"), ("2", "b", "train", "x"), ("3", "a", "train", "x")])
+        )
+        assert counts.loc["train-test", "other gloss"] == 1  # 1-2
+        assert counts.loc["train-test", "same gloss"] == 1  # 1-3
+        assert counts.loc["train-train", "other gloss"] == 1  # 2-3
+        assert counts.to_numpy().sum() == 3
+
+
+class TestGlossCollisions:
+    def test_clips_grouped_by_gloss_set_with_placement(self) -> None:
+        flagged = flag_twins(
+            instances(
+                [
+                    ("1", "doctor", "train", "x"),
+                    ("2", "physician", "train", "x"),
+                    ("3", "doctor", "train", "y"),
+                    ("4", "physician", "test", "y"),
+                    ("5", "past", "val", "z"),
+                    ("6", "before", "test", "z"),
                 ]
             )
         )
-        table = class_duplicate_table(flagged)
-        assert table.loc["a", "conflict_all"] == 1 / 4
+        collisions = gloss_collisions(flagged)
+        assert collisions.loc["doctor / physician", "clips"] == 2
+        assert collisions.loc["doctor / physician", "video_ids"] == "1, 2 | 3, 4"
+        assert collisions.loc["doctor / physician", "placement"] == "mixed"
+        assert collisions.loc["before / past", "placement"] == "several sets"
+        assert collisions.index[0] == "doctor / physician"  # most clips first
+
+
+class TestGlossMeasures:
+    def test_shares_and_lent_count(self) -> None:
+        flagged = flag_twins_by_set(
+            flag_twins(
+                instances(
+                    [
+                        ("1", "a", "train", "x"),
+                        ("2", "b", "test", "x"),
+                        ("3", "a", "train", "y"),
+                        ("4", "a", "test", "z"),
+                        ("5", "a", "train", "z"),
+                    ]
+                )
+            )
+        )
+        table = gloss_measures(flagged)
+        assert list(table.columns) == list(GLOSS_MEASURES)
+        assert table.loc["a", "conflict_any"] == 1 / 4
         assert table.loc["a", "leak_test"] == 1.0
-        assert table.loc["a", "conflict_train"] == 1 / 3
-        assert table.loc["b", "conflict_test"] == 1.0
-        assert table.loc["b", "conflict_train"] == 0.0
-        assert table.conflict_flag.all()
+        assert table.loc["a", "conflict_train_train"] == 0.0  # 1's twin is in test
+        assert table.loc["b", "conflict_test_train"] == 1.0
+        assert table.loc["a", "lends_to_test"] == 1  # b's test clip is a in train
+        assert table.loc["b", "lends_to_test"] == 0
 
 
 class TestHashClips:
@@ -71,7 +136,7 @@ class TestHashClips:
 
 
 def with_variations(rows: list[tuple[str, str, int, str]]) -> pd.DataFrame:
-    return pd.DataFrame(rows, columns=["video_id", "gloss", "variation_id", "md5"])
+    return pd.DataFrame(rows, columns=pd.Index(["video_id", "gloss", "variation_id", "md5"]))
 
 
 SIGN_ROWS = [

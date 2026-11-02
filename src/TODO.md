@@ -133,13 +133,12 @@ Misc TODOs:
   (about 6 days for 20 trials). Optional GPU work for stronger thesis numbers: the sweep-1 best config on
   asl300 (about 16 h, initialised from trial `5mzfq88e`'s checkpoint), then asl1000 and asl2000.
   Clear the stale sweep (`510lhysg`, 20/20) in `src/que/state/Server.json` when the next one is set.
-- **Two duplicate-clip analyses (as of 2026-10-18).** The two `main`s diverged and each did one:
-  `results/dataset_analysis/find_duplicates.py` (exact + near-duplicate frame fingerprints, writes
-  `stashed_results/duplicates_asl2000.json`, used by `satnac_2026/duplicate_accuracy.ipynb`) and
-  `results/dataset_analysis/duplicates.py` (byte-identical MD5 copies, for `duplicate_clips.ipynb`).
-  Compare their findings, then keep one module (or make one build on the other) and one stash.
-- `results/dataset_analysis/duplicates.py` and `tests/results/test_duplicates.py` have 8 pyright errors
-  (as of 2026-10-18): pandas groupby/`DataFrame(columns=list)` typing. Fix with explicit casts/types.
+- **Two duplicate-clip modules (as of 2026-11-03).** `duplicate_clips.ipynb` (the dataset) and
+  `satnac_2026/duplicate_accuracy.ipynb` (the model) now both use `results/dataset_analysis/duplicates.py`
+  (MD5 copies; the same 900 groups as `find_duplicates.py`'s `exact` kind). `satnac_2026/signer_shortcut.py`
+  (with its notebook and `tests/results/test_signer_shortcut.py`) still reads `find_duplicates.py`'s
+  `stashed_results/duplicates_asl2000.json`; move it to `duplicates.py`, then retire
+  `find_duplicates.py` and its stash (`find_dups.py`'s `known_pairs` reads it too).
 - Experiment tracking for Que_v2 (agreed 2026-10-22: build this rather than revive the v1 Que
   for it). Que_v2 only schedules; results live in each run's `run.json` (a `CompExpInfo`,
   written by `train_and_test.py` / `sweep_trial.py`) under `src/runs/`. `results/sweeping/helpers.py`
