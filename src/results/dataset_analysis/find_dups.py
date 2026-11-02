@@ -18,9 +18,9 @@ import cv2
 import numpy as np
 from scipy.fft import dctn
 
+from src.results import get_stash_path, load_json, stash_json
 from src.run_types import RAW_DIR
 from src.utils import cv_load
-from src.results import get_stash_path, load_json, stash_json
 
 
 def _build_fpath(vid: str) -> Path:
@@ -229,7 +229,7 @@ def build_frame_dictionary(video_ids: list[str]) -> dict[int, list[tuple[str, in
     return frame_dict
 
 
-RunIndex = dict[int, list[tuple[str, list[int]]]]  # hash -> [(video_id, [indexes])]
+HashIndex = dict[int, list[str]]  # frame hash -> video_ids containing it
 
 
 def hash_videos(video_ids: list[str]) -> dict[str, np.ndarray]:
@@ -237,41 +237,55 @@ def hash_videos(video_ids: list[str]) -> dict[str, np.ndarray]:
     return {vid: pHash(cv_load(_build_fpath(vid), 0, 0, all=True)) for vid in video_ids}
 
 
-def aggregate_hashes(vids_to_pf_hashes: dict[str, list[int]]) -> RunIndex:
-    """Index [(video_id, [frame_indexes])] under frame hash keys
+def video_hash_sets(vids_to_pf_hashes: dict[str, list[int]]) -> dict[str, set[int]]:
+    """Each video's full set of distinct frame hashes (the denominator in `candidates`)."""
+    return {vid: set(map(int, hashes)) for vid, hashes in vids_to_pf_hashes.items()}
 
-    Args:
-        vids_to_pf_hashes (dict[str, np.ndarray]): video_id (key) to frame_hash (value)
 
-    Returns:
-        RunIndex: frame_hash (key) to video entries (video_id, [frame_indexes])
-    """
-    index = defaultdict(list[tuple[str, list[int]]])
-    for vid, pfHashes in vids_to_pf_hashes.items():
-        uhashes = defaultdict(list[int])  # hash -> [indexes]
-        for i, pfH in enumerate(pfHashes):
-            uhashes[int(pfH)].append(i)
-
-        for uhash, idexes in uhashes.items():
-            index[uhash].append((vid, idexes))
+def build_hash_index(video_sets: dict[str, set[int]]) -> HashIndex:
+    """Index each video once under every distinct frame hash it contains."""
+    index: HashIndex = defaultdict(list)
+    for vid, hashes in video_sets.items():
+        for h in hashes:
+            index[h].append(vid)
     return index
 
 
-def stoplist(index: RunIndex, max_videos: int) -> tuple[RunIndex, RunIndex]:  # step 2
-    """Split into (kept, dropped) by distinct videos per bucket."""
-    kept: RunIndex = defaultdict(list)
-    dropped: RunIndex = defaultdict(list)
-    for ph, vid_entries in index.items():
-        if len(vid_entries) > max_videos or len(vid_entries) == 1:
-            dropped[ph].extend(vid_entries)
-        else:
-            kept[ph].extend(vid_entries)
+def stoplist(index: HashIndex, max_videos: int) -> tuple[HashIndex, HashIndex]:
+    """Split into (kept, dropped): dropped buckets hold more than `max_videos` videos.
+
+    Single-video buckets can't form a pair, so they are discarded and appear in neither.
+    """
+    kept: HashIndex = {}
+    dropped: HashIndex = {}
+    for h, vids in index.items():
+        if len(vids) > max_videos:
+            dropped[h] = vids
+        elif len(vids) > 1:
+            kept[h] = vids
     return kept, dropped
 
 
-# def count_shared(kept: RunIndex):
-#     for ph, vid_entries in kept.items():
-#         for (va, indexesa), (vb, indexesb) in itertools.combinations(vid_entries, 2):
+def count_shared(index: HashIndex) -> Counter[tuple[str, str]]:
+    """(a, b) with a < b -> number of distinct hashes the two videos share."""
+    shared: Counter[tuple[str, str]] = Counter()
+    for vids in index.values():
+        shared.update(itertools.combinations(sorted(vids), 2))
+    return shared
+
+
+def candidates(
+    shared: Counter[tuple[str, str]], video_sets: dict[str, set[int]], min_frac: float
+) -> dict[tuple[str, str], float]:
+    """Pairs sharing at least `min_frac` of the smaller video's distinct hashes, with that fraction.
+
+    `video_sets` must be the unfiltered sets from `video_hash_sets`: taking the denominator from the
+    stop-listed index would shrink it and inflate the fraction.
+    """
+    fracs = {
+        (a, b): n / min(len(video_sets[a]), len(video_sets[b])) for (a, b), n in shared.items()
+    }
+    return {pair: f for pair, f in fracs.items() if f >= min_frac}
 
 
 def _summarise(
@@ -490,35 +504,37 @@ def build_example_vids() -> set[str]:
     return vids
 
 
+HERE = Path(__file__).parent
+TEST_VIDS_STUB = "test_vids_"
+
+
+def _stash_path(stub: str) -> Path:
+    """`get_stash_path` is relative to the working directory; anchor it to this script's folder."""
+    return HERE / get_stash_path(stub)
+
+
 def stash_hashes(stub: str, vids: list[str]) -> Path:
     return stash_json(
         {v: list(map(int, idxes)) for v, idxes in hash_videos(vids).items()},
-        get_stash_path(stub),
+        _stash_path(stub),
     )
 
 
 def test_pairs():
     max_vids = 50
-    # stash_p = stash_hashes("test_vids", list(build_example_vids()))
-    # print(stash_p) stashed_results/test_vidsresults.json
-    vid_hashes: dict[str, list[int]] = load_json(
-        Path("./stashed_results/test_vidsresults.json")
-    )
-    index = aggregate_hashes(vid_hashes)
-    print("Index[h0]:")
-    for pH, vid_entries in index.items():
-        print(f"{pH} : {vid_entries}")
-        break
-    kept, dropped = stoplist(index, max_vids)
-    print("Kept[h0]:")
-    for pH, vid_entries in kept.items():
-        print(f"{pH} : {vid_entries}")
-        break
-    print("Dropped[h0]:")
-    for pH, vid_entries in dropped.items():
-        print(f"{pH} : {vid_entries}")
-        break
-    
+    min_frac = 0.5
+    # stash_hashes(TEST_VIDS_STUB, list(build_example_vids()))
+    vid_hashes: dict[str, list[int]] = load_json(_stash_path(TEST_VIDS_STUB))
+    video_sets = video_hash_sets(vid_hashes)
+    kept, dropped = stoplist(build_hash_index(video_sets), max_vids)
+    print(f"Kept buckets: {len(kept)}; dropped (> {max_vids} videos): {len(dropped)}")
+
+    shared = count_shared(kept)
+    cands = candidates(shared, video_sets, min_frac)
+    print(f"Pairs sharing a hash: {len(shared)}; candidates (frac >= {min_frac}): {len(cands)}")
+    for (a, b), f in sorted(cands.items(), key=lambda x: -x[1]):
+        print(f"  {a} {b}: {shared[a, b]} shared, frac {f:.2f} "
+              f"(sizes {len(video_sets[a])}, {len(video_sets[b])})")
 
 
 if __name__ == "__main__":
