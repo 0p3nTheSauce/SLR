@@ -25,25 +25,33 @@ def _build_fpath(vid: str) -> Path:
     return (RAW_DIR / vid).with_suffix(".mp4")
 
 
-def _prep_vid(frames: np.ndarray, h_out: int = 64) -> np.ndarray:
-    """Greyscale (average) then resize (inter area)
+def _area_matrix(n_in: int, n_out: int) -> np.ndarray:
+    """(n_out, n_in) matrix; row i holds the fractional coverage of each
+    input pixel by output bin i, normalised to sum to 1."""
+    edges = np.linspace(0, n_in, n_out + 1)
+    lo, hi = edges[:-1, None], edges[1:, None]
+    px = np.arange(n_in)[None, :]
+    overlap = np.clip(np.minimum(hi, px + 1) - np.maximum(lo, px), 0, None)
+    return (overlap / (n_in / n_out)).astype(np.float32)
 
-    Args:
-        frames (np.ndarray): Batched frames (TxHxWxC)
-        h_out (int, optional): Length of sides of output frames (H and W). Defaults to 64.
 
-    Returns:
-        np.ndarray: Greyscaled resized frames.
-    """
-    grey = frames.mean(axis=-1)
-    t, h, w = grey.shape
+def _resize_area(grey: np.ndarray, h_out: int, w_out: int | None = None) -> np.ndarray:
+    """Batched area resize of TxHxW -> Tx h_out x w_out (float32)."""
+    w_out = w_out or h_out
+    _, h, w = grey.shape
+    r_h = _area_matrix(h, h_out)   # (h_out, H)
+    r_w = _area_matrix(w, w_out)   # (w_out, W)
+    return r_h @ grey @ r_w.T      # broadcasts over T
 
-    q_h = h // h_out
-    q_w = w // h_out
 
-    # Every HxW frame is split into h_outxh_out blocks of qxq pixels
-    resized = grey.reshape(t, h_out, q_h, h_out, q_w).mean(axis=(2, 4))
-    return resized.astype(np.uint8)
+def _prep_vid(frames: np.ndarray, h_out: int = 64, canon: int = 256) -> np.ndarray:
+    """Greyscale (average), area-resize to canon x canon, then block-average to h_out."""
+    grey = frames.mean(axis=-1, dtype=np.float32)
+    grey = _resize_area(grey, canon)               # guarantees a consistent shape
+    t = grey.shape[0]
+    q = canon // h_out                             # requires canon % h_out == 0
+    small = grey.reshape(t, h_out, q, h_out, q).mean(axis=(2, 4))
+    return np.rint(small).astype(np.uint8)
 
 
 def _pHash(frames: np.ndarray, hash_h_out: int = 8) -> np.ndarray:
@@ -162,12 +170,21 @@ def _compare_pf_hashes(
 
 
 def report(all_trims: dict[str, Callable], original: np.ndarray, augmented: np.ndarray):
-    o_gH = _pHash_global(original)
-    o_pfH = _pHash(original)
+    """Compare a series of provided crops/trims on the global and per frame pHashes. 
+    Video preparation is applied internally (do not call _prep_vid before calling this function). 
+
+    Args:
+        all_trims (dict[str, Callable]): Dictionary containing lambda augmentations
+        original (np.ndarray): Unaltered original (applicable if additional augmentations such as recoding applied)
+        augmented (np.ndarray): Pre-augmented (e.g. jpeg round trip)
+    """
+    o_prep = _prep_vid(original)
+    o_gH = _pHash_global(o_prep)
+    o_pfH = _pHash(o_prep)
     for k, f in all_trims.items():
         print()
         print(f"{' '.join(k.split('_'))}:")
-        auged = f(augmented)
+        auged = _prep_vid(f(augmented))
         gH = _pHash_global(auged)
         pfH = _pHash(auged)
         g_d = _hamming(o_gH[0], gH[0])
@@ -244,7 +261,7 @@ def _summarise(fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[
             vhashes = set(video_to_hash[v])
             print(f"Number of pHash entries for {v}: {len(vhashes)}")
             for ph in vhashes:
-                idx_counts = Counter(fdict[ph])
+                idx_counts = Counter(vid for vid, _ in fdict[ph])
                 most_common = max([(idx, c) for idx, c in idx_counts.items()], key=lambda x:x[1])
                 print(f"Most common index for {most_common[0]}: {most_common[1]}")
         print('-'*10)
@@ -287,51 +304,82 @@ def initial_tests():
     print(f"(C) Distance different signer, same action: {_hamming(hams[0], hams[3])}")
     print(f"Redundency check, should be same as (C): {_hamming(hams[1], hams[3])}")
 
+def _crop_frac(
+    f: np.ndarray,
+    start: float = 0.0, end: float = 0.0,
+    top: float = 0.0, bottom: float = 0.0,
+    left: float = 0.0, right: float = 0.0,
+) -> np.ndarray:
+    """Trim a TxHxWxC clip by a fraction of each axis' length, per side."""
+    t, h, w, _ = f.shape
+    t0, t1 = round(start * t), t - round(end * t)
+    y0, y1 = round(top * h), h - round(bottom * h)
+    x0, x1 = round(left * w), w - round(right * w)
+    return f[t0:t1, y0:y1, x0:x1]
+
+def _make_aug(sides: tuple[str, ...], p: float):
+    # factory function, so sides and p are bound per augmentation
+    return lambda f: _crop_frac(f, **{s: p for s in sides})
+
+
+def _build_augs(ops: dict[str, tuple[str, ...]], fracs) -> dict:
+    return {f"{name}_{p:.2f}": _make_aug(sides, p)
+            for name, sides in ops.items() for p in fracs}
+
+# name -> which sides get trimmed by the same fraction p
+TEMPORAL_OPS = {
+    "trim_start":     ("start",),
+    "trim_end":       ("end",),
+    "trim_start_end": ("start", "end"),
+}
+SPATIAL_OPS = {
+    "crop_left":           ("left",),
+    "crop_right":          ("right",),
+    "crop_left_right":     ("left", "right"),
+    "crop_top":            ("top",),
+    "crop_bottom":         ("bottom",),
+    "crop_top_bottom":     ("top", "bottom"),
+}
+COMBINED_OPS = {
+    "trim_crop_all": ("start", "end", "top", "bottom", "left", "right"),
+}
+
+FRACS = (0.05, 0.10, 0.20, 0.25)
+IDENTITY = {"identity": lambda f: f}
+
 def compare_hashes():
     v = "05741"  # (before, test) signer 11
     fname = _build_fpath(v)
     frames = cv_load(fname, 0, 0, all=True)
-    preproc = _prep_vid(frames)
 
-    T = preproc.shape[0]
-    frame_deviations = [d for d in (5, 10, 20, round(0.25 * T)) if 2 * d < T]
-    starts = {f"trim_start_{d}": lambda f, d=d: f[d:] for d in frame_deviations}
-    ends = {f"trim_end_{d}": lambda f, d=d: f[:-d] for d in frame_deviations}
-    both = {f"trim_start_end_{d}": lambda f, d=d: f[d:-d] for d in frame_deviations}
-    all_trims = starts | ends | both | {"identity": lambda f: f}
-
-
-    lefts = {f"crop left_{d}": lambda f, d=d: f[:, :, :-d] for d in frame_deviations}
-    rights = {f"crop right_{d}": lambda f, d=d: f[:, :, d:] for d in frame_deviations}
-    left_and_rights = {f"crop left_and_right_{d}": lambda f, d=d: f[:, :, d:-d] for d in frame_deviations}
-    tops = {f"crop top_{d}": lambda f, d=d: f[:, :-d, :] for d in frame_deviations}
-    bottoms = {f"crop bottom_{d}": lambda f, d=d: f[:, d:, :] for d in frame_deviations}
-    top_and_bottoms = {f"crop top_and_bottom_{d}": lambda f, d=d: f[:, d:-d, :] for d in frame_deviations}
-    all_crops = lefts | rights | left_and_rights | tops | bottoms | top_and_bottoms | {"identity": lambda f: f}
-
-    top_bottom_start_end = {f"crop top_and_bottom_start_end_{d}": lambda f, d=d: f[d:-d, d:-d, d:-d] for d in frame_deviations}
-    all_trims_and_crops = all_trims | all_crops | top_bottom_start_end
-
-    o_gH = _pHash_global(preproc)
-    o_pfH = _pHash(preproc)
+    all_trims = IDENTITY | _build_augs(TEMPORAL_OPS, FRACS)
+    all_crops = IDENTITY | _build_augs(SPATIAL_OPS, FRACS)
+    all_trims_and_crops = (
+        all_trims | all_crops | _build_augs(COMBINED_OPS, FRACS)
+    )
+    
+    o_preped = _prep_vid(frames)
+    o_gH = _pHash_global(o_preped)
+    o_pfH = _pHash(o_preped)
     # print(f"Origninal global: {ogH}")
     # print(f"Original frame-wise: {ofH}")
 
     print("-" * 10)
-    report(all_trims_and_crops, preproc, preproc)
+    report(all_trims_and_crops, frames, frames)
     print("-" * 10)
     print()
     
-    recoded = _prep_vid(_round_trip_compress(frames))
-    rgH = _pHash_global(recoded)
+    jpeg_recoded = _round_trip_compress(frames)
+    recoded_preped = _prep_vid(jpeg_recoded)
+    rgH = _pHash_global(recoded_preped)
     # print(f"Recoded pHash: {rgH}")
     print(f"Hamming global recoded: {_hamming(rgH[0], o_gH[0])}")
-    pfH = _pHash(recoded)
+    pfH = _pHash(recoded_preped)
     pf_d, pf_k = _compare_pf_hashes(o_pfH, pfH)
     print(f"Best mean per-frame hamming recoded: {pf_d} offset: {pf_k}")
     print("-" * 10)
 
-    report(all_trims_and_crops, preproc, recoded)
+    report(all_trims_and_crops, jpeg_recoded, jpeg_recoded)
     print("-" * 10)
     print()
     
