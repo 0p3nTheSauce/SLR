@@ -401,10 +401,6 @@ def watch_video(frames=None, path="", wait=33, title="Video"):
             key = cv2.waitKey(wait) & 0xFF
             if key == ord("q") or key == 27:
                 break
-            cv2.imshow(f"{title} from tensor", img)
-            key = cv2.waitKey(wait) & 0xFF
-            if key == ord("q") or key == 27:
-                break
     else:
         cap = cv2.VideoCapture(path)
         beg = True
