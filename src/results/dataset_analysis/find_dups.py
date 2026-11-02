@@ -226,6 +226,71 @@ def build_frame_dictionary(video_ids: list[str]) -> dict[int, list[tuple[str, in
 
     return frame_dict
 
+Run = tuple[int, int, int]  # (hash, start, length)
+RunIndex = dict[int, list[tuple[str, int, int]]]  # hash -> [(video_id, start, length)]
+
+
+def hash_videos(video_ids: list[str]) -> dict[str, np.ndarray]:
+    """Decode each video and return its per-frame pHashes (the step to cache later)."""
+    return {vid : pHash(cv_load(_build_fpath(vid), 0,0,all=True)) for vid in video_ids}
+
+def to_runs(pf_hashes: np.ndarray) -> list[Run]:                     # step 1
+    """Collapse consecutive identical hashes into (hash, start, length)."""
+    runs = []
+    h = -1
+    s = 0
+    l = 0
+    
+    for i, p in enumerate(pf_hashes):
+        if h == -1:
+            h = p
+        if p == h:
+            l += 1
+        else:
+            #save previous 
+            runs.append((h,s,l))
+            #reset for new hash
+            h = p
+            s = i
+            l = 1
+    
+    return runs
+
+def build_run_index(video_runs: dict[str, list[Run]]) -> RunIndex:   # step 1
+    """hash -> [(video_id, start, length)], i.e. build_frame_dictionary over runs."""
+    frame_dict: RunIndex = defaultdict(list)
+    for vid, runs in video_runs.items():
+        for r in runs:
+            frame_dict[r[0]].append((vid, r[1], r[2]))
+    return frame_dict
+        
+
+def stoplist(index: RunIndex, max_videos: int) -> tuple[RunIndex, RunIndex]:  # step 2
+    """Split into (kept, dropped) by distinct videos per bucket."""
+    kept: RunIndex = defaultdict(list)
+    dropped: RunIndex = defaultdict(list)
+    for hash, vid_run in index.items():
+        if len({x[0] for x in vid_run}) > max_videos:
+            dropped[hash] = vid_run
+        else:
+            kept[hash] = vid_run
+    return kept, dropped
+        
+    
+
+def vote(index: RunIndex) -> Counter[tuple[str, str, int]]:          # step 3
+    """(a, b, k) -> frames matched, for every cross-video pair within each bucket."""
+    votes = defaultdict(int)
+    for runs in index.values():
+        for i, e in enumerate(runs):
+            for j, p in enumerate(runs):
+                if i == j:
+                    continue
+                votes[(e[0], p[0], e[1] - e[1])] += min(e[2], e[2])
+    return votes
+
+            
+
 
 def _summarise(fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[str, str]]):
     
@@ -261,9 +326,12 @@ def _summarise(fdict: dict[int, list[tuple[str, int]]], known_pairs: list[tuple[
             vhashes = set(video_to_hash[v])
             print(f"Number of pHash entries for {v}: {len(vhashes)}")
             for ph in vhashes:
-                idx_counts = Counter(vid for vid, _ in fdict[ph])
-                most_common = max([(idx, c) for idx, c in idx_counts.items()], key=lambda x:x[1])
-                print(f"Most common index for {most_common[0]}: {most_common[1]}")
+                frames_per_vid = Counter(vid for vid, _ in fdict[ph])
+                top_vid, n_frames = frames_per_vid.most_common(1)[0]
+                print(
+                    f"Bucket {ph}: {len(frames_per_vid)} distinct videos; "
+                    f"most frames from {top_vid} ({n_frames})"
+                )
         print('-'*10)
     print()
     print(f"Number of black ({black}) frames: {len(fdict[black])}")
@@ -379,7 +447,7 @@ def compare_hashes():
     print(f"Best mean per-frame hamming recoded: {pf_d} offset: {pf_k}")
     print("-" * 10)
 
-    report(all_trims_and_crops, jpeg_recoded, jpeg_recoded)
+    report(all_trims_and_crops, frames, jpeg_recoded)
     print("-" * 10)
     print()
     
@@ -412,7 +480,7 @@ def small_set_test():
 
 if __name__ == "__main__":
     # initial_tests()
-    compare_hashes()
+    # compare_hashes()
     print('\n'*2, '-'*10, '\n'*2)
     small_set_test()
     
