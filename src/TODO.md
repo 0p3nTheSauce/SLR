@@ -102,8 +102,11 @@ Misc TODOs:
   byte-identical copies, 1877 of them one clip under several glosses, and 184 test instances have a
   twin in train/val. Decide how the final results treat them (drop the conflicted instances from
   test, merge the glosses, or report both), and whether the train copies should be removed.
-  Near-duplicates (re-encodes) are not found by the MD5 hashing: try perceptual hashing or
-  frame-level matching. Compare the conflicting gloss pairs with the Boston University revised
+  Near-duplicates (re-encodes, trims) are not found by the MD5 hashing. Per-frame pHashes
+  (`results/dataset_analysis/find_dups.py`, findings in `near_duplicates.md` beside it, 2026-11-02)
+  recover all exact copies but can't separate same-session signs: add a pixel-level verifier for
+  the candidates. The old `near` groups in `find_duplicates.py` are false positives: drop or fix
+  that kind when the two analyses are merged (below). Compare the conflicting gloss pairs with the Boston University revised
   labels (the item above).
 - **Cleaned dataset with variation-level classes (feasibility in
   `results/dataset_analysis/custom_dataset_feasibility.ipynb`).** Needs: a reviewed merge list (338

@@ -162,6 +162,11 @@ only, so this is a lower bound: a re-encode of the same video is not found.
   bins. So much of the low F1 on those glosses is label ambiguity, and each copy also counts as a
   separate train instance.
 
+Non-identical copies (re-encoded, trimmed or cropped) were searched for with per-frame perceptual
+hashes on 2026-11-02, and none have been found so far. The `near` groups in
+`find_duplicates.py`'s report are false positives: different signs by the same signer. See
+[`near_duplicates.md`](../results/dataset_analysis/near_duplicates.md).
+
 ## Naming conventions
 
 ### Split vs Set
