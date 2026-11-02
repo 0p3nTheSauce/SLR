@@ -10,16 +10,18 @@
 
 import itertools
 from collections import Counter, defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import cast
 
 import cv2
 import numpy as np
 from scipy.fft import dctn
+from tqdm import tqdm
 
 from src.results import get_stash_path, load_json, stash_json
-from src.run_types import RAW_DIR
+from src.run_types import RAW_DIR, SPLIT_DIR
 from src.utils import cv_load
 
 
@@ -232,9 +234,23 @@ def build_frame_dictionary(video_ids: list[str]) -> dict[int, list[tuple[str, in
 HashIndex = dict[int, list[str]]  # frame hash -> video_ids containing it
 
 
-def hash_videos(video_ids: list[str]) -> dict[str, np.ndarray]:
-    """Decode each video and return its per-frame pHashes"""
-    return {vid: pHash(cv_load(_build_fpath(vid), 0, 0, all=True)) for vid in video_ids}
+def _hash_video(vid: str) -> np.ndarray:
+    return pHash(cv_load(_build_fpath(vid), 0, 0, all=True))
+
+
+def hash_videos(video_ids: list[str], workers: int | None = None) -> dict[str, np.ndarray]:
+    """Decode each video (in parallel) and return its per-frame pHashes"""
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        hashes = pool.map(_hash_video, video_ids, chunksize=16)
+        return dict(
+            tqdm(zip(video_ids, hashes, strict=True), total=len(video_ids), desc="Hashing")
+        )
+
+
+def asl2000_video_ids() -> list[str]:
+    """Every instance's video_id in the plain asl2000 split (21,095 videos)."""
+    split = load_json(SPLIT_DIR / "asl2000.json")
+    return sorted(inst["video_id"] for gloss in split for inst in gloss["instances"])
 
 
 def video_hash_sets(vids_to_pf_hashes: dict[str, list[int]]) -> dict[str, set[int]]:
@@ -286,6 +302,55 @@ def candidates(
         (a, b): n / min(len(video_sets[a]), len(video_sets[b])) for (a, b), n in shared.items()
     }
     return {pair: f for pair, f in fracs.items() if f >= min_frac}
+
+
+def verify(
+    pairs: Iterable[tuple[str, str]], vid_hashes: dict[str, np.ndarray], max_dist: float
+) -> dict[tuple[str, str], tuple[float, int]]:
+    """Candidate pairs whose best-aligned mean per-frame Hamming distance is at most `max_dist`.
+
+    Searches every offset with `_compare_pf_hashes` (overlap at least half the shorter clip), so a
+    pair is judged on all its overlapping frames, not just the hashes it shares.
+
+    Returns:
+        (a, b) -> (mean distance, offset k: frame j of b lines up with frame j + k of a)
+    """
+    out: dict[tuple[str, str], tuple[float, int]] = {}
+    for a, b in pairs:
+        dist, k = _compare_pf_hashes(vid_hashes[a], vid_hashes[b])
+        if dist <= max_dist:
+            out[a, b] = (dist, k)
+    return out
+
+
+def group_pairs(pairs: Iterable[tuple[str, str]]) -> list[list[str]]:
+    """Connected components (union-find) of the pair graph, each sorted, largest first."""
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for a, b in pairs:
+        parent[find(a)] = find(b)
+    groups: dict[str, list[str]] = defaultdict(list)
+    for x in parent:
+        groups[find(x)].append(x)
+    return sorted((sorted(g) for g in groups.values()), key=lambda g: (-len(g), g))
+
+
+def known_pairs(kinds: tuple[str, ...] = ("exact", "near")) -> set[tuple[str, str]]:
+    """Every within-group pair (a < b) of the given kinds in `find_duplicates.py`'s report."""
+    report = load_json(HERE / "stashed_results/duplicates_asl2000.json")
+    return {
+        pair
+        for g in report["groups"]
+        if g["kind"] in kinds
+        for pair in itertools.combinations(sorted(m["video_id"] for m in g["members"]), 2)
+    }
 
 
 def _summarise(
@@ -506,6 +571,7 @@ def build_example_vids() -> set[str]:
 
 HERE = Path(__file__).parent
 TEST_VIDS_STUB = "test_vids_"
+ASL2000_STUB = "asl2000_frame_phash_"
 
 
 def _stash_path(stub: str) -> Path:
@@ -537,9 +603,40 @@ def test_pairs():
               f"(sizes {len(video_sets[a])}, {len(video_sets[b])})")
 
 
+def find_all(max_vids: int = 50, min_frac: float = 0.5, max_dist: float = 2.0):
+    """Run the whole pipeline on the stashed asl2000 hashes and check recall on the old report."""
+    raw: dict[str, list[int]] = load_json(_stash_path(ASL2000_STUB))
+    vid_hashes = {v: np.asarray(h, dtype=np.uint64) for v, h in raw.items()}
+    video_sets = video_hash_sets(raw)
+    kept, dropped = stoplist(build_hash_index(video_sets), max_vids)
+    print(f"Videos: {len(raw)}; kept buckets: {len(kept)}; dropped (> {max_vids} videos): "
+          f"{len(dropped)}, sizes {sorted((len(v) for v in dropped.values()), reverse=True)[:10]}")
+
+    shared = count_shared(kept)
+    cands = candidates(shared, video_sets, min_frac)
+    print(f"Pairs sharing a hash: {len(shared)}; candidates (frac >= {min_frac}): {len(cands)}")
+
+    verified = verify(cands, vid_hashes, max_dist)
+    groups = group_pairs(verified)
+    print(f"Verified pairs (mean dist <= {max_dist}): {len(verified)}; groups: {len(groups)}, "
+          f"sizes {Counter(len(g) for g in groups).most_common()}")
+
+    group_of = {v: i for i, g in enumerate(groups) for v in g}
+    for kinds in [("exact",), ("near",)]:
+        known = known_pairs(kinds)
+        found = sum(group_of.get(a, -1) == group_of.get(b, -2) for a, b in known)
+        print(f"Recall on {kinds[0]} pairs: {found}/{len(known)}")
+    new = sorted(set(verified) - known_pairs())
+    print(f"Verified pairs not in the old exact/near groups: {len(new)}")
+    for a, b in new[:20]:
+        print(f"  {a} {b}: dist {verified[a, b][0]:.2f}, k {verified[a, b][1]}, "
+              f"lengths {len(vid_hashes[a])}, {len(vid_hashes[b])}")
+
+
 if __name__ == "__main__":
     # initial_tests()
     # compare_hashes()
     # print("\n" * 2, "-" * 10, "\n" * 2)
     # small_set_test()
-    test_pairs()
+    # test_pairs()
+    find_all()

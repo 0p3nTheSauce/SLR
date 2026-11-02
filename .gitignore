@@ -27,4 +27,5 @@ src/que/experiments
 .vscode/
 ./.vscode/
 slr.egg-info/
-src/results/outputs/
+src/results/outputs/# 27 MB, rebuilt by find_dups.stash_hashes (~36 min)
+src/results/dataset_analysis/stashed_results/asl2000_frame_phash_results.json
