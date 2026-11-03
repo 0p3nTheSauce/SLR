@@ -21,6 +21,7 @@ from scipy.fft import dctn
 from tqdm import tqdm
 
 from src.results import get_stash_path, load_json, stash_json
+from src.results.dataset_analysis.duplicates import group_pairs
 from src.run_types import RAW_DIR, SPLIT_DIR
 from src.utils import cv_load
 
@@ -321,25 +322,6 @@ def verify(
         if dist <= max_dist:
             out[a, b] = (dist, k)
     return out
-
-
-def group_pairs(pairs: Iterable[tuple[str, str]]) -> list[list[str]]:
-    """Connected components (union-find) of the pair graph, each sorted, largest first."""
-    parent: dict[str, str] = {}
-
-    def find(x: str) -> str:
-        parent.setdefault(x, x)
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    for a, b in pairs:
-        parent[find(a)] = find(b)
-    groups: dict[str, list[str]] = defaultdict(list)
-    for x in parent:
-        groups[find(x)].append(x)
-    return sorted((sorted(g) for g in groups.values()), key=lambda g: (-len(g), g))
 
 
 def known_pairs(kinds: tuple[str, ...] = ("exact", "near")) -> set[tuple[str, str]]:

@@ -16,7 +16,7 @@ from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from itertools import combinations
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, TypeVar, cast
 
 import numpy as np
 import pandas as pd
@@ -133,22 +133,30 @@ def twin_pairs(instances: pd.DataFrame) -> pd.DataFrame:
     return pairs
 
 
-def set_pair_counts(instances: pd.DataFrame) -> pd.DataFrame:
-    """Unordered pairs of instances sharing a clip, by the two sets they are in (rows, e.g.
-    `train-test`, in `SETS` order) and whether they share a gloss (columns `same gloss`,
-    `other gloss`)."""
-    pairs = twin_pairs(instances)
-    pairs = pairs[pairs.video_id < pairs.video_id_twin]
-    order = {s: i for i, s in enumerate(SETS)}
-    set_pair = [
-        "-".join(sorted((a, b), key=order.__getitem__)) for a, b in zip(pairs.set, pairs.set_twin)
-    ]
-    rows = [f"{a}-{b}" for i, a in enumerate(SETS) for b in SETS[i:]]
-    gloss = pairs.same_gloss.map({True: "same gloss", False: "other gloss"})
-    return (
-        pd.crosstab(pd.Series(set_pair, name="sets", index=pairs.index), gloss.rename("gloss"))
-        .reindex(index=rows, columns=["other gloss", "same gloss"], fill_value=0)
-    )
+TWIN_GLOSSES = ("other gloss", "same gloss", "both")
+"""`twin_set_counts`' columns: an instance's twins in a set are all under other glosses, all
+under its own gloss, or some of each."""
+
+
+def twin_set_counts(flagged: pd.DataFrame) -> pd.DataFrame:
+    """Instances with a twin in each set, by the instance's own set and the twin's.
+
+    `flagged` is `flag_twins_by_set` output. Rows are a (`set`, `twin set`) MultiIndex in `SETS`
+    order, columns `TWIN_GLOSSES`. The columns are exclusive, so a row sums to the instances of
+    `set` with any twin in `twin set`; an instance with twins in several sets is in several rows.
+    """
+    rows: dict[tuple[str, str], dict[str, int]] = {}
+    for own in SETS:
+        in_set = cast(pd.DataFrame, flagged[flagged.set == own])
+        for twin in SETS:
+            same = in_set[twin_set_column("same_gloss", twin)].to_numpy()
+            other = in_set[twin_set_column("other_gloss", twin)].to_numpy()
+            rows[own, twin] = {
+                "other gloss": int((other & ~same).sum()),
+                "same gloss": int((same & ~other).sum()),
+                "both": int((same & other).sum()),
+            }
+    return pd.DataFrame.from_dict(rows, orient="index").rename_axis(["set", "twin set"])
 
 
 def flag_twins_by_set(instances: pd.DataFrame) -> pd.DataFrame:
@@ -192,45 +200,92 @@ def flag_twins_by_set(instances: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def conflict_clips(flagged: pd.DataFrame) -> pd.DataFrame:
-    """One row per clip filed under more than one gloss, indexed by `md5`.
+Node = tuple[str, int]  # a (gloss, variation_id) pair: WLASL's finest class
 
-    `flagged` is `flag_twins` output. Columns: `gloss` (its set of glosses, e.g.
-    `doctor / physician`), `video_ids` (its copies, `,`-separated), `in_one_set` (all its copies
-    are in the same set) and `gloss_set_clips` (how many clips that set of glosses shares).
+
+T = TypeVar("T", str, Node)
+
+
+def group_pairs(pairs: Iterable[tuple[T, T]]) -> list[list[T]]:
+    """Connected components (union-find) of the pair graph, each sorted, largest first.
+
+    A `(x, x)` pair adds `x` on its own, so a node with no partner still gets a component.
     """
-    clips = cast(
+    parent: dict[T, T] = {}
+
+    def find(x: T) -> T:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for a, b in pairs:
+        parent[find(a)] = find(b)
+    groups: dict[T, list[T]] = {}
+    for x in parent:
+        groups.setdefault(find(x), []).append(x)
+    return sorted((sorted(g) for g in groups.values()), key=lambda g: (-len(g), g))
+
+
+def copy_groups(flagged: pd.DataFrame) -> pd.DataFrame:
+    """One row per clip with more than one copy (a group), indexed by `md5`.
+
+    `flagged` is `flag_twins` output. Columns: `copies`, `glosses` (distinct glosses among the
+    copies), `gloss` (those glosses, ` / `-joined), `video_ids` (`, `-joined) and the copies in
+    each of `SETS`.
+    """
+    twins = flagged[flagged.has_twin]
+    groups = cast(
         pd.DataFrame,
-        flagged[flagged.twin_other_gloss]
-        .groupby("md5")
-        .agg(
+        twins.groupby("md5").agg(
+            copies=("video_id", "size"),
+            glosses=("gloss", "nunique"),
             gloss=("gloss", lambda g: " / ".join(sorted(set(g)))),
             video_ids=("video_id", lambda v: ", ".join(sorted(v))),
-            sets=("set", "nunique"),
         ),
     )
-    clips["in_one_set"] = clips.sets == 1
-    clips["gloss_set_clips"] = _per_group(clips, ["gloss"], "video_ids", "size")
-    return clips.drop(columns="sets")
+    per_set = pd.crosstab(twins.md5, twins.set).reindex(columns=list(SETS), fill_value=0)
+    return groups.join(per_set)
 
 
-def gloss_collisions(flagged: pd.DataFrame) -> pd.DataFrame:
-    """One row per set of glosses that share a clip (e.g. `doctor / physician`), most clips first.
+def add_gloss_clusters(groups: pd.DataFrame) -> pd.DataFrame:
+    """`copy_groups` output with each group's gloss cluster.
 
-    `flagged` is `flag_twins` output. Columns: `clips` (distinct clips filed under exactly those
-    glosses), `in one set` / `across sets` (how many of those clips have all their copies in one
-    set / spread over sets) and `video_ids` (`,` between the copies of a clip, `|` between clips).
+    Glosses are in one cluster when any clip is filed under both, so a cluster is a connected
+    component and can chain: `a / b` on one clip and `b / c` on another make `a / b / c`, though
+    no clip has all three. Added columns: `cluster` (its glosses, ` / `-joined), `cluster_glosses`
+    (how many) and `whole_cluster` (the clip is filed under every gloss of its cluster).
     """
-    clips = conflict_clips(flagged)
-    collisions = cast(
+    glosses = [g.split(" / ") for g in groups.gloss]
+    clusters = group_pairs((g[0], other) for g in glosses for other in g)
+    cluster_of = {gloss: c for c in clusters for gloss in c}
+    out = groups.copy()
+    out["cluster"] = [" / ".join(cluster_of[g[0]]) for g in glosses]
+    out["cluster_glosses"] = [len(cluster_of[g[0]]) for g in glosses]
+    out["whole_cluster"] = out.glosses == out.cluster_glosses
+    return out
+
+
+def cluster_table(clustered: pd.DataFrame) -> pd.DataFrame:
+    """One row per gloss cluster of `add_gloss_clusters` output, most glosses (then clips) first.
+
+    Columns: `glosses`, `clips`, `copies` (instances), `whole cluster` (clips filed under every
+    gloss of the cluster), the copies in each of `SETS`, and `video_ids` (`, ` between the copies
+    of a clip, ` | ` between clips).
+    """
+    table = cast(
         pd.DataFrame,
-        clips.groupby("gloss").agg(
-            clips=("video_ids", "size"),
-            **{"in one set": ("in_one_set", "sum"), "across sets": ("in_one_set", lambda o: int((~o).sum()))},
+        clustered.groupby("cluster").agg(
+            glosses=("cluster_glosses", "first"),
+            clips=("copies", "size"),
+            copies=("copies", "sum"),
+            **{"whole cluster": ("whole_cluster", "sum")},
+            **{s: (s, "sum") for s in SETS},
             video_ids=("video_ids", lambda v: " | ".join(sorted(v))),
         ),
     )
-    return collisions.sort_values(["clips", "gloss"], ascending=[False, True])
+    return table.sort_values(["glosses", "clips", "cluster"], ascending=[False, False, True])
 
 
 GLOSS_MEASURES = {
@@ -290,9 +345,6 @@ def gloss_measures(flagged: pd.DataFrame) -> pd.DataFrame:
     return table
 
 
-Node = tuple[str, int]  # a (gloss, variation_id) pair: WLASL's finest class
-
-
 def shared_clip_counts(instances: pd.DataFrame) -> Counter[tuple[Node, Node]]:
     """For each pair of (gloss, variation) nodes, the number of distinct clips filed under both.
 
@@ -314,27 +366,13 @@ def merge_signs(instances: pd.DataFrame, min_shared: int) -> pd.Series:
     `over`, `repeat`, `again`, `after`, `before`, `last`, `past`), so `min_shared` should be 2 or
     more. The sign id is the smallest `gloss:variation` string in its component.
     """
-    parent: dict[Node, Node] = {}
-
-    def find(node: Node) -> Node:
-        parent.setdefault(node, node)
-        while parent[node] != node:
-            parent[node] = parent[parent[node]]
-            node = parent[node]
-        return node
-
-    for node in zip(instances.gloss, instances.variation_id):
-        find(node)
-    for (a, b), shared in shared_clip_counts(instances).items():
-        if shared >= min_shared:
-            parent[find(a)] = find(b)
-
-    members: dict[Node, list[str]] = {}
-    for node in list(parent):
-        members.setdefault(find(node), []).append(f"{node[0]}:{node[1]}")
-    sign_of = {root: min(names) for root, names in members.items()}
+    nodes = list(zip(instances.gloss, instances.variation_id))
+    linked = [pair for pair, shared in shared_clip_counts(instances).items() if shared >= min_shared]
+    components = group_pairs([(n, n) for n in nodes] + linked)
+    names = [[f"{gloss}:{variation}" for gloss, variation in c] for c in components]
+    sign_of = {node: min(n) for c, n in zip(components, names) for node in c}
     return pd.Series(
-        [sign_of[find(node)] for node in zip(instances.gloss, instances.variation_id)],
+        [sign_of[node] for node in nodes],
         index=instances.index,
         name="sign",
     )

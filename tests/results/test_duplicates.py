@@ -5,16 +5,18 @@ import pandas as pd
 from src.results.dataset_analysis.duplicates import (
     GLOSS_MEASURES,
     TWIN_KINDS,
-    conflict_clips,
+    add_gloss_clusters,
+    cluster_table,
+    copy_groups,
     flag_twins,
     flag_twins_by_set,
-    gloss_collisions,
     gloss_measures,
+    group_pairs,
     hash_clips,
     merge_signs,
-    set_pair_counts,
     shared_clip_counts,
     twin_set_column,
+    twin_set_counts,
 )
 
 
@@ -69,42 +71,81 @@ class TestFlagTwinsBySet:
         assert not flagged[list(TWIN_KINDS)].to_numpy().any()
 
 
-class TestSetPairCounts:
-    def test_unordered_pairs_by_sets_and_gloss(self) -> None:
-        counts = set_pair_counts(
-            instances([("1", "a", "test", "x"), ("2", "b", "train", "x"), ("3", "a", "train", "x")])
-        )
-        assert counts.loc["train-test", "other gloss"] == 1  # 1-2
-        assert counts.loc["train-test", "same gloss"] == 1  # 1-3
-        assert counts.loc["train-train", "other gloss"] == 1  # 2-3
-        assert counts.to_numpy().sum() == 3
-
-
-class TestGlossCollisions:
-    def test_clips_grouped_by_gloss_set_with_placement(self) -> None:
-        flagged = flag_twins(
+class TestTwinSetCounts:
+    def test_instances_by_own_and_twin_set_with_exclusive_glosses(self) -> None:
+        flagged = flag_twins_by_set(
             instances(
                 [
-                    ("1", "doctor", "train", "x"),
-                    ("2", "physician", "train", "x"),
-                    ("3", "doctor", "train", "y"),
-                    ("4", "physician", "test", "y"),
-                    ("5", "past", "val", "z"),
-                    ("6", "before", "test", "z"),
+                    ("1", "a", "test", "x"),
+                    ("2", "b", "train", "x"),
+                    ("3", "a", "train", "x"),
+                    ("4", "c", "val", "y"),
+                    ("5", "d", "train", "y"),
                 ]
             )
         )
-        collisions = gloss_collisions(flagged)
-        assert collisions.loc["doctor / physician", "clips"] == 2
-        assert collisions.loc["doctor / physician", "video_ids"] == "1, 2 | 3, 4"
-        assert collisions.loc["doctor / physician", "in one set"] == 1  # x: both train
-        assert collisions.loc["doctor / physician", "across sets"] == 1  # y: train and test
-        assert collisions.loc["before / past", "across sets"] == 1
-        assert collisions.index[0] == "doctor / physician"  # most clips first
+        counts = twin_set_counts(flagged)
+        assert counts.loc[("test", "train")].to_dict() == {"other gloss": 0, "same gloss": 0, "both": 1}
+        assert counts.loc[("train", "test")].to_dict() == {"other gloss": 1, "same gloss": 1, "both": 0}
+        assert counts.loc[("train", "train"), "other gloss"] == 2  # 2-3
+        assert counts.loc[("train", "val"), "other gloss"] == 1  # 5-4
+        assert counts.loc[("val", "train"), "other gloss"] == 1
+        assert counts.loc[("test", "test")].sum() == 0
 
-        clips = conflict_clips(flagged)
-        assert clips.loc["x", "in_one_set"] and not clips.loc["y", "in_one_set"]
-        assert clips.loc["x", "gloss_set_clips"] == 2 and clips.loc["z", "gloss_set_clips"] == 1
+
+class TestGroupPairs:
+    def test_components_largest_first_with_singletons(self) -> None:
+        assert group_pairs([("b", "a"), ("c", "b"), ("d", "e"), ("f", "f")]) == [
+            ["a", "b", "c"],
+            ["d", "e"],
+            ["f"],
+        ]
+
+
+class TestGlossClusters:
+    def flagged(self) -> pd.DataFrame:
+        return flag_twins(
+            instances(
+                [
+                    ("1", "ago", "train", "x"),
+                    ("2", "past", "test", "x"),
+                    ("3", "before", "val", "x"),
+                    ("4", "past", "train", "y"),
+                    ("5", "before", "train", "y"),
+                    ("6", "last", "train", "z"),
+                    ("7", "past", "val", "z"),
+                    ("8", "mom", "train", "w"),
+                    ("9", "mom", "test", "w"),
+                    ("10", "solo", "train", "v"),
+                ]
+            )
+        )
+
+    def test_copy_groups_count_copies_glosses_and_sets(self) -> None:
+        groups = copy_groups(self.flagged())
+        assert "v" not in groups.index
+        assert groups.loc["x"].to_dict() == {
+            "copies": 3,
+            "glosses": 3,
+            "gloss": "ago / before / past",
+            "video_ids": "1, 2, 3",
+            "train": 1,
+            "val": 1,
+            "test": 1,
+        }
+
+    def test_clusters_chain_and_coverage(self) -> None:
+        clustered = add_gloss_clusters(copy_groups(self.flagged()))
+        assert set(clustered.loc[["x", "y", "z"], "cluster"]) == {"ago / before / last / past"}
+        assert not clustered.loc["x", "whole_cluster"]  # last is only on z
+        assert clustered.loc["w", "cluster"] == "mom" and clustered.loc["w", "whole_cluster"]
+
+        table = cluster_table(clustered)
+        assert table.index[0] == "ago / before / last / past"
+        row = table.loc["ago / before / last / past"]
+        assert (row.glosses, row.clips, row.copies, row["whole cluster"]) == (4, 3, 7, 0)
+        assert (row.train, row.val, row.test) == (4, 2, 1)
+        assert row.video_ids == "1, 2, 3 | 4, 5 | 6, 7"
 
 
 class TestGlossMeasures:

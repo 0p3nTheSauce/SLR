@@ -150,14 +150,16 @@ Some clips are byte-identical copies of each other, filed under different `video
 only, so this is a lower bound: a re-encode of the same video is not found.
 
 * 1985 instances (9.4%) are one of 900 groups of identical clips (745 pairs, up to 5 copies).
-* 1877 are a **label conflict**: the same clip under two or more glosses (846 clips, 523 distinct
-  gloss sets, mostly synonyms such as `doctor` / `physician`). 849 of the 2000 glosses are in one.
+* 1877 are a **label conflict**: the same clip under two or more glosses (846 clips, mostly
+  synonyms such as `doctor` / `physician`). 849 of the 2000 glosses are in one. Glosses linked by
+  shared clips form 329 clusters, 219 of them pairs; the largest (12 glosses, `ago` / `past`
+  through `again` / `repeat`) are chains of near-synonyms, no clip carrying all their glosses.
   They are concentrated in the `signingsavvy` (36% of its instances) and `aslsearch` (20%) sources.
 * 68 are a **leak**: a twin with the same gloss in a different set (14 in test, 29 in train).
 * 184 of the 2879 test instances (6.4%) have a twin in train or val (156 in train, 45 in val), 174
   of them under another gloss there. On WLASL-1000, 62 of 1876; WLASL-300, 12 of 668; WLASL-100,
-  1 of 258. Most conflicting pairs are within train (652 of 1232), where they give contradictory
-  training targets.
+  1 of 258. Most copies are within train: 1104 train instances have a twin in train (1034 only
+  under other glosses), giving contradictory training targets.
 * No group spans two sources. 11 groups give one file several `signer_id`s (all in `handspeak`,
   `aslpro` and `asldeafined`, with the same id pairs recurring), so those sources' signer ids are
   unreliable. Checked 2026-11-03 in `duplicate_clips.ipynb`.
