@@ -192,18 +192,14 @@ def flag_twins_by_set(instances: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-Placement = Literal["one set", "several sets", "mixed"]
+def conflict_clips(flagged: pd.DataFrame) -> pd.DataFrame:
+    """One row per clip filed under more than one gloss, indexed by `md5`.
 
-
-def gloss_collisions(flagged: pd.DataFrame) -> pd.DataFrame:
-    """One row per set of glosses that share a clip (e.g. `doctor / physician`), most clips first.
-
-    `flagged` is `flag_twins` output. Columns: `clips` (distinct clips filed under exactly those
-    glosses), `video_ids` (`,` between the copies of a clip, `|` between clips) and `placement`:
-    `one set` if each clip's copies are all in one set, `several sets` if each clip's copies span
-    sets, `mixed` if some clips do and some don't.
+    `flagged` is `flag_twins` output. Columns: `gloss` (its set of glosses, e.g.
+    `doctor / physician`), `video_ids` (its copies, `,`-separated), `in_one_set` (all its copies
+    are in the same set) and `gloss_set_clips` (how many clips that set of glosses shares).
     """
-    by_clip = cast(
+    clips = cast(
         pd.DataFrame,
         flagged[flagged.twin_other_gloss]
         .groupby("md5")
@@ -213,17 +209,25 @@ def gloss_collisions(flagged: pd.DataFrame) -> pd.DataFrame:
             sets=("set", "nunique"),
         ),
     )
-    by_clip["placement"] = np.where(by_clip.sets == 1, "one set", "several sets")
+    clips["in_one_set"] = clips.sets == 1
+    clips["gloss_set_clips"] = _per_group(clips, ["gloss"], "video_ids", "size")
+    return clips.drop(columns="sets")
 
-    def placement(clips: pd.Series) -> Placement:
-        return clips.iloc[0] if clips.nunique() == 1 else "mixed"
 
+def gloss_collisions(flagged: pd.DataFrame) -> pd.DataFrame:
+    """One row per set of glosses that share a clip (e.g. `doctor / physician`), most clips first.
+
+    `flagged` is `flag_twins` output. Columns: `clips` (distinct clips filed under exactly those
+    glosses), `in one set` / `across sets` (how many of those clips have all their copies in one
+    set / spread over sets) and `video_ids` (`,` between the copies of a clip, `|` between clips).
+    """
+    clips = conflict_clips(flagged)
     collisions = cast(
         pd.DataFrame,
-        by_clip.groupby("gloss").agg(
+        clips.groupby("gloss").agg(
             clips=("video_ids", "size"),
+            **{"in one set": ("in_one_set", "sum"), "across sets": ("in_one_set", lambda o: int((~o).sum()))},
             video_ids=("video_ids", lambda v: " | ".join(sorted(v))),
-            placement=("placement", placement),
         ),
     )
     return collisions.sort_values(["clips", "gloss"], ascending=[False, True])

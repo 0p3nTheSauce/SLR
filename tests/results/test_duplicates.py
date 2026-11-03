@@ -5,6 +5,7 @@ import pandas as pd
 from src.results.dataset_analysis.duplicates import (
     GLOSS_MEASURES,
     TWIN_KINDS,
+    conflict_clips,
     flag_twins,
     flag_twins_by_set,
     gloss_collisions,
@@ -96,9 +97,14 @@ class TestGlossCollisions:
         collisions = gloss_collisions(flagged)
         assert collisions.loc["doctor / physician", "clips"] == 2
         assert collisions.loc["doctor / physician", "video_ids"] == "1, 2 | 3, 4"
-        assert collisions.loc["doctor / physician", "placement"] == "mixed"
-        assert collisions.loc["before / past", "placement"] == "several sets"
+        assert collisions.loc["doctor / physician", "in one set"] == 1  # x: both train
+        assert collisions.loc["doctor / physician", "across sets"] == 1  # y: train and test
+        assert collisions.loc["before / past", "across sets"] == 1
         assert collisions.index[0] == "doctor / physician"  # most clips first
+
+        clips = conflict_clips(flagged)
+        assert clips.loc["x", "in_one_set"] and not clips.loc["y", "in_one_set"]
+        assert clips.loc["x", "gloss_set_clips"] == 2 and clips.loc["z", "gloss_set_clips"] == 1
 
 
 class TestGlossMeasures:
