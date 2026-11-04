@@ -100,7 +100,11 @@ WLASL is labelled by English gloss, and the gloss-to-sign mapping isn't one-to-o
 * **One sign, several glosses.** Lifeprint glosses the over-the-shoulder sign as
   "PAST | PAST-[before] | PAST-[former]" ([before][lp-before], [past][lp-past]), and the MSU ASL
   Browser describes [FORMER][msu-former] with the same movement. So `before` (variation 0),
-  `former` and `past` can hold the same sign.
+  `former` and `past` can hold the same sign. Exact duplicates back this up: 5 clips are
+  byte-identical copies filed under both `before` and `past`, and every one of those `before`
+  copies is variation 0 (`results/dataset_analysis/duplicate_clips.ipynb`, checked 2026-11-04).
+  `former` has no exact copy, so the duplicate analysis does not link it; its link is test video
+  05735, labelled `before` but signing `former` (`results/satnac_2026/all_misspredictions.ipynb`).
 * **A known WLASL problem.** Neidle and colleagues at Boston University show that WLASL
   sometimes files one sign under several glosses and several signs under one gloss
   ([Neidle & Ballard 2022][asllrp21]; [Neidle et al. 2022][lrec22]), and have published

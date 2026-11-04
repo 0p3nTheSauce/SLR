@@ -138,7 +138,10 @@ Misc TODOs:
   (MD5 copies; the same 900 groups as `find_duplicates.py`'s `exact` kind). `satnac_2026/signer_shortcut.py`
   (with its notebook and `tests/results/test_signer_shortcut.py`) still reads `find_duplicates.py`'s
   `stashed_results/duplicates_asl2000.json`; move it to `duplicates.py`, then retire
-  `find_duplicates.py` and its stash (`find_dups.py`'s `known_pairs` reads it too).
+  `find_duplicates.py` and its stash (`find_dups.py`'s `known_pairs` reads it too). Luke
+  (2026-11-04): merge `find_duplicates.py`, `find_dups.py` and `duplicates.py` into one module,
+  dropping unused or deprecated code. `duplicates.py` still says "group" (`copy_groups`, its
+  docstrings) where `duplicate_clips.ipynb` now says "clip"; align the terms in the merge.
 - Experiment tracking for Que_v2 (agreed 2026-10-22: build this rather than revive the v1 Que
   for it). Que_v2 only schedules; results live in each run's `run.json` (a `CompExpInfo`,
   written by `train_and_test.py` / `sweep_trial.py`) under `src/runs/`. `results/sweeping/helpers.py`
