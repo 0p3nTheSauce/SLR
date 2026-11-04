@@ -146,3 +146,7 @@ Misc TODOs:
   sweep 2's trials (`src/runs/asl100/MViTv2_S_e/sweep_flx99idx/job*/run.json`). A sweep reader
   exists since 2026-10-30 (`helpers.load_sweep_run_jsons`, used by `param_importance.ipynb`); still
   to do: use it in `suggest_sweep.ipynb`, and longer term an index over `src/runs/**/run.json`.
+- Viewer notebooks (`dataset_analysis/instance_viewer.ipynb`, `class_viewer.ipynb`) embed their
+  animation players as outputs, a few MB per run (on 2026-11-04 `instance_viewer` was 6.1 MB,
+  stripped since, and `class_viewer` is 3.3 MB). Committing them after a lookup grows the repo each time; add
+  `nbstripout` (or a pre-commit hook) for these lookup tools, not for results notebooks.
