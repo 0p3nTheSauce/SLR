@@ -7,7 +7,7 @@ from src.results.dataset_analysis.duplicates import (
     TWIN_KINDS,
     add_gloss_clusters,
     cluster_table,
-    copy_groups,
+    duplicated_clips,
     flag_twins,
     flag_twins_by_set,
     gloss_measures,
@@ -121,10 +121,10 @@ class TestGlossClusters:
             )
         )
 
-    def test_copy_groups_count_copies_glosses_and_sets(self) -> None:
-        groups = copy_groups(self.flagged())
-        assert "v" not in groups.index
-        assert groups.loc["x"].to_dict() == {
+    def test_duplicated_clips_count_copies_glosses_and_sets(self) -> None:
+        clips = duplicated_clips(self.flagged())
+        assert "v" not in clips.index
+        assert clips.loc["x"].to_dict() == {
             "copies": 3,
             "glosses": 3,
             "gloss": "ago / before / past",
@@ -135,7 +135,7 @@ class TestGlossClusters:
         }
 
     def test_clusters_chain_and_coverage(self) -> None:
-        clustered = add_gloss_clusters(copy_groups(self.flagged()))
+        clustered = add_gloss_clusters(duplicated_clips(self.flagged()))
         assert set(clustered.loc[["x", "y", "z"], "cluster"]) == {"ago / before / last / past"}
         assert not clustered.loc["x", "whole_cluster"]  # last is only on z
         assert clustered.loc["w", "cluster"] == "mom" and clustered.loc["w", "whole_cluster"]

@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.results.dataset_analysis.find_duplicates import DuplicateGroup, Member, Report
 from src.results.error_analysis.signer_shortcut import (
     GlossSets,
     candidate_features,
@@ -15,38 +14,30 @@ from src.results.error_analysis.signer_shortcut import (
 )
 
 
-def member(video_id: str, gloss: str, set_: str, signer: int = 1, source: str = 's') -> Member:
-    return Member(
-        video_id=video_id, gloss=gloss, set=set_, signer_id=signer, variation_id=0, source=source
-    )
-
-
-def report(*groups: list[Member]) -> Report:
-    return Report(
-        split_file='x',
-        num_instances=0,
-        near_threshold=0.0,
-        failed={},
-        groups=[
-            DuplicateGroup(kind='exact', members=g, cross_gloss=False, cross_set=False) for g in groups
-        ],
-    )
+def instances(rows: list[tuple[str, str, str, int, str]]) -> pd.DataFrame:
+    """`load_instances`-like rows of (video_id, gloss, set, signer_id, md5)."""
+    return pd.DataFrame(rows, columns=pd.Index(['video_id', 'gloss', 'set', 'signer_id', 'md5']))
 
 
 def test_train_gloss_sets_keep_only_training_videos_not_excluded() -> None:
-    members = [
-        member('1', 'a', 'train', signer=1),
-        member('2', 'b', 'test', signer=1),
-        member('3', 'c', 'train', signer=1),
-        member('4', 'd', 'train', signer=2),
-    ]
-    assert train_gloss_sets(members, 'signer_id', exclude={'3'}) == {1: {'a'}, 2: {'d'}}
+    frame = instances([
+        ('1', 'a', 'train', 1, 'w'),
+        ('2', 'b', 'test', 1, 'x'),
+        ('3', 'c', 'train', 1, 'y'),
+        ('4', 'd', 'train', 2, 'z'),
+    ])
+    assert train_gloss_sets(frame, 'signer_id', exclude={'3'}) == {1: {'a'}, 2: {'d'}}
 
 
-def test_copies_and_cross_pairs_come_from_exact_groups() -> None:
-    rep = report([member('1', 'a', 'train'), member('2', 'b', 'test'), member('3', 'c', 'val')])
-    assert train_copy_glosses(rep) == {'1': set(), '2': {'a'}, '3': {'a'}}
-    assert cross_gloss_pairs(rep) == {frozenset('ab'), frozenset('ac'), frozenset('bc')}
+def test_copies_and_cross_pairs_come_from_identical_clips() -> None:
+    frame = instances([
+        ('1', 'a', 'train', 1, 'x'),
+        ('2', 'b', 'test', 1, 'x'),
+        ('3', 'c', 'val', 1, 'x'),
+        ('4', 'd', 'train', 1, 'y'),
+    ])
+    assert train_copy_glosses(frame) == {'2': {'a'}, '3': {'a'}}
+    assert cross_gloss_pairs(frame) == {frozenset('ab'), frozenset('ac'), frozenset('bc')}
 
 
 def test_other_signer_confusions_ignore_the_rows_own_signer() -> None:

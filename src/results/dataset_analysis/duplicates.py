@@ -1,27 +1,39 @@
-"""Find WLASL clips that are byte-identical copies of each other, and how they fall across
-glosses and sets: for `duplicate_clips.ipynb` (the dataset) and
-`error_analysis/duplicate_accuracy.ipynb` (their effect on a model).
+"""Find WLASL clips that are copies of each other, and how they fall across glosses and sets: for
+`duplicate_clips.ipynb` (the dataset), `error_analysis/duplicate_accuracy.ipynb` and
+`error_analysis/signer_shortcut.py` (their effect on a model).
 
 The supplied clips are cut per instance (see `src/info/WLASL_info.md`), so a duplicate is one
 video file filed under two `video_id`s. WLASL files many signs under several glosses, and
 sometimes under the same gloss in two sets, so a copy is a label conflict (different glosses) or
-a train/test leak (same gloss, different sets). Only exact copies are found: a re-encode of the
-same video hashes differently.
+a train/test leak (same gloss, different sets).
+
+Exact copies are found by MD5 (`MD5_STASH`), which a re-encode of the same video escapes. The
+near-duplicate search at the end (per-frame perceptual hashes, `find_near_duplicates`) is
+unfinished: it recovers every exact copy but can't yet tell a trimmed copy from another sign by
+the same signer in the same session. Findings: `near_duplicates.md`.
+
+Run from the repo root, `python -m src.results.dataset_analysis.duplicates` runs
+`find_near_duplicates` on the stashed hashes.
 """
 
 import hashlib
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from itertools import combinations
 from pathlib import Path
 from typing import Literal, TypeVar, cast
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+from scipy.fft import dctn
+from tqdm import tqdm
 
-from src.run_types import SPLIT_DIR
+from src.results import load_json, stash_json
+from src.run_types import RAW_DIR, SPLIT_DIR
+from src.utils import cv_load
 
 TWIN_COLUMNS = ["has_twin", "twin_other_gloss", "twin_other_set", "twin_same_gloss_other_set"]
 
@@ -31,15 +43,20 @@ def clip_md5(video_path: Path) -> str:
     return hashlib.md5(video_path.read_bytes()).hexdigest()
 
 
+def _clip_paths(raw_dir: Path, video_ids: list[str]) -> list[Path]:
+    """Each video's file in `raw_dir` (`<video_id>.<ext>`)."""
+    return [next(raw_dir.glob(f"{video_id}.*")) for video_id in video_ids]
+
+
 def hash_clips(raw_dir: Path, video_ids: Iterable[str], workers: int = 8) -> dict[str, str]:
     """MD5 of each video file in `raw_dir` (`<video_id>.<ext>`), keyed by `video_id`."""
     ids = list(video_ids)
-    paths = [next(raw_dir.glob(f"{video_id}.*")) for video_id in ids]
     with ThreadPoolExecutor(workers) as pool:
-        return dict(zip(ids, pool.map(clip_md5, paths)))
+        return dict(zip(ids, pool.map(clip_md5, _clip_paths(raw_dir, ids))))
 
 
-MD5_STASH = Path(__file__).parent / "stashed_results" / "clip_md5.json"
+STASH_DIR = Path(__file__).parent / "stashed_results"
+MD5_STASH = STASH_DIR / "clip_md5.json"
 """`hash_clips` of every WLASL-2000 clip, keyed by `video_id`."""
 
 
@@ -169,7 +186,7 @@ def flag_twins_by_set(instances: pd.DataFrame) -> pd.DataFrame:
       instance with the same clip, and the same / a different gloss, is in that set.
     - One per `TWIN_KINDS` key, relative to the instance's own set: `repeat` (same gloss, same
       set), `leak` (same gloss, other set), `conflict_same_set` and `conflict_other_set` (a
-      different gloss). An instance in a group of 3+ can have several.
+      different gloss). An instance of a clip with 3+ copies can have several.
 
     As for `flag_twins`, twins are only looked for within `instances`.
     """
@@ -228,15 +245,15 @@ def group_pairs(pairs: Iterable[tuple[T, T]]) -> list[list[T]]:
     return sorted((sorted(g) for g in groups.values()), key=lambda g: (-len(g), g))
 
 
-def copy_groups(flagged: pd.DataFrame) -> pd.DataFrame:
-    """One row per clip with more than one copy (a group), indexed by `md5`.
+def duplicated_clips(flagged: pd.DataFrame) -> pd.DataFrame:
+    """One row per clip with more than one copy, indexed by `md5`.
 
     `flagged` is `flag_twins` output. Columns: `copies`, `glosses` (distinct glosses among the
     copies), `gloss` (those glosses, ` / `-joined), `video_ids` (`, `-joined) and the copies in
     each of `SETS`.
     """
     twins = flagged[flagged.has_twin]
-    groups = cast(
+    clips = cast(
         pd.DataFrame,
         twins.groupby("md5").agg(
             copies=("video_id", "size"),
@@ -246,21 +263,21 @@ def copy_groups(flagged: pd.DataFrame) -> pd.DataFrame:
         ),
     )
     per_set = pd.crosstab(twins.md5, twins.set).reindex(columns=list(SETS), fill_value=0)
-    return groups.join(per_set)
+    return clips.join(per_set)
 
 
-def add_gloss_clusters(groups: pd.DataFrame) -> pd.DataFrame:
-    """`copy_groups` output with each group's gloss cluster.
+def add_gloss_clusters(clips: pd.DataFrame) -> pd.DataFrame:
+    """`duplicated_clips` output with each clip's gloss cluster.
 
     Glosses are in one cluster when any clip is filed under both, so a cluster is a connected
     component and can chain: `a / b` on one clip and `b / c` on another make `a / b / c`, though
     no clip has all three. Added columns: `cluster` (its glosses, ` / `-joined), `cluster_glosses`
     (how many) and `whole_cluster` (the clip is filed under every gloss of its cluster).
     """
-    glosses = [g.split(" / ") for g in groups.gloss]
+    glosses = [g.split(" / ") for g in clips.gloss]
     clusters = group_pairs((g[0], other) for g in glosses for other in g)
     cluster_of = {gloss: c for c in clusters for gloss in c}
-    out = groups.copy()
+    out = clips.copy()
     out["cluster"] = [" / ".join(cluster_of[g[0]]) for g in glosses]
     out["cluster_glosses"] = [len(cluster_of[g[0]]) for g in glosses]
     out["whole_cluster"] = out.glosses == out.cluster_glosses
@@ -376,3 +393,197 @@ def merge_signs(instances: pd.DataFrame, min_shared: int) -> pd.Series:
         index=instances.index,
         name="sign",
     )
+
+
+# Near duplicates: per-frame perceptual hashes. See `near_duplicates.md` for the method, results
+# and why the verifier isn't good enough yet.
+
+PHASH_STASH = STASH_DIR / "asl2000_frame_phash_results.json"
+"""`hash_videos` of every WLASL-2000 clip, keyed by `video_id` (gitignored: about 27 MB and 36
+min to rebuild with `stash_phashes`)."""
+
+Hashes = npt.NDArray[np.uint64]
+HashIndex = dict[int, list[str]]  # frame hash -> video_ids containing it
+
+
+def _area_matrix(n_in: int, n_out: int) -> np.ndarray:
+    """(n_out, n_in) matrix; row i holds the fractional coverage of each input pixel by output bin
+    i, normalised to sum to 1."""
+    edges = np.linspace(0, n_in, n_out + 1)
+    lo, hi = edges[:-1, None], edges[1:, None]
+    px = np.arange(n_in)[None, :]
+    overlap = np.clip(np.minimum(hi, px + 1) - np.maximum(lo, px), 0, None)
+    return (overlap / (n_in / n_out)).astype(np.float32)
+
+
+def _resize_area(grey: np.ndarray, size: int) -> np.ndarray:
+    """Batched area resize of T x H x W to T x `size` x `size` (float32)."""
+    _, h, w = grey.shape
+    return _area_matrix(h, size) @ grey @ _area_matrix(w, size).T
+
+
+def _prep_frames(frames: np.ndarray, size: int = 64, canon: int = 256) -> np.ndarray:
+    """T x H x W x C frames to T x `size` x `size` greyscale: area-resized to `canon` first, so
+    every clip goes through the same shape, then block-averaged (`canon % size` must be 0)."""
+    grey = _resize_area(frames.mean(axis=-1, dtype=np.float32), canon)
+    q = canon // size
+    small = grey.reshape(grey.shape[0], size, q, size, q).mean(axis=(2, 4))
+    return np.rint(small).astype(np.uint8)
+
+
+def frame_phashes(frames: np.ndarray, hash_size: int = 8) -> Hashes:
+    """A 64-bit pHash of each frame of a T x H x W x C clip: the `hash_size` x `hash_size`
+    low-frequency DCT corner of the 64 px greyscale frame, thresholded at its median."""
+    dcts = cast(np.ndarray, dctn(_prep_frames(frames).astype(np.float32), axes=(1, 2)))
+    low = dcts[:, :hash_size, :hash_size]
+    bits = (low > np.median(low, axis=(1, 2), keepdims=True)).reshape(len(low), -1)
+    return np.packbits(bits, axis=-1).view(np.uint64).squeeze(axis=-1)
+
+
+def _clip_phashes(video_path: Path) -> Hashes:
+    return frame_phashes(cv_load(video_path, 0, 0, all=True))
+
+
+def hash_videos(
+    raw_dir: Path, video_ids: Iterable[str], workers: int | None = None
+) -> dict[str, Hashes]:
+    """`frame_phashes` of each video file in `raw_dir`, keyed by `video_id` (decoded in parallel)."""
+    ids = list(video_ids)
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        hashes = pool.map(_clip_phashes, _clip_paths(raw_dir, ids), chunksize=16)
+        return dict(tqdm(zip(ids, hashes, strict=True), total=len(ids), desc="Hashing"))
+
+
+def stash_phashes(raw_dir: Path = RAW_DIR) -> Path:
+    """Hash every WLASL-2000 clip into `PHASH_STASH`."""
+    hashes = hash_videos(raw_dir, load_instances("asl2000").video_id)
+    return stash_json({v: list(map(int, h)) for v, h in hashes.items()}, PHASH_STASH)
+
+
+def load_phashes() -> dict[str, Hashes]:
+    """`PHASH_STASH`, as arrays."""
+    raw: dict[str, list[int]] = load_json(PHASH_STASH)
+    return {v: np.asarray(h, dtype=np.uint64) for v, h in raw.items()}
+
+
+def align_hashes(a: Hashes, b: Hashes, min_overlap: int | None = None) -> tuple[float, int]:
+    """Mean per-frame Hamming distance between two clips' hashes, minimised over temporal offsets.
+
+    Offset k lines frame j of `b` up with frame j + k of `a`: k > 0 means `b` starts k frames into
+    `a`, k < 0 that `b` has -k extra frames first. Offsets overlapping fewer than `min_overlap`
+    frames (default half the shorter clip) are skipped.
+
+    Returns:
+        (best mean distance, its offset k)
+    """
+    n1, n2 = len(a), len(b)
+    if min_overlap is None:
+        min_overlap = max(1, min(n1, n2) // 2)
+    best_dist, best_k = float("inf"), 0
+    for k in range(min_overlap - n2, n1 - min_overlap + 1):
+        a0, b0 = max(k, 0), max(-k, 0)
+        overlap = min(n1 - a0, n2 - b0)
+        dist = float(np.bitwise_count(a[a0 : a0 + overlap] ^ b[b0 : b0 + overlap]).mean())
+        if dist < best_dist:
+            best_dist, best_k = dist, k
+    return best_dist, best_k
+
+
+def build_hash_index(hash_sets: dict[str, set[int]]) -> HashIndex:
+    """Index each video once under every distinct frame hash it contains."""
+    index: HashIndex = defaultdict(list)
+    for vid, hashes in hash_sets.items():
+        for h in hashes:
+            index[h].append(vid)
+    return index
+
+
+def stoplist(index: HashIndex, max_videos: int) -> tuple[HashIndex, HashIndex]:
+    """Split into (kept, dropped): dropped buckets hold more than `max_videos` videos.
+
+    Single-video buckets can't form a pair, so they are discarded and appear in neither.
+    """
+    kept: HashIndex = {}
+    dropped: HashIndex = {}
+    for h, vids in index.items():
+        if len(vids) > max_videos:
+            dropped[h] = vids
+        elif len(vids) > 1:
+            kept[h] = vids
+    return kept, dropped
+
+
+def count_shared(index: HashIndex) -> Counter[tuple[str, str]]:
+    """(a, b) with a < b -> number of distinct hashes the two videos share."""
+    shared: Counter[tuple[str, str]] = Counter()
+    for vids in index.values():
+        shared.update(combinations(sorted(vids), 2))
+    return shared
+
+
+def candidates(
+    shared: Counter[tuple[str, str]], hash_sets: dict[str, set[int]], min_frac: float
+) -> dict[tuple[str, str], float]:
+    """Pairs sharing at least `min_frac` of the smaller video's distinct hashes, with that fraction.
+
+    `hash_sets` must be every video's full set of distinct hashes: taking the denominator from the
+    stop-listed index would shrink it and inflate the fraction.
+    """
+    fracs = {
+        (a, b): n / min(len(hash_sets[a]), len(hash_sets[b])) for (a, b), n in shared.items()
+    }
+    return {pair: f for pair, f in fracs.items() if f >= min_frac}
+
+
+def verify(
+    pairs: Iterable[tuple[str, str]], hashes: dict[str, Hashes], max_dist: float
+) -> dict[tuple[str, str], tuple[float, int]]:
+    """Pairs whose `align_hashes` distance is at most `max_dist`, so a pair is judged on all its
+    overlapping frames, not just the hashes it shares.
+
+    Returns:
+        (a, b) -> (mean distance, offset k: frame j of b lines up with frame j + k of a)
+    """
+    out: dict[tuple[str, str], tuple[float, int]] = {}
+    for a, b in pairs:
+        dist, k = align_hashes(hashes[a], hashes[b])
+        if dist <= max_dist:
+            out[a, b] = (dist, k)
+    return out
+
+
+def find_near_duplicates(
+    hashes: dict[str, Hashes], max_vids: int = 50, min_frac: float = 0.5, max_dist: float = 2.0
+) -> dict[tuple[str, str], tuple[float, int]]:
+    """Verified pairs (`verify`) among the candidates (`candidates` on the `stoplist`-ed index),
+    printing the count at each stage and the recall on the exact copies.
+
+    Every candidate found so far is a different sign by the same signer: see `near_duplicates.md`.
+    """
+    hash_sets = {v: set(map(int, h)) for v, h in hashes.items()}
+    kept, dropped = stoplist(build_hash_index(hash_sets), max_vids)
+    print(
+        f"Videos: {len(hashes)}; kept buckets: {len(kept)}; dropped (> {max_vids} videos): "
+        f"{len(dropped)}, sizes {sorted((len(v) for v in dropped.values()), reverse=True)[:10]}"
+    )
+    shared = count_shared(kept)
+    cands = candidates(shared, hash_sets, min_frac)
+    print(f"Pairs sharing a hash: {len(shared)}; candidates (frac >= {min_frac}): {len(cands)}")
+
+    verified = verify(cands, hashes, max_dist)
+    groups = group_pairs(verified)
+    print(
+        f"Verified pairs (mean dist <= {max_dist}): {len(verified)}; groups: {len(groups)}, "
+        f"sizes {Counter(len(g) for g in groups).most_common()}"
+    )
+    pairs = twin_pairs(load_instances("asl2000"))
+    exact = {(a, b) for a, b in zip(pairs.video_id, pairs.video_id_twin) if a < b}
+    group_of = {v: i for i, g in enumerate(groups) for v in g}
+    found = sum(group_of.get(a, -1) == group_of.get(b, -2) for a, b in exact)
+    print(f"Recall on exact pairs: {found}/{len(exact)}")
+    print(f"Verified pairs that aren't exact copies: {len(set(verified) - exact)}")
+    return verified
+
+
+if __name__ == "__main__":
+    find_near_duplicates(load_phashes())

@@ -1,6 +1,7 @@
 # Near-duplicate search with per-frame perceptual hashes
 
-Findings from [`find_dups.py`](find_dups.py) on WLASL-2000, run on 2026-11-02. The question: are
+Findings from the near-duplicate search in [`duplicates.py`](duplicates.py) (`find_near_duplicates`;
+then `find_dups.py`, merged into it on 2026-11-04) on WLASL-2000, run on 2026-11-02. The question: are
 there copies of the same clip that are *not* byte-identical (re-encoded, trimmed or cropped), beyond
 the exact copies described in [`WLASL_info.md`](../../info/WLASL_info.md#duplicate-clips)?
 
@@ -14,7 +15,7 @@ before this search can say anything about trimmed copies.
 1. **Hash.** Each frame is greyscaled, area-resized to 256 then 64 px, and turned into a 64-bit
    pHash: the 8×8 low-frequency DCT corner, thresholded at its median. All 21,095 videos took 36 min
    on the local machine (stashed as `stashed_results/asl2000_frame_phash_results.json`, which is
-   gitignored; rebuild it with `stash_hashes(ASL2000_STUB, asl2000_video_ids())`).
+   gitignored; rebuild it with `stash_phashes()`).
 2. **Candidates (blocking).** Each video becomes its set of distinct frame hashes. Index hash →
    videos, drop hashes shared by more than 50 videos (stop-list), count the hashes each pair shares,
    and keep pairs where `shared / min(set sizes) >= 0.5`.
@@ -38,14 +39,14 @@ hashes did worse and were dropped.
 | Verified (≤ 2 bits) | 2,260 pairs in 945 groups, including groups of 141, 54, 22 and 11 |
 | Recall on the old `exact` pairs | **1,301 / 1,301** |
 | Recall on the old `near` pairs | 45 / 670 |
-| Verified pairs not in the old report | 940 |
+| Verified pairs that aren't exact copies | 959 (940 also leaving out the old `near` pairs) |
 
 The candidate and verification steps take about 6 s once the hashes are stashed.
 
 ### The old `near` groups are false positives
 
-`near` is the second kind in [`find_duplicates.py`](find_duplicates.py)'s report
-(`stashed_results/duplicates_asl2000.json`), from 16×16 thumbnails of same-length clips. Of its 670
+`near` was the second kind in `find_duplicates.py`'s report (`stashed_results/duplicates_asl2000.json`;
+both removed on 2026-11-04, last in commit `9291980`), from 16×16 thumbnails of same-length clips. Of its 670
 pairs:
 
 - 100% have the same signer, and only 2% the same gloss (e.g. *milk*/*think*, *peaceful*/*rubber*);
@@ -54,7 +55,7 @@ pairs:
 
 So they are different signs from one session, which the thumbnails averaged together. This does
 not affect the thesis: [`duplicate_accuracy.ipynb`](../error_analysis/duplicate_accuracy.ipynb) and
-`signer_shortcut.py` use `exact` groups only.
+`signer_shortcut.py` use exact (MD5) copies only.
 
 ### The new pairs are false positives too
 
@@ -87,7 +88,7 @@ identical, but nothing in the hash separates a trimmed copy from a different sig
   |diff| > 25, maximised over frames: re-encoding noise is small and spread out, while a different
   sign gives large, concentrated changes around the hands.
 - **Candidate recall is unmeasured.** There are no confirmed trimmed copies to test the
-  hash-sharing step against. Synthetic trims and crops of real clips (as in `compare_hashes`) are the
+  hash-sharing step against. Synthetic trims and crops of real clips (as in `find_dups.compare_hashes`, commit `9291980`) are the
   fallback.
 - **Spatial crops.** Not tested yet; a crop changes the DCT basis, so it may need a hash on a
   centre region or a finer grid.

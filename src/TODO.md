@@ -103,11 +103,10 @@ Misc TODOs:
   twin in train/val. Decide how the final results treat them (drop the conflicted instances from
   test, merge the glosses, or report both), and whether the train copies should be removed.
   Near-duplicates (re-encodes, trims) are not found by the MD5 hashing. Per-frame pHashes
-  (`results/dataset_analysis/find_dups.py`, findings in `near_duplicates.md` beside it, 2026-11-02)
-  recover all exact copies but can't separate same-session signs: add a pixel-level verifier for
-  the candidates. The old `near` groups in `find_duplicates.py` are false positives: drop or fix
-  that kind when the two analyses are merged (below). Compare the conflicting gloss pairs with the Boston University revised
-  labels (the item above).
+  (`find_near_duplicates` in `results/dataset_analysis/duplicates.py`, findings in
+  `near_duplicates.md` beside it, 2026-11-02) recover all exact copies but can't separate
+  same-session signs: add a pixel-level verifier for the candidates. Compare the conflicting gloss
+  pairs with the Boston University revised labels (the item above).
 - **Cleaned dataset with variation-level classes (feasibility in
   `results/dataset_analysis/custom_dataset_feasibility.ipynb`).** Needs: a reviewed merge list (338
   class pairs share 2+ clips), a re-split rule, a per-dataset class list in place of the global
@@ -133,15 +132,6 @@ Misc TODOs:
   (about 6 days for 20 trials). Optional GPU work for stronger thesis numbers: the sweep-1 best config on
   asl300 (about 16 h, initialised from trial `5mzfq88e`'s checkpoint), then asl1000 and asl2000.
   Clear the stale sweep (`510lhysg`, 20/20) in `src/que/state/Server.json` when the next one is set.
-- **Two duplicate-clip modules (as of 2026-11-03).** `duplicate_clips.ipynb` (the dataset) and
-  `error_analysis/duplicate_accuracy.ipynb` (the model) now both use `results/dataset_analysis/duplicates.py`
-  (MD5 copies; the same 900 groups as `find_duplicates.py`'s `exact` kind). `error_analysis/signer_shortcut.py`
-  (with its notebook and `tests/results/test_signer_shortcut.py`) still reads `find_duplicates.py`'s
-  `stashed_results/duplicates_asl2000.json`; move it to `duplicates.py`, then retire
-  `find_duplicates.py` and its stash (`find_dups.py`'s `known_pairs` reads it too). Luke
-  (2026-11-04): merge `find_duplicates.py`, `find_dups.py` and `duplicates.py` into one module,
-  dropping unused or deprecated code. `duplicates.py` still says "group" (`copy_groups`, its
-  docstrings) where `duplicate_clips.ipynb` now says "clip"; align the terms in the merge.
 - Experiment tracking for Que_v2 (agreed 2026-10-22: build this rather than revive the v1 Que
   for it). Que_v2 only schedules; results live in each run's `run.json` (a `CompExpInfo`,
   written by `train_and_test.py` / `sweep_trial.py`) under `src/runs/`. `results/sweeping/helpers.py`

@@ -19,7 +19,7 @@ import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import logsumexp
 
-from src.results.dataset_analysis.find_duplicates import Member, Report
+from src.results.dataset_analysis.duplicates import twin_pairs
 from src.run_types import InstanceTopK
 
 BoolArray = npt.NDArray[np.bool_]
@@ -29,65 +29,61 @@ GlossSets: TypeAlias = Mapping[int | str, set[str]]  # signer id or source -> tr
 
 
 def train_gloss_sets(
-    members: Iterable[Member], key: Literal['signer_id', 'source'], exclude: Iterable[str] = ()
+    instances: pd.DataFrame, key: Literal['signer_id', 'source'], exclude: Iterable[str] = ()
 ) -> dict[int | str, set[str]]:
     """Map each value of `key` (`signer_id` or `source`) to the glosses it has a training video of,
-    skipping the video ids in `exclude`."""
-    skip = set(exclude)
+    skipping the video ids in `exclude`. `instances` is `duplicates.load_instances` output."""
+    train = instances[(instances['set'] == 'train') & ~instances['video_id'].isin(list(exclude))]
     sets: defaultdict[int | str, set[str]] = defaultdict(set)
-    for m in members:
-        if m.set == 'train' and m.video_id not in skip:
-            sets[getattr(m, key)].add(m.gloss)
+    for k, gloss in zip(train[key], train['gloss'], strict=True):
+        sets[k].add(gloss)
     return dict(sets)
 
 
-def train_copy_glosses(report: Report) -> dict[str, set[str]]:
-    """Glosses of each video's identical training copies (exact duplicates only, itself excluded)."""
+def train_copy_glosses(instances: pd.DataFrame) -> dict[str, set[str]]:
+    """Glosses of each video's identical training copies (itself excluded), for the videos that
+    have one. `instances` is `duplicates.load_instances` output."""
+    pairs = twin_pairs(instances)
+    in_train = pairs[pairs['set_twin'] == 'train']
     copies: defaultdict[str, set[str]] = defaultdict(set)
-    for group in report.groups:
-        if group.kind != 'exact':
-            continue
-        for member in group.members:
-            copies[member.video_id] |= {
-                m.gloss for m in group.members if m.set == 'train' and m.video_id != member.video_id
-            }
+    for video_id, gloss in zip(in_train['video_id'], in_train['gloss_twin'], strict=True):
+        copies[video_id].add(gloss)
     return dict(copies)
 
 
-def cross_gloss_pairs(report: Report) -> set[frozenset[str]]:
+def cross_gloss_pairs(instances: pd.DataFrame) -> set[frozenset[str]]:
     """Gloss pairs filed on an identical video anywhere in the dataset: the same sign under two
-    glosses, so a confusion between them isn't evidence of a shortcut."""
-    pairs: set[frozenset[str]] = set()
-    for group in report.groups:
-        if group.kind != 'exact':
-            continue
-        glosses = sorted({m.gloss for m in group.members})
-        pairs |= {frozenset((a, b)) for i, a in enumerate(glosses) for b in glosses[i + 1:]}
-    return pairs
+    glosses, so a confusion between them isn't evidence of a shortcut. `instances` is
+    `duplicates.load_instances` output."""
+    pairs = twin_pairs(instances)
+    other = pairs[~pairs['same_gloss']]
+    return {frozenset(p) for p in zip(other['gloss'], other['gloss_twin'], strict=True)}
 
 
 def prediction_table(
     predictions: Sequence[InstanceTopK],
-    members: Mapping[str, Member],
+    instances: pd.DataFrame,
     classes: Sequence[str],
     copies: Mapping[str, set[str]],
     top_n: int = 5,
 ) -> pd.DataFrame:
-    """One row per prediction: the test video's signer, source and variation, its true and
-    predicted gloss, `copy_pred` (the prediction is the gloss of one of its identical training
-    copies), `has_train_copy` and its `top_n` predicted glosses."""
+    """One row per prediction: the test video's signer, source and variation (from `instances`,
+    `duplicates.load_instances` output), its true and predicted gloss, `copy_pred` (the prediction
+    is the gloss of one of its identical training copies), `has_train_copy` and its `top_n`
+    predicted glosses."""
+    by_id = instances.set_index('video_id')
     rows: list[dict[str, object]] = []
     for p in predictions:
-        m = members[p.video_id]
+        m = by_id.loc[p.video_id]
         gloss = classes[p.target]
-        assert gloss == m.gloss, f'{p.video_id}: prediction target {gloss} but split says {m.gloss}'
+        assert gloss == m['gloss'], f"{p.video_id}: prediction target {gloss} but split says {m['gloss']}"
         top = [classes[i] for i in p.topk_idxs[:top_n]]
         train_copies = copies.get(p.video_id, set())
         rows.append({
             'video_id': p.video_id,
-            'signer': m.signer_id,
-            'source': m.source,
-            'variation': m.variation_id,
+            'signer': m['signer_id'],
+            'source': m['source'],
+            'variation': m['variation_id'],
             'gloss': gloss,
             'predicted': top[0],
             'top1': top[0] == gloss,
