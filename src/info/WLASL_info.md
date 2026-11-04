@@ -149,7 +149,8 @@ Some clips are byte-identical copies of each other, filed under different `video
 `duplicates.py` beside it, hashes stashed in its `stashed_results/clip_md5.json`). Exact copies
 only, so this is a lower bound: a re-encode of the same video is not found.
 
-* 1985 instances (9.4%) are one of 900 groups of identical clips (745 pairs, up to 5 copies).
+* 1985 instances (9.4%) are one of 900 groups of identical clips (745 pairs, up to 5 copies);
+  keeping one instance per group would remove 1085 (5.1%).
 * 1877 are a **label conflict**: the same clip under two or more glosses (846 clips, mostly
   synonyms such as `doctor` / `physician`). 849 of the 2000 glosses are in one. Glosses linked by
   shared clips form 329 clusters, 219 of them pairs; the largest (12 glosses, `ago` / `past`
