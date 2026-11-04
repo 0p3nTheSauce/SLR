@@ -388,6 +388,7 @@ def plot_stacked_bar_chart(
     value_fmt: str = COUNT_FMT,
     label_color: str = "white",
     min_label_frac: float = 0.03,
+    small_labels_beside: bool = False,
     ax=None,
 ):
     """
@@ -412,6 +413,10 @@ def plot_stacked_bar_chart(
         stacked bar have their value label omitted, since it wouldn't fit
         within the segment (e.g. a small split's bars are much shorter than
         the largest split's when several splits share one y-axis).
+    small_labels_beside: instead of omitting those labels, draw them to the
+        right of the bar in the segment's colour, nudged apart vertically so
+        adjacent small segments' labels don't overlap. Zero segments stay
+        unlabelled. Leave room right of the last bar (e.g. a narrower `width`).
     """
     categories = np.asarray(x).tolist()
     n = len(categories)
@@ -436,13 +441,16 @@ def plot_stacked_bar_chart(
     totals = sum(all_values.values())
     label_threshold = min_label_frac * totals.max() #type: ignore
 
+    beside: list[list[tuple[float, float, str]]] = [[] for _ in range(n)]  # per bar: (y, value, colour)
     for i, name in enumerate(series_names):
         label = legend_labels.get(name, name) if legend_labels else name
         values = all_values[name]
         container = ax.bar(x_pos, values, width, bottom=bottoms, label=label, color=palette[i])
         if show_values:
-            for bar, val, bot in zip(container, values, bottoms):
+            for j, (bar, val, bot) in enumerate(zip(container, values, bottoms)):
                 if val < label_threshold:
+                    if small_labels_beside and val > 0:
+                        beside[j].append((bot + val / 2, val, palette[i]))
                     continue
                 ax.text(
                     bar.get_x() + bar.get_width() / 2,
@@ -455,6 +463,17 @@ def plot_stacked_bar_chart(
                     fontweight="bold",
                 )
         bottoms += values
+
+    min_gap = 0.07 * float(totals.max())  # type: ignore  # about one 9 pt line on a typical panel
+    for j, labels in enumerate(beside):
+        floor = -np.inf
+        for y, val, colour in labels:  # bottom to top, as stacked
+            y = max(y, floor + min_gap)
+            floor = y
+            ax.text(
+                x_pos[j] + width / 2 + 0.04, y, value_fmt % val,
+                ha="left", va="center", fontsize=9, color=colour, fontweight="bold",
+            )
 
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     if xlabel:
@@ -729,7 +748,8 @@ def plot_correlation_bars(
 
     names: one row each, top to bottom in the given order (sort first, e.g. by |tau|).
         Underscores are replaced for the cmr10 font, except in names holding mathtext (`$`),
-        e.g. `$T_{warmup}$`, which are drawn as given.
+        e.g. `$T_{warmup}$`, which are drawn as given. An empty name with NaN values is a blank,
+        tickless row, e.g. to separate groups of rows.
     correlations: series name -> values aligned to `names`, on a fixed [-1, 1] axis. A NaN leaves
         a gap (e.g. a parameter that sweep fixed). One series is coloured by sign
         (`CORR_NEGATIVE_COLOR` below zero, so for a loss green means higher values went with lower
@@ -785,7 +805,8 @@ def plot_correlation_bars(
     ax.axvline(0, color="black", linewidth=0.8)
     ax.set_xlim(-1, 1)
     ax.set_xlabel(xlabel)
-    ax.set_yticks(np.arange(len(labels)), labels)
+    named = [i for i, label in enumerate(labels) if label]
+    ax.set_yticks(named, [labels[i] for i in named])
     ax.set_ylim(len(labels) - 0.5, -0.5)  # first row on top
     ax.grid(axis="x", linestyle="--", alpha=0.3)
 
@@ -800,14 +821,22 @@ def plot_correlation_bars(
                 label=rf"$p \geq {alpha:g}$",
             ),
         ]
+    if title:
+        ax.set_title(title)
     if handles and legend_loc == "below":
-        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
-    elif handles and legend_loc is not None:
+        # Lay out first, then hang the legend just under the x label's measured extent; another
+        # tight_layout would resize the axes and move the label away from it.
+        fig.tight_layout()
+        fig.draw_without_rendering()  # places the x label, which is otherwise only done on draw
+        x_axis = ax.xaxis.get_tightbbox()
+        assert x_axis is not None
+        bottom = x_axis.transformed(ax.transAxes.inverted()).y0
+        ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, bottom), borderaxespad=0.2, ncol=2)
+        return fig, ax
+    if handles and legend_loc is not None:
         ax.legend(handles=handles, loc=legend_loc)
     elif handles:
         ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(1.02, 1), borderaxespad=0.0)
-    if title:
-        ax.set_title(title)
     fig.tight_layout()
     return fig, ax
 
