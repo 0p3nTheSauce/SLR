@@ -158,11 +158,14 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
   [src/que/README.md](src/que/README.md).
 - `runs/` — Training run output directory (checkpoints/logs per run, organised by split), as
   documented in the README.
-- `results/` — Experiment outputs, one subdir per paper/venue/analysis. `satnac_2026` and
-  `aug_comparison` are the reference examples of current convention:
+- `results/` — Experiment outputs, one subdir per paper/venue/analysis. `satnac_2026`,
+  `error_analysis` and `aug_comparison` are the reference examples of current convention:
   - `satnac_2025` / `satnac_2025_refactor` — SATNAC 2025 result JSONs, notebooks, benchmark
     scripts (`_refactor` is the newer version).
   - `satnac_2026` — per-model TOML configs + results notebook (reference).
+  - `error_analysis` — error analyses of one WLASL-2000 model, used by the SATNAC 2026 paper and
+    the thesis: F1 vs instance/signer counts, over/underachievers, all mispredictions of a gloss,
+    accuracy on duplicated clips, signer/source shortcut (reference).
   - `aug_comparison` — augmentation comparison notebook + helpers (reference).
   - `saicist` — per-instance analysis: correlation plots, over/underachiever JSONs, notebook.
   - `sacair_2026` — benchmark + results notebooks, CSV.
@@ -191,7 +194,7 @@ When bringing a notebook up to current convention:
 1. **Strict typing.** Ruff must report zero warnings on the notebook.
 2. **Fix broken code.** Before writing new code, check whether an equivalent notebook/script
    already exists elsewhere in `src/results` (e.g. `src/results/satnac_2026`,
-   `src/results/aug_comparison`, which represent the current working convention), and use it as
+   `src/results/error_analysis`, `src/results/aug_comparison`, which represent the current working convention), and use it as
    reference/example code rather than reinventing the fix from scratch.
 3. **Plan before implementing.** Since a convention likely already exists elsewhere in the
    repo, work out the approach first rather than writing new code immediately.

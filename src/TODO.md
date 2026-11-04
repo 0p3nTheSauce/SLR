@@ -1,6 +1,6 @@
 Misc TODOs:
-- The S3D comparison (`S3D_cs9lwmiy_s42`, asl2000) of the satnac_2026 error analyses was run on
-  2026-10-30 by executing `correlation_f1`, `eda_performers`, `duplicate_accuracy` and
+- The S3D comparison (`S3D_cs9lwmiy_s42`, asl2000) of the error analyses (`results/error_analysis`)
+  was run on 2026-10-30 by executing `correlation_f1`, `eda_performers`, `duplicate_accuracy` and
   `signer_shortcut` with S3D's parameters substituted (documented in each Setup cell); the
   committed notebooks show job 4. If the thesis keeps both, give the notebooks a run list instead.
 - Idea (Luke, 2026-10-30): ensemble the best S3D sweep trial (sweep 7, `u8yashg8`: `cs9lwmiy`)
@@ -30,7 +30,7 @@ Misc TODOs:
 - `visualise2.plot_frame_grid` now exists as the convention-following (returns `(fig, axes)`,
   saved via `save_fig`) replacement for the legacy `utils.plt_display_grid` (which saves
   directly via its own `output` param, and doesn't mkdir the parent dir first -- unlike
-  `save_fig`). `src/results/satnac_2026/eda_performers.ipynb` and `visualise2.FrameVisualiser`
+  `save_fig`). `src/results/error_analysis/eda_performers.ipynb` and `visualise2.FrameVisualiser`
   have been migrated; still on the old `utils.plt_display_grid` directly:
   `src/results/dataset_analysis/view_dataset_by_admin_info.ipynb`,
   `src/results/augmentation_demos/{autoaugment,cropping_norms,randaugment}.ipynb`,
@@ -134,8 +134,8 @@ Misc TODOs:
   asl300 (about 16 h, initialised from trial `5mzfq88e`'s checkpoint), then asl1000 and asl2000.
   Clear the stale sweep (`510lhysg`, 20/20) in `src/que/state/Server.json` when the next one is set.
 - **Two duplicate-clip modules (as of 2026-11-03).** `duplicate_clips.ipynb` (the dataset) and
-  `satnac_2026/duplicate_accuracy.ipynb` (the model) now both use `results/dataset_analysis/duplicates.py`
-  (MD5 copies; the same 900 groups as `find_duplicates.py`'s `exact` kind). `satnac_2026/signer_shortcut.py`
+  `error_analysis/duplicate_accuracy.ipynb` (the model) now both use `results/dataset_analysis/duplicates.py`
+  (MD5 copies; the same 900 groups as `find_duplicates.py`'s `exact` kind). `error_analysis/signer_shortcut.py`
   (with its notebook and `tests/results/test_signer_shortcut.py`) still reads `find_duplicates.py`'s
   `stashed_results/duplicates_asl2000.json`; move it to `duplicates.py`, then retire
   `find_duplicates.py` and its stash (`find_dups.py`'s `known_pairs` reads it too). Luke

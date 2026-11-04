@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from src.results.dataset_analysis.find_duplicates import DuplicateGroup, Member, Report
-from src.results.satnac_2026.signer_shortcut import (
+from src.results.error_analysis.signer_shortcut import (
     GlossSets,
     candidate_features,
     conditional_logit,

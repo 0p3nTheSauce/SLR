@@ -1,6 +1,6 @@
 """Find WLASL clips that are byte-identical copies of each other, and how they fall across
 glosses and sets: for `duplicate_clips.ipynb` (the dataset) and
-`satnac_2026/duplicate_accuracy.ipynb` (their effect on a model).
+`error_analysis/duplicate_accuracy.ipynb` (their effect on a model).
 
 The supplied clips are cut per instance (see `src/info/WLASL_info.md`), so a duplicate is one
 video file filed under two `video_id`s. WLASL files many signs under several glosses, and

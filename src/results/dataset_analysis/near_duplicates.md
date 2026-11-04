@@ -53,7 +53,7 @@ pairs:
 - their aligned raw-pixel mean |difference| is 4–7, well above a re-encode (see below).
 
 So they are different signs from one session, which the thumbnails averaged together. This does
-not affect the thesis: [`duplicate_accuracy.ipynb`](../satnac_2026/duplicate_accuracy.ipynb) and
+not affect the thesis: [`duplicate_accuracy.ipynb`](../error_analysis/duplicate_accuracy.ipynb) and
 `signer_shortcut.py` use `exact` groups only.
 
 ### The new pairs are false positives too

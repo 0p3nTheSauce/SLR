@@ -104,7 +104,7 @@ WLASL is labelled by English gloss, and the gloss-to-sign mapping isn't one-to-o
   byte-identical copies filed under both `before` and `past`, and every one of those `before`
   copies is variation 0 (`results/dataset_analysis/duplicate_clips.ipynb`, checked 2026-11-04).
   `former` has no exact copy, so the duplicate analysis does not link it; its link is test video
-  05735, labelled `before` but signing `former` (`results/satnac_2026/all_misspredictions.ipynb`).
+  05735, labelled `before` but signing `former` (`results/error_analysis/all_misspredictions.ipynb`).
 * **A known WLASL problem.** Neidle and colleagues at Boston University show that WLASL
   sometimes files one sign under several glosses and several signs under one gloss
   ([Neidle & Ballard 2022][asllrp21]; [Neidle et al. 2022][lrec22]), and have published
@@ -113,7 +113,7 @@ WLASL is labelled by English gloss, and the gloss-to-sign mapping isn't one-to-o
   signs".
 
 What this looks like in our data (asl2000_cutoff_9 labels and MViTv2_S exp000's stashed test
-predictions, `results/satnac_2026/all_misspredictions.ipynb`; checked 2026-10-05):
+predictions, `results/error_analysis/all_misspredictions.ipynb`; checked 2026-10-05):
 
 | Gloss | Train / val / test instances | Variations |
 |---|---|---|
@@ -169,7 +169,7 @@ only, so this is a lower bound: a re-encode of the same video is not found.
   `aslpro` and `asldeafined`, with the same id pairs recurring), so those sources' signer ids are
   unreliable. Checked 2026-11-03 in `duplicate_clips.ipynb`.
 * Effect on the results (job 4's final `MViTv2_S_16x4_e` model, WLASL-2000, 2026-11-03, in
-  [`duplicate_accuracy.ipynb`](../results/satnac_2026/duplicate_accuracy.ipynb)): all 147 test
+  [`duplicate_accuracy.ipynb`](../results/error_analysis/duplicate_accuracy.ipynb)): all 147 test
   instances whose only training copies carry another gloss are predicted as that gloss. Glosses in
   a conflict have a mean test F1 of 0.27 against 0.58 for glosses with no copy, which holds within
   training-signer bins, and the share of a gloss in a conflict correlates with F1 more strongly

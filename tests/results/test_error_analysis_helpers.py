@@ -2,7 +2,7 @@ import pytest
 import torch
 
 from src.preprocess import Instance
-from src.results.satnac_2026.helpers import VariationStepper, find_video
+from src.results.error_analysis.helpers import VariationStepper, find_video
 
 
 def _fetched(video_id: str, variation_id: int) -> tuple[Instance, torch.Tensor]:
