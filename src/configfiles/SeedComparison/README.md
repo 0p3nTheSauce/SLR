@@ -8,6 +8,7 @@ told apart by `admin.config_path`.
 |-----------|-----------|---------------|---------------|--------------|---------------|--------|
 | 13idpda6  | asl100    | [S3D sweep 4](../sweeps/S3D/exp004/)   | 75.581395     | 0.976105     | 0.936 | [S3D_13idpda6.toml](./S3D_13idpda6.toml) |
 | czopef0v  | asl100_cutoff_9 | [S3D sweep 5](../sweeps/S3D/exp005/) | 64.341085 | 1.460382 | 1.186 | [S3D_czopef0v.toml](./S3D_czopef0v.toml) |
+| woitlmw6  | asl100    | [MViTv2_S_e sweep 2](../sweeps/MViTv2_S_e/exp000/) | 82.945736 | 0.772853 | 0.574 | [MViTv2_S_e_woitlmw6.toml](./MViTv2_S_e_woitlmw6.toml) |
 
 - `13idpda6` was the best `S3D` model by test average loss. It ran on the old `asl100` split,
   but its seed runs use `asl100_cutoff_9`. Its 10 seeds give a best val loss of 0.880 ± 0.039
@@ -17,6 +18,10 @@ told apart by `admin.config_path`.
   lucky seed. Its 10 seeds give a best val loss of 1.193 ± 0.074, so the original trial (1.186)
   was typical, not lucky. Sweep 6's best trial (1.264) is within 1 seed std of that mean,
   though, so the large-`eps` regime isn't clearly better.
+- `woitlmw6` is the best trial (by best val loss) of `MViTv2_S_e` sweep 2 (`flx99idx`, Que_v2
+  job 55), on the corrected 0-based `asl100`, unlike the S3D ones. Queued 2026-11-05 as Que_v2
+  group `seedcmp-MViTv2_S_e`, after the thesis's final chain of the same config
+  ([MViTv2_S_e_woitlmw6.toml](../thesis_final/MViTv2_S_e_woitlmw6.toml)); results to come.
 
 Seed figures are from [suggest_sweep.ipynb](../../results/sweeping/suggest_sweep.ipynb), as of
 2026-10-02.
