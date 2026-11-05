@@ -9,6 +9,12 @@ Misc TODOs:
   That script ranks within one sweep, so it needs a variant taking explicit runs. Check both
   checkpoints were trained and are tested on the same split and class indexing (sweeps 0-1 ran on
   the 1-indexed `asl100_cutoff_9`, sweep 2 on the corrected `asl100`).
+- S3D sweep 7 (`u8yashg8`, which the thesis's S3D finals `S3D_cs9lwmiy.toml` come from) ran with
+  `eta_min = 0` and no hold, the technicality MViTv2_S_e sweep 2 (`flx99idx`) was rerun to fix.
+  The finals' 43-epoch cap is harmless (every stage peaked at epochs 36-38, and the LR is held at
+  0 after 43), but the sweep itself never searched with a training tail. Luke (2026-11-05): a
+  limitation in the thesis for now, not queued; if there's GPU time after the thesis, rerun the
+  sweep on the corrected `asl100` with a small positive `eta_min` and `hold_after_tmax`, as sweep 2.
 - Before e0c4521 (2026-10-18), a run that reached `max_epoch` between resume saves (every 5 epochs)
   kept a stale newest checkpoint, so `full_test` recorded `best_val_loss`/`best_val_acc` from up to
   4 epochs before the end (test/val accuracies are unaffected: they come from `best.pth`). Find
