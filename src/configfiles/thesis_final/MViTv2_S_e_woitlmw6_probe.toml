@@ -1,0 +1,82 @@
+# Probe (5 Nov 2026, thesis Limitations): does sweep 2's config (MViTv2_S_e_woitlmw6.toml) learn on
+# the corrected asl1000 trained directly from K400, where sweep 1's didn't (Que_v2 job 8, chance
+# for 4 epochs)? The same config except max_epoch 5, so the run stops after 5 epochs of the
+# same warmup; only the val loss/accuracy per epoch matter. Queued once, after the chain and before
+# the seed comparison:
+#   que2 submit base train model=MViTv2_S_e split=asl1000 seed=42 --priority 15 \
+#     config=src/configfiles/thesis_final/MViTv2_S_e_woitlmw6_probe.toml
+
+[training]
+batch_size = 2
+update_per_step = 4
+max_epoch = 5
+
+[optimizer]
+eps = 3e-06
+backbone_init_lr = 0.00023116002288704412
+backbone_weight_decay = 0.0523421572232225
+classifier_init_lr = 0.00020605381091671305
+classifier_weight_decay = 0.0001
+
+[model_params]
+drop_p = 0.4420840493890998
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 3, type = "chunked" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.4
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 3
+magnitude = 13
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 27
+eta_min = 1e-06
+hold_after_tmax = true
+
+[scheduler.warm_up]
+start_factor = 0.1
+end_factor = 1.0
+warmup_epochs = 5
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
