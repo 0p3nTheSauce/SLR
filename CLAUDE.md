@@ -173,6 +173,8 @@ gloss called `empty`, split/set naming, what preprocessing changed) and
     the method, environment, coverage, summary and full tables in one file.
   - `stats` — dataset-stat notebooks.
   - `augmentation_demos` — illustrative notebooks, one per augmentation type.
+  - `chained_vs_direct` — validation accuracy per epoch of MViTv2-S trained directly from K400
+    vs chained from the previous split (asl300, asl1000), for the thesis's transfer ablation.
   - `seed_comparison` — variance of one config across 10 seeds (see
     `configfiles/SeedComparison/`).
   - `sweeping` — `suggest_sweep.ipynb`: compares wandb sweeps' Que trials and suggests the next
