@@ -21,12 +21,13 @@ def _unsqueeze(
 
 
 class MViTv2S_basic(nn.Module):
-    def __init__(self, num_classes=100, drop_p=0.5, weights_path=None):
+    def __init__(self, num_classes=100, drop_p=0.5, weights_path=None, pretrained: bool = True):
+        """`pretrained=False` builds the backbone with torchvision's random init instead of K400."""
         super().__init__()
         self.num_classes = num_classes
         self.drop_p = drop_p
 
-        mvitv2s = mvit_v2_s(MViT_V2_S_Weights.KINETICS400_V1)
+        mvitv2s = mvit_v2_s(weights=MViT_V2_S_Weights.KINETICS400_V1 if pretrained else None)
 
         self.backbone = nn.ModuleList(
             [  # stored in module list for parameter groups
@@ -88,8 +89,12 @@ class MViTv2S_basic(nn.Module):
         return x
 
 class MViTv2S_extended(MViTv2S_basic):
-    def __init__(self, num_classes=100, drop_p=0.5, weights_path=None, num_frames=32):
-        super().__init__(num_classes=num_classes, drop_p=drop_p, weights_path=weights_path)
+    def __init__(
+        self, num_classes=100, drop_p=0.5, weights_path=None, num_frames=32, pretrained: bool = True
+    ):
+        super().__init__(
+            num_classes=num_classes, drop_p=drop_p, weights_path=weights_path, pretrained=pretrained
+        )
         # After building/loading the model, interpolate temporal pos embed
         self._adapt_pos_encoding(num_frames=num_frames)
 

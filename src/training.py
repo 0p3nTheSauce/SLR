@@ -753,7 +753,7 @@ def train_loop(
             final_classes=num_classes,
         )
     else:
-        model = get_model(model_name, num_classes, drop_p)
+        model = get_model(model_name, num_classes, drop_p, config.model_params.pretrained)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)

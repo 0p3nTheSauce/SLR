@@ -330,6 +330,7 @@ class DataInfo(BaseModel):
     strict_size: bool = True  # from config
     target_length: int | None = None
     frame_size: int | None = None
+    crop_to_person: bool = False  # crop every set's clips to a square around the person bbox
 
     @model_validator(mode="after")
     def check_frame_strat(self) -> DataInfo:
@@ -426,6 +427,7 @@ class OptimizerInfo(BaseModel):
 
 class ModelClassifierInfo(BaseModel):
     drop_p: float | None = None
+    pretrained: bool = True  # False: random init (see `models.get_model` for which models allow it)
 
 
 class WarmUpSched(BaseModel):

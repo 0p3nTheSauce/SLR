@@ -669,6 +669,29 @@ def _crop_frames(frames: Tensor, item: Instance):
 	return crop_frames(frames, item.bbox)
 
 
+def square_around(bbox: list[int], height: int, width: int) -> list[int]:
+	"""The smallest square containing `bbox`, centred on it and shifted to lie inside the frame.
+
+	Its side is capped at the frame's shorter side, so a box wider or taller than that is cut.
+	"""
+	x1, y1, x2, y2 = bbox
+	side = min(max(x2 - x1, y2 - y1), height, width)
+	left = min(max(round((x1 + x2 - side) / 2), 0), width - side)
+	top = min(max(round((y1 + y2 - side) / 2), 0), height - side)
+	return [left, top, left + side, top + side]
+
+
+def crop_to_person(frames: Tensor, item: Instance, size: int = 256) -> Tensor:
+	"""Crop clip frames (T, C, H, W) to a square around the person bbox, resized to `size` square.
+
+	The square keeps the signer's aspect ratio; resizing back to the clips' 256 px leaves the
+	usual spatial augmentations (e.g. `Centre_crop` 224) working unchanged afterwards.
+	"""
+	_, _, height, width = frames.shape
+	cropped = crop_frames(frames, square_around(item.bbox, height, width))
+	return v2.functional.resize(cropped, [size, size], antialias=True)
+
+
 def resize_by_diag(frames: Tensor, bbox: list[int], target_diag: int):
 	"""
 	Resize frame so person bounding box diagonal equals target_diagonal

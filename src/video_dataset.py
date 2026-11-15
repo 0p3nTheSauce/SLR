@@ -32,6 +32,7 @@ from src.run_types import (
 from src.utils import load_rgb_frames_from_video
 from src.video_transforms import (
     # correct_num_frames,
+    crop_to_person,
     get_transform,
 )
 
@@ -290,7 +291,8 @@ def get_data_set(
 
     Args:
         set_info (DataSetInfo): location information
-        data_info (DataInfo): transforms
+        data_info (DataInfo): transforms. With `crop_to_person`, every clip is first cropped to
+            its person bbox (`crop_to_person`), unless `item_transforms` is passed.
 
     Raises:
         ValueError: If no augmentation provided
@@ -298,6 +300,8 @@ def get_data_set(
     Returns:
         tuple[VideoDataset, list[int] | None, float | None]: dataset, perm, sh_e
     """
+    if data_info.crop_to_person:
+        kwargs.setdefault("item_transforms", crop_to_person)
 
     aug_info = (
         data_info.train_augs if set_info["set_name"] == "train" else data_info.test_augs

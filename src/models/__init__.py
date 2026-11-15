@@ -54,16 +54,21 @@ model_names = [
 ]
 
 
-def get_model(model_name: str, num_classes: int, drop_p: float | None) -> torch.nn.Module:
+def get_model(
+    model_name: str, num_classes: int, drop_p: float | None, pretrained: bool = True
+) -> torch.nn.Module:
     """Get model by name.
 
     Args:
         model_name (str): One of S3D, R3D_18, R(2+1)D_18, Swin3D_T, Swin3D_S, Swin3D_B, MViTv2_S, MViTv1_B, MViTv2_S_e, MViTv2_S_16x4, MViTv2_B_32x3, MVirTed_t
         num_classes (int): Number of output classes.
         drop_p (float): Dropout in final classification layer.
+        pretrained (bool): Start from Kinetics-400 weights. Only the torchvision MViTv2-S models
+            (`MViTv2_S`, `MViTv2_S_e`) can be built without them.
 
     Raises:
-            ValueError: If model_name is not recognized.
+            ValueError: If model_name is not recognized, or `pretrained` is False for a model
+                that always loads its pretrained weights.
 
     Returns:
             torch.nn.Module: Model instance
@@ -91,6 +96,13 @@ def get_model(model_name: str, num_classes: int, drop_p: float | None) -> torch.
     if model_name not in model_constructors_dp and model_name not in model_constructors_opdp:
         raise ValueError(
             f"Model {model_name} not recognized. Available models: {list(model_constructors_dp.keys()) + list(model_constructors_opdp.keys())}"
+        )
+
+    if not pretrained:
+        if model_name not in (MViTv2_S, MViTv2_S_e):
+            raise ValueError(f"Model {model_name} can't be built without pretrained weights")
+        return model_constructors_dp[model_name](
+            num_classes=num_classes, drop_p=drop_p, pretrained=False
         )
 
     if model_name in model_constructors_dp:
