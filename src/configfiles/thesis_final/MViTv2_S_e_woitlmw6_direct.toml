@@ -1,0 +1,83 @@
+# Chained vs direct on the thesis final configuration (16 Nov 2026, thesis msg; Luke approved): sweep
+# 2's MViTv2_S_e_woitlmw6.toml verbatim (max_epoch 50, patience 15), but trained on the corrected
+# asl1000 directly from K400, seed 42, to compare with the chain's asl1000 stage (Que_v2 job 77).
+# Its own file only so the run directory differs from job 77's (run_name = <config stem>_s<seed>).
+# The 5-epoch version is MViTv2_S_e_woitlmw6_probe.toml (job 89). Queued after the ablations and
+# ahead of the MViTv2-B rechain:
+#   que2 submit base train model=MViTv2_S_e split=asl1000 seed=42 --priority 5 \
+#     config=src/configfiles/thesis_final/MViTv2_S_e_woitlmw6_direct.toml
+
+[training]
+batch_size = 2
+update_per_step = 4
+max_epoch = 50
+
+[optimizer]
+eps = 3e-06
+backbone_init_lr = 0.00023116002288704412
+backbone_weight_decay = 0.0523421572232225
+classifier_init_lr = 0.00020605381091671305
+classifier_weight_decay = 0.0001
+
+[model_params]
+drop_p = 0.4420840493890998
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 3, type = "chunked" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.4
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 3
+magnitude = 13
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 27
+eta_min = 1e-06
+hold_after_tmax = true
+
+[scheduler.warm_up]
+start_factor = 0.1
+end_factor = 1.0
+warmup_epochs = 5
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
