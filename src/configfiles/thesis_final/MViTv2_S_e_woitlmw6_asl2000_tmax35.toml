@@ -1,0 +1,85 @@
+# asl2000 learning-rate/schedule check (17 Nov 2026, Luke asked): is woitlmw6, tuned on asl100,
+# held back on asl2000 by its schedule? woitlmw6 anneals over tmax 27 epochs after the 5 warm-up
+# epochs, then holds at eta_min 1e-6, so job 78 (asl2000 stage, 54.32 test top-1) barely moved after
+# about epoch 32. Each run here is woitlmw6 with max_epoch 40 and tmax 35 (the cosine fills the run),
+# chained from the same asl1000 checkpoint as job 78 (job 77), seed 42, on the corrected asl2000.
+# One seed each: test top-1 sampling error is about +-0.9 points on asl2000.
+#   que2 submit base train model=MViTv2_S_e split=asl2000 seed=42 --priority 0 \
+#     config=src/configfiles/thesis_final/<this file> \
+#     -w src/runs/asl1000/MViTv2_S_e/MViTv2_S_e_woitlmw6_s42/checkpoints/best.pth
+# Variant 1 of 3: schedule length only (eta_min 1e-6 and the LRs unchanged).
+
+[training]
+batch_size = 2
+update_per_step = 4
+max_epoch = 40
+
+[optimizer]
+eps = 3e-06
+backbone_init_lr = 0.00023116002288704412
+backbone_weight_decay = 0.0523421572232225
+classifier_init_lr = 0.00020605381091671305
+classifier_weight_decay = 0.0001
+
+[model_params]
+drop_p = 0.4420840493890998
+
+[data]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[data.train_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 3, type = "chunked" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[[data.train_augs.spatial_aug]]
+type = "HORIZONTAL_FLIP"
+p = 0.4
+
+[[data.train_augs.spatial_aug]]
+frame_size = 224
+type = "Centre_crop"
+
+[[data.train_augs.spatial_aug]]
+type = "RANDAUGMENT"
+num_ops = 3
+magnitude = 13
+num_magnitude_bins = 31
+interpolation = "bilinear"
+
+[data.test_augs]
+normalise = true
+temporal_aug = [
+    { target_length = 32, max_wobble = 0, type = "uniform" },
+]
+spatial_aug = [
+    { frame_size = 224, type = "Centre_crop" },
+]
+strict_size = true
+target_length = 32
+frame_size = 224
+
+[scheduler]
+type = "CosineAnnealingLR"
+tmax = 35
+eta_min = 1e-06
+hold_after_tmax = true
+
+[scheduler.warm_up]
+start_factor = 0.1
+end_factor = 1.0
+warmup_epochs = 5
+
+[stopping]
+type = "early_stopper"
+metric = "loss"
+phase = "val"
+mode = "min"
+patience = 15
+min_delta = 0.01
