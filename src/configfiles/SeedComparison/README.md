@@ -21,7 +21,9 @@ told apart by `admin.config_path`.
 - `woitlmw6` is the best trial (by best val loss) of `MViTv2_S_e` sweep 2 (`flx99idx`, Que_v2
   job 55), on the corrected 0-based `asl100`, unlike the S3D ones. Queued 2026-11-05 as Que_v2
   group `seedcmp-MViTv2_S_e`, after the thesis's final chain of the same config
-  ([MViTv2_S_e_woitlmw6.toml](../thesis_final/MViTv2_S_e_woitlmw6.toml)); results to come.
+  ([MViTv2_S_e_woitlmw6.toml](../thesis_final/MViTv2_S_e_woitlmw6.toml)). Its 10 seeds give
+  test top-1 81.20 ± 1.28 (S3D `13idpda6`: 73.72 ± 1.03) and test loss 0.817 ± 0.022; both are in
+  [seed_comparison](../../results/seed_comparison/results.ipynb).
 
 Seed figures are from [suggest_sweep.ipynb](../../results/sweeping/suggest_sweep.ipynb), as of
 2026-10-02.
