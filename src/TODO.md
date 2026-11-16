@@ -1,8 +1,12 @@
 Misc TODOs:
 - The S3D comparison (`S3D_cs9lwmiy_s42`, asl2000) of the error analyses (`results/error_analysis`)
   was run on 2026-10-30 by executing `correlation_f1`, `eda_performers`, `duplicate_accuracy` and
-  `signer_shortcut` with S3D's parameters substituted (documented in each Setup cell); the
-  committed notebooks show job 4. If the thesis keeps both, give the notebooks a run list instead.
+  `signer_shortcut` with S3D's parameters substituted (documented in each Setup cell). Since
+  2026-11-16 the committed `correlation_f1`, `eda_performers`, `duplicate_accuracy` and
+  `all_misspredictions` show the thesis's final model (sweep 2's chain, Que_v2 job 78,
+  `MViTv2_S_e_woitlmw6_s42`); job 4 (`signer_shortcut` still shows it) and S3D are documented
+  alternatives in the Setup cells, their figures kept under their own stubs. If the thesis keeps
+  several, give the notebooks a run list instead.
 - Idea (Luke, 2026-10-30): ensemble the best S3D sweep trial (sweep 7, `u8yashg8`: `cs9lwmiy`)
   with the best MViTv2-S sweep trial (sweep 1's `5mzfq88e`, or sweep 2's best once `flx99idx`
   finishes), averaging softmaxes as `results/sweeping/ensemble.py` does for one sweep's top trials.
