@@ -6,6 +6,11 @@
 # ahead of the MViTv2-B rechain:
 #   que2 submit base train model=MViTv2_S_e split=asl1000 seed=42 --priority 5 \
 #     config=src/configfiles/thesis_final/MViTv2_S_e_woitlmw6_direct.toml
+# Also run on the corrected asl2000 (21 Nov 2026, thesis msg; Luke: "pause job 95 for direct
+# asl2000"), to compare with the chain's asl2000 stage (job 78). Priority 10 preempts job 95, which
+# resumes from its last epoch afterwards:
+#   que2 submit base train model=MViTv2_S_e split=asl2000 seed=42 --priority 10 \
+#     config=src/configfiles/thesis_final/MViTv2_S_e_woitlmw6_direct.toml
 
 [training]
 batch_size = 2
